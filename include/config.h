@@ -3,7 +3,7 @@
 
 #define FW_MAJOR_VERSION 1
 #define FW_MINOR_VERSION 5
-#define FW_PATCH_VERSION 4
+#define FW_PATCH_VERSION 5
 
 #define LOG_MAX_NOTES_NUMBER 5
 
@@ -37,9 +37,9 @@
 
 enum API_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the API (in seconds)
 {
-    API_FIRST_RETRY = 5,
-    API_SECOND_RETRY = 10,
-    API_THIRD_RETRY = 30
+    API_FIRST_RETRY = 15,
+    API_SECOND_RETRY = 30,
+    API_THIRD_RETRY = 60
 };
 
 enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi-Fi (in seconds)
@@ -55,6 +55,14 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #elif defined(BOARD_WAVESHARE_ESP32_DRIVER)
 #define PIN_RESET 25
 #define PIN_INTERRUPT 16
+#define FAKE_BATTERY_VOLTAGE
+#elif defined(BOARD_SEEED_XIAO_ESP32C3)
+#define PIN_INTERRUPT 9
+#define PIN_RESET 9
+#define FAKE_BATTERY_VOLTAGE
+#elif defined(BOARD_SEEED_XIAO_ESP32S3)
+#define PIN_INTERRUPT 0
+#define PIN_RESET 0
 #define FAKE_BATTERY_VOLTAGE
 #endif
 

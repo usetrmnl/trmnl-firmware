@@ -62,8 +62,25 @@
    #define EPD_DC_PIN   27
    #define EPD_BUSY_PIN 25
 
+#elif defined(BOARD_SEEED_XIAO_ESP32C3)
+   // Pin definition for Seeed XIAO ESP32C3 Board
+   #define EPD_SCK_PIN  8
+   #define EPD_MOSI_PIN 10
+   #define EPD_CS_PIN   3
+   #define EPD_RST_PIN  2
+   #define EPD_DC_PIN   5
+   #define EPD_BUSY_PIN 4
+
+#elif defined(BOARD_SEEED_XIAO_ESP32S3)
+   // Pin definition for Seeed XIAO ESP32S3 Board
+   #define EPD_SCK_PIN  7
+   #define EPD_MOSI_PIN 9
+   #define EPD_CS_PIN   2
+   #define EPD_RST_PIN  1
+   #define EPD_DC_PIN   4
+   #define EPD_BUSY_PIN 3
 #else
-   #error "Board type not defined. Please define BOARD_WAVESHARE_ESP32_DRIVER or BOARD_TRMNL in platformio.ini build_flags."
+   #error "Board type not defined. Please define BOARD_WAVESHARE_ESP32_DRIVER or BOARD_TRMNL or BOARD_SEEED_XIAO_ESP32C3 or BOARD_SEEED_XIAO_ESP32S3 in platformio.ini build_flags."
 #endif
 
 #define GPIO_PIN_SET   1

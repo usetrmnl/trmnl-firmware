@@ -34,6 +34,8 @@
   static SPIClass * display_spi = new SPIClass(HSPI);
 #elif CONFIG_IDF_TARGET_ESP32C3
   static SPIClass * display_spi = new SPIClass(FSPI);
+#elif CONFIG_IDF_TARGET_ESP32S3
+  static SPIClass * display_spi = new SPIClass(FSPI);
 #else
   #error "Unsupported ESP32 target"
 #endif

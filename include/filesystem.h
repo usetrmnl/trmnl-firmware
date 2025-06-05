@@ -54,3 +54,5 @@ bool filesystem_file_delete(const char *name);
  * @return result - true if success; false - if failed
  */
 bool filesystem_file_rename(const char *old_name, const char *new_name);
+
+void list_files();
