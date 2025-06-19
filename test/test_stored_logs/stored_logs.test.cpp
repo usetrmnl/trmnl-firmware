@@ -10,7 +10,8 @@ StoredLogs subject(3, "log_", "log_head", persistence);
 void test_stores_string(void)
 {
   TEST_ASSERT_EQUAL(0, persistence.size());
-  subject.store_log("asdf");
+  LogStoreResult result = subject.store_log("asdf");
+  TEST_ASSERT_EQUAL(LogStoreResult::SUCCESS, result.status);
   TEST_ASSERT_EQUAL(1, persistence.size());
   String s = subject.gather_stored_logs();
   TEST_ASSERT_EQUAL_STRING("asdf", s.c_str());
@@ -21,9 +22,12 @@ void test_stores_string(void)
 void test_stores_several_strings()
 {
   TEST_ASSERT_EQUAL(0, persistence.size());
-  subject.store_log("asdf");
-  subject.store_log("qwer");
-  subject.store_log("zxcv");
+  LogStoreResult result1 = subject.store_log("asdf");
+  LogStoreResult result2 = subject.store_log("qwer");
+  LogStoreResult result3 = subject.store_log("zxcv");
+  TEST_ASSERT_EQUAL(LogStoreResult::SUCCESS, result1.status);
+  TEST_ASSERT_EQUAL(LogStoreResult::SUCCESS, result2.status);
+  TEST_ASSERT_EQUAL(LogStoreResult::SUCCESS, result3.status);
   TEST_ASSERT_EQUAL(3, persistence.size());
   String s = subject.gather_stored_logs();
   TEST_ASSERT_EQUAL_STRING("asdf,qwer,zxcv", s.c_str());
@@ -35,13 +39,17 @@ void test_circular_buffer_overwrites_oldest()
 {
   TEST_ASSERT_EQUAL(0, persistence.size());
 
-  subject.store_log("log1");
-  subject.store_log("log2");
-  subject.store_log("log3");
+  LogStoreResult result1 = subject.store_log("log1");
+  LogStoreResult result2 = subject.store_log("log2");
+  LogStoreResult result3 = subject.store_log("log3");
+  TEST_ASSERT_EQUAL(LogStoreResult::SUCCESS, result1.status);
+  TEST_ASSERT_EQUAL(LogStoreResult::SUCCESS, result2.status);
+  TEST_ASSERT_EQUAL(LogStoreResult::SUCCESS, result3.status);
 
   TEST_ASSERT_EQUAL(3, persistence.size());
 
-  subject.store_log("log4");
+  LogStoreResult result4 = subject.store_log("log4");
+  TEST_ASSERT_EQUAL(LogStoreResult::SUCCESS, result4.status);
 
   // Should now be 4 total (3 logs + head pointer)
   TEST_ASSERT_EQUAL(4, persistence.size());
@@ -56,6 +64,28 @@ void test_circular_buffer_overwrites_oldest()
   TEST_ASSERT_EQUAL(1, persistence.size());
 }
 
+void test_overwrite_counter()
+{
+  TEST_ASSERT_EQUAL(0, subject.get_overwrite_count());
+
+  // Fill all slots
+  subject.store_log("log1");
+  subject.store_log("log2");
+  subject.store_log("log3");
+  TEST_ASSERT_EQUAL(0, subject.get_overwrite_count());
+
+  // Now start overwriting
+  subject.store_log("log4");
+  TEST_ASSERT_EQUAL(1, subject.get_overwrite_count());
+
+  subject.store_log("log5");
+  TEST_ASSERT_EQUAL(2, subject.get_overwrite_count());
+
+  // Clear should reset counter
+  subject.clear_stored_logs();
+  TEST_ASSERT_EQUAL(0, subject.get_overwrite_count());
+}
+
 void setUp(void) {}
 
 void tearDown(void) {}
@@ -66,6 +96,7 @@ void process()
   RUN_TEST(test_stores_string);
   RUN_TEST(test_stores_several_strings);
   RUN_TEST(test_circular_buffer_overwrites_oldest);
+  RUN_TEST(test_overwrite_counter);
   UNITY_END();
 }
 

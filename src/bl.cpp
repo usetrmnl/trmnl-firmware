@@ -1932,7 +1932,11 @@ static void submitOrSaveLogString(const char *log_buffer, size_t size)
   {
     Log_info("Was unable to send log to API; saving locally for later.");
     // log not send
-    storedLogs.store_log(String(log_buffer));
+    LogStoreResult store_result = storedLogs.store_log(String(log_buffer));
+    if (store_result.status != LogStoreResult::SUCCESS)
+    {
+      Log_error("Failed to store log: %s", store_result.message);
+    }
   }
 }
 
