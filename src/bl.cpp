@@ -570,6 +570,12 @@ static https_request_err_e downloadAndShow()
   apiHostname.replace("https://", "");
   apiHostname.replace("http://", "");
   apiHostname.replace("/", "");
+
+  int colon = apiHostname.indexOf(':');
+  if (colon != -1) {
+    apiHostname = apiHostname.substring(0, colon);
+  }
+
   for (int attempt = 1; attempt <= 5; ++attempt)
   {
     if (WiFi.hostByName(apiHostname.c_str(), serverIP) == 1)
