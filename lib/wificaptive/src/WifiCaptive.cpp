@@ -52,10 +52,10 @@ bool WifiCaptive::startPortal()
             {
                 _resetcallback(); // @CALLBACK
             } },
-        .setConnectionCredentials = [this](const String ssid, const String password, const String api_server)
+        .setConnectionCredentials = [this](const WifiCredentials credentials, const String api_server)
         {
-            _ssid = ssid;
-            _password = password;
+            _ssid = credentials.ssid;
+            _password = credentials.pswd;
             _api_server = api_server; },
         .getAnnotatedNetworks = [this](bool runScan)
         {
@@ -86,10 +86,11 @@ bool WifiCaptive::startPortal()
         }
         else
         {
-            bool res = connect(_ssid, _password) == WL_CONNECTED;
+            WifiCredentials credentials = {_ssid, _password};
+            bool res = connect(credentials) == WL_CONNECTED;
             if (res)
             {
-                saveWifiCredentials(_ssid, _password);
+                saveWifiCredentials(credentials);
                 saveApiServer(_api_server);
                 succesfullyConnected = true;
                 break;
@@ -154,14 +155,14 @@ void WifiCaptive::resetSettings()
     WiFi.disconnect(true, true);
 }
 
-uint8_t WifiCaptive::connect(String ssid, String pass)
+uint8_t WifiCaptive::connect(const WifiCredentials credentials)
 {
     uint8_t connRes = (uint8_t)WL_NO_SSID_AVAIL;
 
-    if (ssid != "")
+    if (credentials.ssid != "")
     {
         WiFi.enableSTA(true);
-        WiFi.begin(ssid.c_str(), pass.c_str());
+        WiFi.begin(credentials.ssid.c_str(), credentials.pswd.c_str());
         connRes = waitForConnectResult();
     }
 
@@ -227,14 +228,14 @@ void WifiCaptive::readWifiCredentials()
     preferences.end();
 }
 
-void WifiCaptive::saveWifiCredentials(String ssid, String pass)
+void WifiCaptive::saveWifiCredentials(const WifiCredentials credentials)
 {
-    Log_info("Saving wifi credentials: %s", ssid.c_str());
+    Log_info("Saving wifi credentials: %s", credentials.ssid.c_str());
 
     // Check if the credentials already exist
     for (u16_t i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
     {
-        if (_savedWifis[i].ssid == ssid && _savedWifis[i].pswd == pass)
+        if (_savedWifis[i].ssid == credentials.ssid && _savedWifis[i].pswd == credentials.pswd)
         {
             return; // Avoid saving duplicate networks
         }
@@ -245,7 +246,7 @@ void WifiCaptive::saveWifiCredentials(String ssid, String pass)
         _savedWifis[i] = _savedWifis[i - 1];
     }
 
-    _savedWifis[0] = {ssid, pass};
+    _savedWifis[0] = credentials;
 
     Preferences preferences;
     preferences.begin("wificaptive", false);
@@ -480,7 +481,7 @@ bool WifiCaptive::autoConnect()
         for (int attempt = 0; attempt < WIFI_CONNECTION_ATTEMPTS; attempt++)
         {
             Log_info("Attempt %d to connect to %s", attempt + 1, _savedWifis[last_used_index].ssid.c_str());
-            connect(_savedWifis[last_used_index].ssid, _savedWifis[last_used_index].pswd);
+            connect(_savedWifis[last_used_index]);
 
             // Check if connected
             if (WiFi.status() == WL_CONNECTED)
@@ -522,7 +523,7 @@ bool WifiCaptive::autoConnect()
         for (int attempt = 0; attempt < WIFI_CONNECTION_ATTEMPTS; attempt++)
         {
             Log_info("Attempt %d to connect to %s", attempt + 1, network.ssid.c_str());
-            connect(network.ssid, network.pswd);
+            connect(network);
 
             // Check if connected
             if (WiFi.status() == WL_CONNECTED)

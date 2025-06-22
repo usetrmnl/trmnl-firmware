@@ -46,11 +46,11 @@ private:
     WifiCredentials _savedWifis[WIFI_MAX_SAVED_CREDS];
 
     void setUpDNSServer(DNSServer &dnsServer, const IPAddress &localIP);
-    uint8_t connect(String ssid, String pass);
+    uint8_t connect(const WifiCredentials credentials);
     uint8_t waitForConnectResult(uint32_t timeout);
     uint8_t waitForConnectResult();
     void readWifiCredentials();
-    void saveWifiCredentials(String ssid, String pass);
+    void saveWifiCredentials(const WifiCredentials credentials);
     void saveLastUsedWifiIndex(int index);
     int readLastUsedWifiIndex();
     void saveApiServer(String url);

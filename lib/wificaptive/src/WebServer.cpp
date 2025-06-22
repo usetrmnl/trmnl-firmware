@@ -109,7 +109,7 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
 		String ssid = data["ssid"];
 		String pswd = data["pswd"];
         String api_server = data["server"];
-        callbacks.setConnectionCredentials(ssid, pswd, api_server);
+        callbacks.setConnectionCredentials({ssid, pswd}, api_server);
         String mac = WiFi.macAddress();
         String message = "{\"ssid\":\"" + ssid + "\",\"mac\":\"" + mac + "\"}";
         request->send(200, "application/json", message); });

@@ -12,7 +12,7 @@
 struct WifiOperationCallbacks
 {
     std::function<void()> resetSettings;
-    std::function<void(const String, const String, const String)> setConnectionCredentials;
+    std::function<void(const WifiCredentials, const String)> setConnectionCredentials;
     std::function<std::vector<Network>(bool)> getAnnotatedNetworks;
 };
 
