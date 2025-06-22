@@ -9,6 +9,7 @@
 #include "Preferences.h"
 #include "WifiCaptivePage.h"
 #include <ArduinoJson.h>
+#include "wifi-types.h"
 
 #define WIFI_SSID "TRMNL"
 #define WIFI_PASSWORD NULL
@@ -36,19 +37,6 @@
 class WifiCaptive
 {
 private:
-    struct WifiCredentials
-    {
-        String ssid;
-        String pswd;
-    };
-    struct Network
-    {
-        String ssid;
-        int32_t rssi;
-        bool open;
-        bool saved;
-    };
-
     DNSServer *_dnsServer;
     AsyncWebServer *_server;
     String _ssid = "";
@@ -69,9 +57,9 @@ private:
     void saveLastUsedWifiIndex(int index);
     int readLastUsedWifiIndex();
     void saveApiServer(String url);
-    std::vector<WifiCredentials> matchNetworks(std::vector<Network> &scanResults, WifiCaptive::WifiCredentials wifiCredentials[]);
+    std::vector<WifiCredentials> matchNetworks(std::vector<Network> &scanResults, WifiCredentials wifiCredentials[]);
     std::vector<Network> getScannedUniqueNetworks(bool runScan);
-    std::vector<Network> combineNetworks(std::vector<Network> &scanResults, WifiCaptive::WifiCredentials wifiCredentials[]);
+    std::vector<Network> combineNetworks(std::vector<Network> &scanResults, WifiCredentials wifiCredentials[]);
 
 public:
     /// @brief Starts WiFi configuration portal.
