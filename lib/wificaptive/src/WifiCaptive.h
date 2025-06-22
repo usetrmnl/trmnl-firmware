@@ -26,8 +26,6 @@
 #define WIFI_CONNECTION_ATTEMPTS 3
 // Define max connection timeout
 #define CONNECTION_TIMEOUT 15000
-// Local IP URL
-#define LocalIPURL "http://4.3.2.1"
 
 #define WIFI_SSID_KEY(i) ("wifi_" + String(i) + "_ssid").c_str()
 #define WIFI_PSWD_KEY(i) ("wifi_" + String(i) + "_pswd").c_str()
@@ -48,7 +46,6 @@ private:
     WifiCredentials _savedWifis[WIFI_MAX_SAVED_CREDS];
 
     void setUpDNSServer(DNSServer &dnsServer, const IPAddress &localIP);
-    void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP);
     uint8_t connect(String ssid, String pass);
     uint8_t waitForConnectResult(uint32_t timeout);
     uint8_t waitForConnectResult();
