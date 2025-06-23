@@ -57,6 +57,7 @@ private:
     std::vector<WifiCredentials> matchNetworks(std::vector<Network> &scanResults, WifiCredentials wifiCredentials[]);
     std::vector<Network> getScannedUniqueNetworks(bool runScan);
     std::vector<Network> combineNetworks(std::vector<Network> &scanResults, WifiCredentials wifiCredentials[]);
+    bool tryConnectWithRetries(const WifiCredentials creds, int last_used_index);
 
 public:
     /// @brief Starts WiFi configuration portal.

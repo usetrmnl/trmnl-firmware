@@ -468,7 +468,6 @@ bool WifiCaptive::autoConnect()
     Log_info("Trying to autoconnect to wifi...");
     readWifiCredentials();
 
-    // if last used network is available, try to connect to it
     int last_used_index = readLastUsedWifiIndex();
 
     if (_savedWifis[last_used_index].ssid != "")
@@ -478,32 +477,15 @@ bool WifiCaptive::autoConnect()
         WiFi.setMinSecurity(WIFI_AUTH_OPEN);
         WiFi.mode(WIFI_STA);
 
-        for (int attempt = 0; attempt < WIFI_CONNECTION_ATTEMPTS; attempt++)
+        if (tryConnectWithRetries(_savedWifis[last_used_index], last_used_index))
         {
-            Log_info("Attempt %d to connect to %s", attempt + 1, _savedWifis[last_used_index].ssid.c_str());
-            connect(_savedWifis[last_used_index]);
-
-            // Check if connected
-            if (WiFi.status() == WL_CONNECTED)
-            {
-                Log_info("Connected to %s", _savedWifis[last_used_index].ssid.c_str());
-                return true;
-            }
-            WiFi.disconnect();
-            
-            // Exponential backoff: 2s, 4s, 8s delays between attempts
-            if (attempt < WIFI_CONNECTION_ATTEMPTS - 1) {
-                uint32_t backoff_delay = 2000 * (1 << attempt); // 2^attempt * 2000ms
-                Log_info("Connection failed, waiting %d ms before retry...", backoff_delay);
-                delay(backoff_delay);
-            }
+            return true;
         }
     }
 
     Log_info("Last used network unavailable, scanning for known networks...");
     std::vector<Network> scanResults = getScannedUniqueNetworks(true);
     std::vector<WifiCredentials> sortedNetworks = matchNetworks(scanResults, _savedWifis);
-    // if no networks found, try to connect to saved wifis
     if (sortedNetworks.size() == 0)
     {
         Log_info("No matched networks found in scan, trying all saved networks...");
@@ -519,39 +501,48 @@ bool WifiCaptive::autoConnect()
         }
 
         Log_info("Trying to connect to saved network %s...", network.ssid.c_str());
-
-        for (int attempt = 0; attempt < WIFI_CONNECTION_ATTEMPTS; attempt++)
+        int found_index = -1;
+        for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
         {
-            Log_info("Attempt %d to connect to %s", attempt + 1, network.ssid.c_str());
-            connect(network);
-
-            // Check if connected
-            if (WiFi.status() == WL_CONNECTED)
+            if (_savedWifis[i].ssid == network.ssid)
             {
-                Log_info("Connected to %s", network.ssid.c_str());
-                // success! save the index of the last used network
-                for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
-                {
-                    if (_savedWifis[i].ssid == network.ssid)
-                    {
-                        saveLastUsedWifiIndex(i);
-                        break;
-                    }
-                }
-                return true;
+                found_index = i;
+                break;
             }
-            WiFi.disconnect();
-            
-            // Exponential backoff: 2s, 4s, 8s delays between attempts
-            if (attempt < WIFI_CONNECTION_ATTEMPTS - 1) {
-                uint32_t backoff_delay = 2000 * (1 << attempt); // 2^attempt * 2000ms
-                Log_info("Connection failed, waiting %d ms before retry...", backoff_delay);
-                delay(backoff_delay);
-            }
+        }
+        if (tryConnectWithRetries(network, found_index))
+        {
+            return true;
         }
     }
 
     Log_info("Failed to connect to any network");
+    return false;
+}
+
+bool WifiCaptive::tryConnectWithRetries(const WifiCredentials creds, int last_used_index)
+{
+    for (int attempt = 0; attempt < WIFI_CONNECTION_ATTEMPTS; attempt++)
+    {
+        Log_info("Attempt %d to connect to %s", attempt + 1, creds.ssid.c_str());
+        connect(creds);
+        if (WiFi.status() == WL_CONNECTED)
+        {
+            Log_info("Connected to %s", creds.ssid.c_str());
+            if (last_used_index >= 0)
+            {
+                saveLastUsedWifiIndex(last_used_index);
+            }
+            return true;
+        }
+        WiFi.disconnect();
+        if (attempt < WIFI_CONNECTION_ATTEMPTS - 1)
+        {
+            uint32_t backoff_delay = 2000 * (1 << attempt);
+            Log_info("Connection failed, waiting %d ms before retry...", backoff_delay);
+            delay(backoff_delay);
+        }
+    }
     return false;
 }
 
