@@ -553,6 +553,7 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   inputs.rssi = WiFi.RSSI();
   inputs.displayWidth = display_width();
   inputs.displayHeight = display_height();
+  inputs.model = DEVICE_MODEL;
   inputs.specialFunction = special_function;
 
   return inputs;
