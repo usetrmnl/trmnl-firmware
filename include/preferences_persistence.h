@@ -29,8 +29,6 @@ public:
 
   size_t writeBool(const char *key, const bool value) override;
 
-  void end() override;
-
   bool clear() override;
 
   bool remove(const char *key) override;

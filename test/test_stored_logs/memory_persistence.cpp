@@ -87,8 +87,6 @@ size_t MemoryPersistence::writeBool(const char *key, const bool value)
   return sizeof(bool);
 }
 
-void MemoryPersistence::end() {}
-
 bool MemoryPersistence::clear()
 {
   storage.clear();

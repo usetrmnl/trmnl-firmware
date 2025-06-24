@@ -25,8 +25,6 @@ public:
 
   virtual size_t writeBool(const char *key, const bool value) = 0;
 
-  virtual void end() = 0;
-
   virtual bool clear() = 0;
 
   virtual bool remove(const char *key) = 0;

@@ -50,11 +50,6 @@ size_t PreferencesPersistence::writeBool(const char *key, const bool value)
   return _preferences.putBool(key, value);
 }
 
-void PreferencesPersistence::end()
-{
-  return _preferences.end();
-}
-
 bool PreferencesPersistence::clear()
 {
   return _preferences.clear();

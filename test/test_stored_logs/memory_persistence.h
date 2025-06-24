@@ -16,7 +16,6 @@ public:
   size_t writeUChar(const char *key, const uint8_t value) override;
   bool readBool(const char *key, const bool defaultValue) override;
   size_t writeBool(const char *key, const bool value) override;
-  void end() override;
   bool clear() override;
   bool remove(const char *key) override;
 
