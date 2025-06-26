@@ -180,7 +180,7 @@ void bl_init(void)
       {
       case SF_IDENTIFY:
       {
-        Log.info("%s [%d]: Identify special function...It will be handled while API ping...\r\n", __FILE__, __LINE__);
+        Log.info("%s [%d]: Identify special function...It will be handled with API ping...\r\n", __FILE__, __LINE__);
       }
       break;
       case SF_SLEEP:
@@ -197,7 +197,7 @@ void bl_init(void)
       break;
       case SF_RESTART_PLAYLIST:
       {
-        Log.info("%s [%d]: Identify special function...It will be handled while API ping...\r\n", __FILE__, __LINE__);
+        Log.info("%s [%d]: Restart Playlist special function...It will be handled with API ping...\r\n", __FILE__, __LINE__);
       }
       break;
       case SF_REWIND:
@@ -207,7 +207,12 @@ void bl_init(void)
       break;
       case SF_SEND_TO_ME:
       {
-        Log.info("%s [%d]: Send to me special function...It will be handled while API ping...\r\n", __FILE__, __LINE__);
+        Log.info("%s [%d]: Send to me special function...It will be handled with API ping...\r\n", __FILE__, __LINE__);
+      }
+      break;
+      case SF_GUEST_MODE:
+      {
+        Log.info("%s [%d]: Guest Mode special function...It will be handled with API ping...\r\n", __FILE__, __LINE__);
       }
       break;
       default:
@@ -1227,7 +1232,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
         }
         else
         {
-          Log.error("%s [%d]: identify failed\r\n", __FILE__, __LINE__);
+          Log.error("%s [%d]: Restart playlist failed\r\n", __FILE__, __LINE__);
         }
       }
       break;
@@ -1378,6 +1383,70 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
         else
         {
           Log.error("%s [%d]: send_to_me failed\r\n", __FILE__, __LINE__);
+        }
+      }
+      break;
+      case SF_GUEST_MODE:
+      {
+        String action = apiResponse.action;
+        if (action.equals("guest_mode"))
+        {
+          Log.info("%s [%d]:Guest Mode success\r\n", __FILE__, __LINE__);
+          String image_url = apiResponse.image_url;
+          if (image_url.length() > 0)
+          {
+            Log.info("%s [%d]: image_url: %s\r\n", __FILE__, __LINE__, image_url.c_str());
+            Log.info("%s [%d]: image url end with: %d\r\n", __FILE__, __LINE__, image_url.endsWith("/setup-logo.bmp"));
+
+            image_url.toCharArray(filename, image_url.length() + 1);
+            // check if plugin is applied
+            bool flag = preferences.getBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
+            Log.info("%s [%d]: flag: %d\r\n", __FILE__, __LINE__, flag);
+
+            if (apiResponse.filename == "empty_state")
+            {
+              Log.info("%s [%d]: End with empty_state\r\n", __FILE__, __LINE__);
+              if (!flag)
+              {
+                // draw received logo
+                status = true;
+                // set flag to true
+                if (preferences.getBool(PREFERENCES_DEVICE_REGISTERED_KEY, false) != true) // check the flag to avoid the re-writing
+                {
+                  bool res = preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, true);
+                  if (res)
+                    Log.info("%s [%d]: Flag written true successfully\r\n", __FILE__, __LINE__);
+                  else
+                    Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
+                }
+              }
+              else
+              {
+                // don't draw received logo
+                status = false;
+              }
+            }
+            else
+            {
+              Log.info("%s [%d]: End with NO empty_state\r\n", __FILE__, __LINE__);
+              if (flag)
+              {
+                if (preferences.getBool(PREFERENCES_DEVICE_REGISTERED_KEY, false) != false) // check the flag to avoid the re-writing
+                {
+                  bool res = preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
+                  if (res)
+                    Log.info("%s [%d]: Flag written false successfully\r\n", __FILE__, __LINE__);
+                  else
+                    Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
+                }
+              }
+              status = true;
+            }
+          }
+        }
+        else
+        {
+          Log.error("%s [%d]: Guest Mode failed\r\n", __FILE__, __LINE__);
         }
       }
       break;
