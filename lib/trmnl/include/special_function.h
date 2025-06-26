@@ -11,6 +11,7 @@ enum SPECIAL_FUNCTION
   SF_RESTART_PLAYLIST,
   SF_REWIND,
   SF_SEND_TO_ME,
+  SF_GUEST_MODE,
 };
 
 SPECIAL_FUNCTION parseSpecialFunction(String &special_function_str);
