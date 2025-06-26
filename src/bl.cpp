@@ -1232,7 +1232,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
         }
         else
         {
-          Log.error("%s [%d]: identify failed\r\n", __FILE__, __LINE__);
+          Log.error("%s [%d]: Restart playlist failed\r\n", __FILE__, __LINE__);
         }
       }
       break;
@@ -1446,7 +1446,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
         }
         else
         {
-          Log.error("%s [%d]: identify failed\r\n", __FILE__, __LINE__);
+          Log.error("%s [%d]: Guest Mode failed\r\n", __FILE__, __LINE__);
         }
       }
       break;
