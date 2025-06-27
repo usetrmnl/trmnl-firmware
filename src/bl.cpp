@@ -83,6 +83,8 @@ static DeviceStatusStamp getDeviceStatusStamp();
 void submitLog(const char *format, time_t time, int line, const char *file, ...);
 void log_nvs_usage();
 
+String fw_version_string = String(FW_MAJOR_VERSION) + "." + String(FW_MINOR_VERSION) + "." + String(FW_PATCH_VERSION) + String(FW_VERSION_SUFFIX);
+
 #define submit_log(format, ...) submitLog(format, getTime(), __LINE__, __FILE__, ##__VA_ARGS__);
 
 void wait_for_serial()
@@ -247,7 +249,7 @@ void bl_init(void)
   // Mount SPIFFS
   filesystem_init();
 
-  Log_info("Firmware version %d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
+  Log_info("Firmware version %s", fw_version_string);
   Log_info("Arduino version %d.%d.%d", ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH);
   Log_info("ESP-IDF version %d.%d.%d", ESP_IDF_VERSION_MAJOR, ESP_IDF_VERSION_MINOR, ESP_IDF_VERSION_PATCH);
   list_files();
@@ -290,15 +292,9 @@ void bl_init(void)
     // WiFi credentials are not saved - start captive portal
     Log.info("%s [%d]: WiFi NOT saved\r\n", __FILE__, __LINE__);
 
-    char fw_version[20];
+    Log_info("FW version %s", fw_version_string);
 
-    sprintf(fw_version, "%d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
-
-    String fw = fw_version;
-
-    Log.info("%s [%d]: FW version %s\r\n", __FILE__, __LINE__, fw_version);
-
-    showMessageWithLogo(WIFI_CONNECT, "", false, fw.c_str(), "");
+    showMessageWithLogo(WIFI_CONNECT, "", false, "%s", fw_version_string);
     WifiCaptivePortal.setResetSettingsCallback(resetDeviceCredentials);
     res = WifiCaptivePortal.startPortal();
     if (!res)
@@ -551,9 +547,7 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
 
   inputs.batteryVoltage = readBatteryVoltage();
 
-  inputs.firmwareVersion = String(FW_MAJOR_VERSION) + "." +
-                           String(FW_MINOR_VERSION) + "." +
-                           String(FW_PATCH_VERSION);
+  inputs.firmwareVersion = String(fw_version_string);
 
   inputs.rssi = WiFi.RSSI();
   inputs.displayWidth = display_width();
@@ -1514,9 +1508,6 @@ static void getDeviceCredentials()
       strcpy(new_url, preferences.getString(PREFERENCES_API_URL, API_BASE_URL).c_str());
       strcat(new_url, "/api/setup/");
 
-      char fw_version[30];
-      sprintf(fw_version, "%d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
-
       if (https.begin(*client, new_url))
       { // HTTPS
         Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
@@ -1524,7 +1515,7 @@ static void getDeviceCredentials()
         // start connection and send HTTP header
 
         https.addHeader("ID", WiFi.macAddress());
-        https.addHeader("FW-Version", fw_version);
+        https.addHeader("FW-Version", fw_version_string);
         Log.info("%s [%d]: Device MAC address: %s\r\n", __FILE__, __LINE__, WiFi.macAddress().c_str());
 
         int httpCode = https.GET();
@@ -2168,14 +2159,11 @@ DeviceStatusStamp getDeviceStatusStamp()
 {
   DeviceStatusStamp deviceStatus = {};
 
-  char fw_version[30];
-  sprintf(fw_version, "%d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
-
   deviceStatus.wifi_rssi_level = WiFi.RSSI();
   parseWifiStatusToStr(deviceStatus.wifi_status, sizeof(deviceStatus.wifi_status), WiFi.status());
   deviceStatus.refresh_rate = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY);
   deviceStatus.time_since_last_sleep = time_since_sleep;
-  snprintf(deviceStatus.current_fw_version, sizeof(deviceStatus.current_fw_version), "%d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
+  snprintf(deviceStatus.current_fw_version, sizeof(deviceStatus.current_fw_version), "%s", fw_version_string);
   parseSpecialFunctionToStr(deviceStatus.special_function, sizeof(deviceStatus.special_function), special_function);
   deviceStatus.battery_voltage = readBatteryVoltage();
   parseWakeupReasonToStr(deviceStatus.wakeup_reason, sizeof(deviceStatus.wakeup_reason), esp_sleep_get_wakeup_cause());
