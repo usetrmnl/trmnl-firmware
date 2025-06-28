@@ -5,10 +5,6 @@
 #define FW_MINOR_VERSION 5
 #define FW_PATCH_VERSION 9
 
-#ifndef FW_VERSION_SUFFIX
-#define FW_VERSION_SUFFIX ""
-#endif
-
 #define LOG_MAX_NOTES_NUMBER 5
 
 #define PREFERENCES_API_KEY "api_key"

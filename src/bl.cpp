@@ -83,7 +83,11 @@ static DeviceStatusStamp getDeviceStatusStamp();
 void submitLog(const char *format, time_t time, int line, const char *file, ...);
 void log_nvs_usage();
 
-String fw_version_string = String(FW_MAJOR_VERSION) + "." + String(FW_MINOR_VERSION) + "." + String(FW_PATCH_VERSION) + String(FW_VERSION_SUFFIX);
+#ifndef GIT_COMMIT_HASH
+#define GIT_COMMIT_HASH ""
+#endif
+
+String fw_version_string = String(FW_MAJOR_VERSION) + "." + String(FW_MINOR_VERSION) + "." + String(FW_PATCH_VERSION) + String(GIT_COMMIT_HASH);
 
 #define submit_log(format, ...) submitLog(format, getTime(), __LINE__, __FILE__, ##__VA_ARGS__);
 
