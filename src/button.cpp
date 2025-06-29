@@ -11,6 +11,9 @@ ButtonPressResult read_button_presses()
   {
     auto elapsed = millis() - time_start;
     auto pin = digitalRead(PIN_INTERRUPT);
+  #if defined(BOARD_WAVESHARE_ESP32_DRIVER)
+    pin = !pin;
+  #endif
     if(pin == LOW && elapsed > BUTTON_SOFT_RESET_TIME){
       return SoftReset;
     }
