@@ -2,12 +2,15 @@ Import("env", "projenv")
 import subprocess
 
 try:
-    git_hash = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode('ascii').strip()
-
-    print("Using git hash", git_hash)
+    include_hash = env.GetProjectOption("include_git_hash", "false").lower() == "true"
     
-    projenv.Append(CPPDEFINES=[("GIT_COMMIT_HASH", f'\\"+{git_hash}\\"')])
+    if include_hash:
+        git_hash = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode('ascii').strip()
+        print(f"Using git hash: {git_hash}")
+        projenv.Append(CPPDEFINES=[("FW_VERSION_SUFFIX", f'\\"+{git_hash}\\"')])
+    else:
+        print("Skipping git hash (include_git_hash = false)")
             
 except:
-    print("No git repository found, using default empty GIT_COMMIT_HASH")
+    print("No git repository found, using default empty FW_VERSION_SUFFIX")
     pass

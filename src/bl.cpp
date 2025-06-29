@@ -83,11 +83,11 @@ static DeviceStatusStamp getDeviceStatusStamp();
 void submitLog(const char *format, time_t time, int line, const char *file, ...);
 void log_nvs_usage();
 
-#ifndef GIT_COMMIT_HASH
-#define GIT_COMMIT_HASH ""
+#ifndef FW_VERSION_SUFFIX
+#define FW_VERSION_SUFFIX ""
 #endif
 
-String fw_version_string = String(FW_MAJOR_VERSION) + "." + String(FW_MINOR_VERSION) + "." + String(FW_PATCH_VERSION) + String(GIT_COMMIT_HASH);
+String fw_version_string = String(FW_MAJOR_VERSION) + "." + String(FW_MINOR_VERSION) + "." + String(FW_PATCH_VERSION) + String(FW_VERSION_SUFFIX);
 
 #define submit_log(format, ...) submitLog(format, getTime(), __LINE__, __FILE__, ##__VA_ARGS__);
 
@@ -298,7 +298,7 @@ void bl_init(void)
 
     Log_info("FW version %s", fw_version_string);
 
-    showMessageWithLogo(WIFI_CONNECT, "", false, "%s", fw_version_string);
+    showMessageWithLogo(WIFI_CONNECT, "", false, fw_version_string.c_str(), "");
     WifiCaptivePortal.setResetSettingsCallback(resetDeviceCredentials);
     res = WifiCaptivePortal.startPortal();
     if (!res)
