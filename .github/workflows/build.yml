@@ -82,15 +82,40 @@ jobs:
       - name: Build release firmware
         run: pio run -e trmnl
 
-      - name: Name file
-        run: echo "FIRMWARE_FILE=trmnl-merged.$(git rev-parse --short ${{ github.sha }}).bin" >> $GITHUB_ENV
+      - name: Name files
+        run: |
+          echo "MERGED_FIRMWARE_FILE=trmnl-merged.$(git rev-parse --short ${{ github.sha }}).bin" >> $GITHUB_ENV
+          echo "APP_FIRMWARE_FILE=trmnl-app.$(git rev-parse --short ${{ github.sha }}).bin" >> $GITHUB_ENV
 
       - name: Create combined firmware image
-        run: ./scripts/merge_firmware.sh .pio/build/trmnl ${{ env.FIRMWARE_FILE }}
+        run: ./scripts/merge_firmware.sh .pio/build/trmnl ${{ env.MERGED_FIRMWARE_FILE }}
 
-      - name: Upload artifact
+      - name: Copy application firmware
+        run: cp .pio/build/trmnl/firmware.bin ${{ env.APP_FIRMWARE_FILE }}
+
+      - name: Upload firmware artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: firmware image
-          path: ${{ env.FIRMWARE_FILE }}
+          name: firmware images
+          path: "*.bin"
           retention-days: 30
+
+      - name: Add firmware documentation
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << 'EOF'
+          ## 📦 Firmware Artifacts
+
+          Two firmware images have been built:
+
+          ### 🔄 `${{ env.MERGED_FIRMWARE_FILE }}` - Full Firmware
+          - **Complete factory image** with bootloader, partitions, and application
+          - **⚠️ Wipes all persistent storage** (settings, wifi credentials, etc.)
+          - Use for initial flashing or factory reset
+          - Flash command: `./scripts/flash_merged.sh ${{ env.MERGED_FIRMWARE_FILE }}`
+
+          ### ⚡ `${{ env.APP_FIRMWARE_FILE }}` - Application Only
+          - **Application firmware only** 
+          - **✅ Preserves persistent storage** (settings, wifi credentials, etc.)
+          - Use for updates without losing configuration
+          - Flash command: `./scripts/flash_app.sh ${{ env.APP_FIRMWARE_FILE }}`
+          EOF
