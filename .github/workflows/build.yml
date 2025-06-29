@@ -82,12 +82,15 @@ jobs:
       - name: Build release firmware
         run: pio run -e trmnl
 
-      - name: Upload firmware artifact
+      - name: Name file
+        run: echo "FIRMWARE_FILE=trmnl-merged.$(git rev-parse --short ${{ github.sha }}).bin" >> $GITHUB_ENV
+
+      - name: Create combined firmware image
+        run: ./scripts/merge_firmware.sh .pio/build/trmnl ${{ env.FIRMWARE_FILE }}
+
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: trmnl-firmware-${{ github.sha }}
-          path: |
-            .pio/build/trmnl/firmware.bin
-            .pio/build/trmnl/firmware.elf
-            .pio/build/trmnl/firmware.map
+          name: firmware image
+          path: ${{ env.FIRMWARE_FILE }}
           retention-days: 30
