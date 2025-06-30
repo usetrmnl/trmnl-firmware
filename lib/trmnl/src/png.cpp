@@ -15,7 +15,7 @@ image_err_e processPNG(PNG *png, uint8_t *&decoded_buffer)
   uint32_t height = png->getHeight();
   uint32_t bpp = png->getBpp();
 
-  if (width != 800 || height != 480 || bpp != 1)
+  if (width != 800 || height != 480)
   {
     Log_error("PNG_BAD_SIZE");
     return PNG_BAD_SIZE;
