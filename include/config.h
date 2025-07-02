@@ -63,7 +63,7 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #define PIN_INTERRUPT 9
 #define PIN_RESET 9
 #define FAKE_BATTERY_VOLTAGE
-#elif defined(BOARD_SEEED_XIAO_ESP32S3)a
+#elif defined(BOARD_SEEED_XIAO_ESP32S3)
 #define DEVICE_MODEL "seeed_esp32s3"
 #define PIN_INTERRUPT 0
 #define PIN_RESET 0
