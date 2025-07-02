@@ -80,6 +80,8 @@ jobs:
         run: pip install --upgrade platformio
 
       - name: Build release firmware
+        env:
+          INCLUDE_GIT_HASH_IN_VERSION_NUMBER: true
         run: pio run -e trmnl
 
       - name: Name files
