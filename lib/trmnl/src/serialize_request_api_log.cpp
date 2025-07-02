@@ -2,5 +2,5 @@
 
 String serializeApiLogRequest(String log_buffer)
 {
-  return "{\"log\":{\"logs_array\":[" + log_buffer + "]}}";
+  return "{\"logs\":[" + log_buffer + "]}";
 }
