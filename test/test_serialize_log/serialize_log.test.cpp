@@ -41,27 +41,20 @@ String compact(String input)
 void test_serialize_log(void)
 {
   auto expected = compact(R"({
-    "creation_timestamp": 1609459200,
-    "device_status_stamp": {
-      "wifi_rssi_level": -50,
-      "wifi_status": "Connected",
-      "refresh_rate": 30000,
-      "time_since_last_sleep_start": 120,
-      "current_fw_version": "1.2.3",
-      "special_function": "None",
-      "battery_voltage": 4.2,
-      "wakeup_reason": "Timer",
-      "free_heap_size": 50000,
-      "max_alloc_size": 40000
-    },
-    "log_id": 456,
-    "log_message": "Test log message",
-    "log_codeline": 123,
-    "log_sourcefile": "test.cpp",
-    "additional_info": {
-      "filename_current": "current.png",
-      "filename_new": "new.png"
-    }
+    "created_at": 1609459200,
+    "id": 456,
+    "message": "Test log message",
+    "source_line": 123,
+    "source_path": "test.cpp",
+    "wifi_signal": -50,
+    "wifi_status": "Connected",
+    "refresh_rate": 30000,
+    "sleep_duration": 120,
+    "firmware_version": "1.2.3",
+    "special_function": "None",
+    "battery_voltage": 4.2,
+    "wake_reason": "Timer",
+    "free_heap_size": 50000
   })");
 
   auto result = serialize_log(input);
@@ -76,28 +69,21 @@ void test_serialize_log_with_retry(void)
   inputWithRetry.retryAttempt = 2;
 
   auto expected = compact(R"({
-    "creation_timestamp": 1609459200,
-    "device_status_stamp": {
-      "wifi_rssi_level": -50,
-      "wifi_status": "Connected",
-      "refresh_rate": 30000,
-      "time_since_last_sleep_start": 120,
-      "current_fw_version": "1.2.3",
-      "special_function": "None",
-      "battery_voltage": 4.2,
-      "wakeup_reason": "Timer",
-      "free_heap_size": 50000,
-      "max_alloc_size": 40000
-    },
-    "log_id": 456,
-    "log_message": "Test log message",
-    "log_codeline": 123,
-    "log_sourcefile": "test.cpp",
-    "additional_info": {
-      "filename_current": "current.png",
-      "filename_new": "new.png",
-      "retry_attempt": 2
-    }
+    "created_at": 1609459200,
+    "id": 456,
+    "message": "Test log message",
+    "source_line": 123,
+    "source_path": "test.cpp",
+    "wifi_signal": -50,
+    "wifi_status": "Connected",
+    "refresh_rate": 30000,
+    "sleep_duration": 120,
+    "firmware_version": "1.2.3",
+    "special_function": "None",
+    "battery_voltage": 4.2,
+    "wake_reason": "Timer",
+    "free_heap_size": 50000,
+    "retry": 2
   })");
 
   String result = serialize_log(inputWithRetry);
