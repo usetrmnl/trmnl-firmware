@@ -16,7 +16,7 @@ String compact(String input)
 
 void test_serialize_one_log(void)
 {
-  auto expected = String("{\"log\":{\"logs_array\":[{\"foo\":\"bar\"}]}}");
+  auto expected = String("{\"logs\":[{\"foo\":\"bar\"}]}");
   auto result = serializeApiLogRequest("{\"foo\":\"bar\"}");
 
   TEST_ASSERT_EQUAL_STRING(expected.c_str(), result.c_str());
@@ -24,7 +24,7 @@ void test_serialize_one_log(void)
 
 void test_serialize_multiple_logs(void)
 {
-  auto expected = String("{\"log\":{\"logs_array\":[{\"foo\":\"bar\"},{\"foo\":\"baz\"}]}}");
+  auto expected = String("{\"logs\":[{\"foo\":\"bar\"},{\"foo\":\"baz\"}]}");
   auto result = serializeApiLogRequest("{\"foo\":\"bar\"},{\"foo\":\"baz\"}");
 
   TEST_ASSERT_EQUAL_STRING(expected.c_str(), result.c_str());
