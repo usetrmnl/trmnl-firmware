@@ -1,0 +1,86 @@
+name: publish-firmware
+
+on:
+  workflow_call:
+    inputs:
+      include_git_hash_in_firmware_version:
+        description: 'Include git hash in firmware version number (e.g. "1.2.3+15ba280")'
+        required: true
+        type: boolean
+      filename_suffix_type:
+        description: "Type of suffix to use for firmware file names (git_tag or git_short_hash)"
+        required: true
+        type: string
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio/.cache
+          key: ${{ runner.os }}-pio
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install PlatformIO Core
+        run: pip install --upgrade platformio
+
+      - name: Build release firmware
+        env:
+          INCLUDE_GIT_HASH_IN_VERSION_NUMBER: ${{ inputs.include_git_hash_in_firmware_version }}
+        run: pio run -e trmnl
+
+      - name: Set filename suffix
+        run: |
+          if [[ "${{ inputs.filename_suffix_type }}" == "git_tag" ]]; then
+            echo "SUFFIX=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          else
+            echo "SUFFIX=$(git rev-parse --short ${{ github.sha }})" >> $GITHUB_ENV
+          fi
+
+      - name: Name files
+        run: |
+          echo "MERGED_FIRMWARE_FILE=trmnl-merged.${{ env.SUFFIX }}.bin" >> $GITHUB_ENV
+          echo "APP_FIRMWARE_FILE=trmnl-app.${{ env.SUFFIX }}.bin" >> $GITHUB_ENV
+
+      - name: Create combined firmware image
+        run: ./scripts/merge_firmware.sh .pio/build/trmnl ${{ env.MERGED_FIRMWARE_FILE }}
+
+      - name: Copy application firmware
+        run: cp .pio/build/trmnl/firmware.bin ${{ env.APP_FIRMWARE_FILE }}
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware images
+          path: "*.bin"
+          retention-days: 30
+
+      - name: Add firmware documentation
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << 'EOF'
+          ## 📦 Firmware Artifacts
+
+          Two firmware images have been built:
+
+          ### 🔄 `${{ env.MERGED_FIRMWARE_FILE }}` - Full Firmware
+          - **Complete factory image** with bootloader, partitions, and application
+          - **⚠️ Wipes all persistent storage** (settings, wifi credentials, etc.)
+          - Use for initial flashing or factory reset
+          - Flash command: `./scripts/flash_merged.sh ${{ env.MERGED_FIRMWARE_FILE }}`
+
+          ### ⚡ `${{ env.APP_FIRMWARE_FILE }}` - Application Only
+          - **Application firmware only** 
+          - **✅ Preserves persistent storage** (settings, wifi credentials, etc.)
+          - Use for updates without losing configuration
+          - Flash command: `./scripts/flash_app.sh ${{ env.APP_FIRMWARE_FILE }}`
+          EOF
