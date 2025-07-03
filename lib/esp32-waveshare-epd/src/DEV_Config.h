@@ -84,7 +84,6 @@
 #endif
 
 #define GPIO_PIN_SET   1
-#define GPIO_PIN_RESET 0
 
 /**
  * GPIO read and write
