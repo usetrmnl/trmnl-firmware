@@ -452,8 +452,9 @@
         scanningInfoBox.style.display = 'none';
         scanningLoader.style.display = 'none';
 
-        var knownNetworks = json.filter((item) => item.saved);
-        var otherNetworks = json.filter((item) => !item.saved);
+        displayInfo(`MAC: ${json.mac}`);
+        var knownNetworks = json.networks.filter((item) => item.saved);
+        var otherNetworks = json.networks.filter((item) => !item.saved);
         if (knownNetworks.length > 0) {
           document.getElementById('saved-networks').style.display = 'table';
           document.getElementById('other-networks-caption').style.display = 'block';
@@ -524,9 +525,9 @@
 
       let message = "";
       if (ssid.length > 0) {
-        message = `Connecting to SSID: ${ssid}. MAC address: ${mac}`;
+        message = `Connecting to SSID: ${ssid}. MAC: ${mac}`;
       } else {
-        message = `No AP set. MAC address: ${mac}`;
+        message = `No AP set. MAC: ${mac}`;
       }
       displayInfo(message);
     }

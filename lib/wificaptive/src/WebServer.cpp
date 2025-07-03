@@ -55,7 +55,7 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
 
     auto scanGET = server.on("/scan", HTTP_GET, [callbacks](AsyncWebServerRequest *request)
                              {
-		String json = "[";
+		String json = "{\"networks\":[";
 		int n = WiFi.scanComplete();
 		if (n == WIFI_SCAN_FAILED) {
 			WiFi.scanNetworks(true);
@@ -99,8 +99,14 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
 				WiFi.scanNetworks(true);
 			}
 		}
-		json += "]";
-		request->send(200, "application/json", json);
+		json += "],";
+
+        // Expose MAC pre-connect for easier setup debugging
+        String mac = WiFi.macAddress();
+        json+= "\"mac\":\""+mac+"\"";
+
+        json += "}";
+        request->send(200, "application/json", json);
 		json = String(); });
 
     AsyncCallbackJsonWebHandler *handler = new AsyncCallbackJsonWebHandler("/connect", [callbacks](AsyncWebServerRequest *request, JsonVariant &json)
