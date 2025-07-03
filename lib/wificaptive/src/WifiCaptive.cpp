@@ -1,4 +1,5 @@
 #include "WifiCaptive.h"
+#include <WiFi.h>
 #include <trmnl_log.h>
 #include "WebServer.h"
 

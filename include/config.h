@@ -68,9 +68,17 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #define PIN_INTERRUPT 0
 #define PIN_RESET 0
 #define FAKE_BATTERY_VOLTAGE
+#elif defined(BOARD_XIAO_EPAPER_DISPLAY)
+#define DEVICE_MODEL "xiao_epaper_display"
+#define PIN_INTERRUPT 5
+#define PIN_RESET 0
 #endif
 
+#if defined(BOARD_XIAO_EPAPER_DISPLAY)
+#define PIN_BATTERY 1
+#else
 #define PIN_BATTERY 3
+#endif
 
 // #define FAKE_BATTERY_VOLTAGE // Uncomment to report 4.2V instead of reading ADC
 

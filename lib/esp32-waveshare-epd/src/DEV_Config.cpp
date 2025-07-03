@@ -84,14 +84,19 @@ function:
 void DEV_SPI_WriteByte(UBYTE data)
 {
     // SPI.beginTransaction(spi_settings);
-    
-    //digitalWrite(EPD_CS_PIN, GPIO_PIN_RESET);
+#ifdef BOARD_XIAO_EPAPER_DISPLAY
+    digitalWrite(EPD_CS_PIN, GPIO_PIN_RESET);
+#else
     REG_WRITE(GPIO_OUT_W1TC_REG, 1 << EPD_CS_PIN);
+#endif
 
     display_spi->transfer(data);
 
-    //digitalWrite(EPD_CS_PIN, GPIO_PIN_SET);
+#ifdef BOARD_XIAO_EPAPER_DISPLAY
+    digitalWrite(EPD_CS_PIN, GPIO_PIN_SET);
+#else
     REG_WRITE(GPIO_OUT_W1TS_REG, 1 << EPD_CS_PIN);
+#endif
 
     // SPI.endTransaction();
 }
