@@ -15,14 +15,15 @@ struct LogStoreResult {
 
 class StoredLogs {
 private:
-    uint8_t max_notes;
+    uint8_t old_count;
+    uint8_t new_count;
     const char* log_key;
     const char* head_key;
     Persistence& persistence;
     uint32_t overwrite_count;
 
 public:
-    StoredLogs(uint8_t max_notes, const char* log_key, const char* head_key, Persistence& persistence);
+    StoredLogs(uint8_t old_count, uint8_t new_count, const char* log_key, const char* head_key, Persistence& persistence);
     
     LogStoreResult store_log(const String& log_buffer);
     String gather_stored_logs();

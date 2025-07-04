@@ -59,7 +59,7 @@ RTC_DATA_ATTR uint8_t need_to_refresh_display = 1;
 
 Preferences preferences;
 PreferencesPersistence preferencesPersistence(preferences);
-StoredLogs storedLogs(LOG_MAX_NOTES_NUMBER, PREFERENCES_LOG_KEY, PREFERENCES_LOG_BUFFER_HEAD_KEY, preferencesPersistence);
+StoredLogs storedLogs(LOG_MAX_NOTES_NUMBER / 2, LOG_MAX_NOTES_NUMBER / 2, PREFERENCES_LOG_KEY, PREFERENCES_LOG_BUFFER_HEAD_KEY, preferencesPersistence);
 
 static https_request_err_e downloadAndShow(); // download and show the image
 static uint32_t downloadStream(WiFiClient *stream, int content_size, uint8_t *buffer);
