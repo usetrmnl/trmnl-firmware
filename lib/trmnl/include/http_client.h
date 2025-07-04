@@ -43,8 +43,7 @@ ReturnType withHttp(const String &url, Callback callback)
   // Check if client creation succeeded
   if (!client)
   {
-    ReturnType result = callback(nullptr, HTTPCLIENT_WIFICLIENT_ERROR);
-    return result;
+    return callback(nullptr, HTTPCLIENT_WIFICLIENT_ERROR);
   }
 
   ReturnType result;

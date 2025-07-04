@@ -1,7 +1,7 @@
 #include <filesystem.h>
 #include <Arduino.h>
 #include <SPIFFS.h>
-#include <ArduinoLog.h>
+#include <trmnl_log.h>
 
 /**
  * @brief Function to init the filesystem
@@ -12,13 +12,13 @@ bool filesystem_init(void)
 {
     if (!SPIFFS.begin(true))
     {
-        Log.fatal("%s [%d]: Failed to mount SPIFFS\r\n", __FILE__, __LINE__);
+        Log_fatal("Failed to mount SPIFFS");
         ESP.restart();
         return false;
     }
     else
     {
-        Log.info("%s [%d]: SPIFFS mounted\r\n", __FILE__, __LINE__);
+        Log_info("SPIFFS mounted");
         return true;
     }
 }
@@ -43,7 +43,7 @@ bool filesystem_read_from_file(const char *name, uint8_t *out_buffer, size_t siz
 {
     if (SPIFFS.exists(name))
     {
-        Log.info("%s [%d]: file %s exists\r\n", __FILE__, __LINE__, name);
+        Log_info("file %s exists", name);
         File file = SPIFFS.open(name, FILE_READ);
         if (file)
         {
@@ -52,13 +52,13 @@ bool filesystem_read_from_file(const char *name, uint8_t *out_buffer, size_t siz
         }
         else
         {
-            Log.error("%s [%d]: File %s open error\r\n", __FILE__, __LINE__, name);
+            Log_error("File %s open error", name);
             return false;
         }
     }
     else
     {
-        Log.error("%s [%d]: file %s doesn\'t exists\r\n", __FILE__, __LINE__, name);
+        Log_error("file %s doesn\'t exists", name);
         return false;
     }
 }
@@ -73,18 +73,18 @@ bool filesystem_read_from_file(const char *name, uint8_t *out_buffer, size_t siz
 size_t filesystem_write_to_file(const char *name, uint8_t *in_buffer, size_t size)
 {
     uint32_t SPIFFS_freeBytes = (SPIFFS.totalBytes() - SPIFFS.usedBytes());
-    Log.info("%s [%d]: SPIFFS free space: %d, total: %d\r\n", __FILE__, __LINE__, SPIFFS_freeBytes,SPIFFS.totalBytes());
+    Log_info("SPIFFS free space - %d, total -%d", SPIFFS_freeBytes, SPIFFS.totalBytes());
     if (SPIFFS.exists(name))
     {
-        Log.info("%s [%d]: file %s exists. Deleting...\r\n", __FILE__, __LINE__, name);
+        Log_info("file %s exists. Deleting...", name);
         if (SPIFFS.remove(name))
-            Log.info("%s [%d]: file %s deleted\r\n", __FILE__, __LINE__, name);
+            Log_info("file %s deleted", name);
         else
-            Log.info("%s [%d]: file %s deleting failed\r\n", __FILE__, __LINE__, name);
+            Log_info("file %s deleting failed", name);
     }
     else
     {
-        Log.info("%s [%d]: file %s not exists.\r\n", __FILE__, __LINE__, name);
+        Log_info("file %s not exists.", name);
     }
     delay(100);
     File file = SPIFFS.open(name, FILE_WRITE);
@@ -102,27 +102,27 @@ size_t filesystem_write_to_file(const char *name, uint8_t *in_buffer, size_t siz
             {
                 file.close();
 
-                Log.info("%s [%d]: Erasing SPIFFS...\r\n", __FILE__, __LINE__);
+                Log_info("Erasing SPIFFS...");
                 if (SPIFFS.format())
                 {
-                    Log.info("%s [%d]: SPIFFS erased successfully.\r\n", __FILE__, __LINE__);
+                    Log_info("SPIFFS erased successfully.");
                 }
                 else
                 {
-                    Log.error("%s [%d]: Error erasing SPIFFS.\r\n", __FILE__, __LINE__);
+                    Log_error("Error erasing SPIFFS.");
                 }
 
                 return bytesWritten;
             }
             bytesWritten += chunkSize;
         }
-        Log.info("%s [%d]: file %s writing success - %d bytes\r\n", __FILE__, __LINE__, name, bytesWritten);
+        Log_info("file %s writing success - %d bytes", name, bytesWritten);
         file.close();
         return bytesWritten;
     }
     else
     {
-        Log.error("%s [%d]: File open ERROR\r\n", __FILE__, __LINE__);
+        Log_error("File open ERROR");
         return 0;
     }
 }
@@ -136,12 +136,12 @@ bool filesystem_file_exists(const char *name)
 {
     if (SPIFFS.exists(name))
     {
-        Log.info("%s [%d]: file %s exists.\r\n", __FILE__, __LINE__, name);
+        Log_info("file %s exists.", name);
         return true;
     }
     else
     {
-        Log.error("%s [%d]: file %s not exists.\r\n", __FILE__, __LINE__, name);
+        Log_error("file %s not exists.", name);
         return false;
     }
 }
@@ -157,18 +157,18 @@ bool filesystem_file_delete(const char *name)
     {
         if (SPIFFS.remove(name))
         {
-            Log.info("%s [%d]: file %s deleted\r\n", __FILE__, __LINE__, name);
+            Log_info("file %s deleted", name);
             return true;
         }
         else
         {
-            Log.error("%s [%d]: file %s deleting failed\r\n", __FILE__, __LINE__, name);
+            Log_error("file %s deleting failed", name);
             return false;
         }
     }
     else
     {
-        Log.info("%s [%d]: file %s doesn't exist\r\n", __FILE__, __LINE__, name);
+        Log_info("file %s doesn't exist", name);
         return true;
     }
 }
@@ -183,22 +183,32 @@ bool filesystem_file_rename(const char *old_name, const char *new_name)
 {
     if (SPIFFS.exists(old_name))
     {
-        Log.info("%s [%d]: file %s exists.\r\n", __FILE__, __LINE__, old_name);
+        Log_info("file %s exists.", old_name);
         bool res = SPIFFS.rename(old_name, new_name);
         if (res)
         {
-            Log.info("%s [%d]: file %s renamed to %s.\r\n", __FILE__, __LINE__, old_name, new_name);
+            Log_info("file %s renamed to %s.", old_name, new_name);
             return true;
         }
         else
-        {
-            Log.error("%s [%d]: file %s wasn't renamed.\r\n", __FILE__, __LINE__, old_name);
-            return false;
-        }
+            Log_error("file %s wasn't renamed.", old_name);
+        return false;
     }
     else
     {
-        Log.error("%s [%d]: file %s not exists.\r\n", __FILE__, __LINE__, old_name);
+        Log_error("file %s not exists.", old_name);
         return false;
     }
+}
+
+void list_files()
+{
+    Log_info("Filesystem Usage: %d/%d", SPIFFS.usedBytes(), SPIFFS.totalBytes());
+    File rootDir = SPIFFS.open("/");
+
+    while (File file = rootDir.openNextFile())
+    {
+        Log_info("  %d  %s", file.size(), file.name());
+    }
+    rootDir.close();
 }

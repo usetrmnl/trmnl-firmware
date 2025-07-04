@@ -1,13 +1,13 @@
 #include <Arduino.h>
 #include "png_flip.h"
 #include <display.h>
-#include <ArduinoLog.h>
 #include "DEV_Config.h"
 #include "EPD.h"
 #include "GUI_Paint.h"
 #include <config.h>
 #include <ImageData.h>
 #include <ctype.h> //iscntrl()
+#include <trmnl_log.h>
 
 /**
  * @brief Function to init the display
@@ -16,13 +16,13 @@
  */
 void display_init(void)
 {
-    Log.info("%s [%d]: dev module start\r\n", __FILE__, __LINE__);
+    Log_info("dev module start");
     DEV_Module_Init();
-    Log.info("%s [%d]: dev module end\r\n", __FILE__, __LINE__);
+    Log_info("dev module end");
 
-    Log.info("%s [%d]: screen hw start\r\n", __FILE__, __LINE__);
+    Log_info("screen hw start");
     EPD_7IN5_V2_Init_New();
-    Log.info("%s [%d]: screen hw end\r\n", __FILE__, __LINE__);
+    Log_info("screen hw end");
 }
 
 /**
@@ -32,9 +32,9 @@ void display_init(void)
  */
 void display_reset(void)
 {
-    Log.info("%s [%d]: e-Paper Clear start\r\n", __FILE__, __LINE__);
+    Log_info("e-Paper Clear start");
     EPD_7IN5_V2_Clear();
-    Log.info("%s [%d]:  e-Paper Clear end\r\n", __FILE__, __LINE__);
+    Log_info("e-Paper Clear end");
     // DEV_Delay_ms(500);
 }
 
@@ -223,24 +223,24 @@ void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG)
     UBYTE *BlackImage;
     /* you have to edit the startup_stm32fxxx.s file and set a big enough heap size */
     UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
-
-    Log.error("%s [%d]: free heap - %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
-    Log.error("%s [%d]: free alloc heap - %d\r\n", __FILE__, __LINE__, ESP.getMaxAllocHeap());
+    
+    Log_error("free heap - %d", ESP.getFreeHeap());
+    Log_error("free alloc heap - %d", ESP.getMaxAllocHeap());
     if ((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL)
     {
-        Log.fatal("%s [%d]: Failed to apply for black memory...\r\n", __FILE__, __LINE__);
+        Log_fatal("Failed to apply for black memory...");
         ESP.restart();
     }
-    Log.info("%s [%d]: Paint_NewImage %d\r\n", __FILE__, __LINE__, reverse);
-
+    Log_info("Paint_NewImage %d", reverse);
+    
     Paint_NewImage(BlackImage, width, height, 0, WHITE);
 
-    Log.info("%s [%d]: show image for array\r\n", __FILE__, __LINE__);
+    Log_info("show image for array");
     Paint_SelectImage(BlackImage);
     Paint_Clear(WHITE);
     if (reverse)
     {
-        Log.info("%s [%d]: inverse the image\r\n", __FILE__, __LINE__);
+        Log_info("inverse the image");
         for (size_t i = 0; i < DISPLAY_BMP_IMAGE_SIZE; i++)
         {
             image_buffer[i] = ~image_buffer[i];
@@ -248,7 +248,7 @@ void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG)
     }
     if (isPNG == true)
     {
-        Log.info("Drawing PNG\n");
+        Log_info("Drawing PNG");
         flip_image(image_buffer, width, height);
         horizontal_mirror(image_buffer, width, height);
         Paint_DrawBitMap(image_buffer);
@@ -258,7 +258,7 @@ void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG)
         Paint_DrawBitMap(image_buffer + 62);
     }
     EPD_7IN5_V2_Display(BlackImage);
-    Log.info("%s [%d]: display\r\n", __FILE__, __LINE__);
+    Log_info("display");
 
     free(BlackImage);
     BlackImage = NULL;
@@ -277,18 +277,18 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     UBYTE *BlackImage;
     /* you have to edit the startup_stm32fxxx.s file and set a big enough heap size */
     UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
-    Log.error("%s [%d]: free heap - %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
-    Log.error("%s [%d]: free alloc heap - %d\r\n", __FILE__, __LINE__, ESP.getMaxAllocHeap());
+    Log_error("free heap - %d", ESP.getFreeHeap());
+    Log_error("free alloc heap - %d", ESP.getMaxAllocHeap());
     if ((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL)
     {
-        Log.fatal("%s [%d]: Failed to apply for black memory...\r\n", __FILE__, __LINE__);
+        Log_fatal("Failed to apply for black memory...");
         ESP.restart();
     }
 
-    Log.info("%s [%d]: Paint_NewImage\r\n", __FILE__, __LINE__);
+    Log_info("Paint_NewImage");
     Paint_NewImage(BlackImage, width, height, 0, WHITE);
 
-    Log.info("%s [%d]: show image for array\r\n", __FILE__, __LINE__);
+    Log_info("show image for array");
     Paint_SelectImage(BlackImage);
     Paint_Clear(WHITE);
     Paint_DrawBitMap(image_buffer + 62);
@@ -391,7 +391,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     }
 
     EPD_7IN5_V2_Display(BlackImage);
-    Log.info("%s [%d]: display\r\n", __FILE__, __LINE__);
+    Log_info("display");
     free(BlackImage);
     BlackImage = NULL;
 }
@@ -410,7 +410,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 {
     if (message_type == WIFI_CONNECT)
     {
-        Log.info("%s [%d]: Display set to white\r\n", __FILE__, __LINE__);
+        Log_info("Display set to white");
         EPD_7IN5_V2_ClearWhite();
         delay(1000);
     }
@@ -420,18 +420,18 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     UBYTE *BlackImage;
     /* you have to edit the startup_stm32fxxx.s file and set a big enough heap size */
     UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
-    Log.error("%s [%d]: free heap - %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
-    Log.error("%s [%d]: free alloc heap - %d\r\n", __FILE__, __LINE__, ESP.getMaxAllocHeap());
+    Log_error("free heap - %d", ESP.getFreeHeap());
+    Log_error("free alloc heap - %d", ESP.getMaxAllocHeap());
     if ((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL)
     {
-        Log.fatal("%s [%d]: Failed to apply for black memory...\r\n", __FILE__, __LINE__);
+        Log_fatal("Failed to apply for black memory...");
         ESP.restart();
     }
 
-    Log.info("%s [%d]: Paint_NewImage\r\n", __FILE__, __LINE__);
+    Log_info("Paint_NewImage");
     Paint_NewImage(BlackImage, width, height, 0, WHITE);
 
-    Log.info("%s [%d]: show image for array\r\n", __FILE__, __LINE__);
+    Log_info("show image for array");
     Paint_SelectImage(BlackImage);
     Paint_Clear(WHITE);
     Paint_DrawBitMap(image_buffer + 62);
@@ -439,7 +439,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     {
     case FRIENDLY_ID:
     {
-        Log.info("%s [%d]: friendly id case\r\n", __FILE__, __LINE__);
+        Log_info("friendly id case");
         char string1[] = "Please sign up at usetrmnl.com/signup";
         Paint_DrawString_EN((800 - sizeof(string1) * 17 > 9) ? (800 - sizeof(string1) * 17) / 2 + 9 : 0, 400, string1, &Font24, WHITE, BLACK);
 
@@ -454,7 +454,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     break;
     case WIFI_CONNECT:
     {
-        Log.info("%s [%d]: wifi connect case\r\n", __FILE__, __LINE__);
+        Log_info("wifi connect case");
 
         String string1 = "FW: ";
         string1 += fw_version;
@@ -478,9 +478,9 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     default:
         break;
     }
-    Log.info("%s [%d]: Start drawing...\r\n", __FILE__, __LINE__);
+    Log_info("Start drawing...");
     EPD_7IN5_V2_Display(BlackImage);
-    Log.info("%s [%d]: display\r\n", __FILE__, __LINE__);
+    Log_info("display");
     free(BlackImage);
     BlackImage = NULL;
 }
@@ -492,6 +492,6 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
  */
 void display_sleep(void)
 {
-    Log.info("%s [%d]: Goto Sleep...\r\n", __FILE__, __LINE__);
+    Log_info("Goto Sleep...");
     EPD_7IN5B_V2_Sleep();
 }

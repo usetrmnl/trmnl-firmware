@@ -83,7 +83,7 @@ void gather_stored_logs(String &log, Preferences &preferences)
       {
         log += note;
 
-        String next_key = PREFERENCES_LOG_KEY + String(i+1);
+        String next_key = PREFERENCES_LOG_KEY + String(i + 1);
         if (preferences.isKey(next_key.c_str()))
         {
           log += ",";
@@ -106,7 +106,7 @@ void clear_stored_logs(Preferences &preferences)
       if (note_del)
         Log_info("log note deleted");
       else
-        Log.info("log note not deleted");
+        Log_info("log note not deleted");
     }
   }
 }

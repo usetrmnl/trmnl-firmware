@@ -3,10 +3,11 @@
 #include "trmnl_log.h"
 #include <memory>
 #include "http_client.h"
+#include <api_request_serialization.h>
 
 bool submitLogToApi(LogApiInput &input, const char *api_url)
 {
-  String payload = "{\"log\":{\"logs_array\":[" + String(input.log_buffer) + "]}}";
+  String payload = serializeApiLogRequest(input.log_buffer);
   Log_info("[HTTPS] begin /api/log ...");
 
   char new_url[200];
@@ -29,6 +30,10 @@ bool submitLogToApi(LogApiInput &input, const char *api_url)
                     https.addHeader("Accept", "application/json");
                     https.addHeader("Access-Token", input.api_key);
                     https.addHeader("Content-Type", "application/json");
+
+                    https.setTimeout(15000);
+                    https.setConnectTimeout(15000);
+
                     Log_info("Send log - %s", payload.c_str());
                     // start connection and send HTTP header
                     int httpCode = https.POST(payload);

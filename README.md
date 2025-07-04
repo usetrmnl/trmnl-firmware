@@ -12,7 +12,7 @@ graph TB
     Start --> Init
 
     IsLongRst{"Reset button 
-      pressed > 300 ms?"}
+      pressed > 5000 ms?"}
     Init --> IsLongRst
 
     ClearWifi("Wi-Fi credentials clear")

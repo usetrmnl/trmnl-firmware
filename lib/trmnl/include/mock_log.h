@@ -1,20 +1,53 @@
 
 #pragma once
 
-/** Empty reimplementation of ArduinoLog for use by tests */
+#include <cstdio>
+#include <cstdarg>
+
+/** Reimplementation of ArduinoLog for use by tests */
 class Logging
 {
+private:
+  void logImpl(const char *level, const char *msg, va_list args)
+  {
+    printf("[%s] ", level);
+    vprintf(msg, args);
+  }
+
 public:
   Logging() {}
 
-  template <class T>
-  void fatal(T msg, ...) {}
+  void fatal(const char *msg, ...)
+  {
+    va_list args;
+    va_start(args, msg);
+    logImpl("FATAL", msg, args);
+    va_end(args);
+  }
 
-  template <class T>
-  void error(T msg, ...) {}
+  void error(const char *msg, ...)
+  {
+    va_list args;
+    va_start(args, msg);
+    logImpl("ERROR", msg, args);
+    va_end(args);
+  }
 
-  template <class T>
-  void info(T msg, ...) {}
+  void info(const char *msg, ...)
+  {
+    va_list args;
+    va_start(args, msg);
+    logImpl("INFO", msg, args);
+    va_end(args);
+  }
+
+  void verbose(const char *msg, ...)
+  {
+    va_list args;
+    va_start(args, msg);
+    logImpl("VERBOSE", msg, args);
+    va_end(args);
+  };
 };
 
 extern Logging Log;
