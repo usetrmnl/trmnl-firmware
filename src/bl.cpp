@@ -1516,6 +1516,7 @@ static void getDeviceCredentials()
         // start connection and send HTTP header
 
         https.addHeader("ID", WiFi.macAddress());
+        https.addHeader("Content-Type", "application/json");
         https.addHeader("FW-Version", fw_version_string);
         Log.info("%s [%d]: Device MAC address: %s\r\n", __FILE__, __LINE__, WiFi.macAddress().c_str());
 
