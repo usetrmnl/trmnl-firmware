@@ -25,6 +25,7 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
            String(inputs.rssi));
 
   https.addHeader("ID", inputs.macAddress);
+  https.addHeader("Content-Type", "application/json");
   https.addHeader("Access-Token", inputs.apiKey);
   https.addHeader("Refresh-Rate", String(inputs.refreshRate));
   https.addHeader("Battery-Voltage", String(inputs.batteryVoltage));
