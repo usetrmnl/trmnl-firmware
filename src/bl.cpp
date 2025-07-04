@@ -32,6 +32,7 @@
 #include "driver/gpio.h"
 #include <nvs.h>
 #include <serialize_log.h>
+#include <preferences_persistence.h>
 
 bool pref_clear = false;
 String new_filename = "";
@@ -57,6 +58,8 @@ SPECIAL_FUNCTION special_function = SF_NONE;
 RTC_DATA_ATTR uint8_t need_to_refresh_display = 1;
 
 Preferences preferences;
+PreferencesPersistence preferencesPersistence(preferences);
+StoredLogs storedLogs(LOG_MAX_NOTES_NUMBER, PREFERENCES_LOG_KEY, PREFERENCES_LOG_BUFFER_HEAD_KEY, preferencesPersistence);
 
 static https_request_err_e downloadAndShow(); // download and show the image
 static uint32_t downloadStream(WiFiClient *stream, int content_size, uint8_t *buffer);
@@ -1935,7 +1938,11 @@ static void submitOrSaveLogString(const char *log_buffer, size_t size)
   {
     Log_info("Was unable to send log to API; saving locally for later.");
     // log not send
-    store_log(log_buffer, size, preferences);
+    LogStoreResult store_result = storedLogs.store_log(String(log_buffer));
+    if (store_result.status != LogStoreResult::SUCCESS)
+    {
+      Log_error("Failed to store log: %s", store_result.message);
+    }
   }
 }
 
@@ -1954,8 +1961,7 @@ static uint32_t getTime(void)
 
 static void submitStoredLogs(void)
 {
-  String log;
-  gather_stored_logs(log, preferences);
+  String log = storedLogs.gather_stored_logs();
 
   String api_key = "";
   if (preferences.isKey(PREFERENCES_API_KEY))
@@ -1983,7 +1989,7 @@ static void submitStoredLogs(void)
   }
   if (submitLogToApiResult == true)
   {
-    clear_stored_logs(preferences);
+    storedLogs.clear_stored_logs();
   }
 }
 
