@@ -1,0 +1,3 @@
+// Workaround: somehow the esp-dsp is not working, thus PNGdec fails to compile
+// At the same time, the s3_rgb565 function is not required anyway...
+#define dsps_fft2r_sc16_aes3_enabled 0
