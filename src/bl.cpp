@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <WiFi.h>
 #include <bl.h>
 #include <types.h>
 #include <ArduinoLog.h>

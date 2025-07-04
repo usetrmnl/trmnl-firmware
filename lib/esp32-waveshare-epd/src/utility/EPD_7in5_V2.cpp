@@ -272,18 +272,27 @@ parameter:
 ******************************************************************************/
 static void EPD_Reset(void)
 {
-    //DEV_Digital_Write(EPD_RST_PIN, 1);
+#ifdef BOARD_XIAO_EPAPER_DISPLAY
+    DEV_Digital_Write(EPD_RST_PIN, 1);
+#else
     REG_WRITE(GPIO_OUT_W1TS_REG, 1 << EPD_RST_PIN);
+#endif
 
     DEV_Delay_ms(200);
     
-    //DEV_Digital_Write(EPD_RST_PIN, 0);
+#ifdef BOARD_XIAO_EPAPER_DISPLAY
+    DEV_Digital_Write(EPD_RST_PIN, 0);
+#else
     REG_WRITE(GPIO_OUT_W1TC_REG, 1 << EPD_RST_PIN);
+#endif
 
     DEV_Delay_ms(2);
 
-    //DEV_Digital_Write(EPD_RST_PIN, 1);
+#ifdef BOARD_XIAO_EPAPER_DISPLAY
+    DEV_Digital_Write(EPD_RST_PIN, 1);
+#else
     REG_WRITE(GPIO_OUT_W1TS_REG, 1 << EPD_RST_PIN);
+#endif
 
     DEV_Delay_ms(200);
 }
@@ -295,8 +304,11 @@ parameter:
 ******************************************************************************/
 static void EPD_SendCommand(UBYTE Reg)
 {
-    //DEV_Digital_Write(EPD_DC_PIN, 0);
+#ifdef BOARD_XIAO_EPAPER_DISPLAY
+    DEV_Digital_Write(EPD_DC_PIN, 0);
+#else
     REG_WRITE(GPIO_OUT_W1TC_REG, 1 << EPD_DC_PIN);
+#endif
 
     DEV_SPI_WriteByte(Reg);
 
@@ -311,7 +323,11 @@ parameter:
 ******************************************************************************/
 static void EPD_SendData(UBYTE Data)
 {
+#ifdef BOARD_XIAO_EPAPER_DISPLAY
+    DEV_Digital_Write(EPD_DC_PIN, 1);
+#else
     REG_WRITE(GPIO_OUT_W1TS_REG, 1 << EPD_DC_PIN);
+#endif
 
     DEV_SPI_WriteByte(Data);
 }
