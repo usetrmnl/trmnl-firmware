@@ -83,6 +83,12 @@ static DeviceStatusStamp getDeviceStatusStamp();
 void submitLog(const char *format, time_t time, int line, const char *file, ...);
 void log_nvs_usage();
 
+#ifndef FW_VERSION_SUFFIX
+#define FW_VERSION_SUFFIX ""
+#endif
+
+String fw_version_string = String(FW_MAJOR_VERSION) + "." + String(FW_MINOR_VERSION) + "." + String(FW_PATCH_VERSION) + String(FW_VERSION_SUFFIX);
+
 #define submit_log(format, ...) submitLog(format, getTime(), __LINE__, __FILE__, ##__VA_ARGS__);
 
 void wait_for_serial()
@@ -180,7 +186,7 @@ void bl_init(void)
       {
       case SF_IDENTIFY:
       {
-        Log.info("%s [%d]: Identify special function...It will be handled while API ping...\r\n", __FILE__, __LINE__);
+        Log.info("%s [%d]: Identify special function...It will be handled with API ping...\r\n", __FILE__, __LINE__);
       }
       break;
       case SF_SLEEP:
@@ -197,7 +203,7 @@ void bl_init(void)
       break;
       case SF_RESTART_PLAYLIST:
       {
-        Log.info("%s [%d]: Identify special function...It will be handled while API ping...\r\n", __FILE__, __LINE__);
+        Log.info("%s [%d]: Restart Playlist special function...It will be handled with API ping...\r\n", __FILE__, __LINE__);
       }
       break;
       case SF_REWIND:
@@ -207,7 +213,12 @@ void bl_init(void)
       break;
       case SF_SEND_TO_ME:
       {
-        Log.info("%s [%d]: Send to me special function...It will be handled while API ping...\r\n", __FILE__, __LINE__);
+        Log.info("%s [%d]: Send to me special function...It will be handled with API ping...\r\n", __FILE__, __LINE__);
+      }
+      break;
+      case SF_GUEST_MODE:
+      {
+        Log.info("%s [%d]: Guest Mode special function...It will be handled with API ping...\r\n", __FILE__, __LINE__);
       }
       break;
       default:
@@ -242,7 +253,7 @@ void bl_init(void)
   // Mount SPIFFS
   filesystem_init();
 
-  Log_info("Firmware version %d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
+  Log_info("Firmware version %s", fw_version_string);
   Log_info("Arduino version %d.%d.%d", ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH);
   Log_info("ESP-IDF version %d.%d.%d", ESP_IDF_VERSION_MAJOR, ESP_IDF_VERSION_MINOR, ESP_IDF_VERSION_PATCH);
   list_files();
@@ -285,15 +296,9 @@ void bl_init(void)
     // WiFi credentials are not saved - start captive portal
     Log.info("%s [%d]: WiFi NOT saved\r\n", __FILE__, __LINE__);
 
-    char fw_version[20];
+    Log_info("FW version %s", fw_version_string);
 
-    sprintf(fw_version, "%d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
-
-    String fw = fw_version;
-
-    Log.info("%s [%d]: FW version %s\r\n", __FILE__, __LINE__, fw_version);
-
-    showMessageWithLogo(WIFI_CONNECT, "", false, fw.c_str(), "");
+    showMessageWithLogo(WIFI_CONNECT, "", false, fw_version_string.c_str(), "");
     WifiCaptivePortal.setResetSettingsCallback(resetDeviceCredentials);
     res = WifiCaptivePortal.startPortal();
     if (!res)
@@ -448,7 +453,7 @@ void bl_init(void)
   break;
   case HTTPS_WRONG_IMAGE_FORMAT:
   {
-    showMessageWithLogo(BMP_FORMAT_ERROR);
+    showMessageWithLogo(MSG_FORMAT_ERROR);
   }
   break;
   case HTTPS_WRONG_IMAGE_SIZE:
@@ -546,13 +551,12 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
 
   inputs.batteryVoltage = readBatteryVoltage();
 
-  inputs.firmwareVersion = String(FW_MAJOR_VERSION) + "." +
-                           String(FW_MINOR_VERSION) + "." +
-                           String(FW_PATCH_VERSION);
+  inputs.firmwareVersion = String(fw_version_string);
 
   inputs.rssi = WiFi.RSSI();
   inputs.displayWidth = display_width();
   inputs.displayHeight = display_height();
+  inputs.model = DEVICE_MODEL;
   inputs.specialFunction = special_function;
 
   return inputs;
@@ -570,6 +574,12 @@ static https_request_err_e downloadAndShow()
   apiHostname.replace("https://", "");
   apiHostname.replace("http://", "");
   apiHostname.replace("/", "");
+
+  int colon = apiHostname.indexOf(':');
+  if (colon != -1) {
+    apiHostname = apiHostname.substring(0, colon);
+  }
+
   for (int attempt = 1; attempt <= 5; ++attempt)
   {
     if (WiFi.hostByName(apiHostname.c_str(), serverIP) == 1)
@@ -719,7 +729,6 @@ static https_request_err_e downloadAndShow()
           }
 
           Log.info("%s [%d]: Received successfully\r\n", __FILE__, __LINE__);
-
           bool bmp_rename = false;
 
           if (filesystem_file_exists("/current.bmp") || filesystem_file_exists("/current.png"))
@@ -731,7 +740,6 @@ static https_request_err_e downloadAndShow()
           }
 
           bool image_reverse = false;
-
           if (isPNG)
           {
             writeImageToFile("/current.png", buffer, content_size);
@@ -826,7 +834,7 @@ static https_request_err_e downloadAndShow()
               result = HTTPS_SUCCESS;
           }
           break;
-          case BMP_FORMAT_ERROR:
+          case BMP_NOT_BMP:
           {
             error = "First two header bytes are invalid!";
           }
@@ -1220,7 +1228,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
         }
         else
         {
-          Log.error("%s [%d]: identify failed\r\n", __FILE__, __LINE__);
+          Log.error("%s [%d]: Restart playlist failed\r\n", __FILE__, __LINE__);
         }
       }
       break;
@@ -1239,7 +1247,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           image_err_e image_proccess_response = PNG_WRONG_FORMAT;
           bmp_err_e bmp_proccess_response = BMP_NOT_BMP;
 
-          // showMessageWithLogo(BMP_FORMAT_ERROR);
+          // showMessageWithLogo(MSG_FORMAT_ERROR);
           String last_dot_file = filesystem_file_exists("/last.bmp") ? "/last.bmp" : "/last.png";
           if (last_dot_file == "/last.bmp")
           {
@@ -1290,7 +1298,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           {
             free(buffer);
             buffer = nullptr;
-            showMessageWithLogo(BMP_FORMAT_ERROR);
+            showMessageWithLogo(MSG_FORMAT_ERROR);
           }
         }
         else
@@ -1311,7 +1319,6 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           Log.info("%s [%d]: send_to_me success\r\n", __FILE__, __LINE__);
 
           bool image_reverse = false;
-          image_err_e image_proccess_response = PNG_WRONG_FORMAT;
 
           if (!filesystem_file_exists("/current.bmp") && !filesystem_file_exists("/current.png"))
           {
@@ -1371,6 +1378,70 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
         else
         {
           Log.error("%s [%d]: send_to_me failed\r\n", __FILE__, __LINE__);
+        }
+      }
+      break;
+      case SF_GUEST_MODE:
+      {
+        String action = apiResponse.action;
+        if (action.equals("guest_mode"))
+        {
+          Log.info("%s [%d]:Guest Mode success\r\n", __FILE__, __LINE__);
+          String image_url = apiResponse.image_url;
+          if (image_url.length() > 0)
+          {
+            Log.info("%s [%d]: image_url: %s\r\n", __FILE__, __LINE__, image_url.c_str());
+            Log.info("%s [%d]: image url end with: %d\r\n", __FILE__, __LINE__, image_url.endsWith("/setup-logo.bmp"));
+
+            image_url.toCharArray(filename, image_url.length() + 1);
+            // check if plugin is applied
+            bool flag = preferences.getBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
+            Log.info("%s [%d]: flag: %d\r\n", __FILE__, __LINE__, flag);
+
+            if (apiResponse.filename == "empty_state")
+            {
+              Log.info("%s [%d]: End with empty_state\r\n", __FILE__, __LINE__);
+              if (!flag)
+              {
+                // draw received logo
+                status = true;
+                // set flag to true
+                if (preferences.getBool(PREFERENCES_DEVICE_REGISTERED_KEY, false) != true) // check the flag to avoid the re-writing
+                {
+                  bool res = preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, true);
+                  if (res)
+                    Log.info("%s [%d]: Flag written true successfully\r\n", __FILE__, __LINE__);
+                  else
+                    Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
+                }
+              }
+              else
+              {
+                // don't draw received logo
+                status = false;
+              }
+            }
+            else
+            {
+              Log.info("%s [%d]: End with NO empty_state\r\n", __FILE__, __LINE__);
+              if (flag)
+              {
+                if (preferences.getBool(PREFERENCES_DEVICE_REGISTERED_KEY, false) != false) // check the flag to avoid the re-writing
+                {
+                  bool res = preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
+                  if (res)
+                    Log.info("%s [%d]: Flag written false successfully\r\n", __FILE__, __LINE__);
+                  else
+                    Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
+                }
+              }
+              status = true;
+            }
+          }
+        }
+        else
+        {
+          Log.error("%s [%d]: Guest Mode failed\r\n", __FILE__, __LINE__);
         }
       }
       break;
@@ -1438,9 +1509,6 @@ static void getDeviceCredentials()
       strcpy(new_url, preferences.getString(PREFERENCES_API_URL, API_BASE_URL).c_str());
       strcat(new_url, "/api/setup/");
 
-      char fw_version[30];
-      sprintf(fw_version, "%d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
-
       if (https.begin(*client, new_url))
       { // HTTPS
         Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
@@ -1449,7 +1517,7 @@ static void getDeviceCredentials()
 
         https.addHeader("ID", WiFi.macAddress());
         https.addHeader("Content-Type", "application/json");
-        https.addHeader("FW-Version", fw_version);
+        https.addHeader("FW-Version", fw_version_string);
         Log.info("%s [%d]: Device MAC address: %s\r\n", __FILE__, __LINE__, WiFi.macAddress().c_str());
 
         int httpCode = https.GET();
@@ -2093,14 +2161,11 @@ DeviceStatusStamp getDeviceStatusStamp()
 {
   DeviceStatusStamp deviceStatus = {};
 
-  char fw_version[30];
-  sprintf(fw_version, "%d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
-
   deviceStatus.wifi_rssi_level = WiFi.RSSI();
   parseWifiStatusToStr(deviceStatus.wifi_status, sizeof(deviceStatus.wifi_status), WiFi.status());
   deviceStatus.refresh_rate = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY);
   deviceStatus.time_since_last_sleep = time_since_sleep;
-  snprintf(deviceStatus.current_fw_version, sizeof(deviceStatus.current_fw_version), "%d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
+  snprintf(deviceStatus.current_fw_version, sizeof(deviceStatus.current_fw_version), "%s", fw_version_string);
   parseSpecialFunctionToStr(deviceStatus.special_function, sizeof(deviceStatus.special_function), special_function);
   deviceStatus.battery_voltage = readBatteryVoltage();
   parseWakeupReasonToStr(deviceStatus.wakeup_reason, sizeof(deviceStatus.wakeup_reason), esp_sleep_get_wakeup_cause());

@@ -5,3 +5,6 @@
 .vscode/ipch
 .idea
 .vscode/settings.json
+sdkconfig.*
+!sdkconfig.defaults
+

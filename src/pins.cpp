@@ -5,10 +5,4 @@
 void pins_init(void)
 {
     pinMode(PIN_INTERRUPT, INPUT);
-    pinMode(PIN_RESET, INPUT_PULLUP);
-}
-
-void pins_set_clear_interrupt(void (*f)(void))
-{
-    attachInterrupt(PIN_RESET, f, RISING);
 }

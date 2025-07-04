@@ -3,7 +3,7 @@
 
 #define FW_MAJOR_VERSION 1
 #define FW_MINOR_VERSION 5
-#define FW_PATCH_VERSION 6
+#define FW_PATCH_VERSION 10
 
 #define LOG_MAX_NOTES_NUMBER 5
 
@@ -50,19 +50,19 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 };
 
 #if defined(BOARD_TRMNL)
-#define PIN_RESET 9
 #define PIN_INTERRUPT 2
+#define DEVICE_MODEL "og"
 #elif defined(BOARD_WAVESHARE_ESP32_DRIVER)
-#define PIN_RESET 25
+#define DEVICE_MODEL "waveshare"
 #define PIN_INTERRUPT 16
 #define FAKE_BATTERY_VOLTAGE
 #elif defined(BOARD_SEEED_XIAO_ESP32C3)
+#define DEVICE_MODEL "seeed_esp32c3"
 #define PIN_INTERRUPT 9
-#define PIN_RESET 9
 #define FAKE_BATTERY_VOLTAGE
 #elif defined(BOARD_SEEED_XIAO_ESP32S3)
+#define DEVICE_MODEL "seeed_esp32s3"
 #define PIN_INTERRUPT 0
-#define PIN_RESET 0
 #define FAKE_BATTERY_VOLTAGE
 #endif
 

@@ -52,6 +52,7 @@ struct ApiDisplayInputs
   String macAddress;
   float batteryVoltage;
   String firmwareVersion;
+  String model;
   int rssi;
   int displayWidth;
   int displayHeight;

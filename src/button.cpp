@@ -41,4 +41,5 @@ ButtonPressResult read_button_presses()
 const char *ButtonPressResultNames[] = {
     "LongPress",
     "DoubleClick",
-    "NoAction"};
+    "NoAction",
+    "SoftReset"};

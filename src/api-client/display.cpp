@@ -15,6 +15,7 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
            "Refresh_Rate: %s\n\r"
            "Battery-Voltage: %s\n\r"
            "FW-Version: %s\r\n"
+           "Model: %s\r\n"
            "RSSI: %s\r\n",
            inputs.macAddress.c_str(),
            inputs.specialFunction,
@@ -22,6 +23,7 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
            String(inputs.refreshRate).c_str(),
            String(inputs.batteryVoltage).c_str(),
            inputs.firmwareVersion.c_str(),
+           inputs.model.c_str(),
            String(inputs.rssi));
 
   https.addHeader("ID", inputs.macAddress);
@@ -30,6 +32,7 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
   https.addHeader("Refresh-Rate", String(inputs.refreshRate));
   https.addHeader("Battery-Voltage", String(inputs.batteryVoltage));
   https.addHeader("FW-Version", inputs.firmwareVersion);
+  https.addHeader("Model", String(inputs.model));
   https.addHeader("RSSI", String(inputs.rssi));
   https.addHeader("Width", String(inputs.displayWidth));
   https.addHeader("Height", String(inputs.displayHeight));
