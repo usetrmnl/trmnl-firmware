@@ -453,7 +453,7 @@ void bl_init(void)
   break;
   case HTTPS_WRONG_IMAGE_FORMAT:
   {
-    showMessageWithLogo(BMP_FORMAT_ERROR);
+    showMessageWithLogo(MSG_FORMAT_ERROR);
   }
   break;
   case HTTPS_WRONG_IMAGE_SIZE:
@@ -729,7 +729,6 @@ static https_request_err_e downloadAndShow()
           }
 
           Log.info("%s [%d]: Received successfully\r\n", __FILE__, __LINE__);
-
           bool bmp_rename = false;
 
           if (filesystem_file_exists("/current.bmp") || filesystem_file_exists("/current.png"))
@@ -741,7 +740,6 @@ static https_request_err_e downloadAndShow()
           }
 
           bool image_reverse = false;
-
           if (isPNG)
           {
             writeImageToFile("/current.png", buffer, content_size);
@@ -836,7 +834,7 @@ static https_request_err_e downloadAndShow()
               result = HTTPS_SUCCESS;
           }
           break;
-          case BMP_FORMAT_ERROR:
+          case BMP_NOT_BMP:
           {
             error = "First two header bytes are invalid!";
           }
@@ -1249,7 +1247,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           image_err_e image_proccess_response = PNG_WRONG_FORMAT;
           bmp_err_e bmp_proccess_response = BMP_NOT_BMP;
 
-          // showMessageWithLogo(BMP_FORMAT_ERROR);
+          // showMessageWithLogo(MSG_FORMAT_ERROR);
           String last_dot_file = filesystem_file_exists("/last.bmp") ? "/last.bmp" : "/last.png";
           if (last_dot_file == "/last.bmp")
           {
@@ -1300,7 +1298,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           {
             free(buffer);
             buffer = nullptr;
-            showMessageWithLogo(BMP_FORMAT_ERROR);
+            showMessageWithLogo(MSG_FORMAT_ERROR);
           }
         }
         else
@@ -1321,7 +1319,6 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           Log.info("%s [%d]: send_to_me success\r\n", __FILE__, __LINE__);
 
           bool image_reverse = false;
-          image_err_e image_proccess_response = PNG_WRONG_FORMAT;
 
           if (!filesystem_file_exists("/current.bmp") && !filesystem_file_exists("/current.png"))
           {
