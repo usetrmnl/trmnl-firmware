@@ -348,14 +348,12 @@ static void EPD_WaitUntilIdle(void)
 {
     Debug("e-Paper busy\r\n");
     unsigned char busy;
-    do
-    {
-        delayMicroseconds(100);
-        //EPD_SendCommand(0x71);
-        //busy = DEV_Digital_Read(EPD_BUSY_PIN);
-        busy = gpio_get_level( (gpio_num_t)EPD_BUSY_PIN );
-    } while (!busy);
-    // DEV_Delay_ms(200);
+
+    while (1) {
+        if (gpio_get_level( (gpio_num_t)EPD_BUSY_PIN ) == 1) break;
+        delay(1);  //give CPU to WiFi stack
+    }
+
     Debug("e-Paper busy release\r\n");
 }
 

@@ -154,6 +154,7 @@ void WifiCaptive::resetSettings()
     }
 
     WiFi.disconnect(true, true);
+    WiFi.eraseAP();
 }
 
 uint8_t WifiCaptive::connect(const WifiCredentials credentials)
