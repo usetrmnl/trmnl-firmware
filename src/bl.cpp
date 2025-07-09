@@ -1900,17 +1900,22 @@ static float readBatteryVoltage(void)
   Log.warning("%s [%d]: FAKE_BATTERY_VOLTAGE is defined. Returning 4.2V.\r\n", __FILE__, __LINE__);
   return 4.2f;
 #else
-  Log.info("%s [%d]: Battery voltage reading...\r\n", __FILE__, __LINE__);
-  int32_t adc = 0;
-  for (uint8_t i = 0; i < 128; i++)
-  {
-    adc += analogReadMilliVolts(PIN_BATTERY);
-  }
+  #ifdef BOARD_XIAO_EPAPER_DISPLAY
+    const int adcEnPin = 6;
+    pinMode(adcEnPin, OUTPUT);
+    digitalWrite(adcEnPin, HIGH);
+  #endif
+    Log.info("%s [%d]: Battery voltage reading...\r\n", __FILE__, __LINE__);
+    int32_t adc = 0;
+    for (uint8_t i = 0; i < 128; i++)
+    {
+      adc += analogReadMilliVolts(PIN_BATTERY);
+    }
 
-  int32_t sensorValue = (adc / 128) * 2;
+    int32_t sensorValue = (adc / 128) * 2;
 
-  float voltage = sensorValue / 1000.0;
-  return voltage;
+    float voltage = sensorValue / 1000.0;
+    return voltage;
 #endif // FAKE_BATTERY_VOLTAGE
 }
 
