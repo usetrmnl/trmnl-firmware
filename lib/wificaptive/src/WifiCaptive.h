@@ -17,7 +17,7 @@
 // Define the DNS interval in milliseconds between processing DNS requests
 #define DNS_INTERVAL 60
 // Define the maximum number of clients that can connect to the server
-#define MAX_CLIENTS 1
+#define MAX_CLIENTS 4
 // Define the WiFi channel to be used (channel 6 in this case)
 #define WIFI_CHANNEL 6
 // Define the maximum number of possible saved credentials
