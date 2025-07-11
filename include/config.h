@@ -5,6 +5,17 @@
 #define FW_MINOR_VERSION 5
 #define FW_PATCH_VERSION 11
 
+// Helper macros for stringification
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+
+#ifndef FW_VERSION_SUFFIX
+#define FW_VERSION_SUFFIX ""
+#endif
+
+// Compile-time firmware version string
+#define FW_VERSION_STRING TOSTRING(FW_MAJOR_VERSION) "." TOSTRING(FW_MINOR_VERSION) "." TOSTRING(FW_PATCH_VERSION) FW_VERSION_SUFFIX
+
 #define LOG_MAX_NOTES_NUMBER 5
 
 #define PREFERENCES_API_KEY "api_key"
