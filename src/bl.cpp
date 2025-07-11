@@ -11,7 +11,6 @@
 #include <stdlib.h>
 #include <ESPAsyncWebServer.h>
 #include <AsyncTCP.h>
-#include <ImageData.h>
 #include <Preferences.h>
 #include <cstdint>
 #include <png_file.h>
@@ -32,6 +31,7 @@
 #include "driver/gpio.h"
 #include <nvs.h>
 #include <serialize_log.h>
+#include "logo_small.h"
 
 bool pref_clear = false;
 String new_filename = "";
@@ -2076,7 +2076,7 @@ static uint8_t *storedLogoOrDefault(void)
   {
     return buffer;
   }
-  return const_cast<uint8_t *>(default_icon);
+  return const_cast<uint8_t *>(logo_small);
 }
 
 static bool saveCurrentFileName(String &name)
