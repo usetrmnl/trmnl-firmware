@@ -1972,10 +1972,12 @@ void bbepFill(BBEPDISP *pBBEP, unsigned char ucColor, int iPlane)
             memset(&pBBEP->ucScreen[iSize], uc2, iSize);
         } else if (iPlane == PLANE_DUPLICATE) {
             memset(pBBEP->ucScreen, uc1, iSize);
-            memset(&pBBEP->ucScreen[iSize], uc1, iSize);
+            if (pBBEP->iFlags & BBEP_HAS_SECOND_PLANE) {
+                memset(&pBBEP->ucScreen[iSize], uc1, iSize);
+            }
         } else if (iPlane == PLANE_0) {
             memset(pBBEP->ucScreen, uc1, iSize);
-        } else if (iPlane == PLANE_1) {
+        } else if (iPlane == PLANE_1 && (pBBEP->iFlags & BBEP_HAS_SECOND_PLANE)) {
             memset(&pBBEP->ucScreen[iSize], uc2, iSize);
         }
     } else { // write directly to the EPD's framebuffer
@@ -2624,7 +2626,9 @@ int bbepWritePlane(BBEPDISP *pBBEP, int iPlane)
             break;
         case PLANE_BOTH:
             bbepWriteImage(pBBEP, ucCMD1, pBBEP->ucScreen, 0);
-            bbepWriteImage(pBBEP, ucCMD2, &pBBEP->ucScreen[iOffset], 0);
+            if (pBBEP->iFlags & BBEP_HAS_SECOND_PLANE) {
+                bbepWriteImage(pBBEP, ucCMD2, &pBBEP->ucScreen[iOffset], 0);
+            }
             break;
         case PLANE_DUPLICATE:
             bbepWriteImage(pBBEP, ucCMD1, pBBEP->ucScreen, 0);

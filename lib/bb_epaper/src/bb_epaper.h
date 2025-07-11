@@ -192,6 +192,7 @@ enum {
 #define BBEP_PARTIAL2 0x0080
 #define BBEP_4BPP_DATA 0x0100
 #define BBEP_SPLIT_BUFFER 0x0200
+#define BBEP_HAS_SECOND_PLANE 0x0400
 
 #define BBEP_BLACK 0
 #define BBEP_WHITE 1
@@ -441,7 +442,7 @@ class BBEPAPER
     void writeCmd(uint8_t u8Cmd);
     int refresh(int iMode, bool bWait = true);
     void setBuffer(uint8_t *pBuffer);
-    int allocBuffer(void);
+    int allocBuffer(bool bSecondPlane = true);
     void * getBuffer(void);
     void freeBuffer(void);
     uint32_t capabilities();

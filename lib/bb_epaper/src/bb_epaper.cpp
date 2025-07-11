@@ -144,9 +144,9 @@ void BBEPAPER::backupPlane(void)
         memcpy(&_bbep.ucScreen[iSize], _bbep.ucScreen, iSize);
     }
 }
-int BBEPAPER::allocBuffer(void)
+int BBEPAPER::allocBuffer(bool bSecondPlane)
 {
-    return bbepAllocBuffer(&_bbep);
+    return bbepAllocBuffer(&_bbep, (int)bSecondPlane);
 } /* allocBuffer() */
 
 void * BBEPAPER::getBuffer(void)
@@ -435,7 +435,11 @@ static uint8_t u8Unicode0, u8Unicode1;
       }
     if (c == '\n') {
       _bbep.iCursorX = 0;
-      _bbep.iCursorY += pBBF->height;
+       if (pBBF) {
+           _bbep.iCursorY += pBBF->height;
+       } else {
+           _bbep.iCursorY += pBBFS->height;
+       }
     } else if (c != '\r') {
       if (c >= first && c <= last) {
           if (pBBF) {

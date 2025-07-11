@@ -8,11 +8,7 @@
 #include "wifi_failed_qr.h"
 #include <ctype.h> //iscntrl()
 #include <trmnl_log.h>
-#include "../lib/bb_epaper/Fonts/Lora_24.h"
-#include "../lib/bb_epaper/Fonts/Lora_20.h"
-#include "../lib/bb_epaper/Fonts/Lora_16.h"
-#include "../lib/bb_epaper/Fonts/Lora_12.h"
-#include "../lib/bb_epaper/Fonts/Lora_8.h"
+#include "../lib/bb_epaper/Fonts/Roboto_20.h"
 
 BBEPAPER bbep(EP75_800x480);
 
@@ -265,7 +261,7 @@ void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG)
         {
             // G5 compressed image
             BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
-            bbep.allocBuffer();
+            bbep.allocBuffer(false);
             bAlloc = true;
             int x = (width - pBBB->width)/2;
             int y = (height - pBBB->height)/2; // center it
@@ -299,7 +295,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     BB_RECT rect;
 
     Log_info("Paint_NewImage");
-    bbep.allocBuffer();
+    bbep.allocBuffer(false);
     Log_info("show image for array");
     if (*(uint16_t *)image_buffer == BB_BITMAP_MARKER)
     {
@@ -315,7 +311,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         memcpy(bbep.getBuffer(), image_buffer+62, Imagesize); // uncompressed 1-bpp bitmap
     }
 
-    bbep.setFont(Lora_20);
+    bbep.setFont(Roboto_20);
     bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
 
     switch (message_type)
@@ -459,7 +455,9 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
  */
 void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_id, bool id, const char *fw_version, String message)
 {
-    bbep.allocBuffer();
+    Log.info("Free heap at before display_show_msg - %d", ESP.getMaxAllocHeap());
+    bbep.allocBuffer(false);
+    Log.info("Free heap after bbep.allocBuffer() - %d", ESP.getMaxAllocHeap());
 
     if (message_type == WIFI_CONNECT)
     {
@@ -473,6 +471,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     auto width = display_width();
     auto height = display_height();
     UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
+    BB_RECT rect;
 
     Log_info("Paint_NewImage");
     Log_info("show image for array");
@@ -491,7 +490,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         memcpy(bbep.getBuffer(), image_buffer+62, Imagesize); // uncompressed 1-bpp bitmap
     }
 
-    bbep.setFont(Lora_20);
+    bbep.setFont(Roboto_20);
     bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
     switch (message_type)
     {
@@ -518,16 +517,20 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 
         String string1 = "FW: ";
         string1 += fw_version;
-        bbep.setCursor((800 - string1.length() * 17 > 9) ? (800 - string1.length() * 17) / 2 + 9 : 0, 340);
-        bbep.print(string1);
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, 330);
+        bbep.println(string1);
         const char string2[] = "Connect phone or computer";
-        bbep.setCursor((800 - sizeof(string2) * 17 > 9) ? (800 - sizeof(string2) * 17) / 2 + 9 : 0, 370);
-        bbep.print(string2);
+        bbep.getStringBox(string2, &rect);
+        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
+        bbep.println(string2);
         const char string3[] = "to \"TRMNL\" WiFi network";
-        bbep.setCursor((800 - sizeof(string3) * 17 > 9) ? (800 - sizeof(string3) * 17) / 2 + 9 : 0, 400);
-        bbep.print(string3);
+        bbep.getStringBox(string3, &rect);
+        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
+        bbep.println(string3);
         const char string4[] = "or scan QR code for help.";
-        bbep.setCursor((800 - sizeof(string4) * 17 > 9) ? (800 - sizeof(string4) * 17) / 2 + 9 : 0, 430);
+        bbep.getStringBox(string4, &rect);
+        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
         bbep.print(string4);
         bbep.loadG5Image(wifi_connect_qr, 639, 336, BBEP_WHITE, BBEP_BLACK);
     }
@@ -536,7 +539,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     {
         UWORD y_start = 340;
         UWORD font_width = 18; // DEBUG
-        Paint_DrawMultilineText(0, y_start, message.c_str(), width, font_width, BBEP_BLACK, BBEP_WHITE, Lora_20, true);
+        Paint_DrawMultilineText(0, y_start, message.c_str(), width, font_width, BBEP_BLACK, BBEP_WHITE, Roboto_20, true);
     }
     break;
     default:

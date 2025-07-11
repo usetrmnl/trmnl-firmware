@@ -1791,7 +1791,7 @@ void bbepGetStringBox(BBEPDISP *pBBEP, BB_FONT *pFont, const char *szMsg, int *w
     *bottom = maxy;
 } /* bbepGetStringBox() */
 
-int bbepAllocBuffer(BBEPDISP *pBBEP)
+int bbepAllocBuffer(BBEPDISP *pBBEP, int bDoubleSize)
 {
 #ifndef NO_RAM
     int iSize;
@@ -1799,7 +1799,10 @@ int bbepAllocBuffer(BBEPDISP *pBBEP)
         iSize = (pBBEP->native_width >> 1) * pBBEP->native_height;
     } else { // B/W or B/W/R or B/W/R/Y
         iSize = ((pBBEP->native_width+7)>>3) * pBBEP->native_height;
-        iSize *= 2; // 2 bit planes
+        if (bDoubleSize) {
+            iSize *= 2; // 2 bit planes
+            pBBEP->iFlags |= BBEP_HAS_SECOND_PLANE;
+        }
     }
 #if defined (HAL_ESP32_HAL_H_) && !defined(__riscv)
     if (iSize > 98000) { // need to use PSRAM
