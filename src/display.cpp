@@ -319,10 +319,12 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     case WIFI_CONNECT:
     {
         const char string1[] = "Connect to TRMNL WiFi";
-        bbep.setCursor((800 - sizeof(string1) * 17 > 9) ? (800 - sizeof(string1) * 17) / 2 + 9 : 0, 400);
-        bbep.print(string1);
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - rect.w)/2, 430);
+        bbep.println(string1);
         const char string2[] = "on your phone or computer";
-        bbep.setCursor((800 - sizeof(string2) * 17 > 9) ? (800 - sizeof(string2) * 17) / 2 + 9 : 0, 430);
+        bbep.getStringBox(string2, &rect);
+        bbep.setCursor((bbep.width() - rect.w)/2, -1);
         bbep.print(string2);
     }
     break;
@@ -330,19 +332,19 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     {
         const char string1[] = "Can't establish WiFi";
         bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - rect.w)/2, 380);
+        bbep.setCursor((bbep.width() - 132 - rect.w)/2, 380);
         bbep.println(string1);
         const char string2[] = "connection. Hold button on";
         bbep.getStringBox(string2, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
         bbep.println(string2);
         const char string3[] = "the back to reset WiFi";
         bbep.getStringBox(string3, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
         bbep.println(string3);
         const char string4[] = "or scan QR Code for help.";
         bbep.getStringBox(string4, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
         bbep.print(string4);
 
         bbep.loadG5Image(wifi_failed_qr, 639, 336, BBEP_WHITE, BBEP_BLACK);
@@ -351,16 +353,20 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     case WIFI_INTERNAL_ERROR:
     {
         const char string1[] = "WiFi connected, but";
-        bbep.setCursor((800 - sizeof(string1) * 17 > 9) ? (800 - sizeof(string1) * 17) / 2 + 9 : 0, 340);
-        bbep.print(string1);
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, 340);
+        bbep.println(string1);
         const char string2[] = "API connection cannot be";
-        bbep.setCursor((800 - sizeof(string2) * 17 > 9) ? (800 - sizeof(string2) * 17) / 2 + 9 : 0, 370);
-        bbep.print(string2);
+        bbep.getStringBox(string2, &rect);
+        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
+        bbep.println(string2);
         const char string3[] = "established. Try to refresh,";
-        bbep.setCursor((800 - sizeof(string3) * 17 > 9) ? (800 - sizeof(string3) * 17) / 2 + 9 : 0, 400);
-        bbep.print(string3);
+        bbep.getStringBox(string3, &rect);
+        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
+        bbep.println(string3);
         const char string4[] = "or scan QR Code for help.";
-        bbep.setCursor((800 - sizeof(string4) * 17 > 9) ? (800 - sizeof(string4) * 17) / 2 + 9 : 0, 430);
+        bbep.getStringBox(string4, &rect);
+        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
         bbep.print(string4);
 
         bbep.loadG5Image(wifi_failed_qr, 639, 336, BBEP_WHITE, BBEP_BLACK);
@@ -369,58 +375,68 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     case WIFI_WEAK:
     {
         const char string1[] = "WiFi connected but signal is weak";
-        bbep.setCursor((800 - sizeof(string1) * 17 > 9) ? (800 - sizeof(string1) * 17) / 2 + 9 : 0, 400);
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, 400);
         bbep.print(string1);
     }
     break;
     case API_ERROR:
     {
         const char string1[] = "WiFi connected, TRMNL not responding.";
-        bbep.setCursor((800 - sizeof(string1) * 17 > 9) ? (800 - sizeof(string1) * 17) / 2 + 9 : 0, 340);
-        bbep.print(string1);
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, 340);
+        bbep.println(string1);
         const char string2[] = "Short click the button on back,";
-        bbep.setCursor((800 - sizeof(string2) * 17 > 9) ? (800 - sizeof(string2) * 17) / 2 + 9 : 0, 400);
-        bbep.print(string2);
+        bbep.getStringBox(string2, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+        bbep.println(string2);
         const char string3[] = "otherwise check your internet.";
-        bbep.setCursor((800 - sizeof(string3) * 17 > 9) ? (800 - sizeof(string3) * 17) / 2 + 9 : 0, 430);
+        bbep.getStringBox(string3, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.print(string3);
     }
     break;
     case API_SIZE_ERROR:
     {
         const char string1[] = "WiFi connected, TRMNL content malformed.";
-        bbep.setCursor((800 - sizeof(string1) * 17 > 9) ? (800 - sizeof(string1) * 17) / 2 + 9 : 0, 400);
-        bbep.print(string1);
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, 400);
+        bbep.println(string1);
         const char string2[] = "Wait or reset by holding button on back.";
-        bbep.setCursor((800 - sizeof(string2) * 17 > 9) ? (800 - sizeof(string2) * 17) / 2 + 9 : 0, 430);
+        bbep.getStringBox(string2, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.print(string2);
     }
     break;
     case FW_UPDATE:
     {
         const char string1[] = "Firmware update available! Starting now...";
-        bbep.setCursor((800 - sizeof(string1) * 17 > 9) ? (800 - sizeof(string1) * 17) / 2 + 9 : 0, 400);
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, 400);
         bbep.print(string1);
     }
     break;
     case FW_UPDATE_FAILED:
     {
         const char string1[] = "Firmware update failed. Device will restart...";
-        bbep.setCursor((800 - sizeof(string1) * 17 > 9) ? (800 - sizeof(string1) * 17) / 2 + 9 : 0, 400);
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, 400);
         bbep.print(string1);
     }
     break;
     case FW_UPDATE_SUCCESS:
     {
         const char string1[] = "Firmware update success. Device will restart..";
-        bbep.setCursor((800 - sizeof(string1) * 17 > 9) ? (800 - sizeof(string1) * 17) / 2 + 9 : 0, 400);
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, 400);
         bbep.print(string1);
     }
     break;
     case MSG_FORMAT_ERROR:
     {
         const char string1[] = "The image format is incorrect";
-        bbep.setCursor((800 - sizeof(string1) * 17 > 9) ? (800 - sizeof(string1) * 17) / 2 + 9 : 0, 400);
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, 400);
         bbep.print(string1);
     }
     break;
@@ -498,8 +514,9 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     {
         Log_info("friendly id case");
         const char string1[] = "Please sign up at usetrmnl.com/signup";
-        bbep.setCursor((800 - sizeof(string1) * 17 > 9) ? (800 - sizeof(string1) * 17) / 2 + 9 : 0, 400);
-        bbep.print(string1);
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - rect.w)/2, 400);
+        bbep.println(string1);
 
         String string2 = "with Friendly ID ";
         if (id)
@@ -507,7 +524,8 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
             string2 += friendly_id;
         }
         string2 += " to finish setup";
-        bbep.setCursor((800 - string2.length() * 17 > 9) ? (800 - string2.length() * 17) / 2 + 9 : 0, 430);
+        bbep.getStringBox(string2, &rect);
+        bbep.setCursor((bbep.width() - rect.w)/2, -1);
         bbep.print(string2);
     }
     break;
