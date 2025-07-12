@@ -124,7 +124,7 @@ void bl_init(void)
     Log_info("WiFi credentials reset completed");
   }
 #endif
-WifiCaptivePortal.resetSettings(); // DEBUG
+
   wakeup_reason = esp_sleep_get_wakeup_cause();
 
   if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO)
