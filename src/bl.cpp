@@ -727,8 +727,8 @@ static https_request_err_e downloadAndShow()
 
             return HTTPS_WRONG_IMAGE_SIZE;
           }
-
-          Log.info("%s [%d]: Received successfully\r\n", __FILE__, __LINE__);
+          WiFi.disconnect(true); // no need for WiFi, save power starting here
+          Log.info("%s [%d]: Received successfully; WiFi off\r\n", __FILE__, __LINE__);
           bool bmp_rename = false;
 
           if (filesystem_file_exists("/current.bmp") || filesystem_file_exists("/current.png"))
@@ -1832,7 +1832,10 @@ static void checkAndPerformFirmwareUpdate(void)
  */
 static void goToSleep(void)
 {
-  WiFi.disconnect(true);
+  if (WiFi.status() == WL_CONNECTED) {
+      WiFi.disconnect();
+  }
+  WiFi.mode(WIFI_OFF); // make sure the WiFi power is turned off
   filesystem_deinit();
   uint32_t time_to_sleep = SLEEP_TIME_TO_SLEEP;
   if (preferences.isKey(PREFERENCES_SLEEP_TIME_KEY))
