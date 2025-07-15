@@ -1664,7 +1664,7 @@ static void getDeviceCredentials()
 
                 // show the image
                 String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
-                display_show_msg(buffer, FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
+                display_show_msg(storedLogoOrDefault(), FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
                 free(buffer);
                 buffer = nullptr;
                 need_to_refresh_display = 0;
@@ -2083,10 +2083,6 @@ static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiRes
 
 static uint8_t *storedLogoOrDefault(void)
 {
-  if (filesystem_read_from_file("/logo.bmp", buffer, DEFAULT_IMAGE_SIZE))
-  {
-    return buffer;
-  }
   return const_cast<uint8_t *>(logo_small);
 }
 
