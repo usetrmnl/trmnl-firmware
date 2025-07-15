@@ -8,7 +8,7 @@
 #include "wifi_failed_qr.h"
 #include <ctype.h> //iscntrl()
 #include <trmnl_log.h>
-#include "../lib/bb_epaper/Fonts/Roboto_20.h"
+#include "../lib/bb_epaper/Fonts/Roboto_Black_16.h"
 
 BBEPAPER bbep(EP75_800x480);
 
@@ -311,7 +311,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         memcpy(bbep.getBuffer(), image_buffer+62, Imagesize); // uncompressed 1-bpp bitmap
     }
 
-    bbep.setFont(Roboto_20);
+    bbep.setFont(Roboto_Black_16);
     bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
 
     switch (message_type)
@@ -506,7 +506,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         memcpy(bbep.getBuffer(), image_buffer+62, Imagesize); // uncompressed 1-bpp bitmap
     }
 
-    bbep.setFont(Roboto_20);
+    bbep.setFont(Roboto_Black_16);
     bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
     switch (message_type)
     {
@@ -557,7 +557,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     {
         UWORD y_start = 340;
         UWORD font_width = 18; // DEBUG
-        Paint_DrawMultilineText(0, y_start, message.c_str(), width, font_width, BBEP_BLACK, BBEP_WHITE, Roboto_20, true);
+        Paint_DrawMultilineText(0, y_start, message.c_str(), width, font_width, BBEP_BLACK, BBEP_WHITE, Roboto_Black_16, true);
     }
     break;
     default:
