@@ -471,9 +471,9 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
  */
 void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_id, bool id, const char *fw_version, String message)
 {
-    Log.info("Free heap at before display_show_msg - %d", ESP.getMaxAllocHeap());
+    Log_info("Free heap at before display_show_msg - %d", ESP.getMaxAllocHeap());
     bbep.allocBuffer(false);
-    Log.info("Free heap after bbep.allocBuffer() - %d", ESP.getMaxAllocHeap());
+    Log_info("Free heap after bbep.allocBuffer() - %d", ESP.getMaxAllocHeap());
 
     if (message_type == WIFI_CONNECT)
     {
