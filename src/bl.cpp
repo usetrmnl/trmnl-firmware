@@ -33,6 +33,7 @@
 #include <nvs.h>
 #include <serialize_log.h>
 #include <preferences_persistence.h>
+#include "logo_small.h"
 
 bool pref_clear = false;
 String new_filename = "";
