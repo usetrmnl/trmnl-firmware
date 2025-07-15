@@ -5,6 +5,6 @@ enum ButtonPressResult
   NoAction,
   SoftReset
 };
-extern const char *ButtonPressResultNames[3];
+extern const char *ButtonPressResultNames[4];
 
 ButtonPressResult read_button_presses();
