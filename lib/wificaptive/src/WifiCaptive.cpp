@@ -1,4 +1,5 @@
 #include "WifiCaptive.h"
+#include <WiFi.h>
 #include <trmnl_log.h>
 #include "WebServer.h"
 
@@ -153,6 +154,7 @@ void WifiCaptive::resetSettings()
     }
 
     WiFi.disconnect(true, true);
+    WiFi.eraseAP();
 }
 
 uint8_t WifiCaptive::connect(const WifiCredentials credentials)

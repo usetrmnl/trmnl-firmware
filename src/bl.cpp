@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <WiFi.h>
 #include <bl.h>
 #include <types.h>
 #include <ArduinoLog.h>
@@ -112,7 +113,7 @@ void bl_init(void)
 #if defined(BOARD_SEEED_XIAO_ESP32C3) || defined(BOARD_SEEED_XIAO_ESP32S3)
   delay(3000);
 
-  if (digitalRead(9) == LOW) {
+  if (digitalRead(PIN_INTERRUPT) == LOW) {
     Log_info("Boot button pressed during startup, resetting WiFi credentials...");
     WifiCaptivePortal.resetSettings();
     Log_info("WiFi credentials reset completed");
@@ -121,7 +122,7 @@ void bl_init(void)
 
   wakeup_reason = esp_sleep_get_wakeup_cause();
 
-  if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO)
+  if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO || wakeup_reason == ESP_SLEEP_WAKEUP_EXT0)
   {
     auto button = read_button_presses();
     wait_for_serial();
@@ -1842,6 +1843,7 @@ static void goToSleep(void)
 #elif CONFIG_IDF_TARGET_ESP32C3
   esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
 #elif CONFIG_IDF_TARGET_ESP32S3
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
 #endif
@@ -1890,17 +1892,22 @@ static float readBatteryVoltage(void)
   Log.warning("%s [%d]: FAKE_BATTERY_VOLTAGE is defined. Returning 4.2V.\r\n", __FILE__, __LINE__);
   return 4.2f;
 #else
-  Log.info("%s [%d]: Battery voltage reading...\r\n", __FILE__, __LINE__);
-  int32_t adc = 0;
-  for (uint8_t i = 0; i < 128; i++)
-  {
-    adc += analogReadMilliVolts(PIN_BATTERY);
-  }
+  #ifdef BOARD_XIAO_EPAPER_DISPLAY
+    const int adcEnPin = 6;
+    pinMode(adcEnPin, OUTPUT);
+    digitalWrite(adcEnPin, HIGH);
+  #endif
+    Log.info("%s [%d]: Battery voltage reading...\r\n", __FILE__, __LINE__);
+    int32_t adc = 0;
+    for (uint8_t i = 0; i < 128; i++)
+    {
+      adc += analogReadMilliVolts(PIN_BATTERY);
+    }
 
-  int32_t sensorValue = (adc / 128) * 2;
+    int32_t sensorValue = (adc / 128) * 2;
 
-  float voltage = sensorValue / 1000.0;
-  return voltage;
+    float voltage = sensorValue / 1000.0;
+    return voltage;
 #endif // FAKE_BATTERY_VOLTAGE
 }
 

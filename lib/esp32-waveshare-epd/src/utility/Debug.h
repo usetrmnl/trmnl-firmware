@@ -16,8 +16,11 @@
 
 #include <Wire.h>
 
-#define USE_DEBUG 1
-#if USE_DEBUG
+#ifndef EPD_DEBUG
+#define EPD_DEBUG 0
+#endif
+
+#if EPD_DEBUG
 	#define Debug(__info) Serial.print(__info)
 #else
 	#define Debug(__info)  
