@@ -12,7 +12,6 @@
 #include <stdlib.h>
 #include <ESPAsyncWebServer.h>
 #include <AsyncTCP.h>
-#include <ImageData.h>
 #include <Preferences.h>
 #include <cstdint>
 #include <png_file.h>
@@ -720,13 +719,14 @@ static https_request_err_e downloadAndShow()
 
             Log.error("%s [%d]: Receiving failed. Read: %d\r\n", __FILE__, __LINE__, counter);
 
-            // display_show_msg(const_cast<uint8_t *>(default_icon), API_SIZE_ERROR);
+            // display_show_msg(const_cast<uint8_t *>(logo_small), API_SIZE_ERROR);
             submit_log("HTTPS request error. Returned code - %d, available bytes - %d, received bytes - %d", httpCode, https.getSize(), counter);
 
             return HTTPS_WRONG_IMAGE_SIZE;
           }
 
-          Log.info("%s [%d]: Received successfully\r\n", __FILE__, __LINE__);
+          WiFi.disconnect(true); // no need for WiFi, save power starting here
+          Log.info("%s [%d]: Received successfully; WiFi off\r\n", __FILE__, __LINE__);
           bool bmp_rename = false;
 
           if (filesystem_file_exists("/current.bmp") || filesystem_file_exists("/current.png"))
@@ -1830,7 +1830,10 @@ static void checkAndPerformFirmwareUpdate(void)
  */
 static void goToSleep(void)
 {
-  WiFi.disconnect(true);
+  if (WiFi.status() == WL_CONNECTED) {
+    WiFi.disconnect();
+  }
+  WiFi.mode(WIFI_OFF); // make sure the WiFi power is turned off
   filesystem_deinit();
   uint32_t time_to_sleep = SLEEP_TIME_TO_SLEEP;
   if (preferences.isKey(PREFERENCES_SLEEP_TIME_KEY))
@@ -2083,7 +2086,7 @@ static uint8_t *storedLogoOrDefault(void)
   {
     return buffer;
   }
-  return const_cast<uint8_t *>(default_icon);
+  return const_cast<uint8_t *>(logo_small);
 }
 
 static bool saveCurrentFileName(String &name)
