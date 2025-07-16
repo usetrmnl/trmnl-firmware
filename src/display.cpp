@@ -8,6 +8,7 @@
 #include "wifi_failed_qr.h"
 #include <ctype.h> //iscntrl()
 #include <trmnl_log.h>
+#include "png_flip.h"
 #include "../lib/bb_epaper/Fonts/Roboto_Black_16.h"
 
 BBEPAPER bbep(EP75_800x480);
@@ -269,16 +270,18 @@ void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG)
             bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
         }
         else
-        {
+        { // This work-around is due to a lack of RAM; the correct method would be to use loadBMP()
+            flip_image(image_buffer+62, bbep.width(), bbep.height(), false); // fix bottom-up bitmap images
             bbep.setBuffer(image_buffer+62); // uncompressed 1-bpp bitmap
         }
     }
-    bbep.writePlane(); // send image data to the EPD
+    bbep.writePlane(PLANE_0); // send image data to the EPD
+    Log_info("Display refresh start");
     bbep.refresh(REFRESH_FULL, true);
     if (bAlloc) {
         bbep.freeBuffer();
     }
-    Log_info("display");
+    Log_info("display refresh end");
 }
 
 /**
@@ -453,7 +456,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         break;
     }
 
-    bbep.writePlane();
+    bbep.writePlane(PLANE_0);
     bbep.refresh(REFRESH_FULL, true);
     bbep.freeBuffer();
     Log_info("display");
@@ -479,7 +482,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     {
         Log_info("Display set to white");
         bbep.fillScreen(BBEP_WHITE);
-        bbep.writePlane();
+        bbep.writePlane(PLANE_0);
         bbep.refresh(REFRESH_FULL, true);
         display_sleep(1000);
     }
@@ -564,7 +567,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         break;
     }
     Log_info("Start drawing...");
-    bbep.writePlane();
+    bbep.writePlane(PLANE_0);
     bbep.refresh(REFRESH_FULL, true);
     bbep.freeBuffer();
     Log_info("display");
