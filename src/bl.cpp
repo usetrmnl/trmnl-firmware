@@ -125,8 +125,9 @@ void bl_init(void)
 
   wakeup_reason = esp_sleep_get_wakeup_cause();
 
-  if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO || wakeup_reason == ESP_SLEEP_WAKEUP_EXT0)
+  if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO || wakeup_reason == ESP_SLEEP_WAKEUP_EXT0 || wakeup_reason == ESP_SLEEP_WAKEUP_EXT1)
   {
+    Log_info("GPIO wakeup detected (%d)", wakeup_reason);
     auto button = read_button_presses();
     wait_for_serial();
     Log_info("GPIO wakeup (%d) -> button was read (%s)", wakeup_reason, ButtonPressResultNames[button]);
@@ -1841,8 +1842,8 @@ static void goToSleep(void)
   esp_sleep_enable_timer_wakeup((uint64_t)time_to_sleep * SLEEP_uS_TO_S_FACTOR);
   // Configure GPIO pin for wakeup
 #if CONFIG_IDF_TARGET_ESP32
-  gpio_wakeup_enable((gpio_num_t)PIN_INTERRUPT, GPIO_INTR_LOW_LEVEL);
-  esp_sleep_enable_gpio_wakeup();
+  #define BUTTON_PIN_BITMASK(GPIO) (1ULL << GPIO)  // 2 ^ GPIO_NUMBER in hex
+  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK(PIN_INTERRUPT), ESP_EXT1_WAKEUP_ANY_HIGH);
 #elif CONFIG_IDF_TARGET_ESP32C3
   esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
 #elif CONFIG_IDF_TARGET_ESP32S3

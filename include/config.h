@@ -64,8 +64,8 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #define PIN_INTERRUPT 2
 #define DEVICE_MODEL "og"
 #elif defined(BOARD_WAVESHARE_ESP32_DRIVER)
+#define PIN_INTERRUPT 33
 #define DEVICE_MODEL "waveshare"
-#define PIN_INTERRUPT 16
 #define FAKE_BATTERY_VOLTAGE
 #elif defined(BOARD_SEEED_XIAO_ESP32C3)
 #define DEVICE_MODEL "seeed_esp32c3"
