@@ -1895,10 +1895,9 @@ static float readBatteryVoltage(void)
   Log.warning("%s [%d]: FAKE_BATTERY_VOLTAGE is defined. Returning 4.2V.\r\n", __FILE__, __LINE__);
   return 4.2f;
 #else
-  #ifdef BOARD_XIAO_EPAPER_DISPLAY
-    const int adcEnPin = 6;
-    pinMode(adcEnPin, OUTPUT);
-    digitalWrite(adcEnPin, HIGH);
+  #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001)
+    pinMode(PIN_VBAT_SWITCH, OUTPUT);
+    digitalWrite(PIN_VBAT_SWITCH, VBAT_SWITCH_LEVEL);
   #endif
     Log.info("%s [%d]: Battery voltage reading...\r\n", __FILE__, __LINE__);
     int32_t adc = 0;
