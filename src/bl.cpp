@@ -232,7 +232,7 @@ void bl_init(void)
   // EPD clear
   Log.info("%s [%d]: Display init\r\n", __FILE__, __LINE__);
   display_init();
-  
+
   // Mount SPIFFS
   filesystem_init();
 
@@ -1905,6 +1905,9 @@ static float readBatteryVoltage(void)
     {
       adc += analogReadMilliVolts(PIN_BATTERY);
     }
+  #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001)
+    digitalWrite(PIN_VBAT_SWITCH, (VBAT_SWITCH_LEVEL == HIGH ? LOW : HIGH));
+  #endif
 
     int32_t sensorValue = (adc / 128) * 2;
 
