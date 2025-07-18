@@ -232,6 +232,9 @@ void bl_init(void)
   // EPD clear
   Log.info("%s [%d]: Display init\r\n", __FILE__, __LINE__);
   display_init();
+  
+  // Mount SPIFFS
+  filesystem_init();
 
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
   {
@@ -247,9 +250,6 @@ void bl_init(void)
     Log.info("%s [%d]: Display TRMNL logo end\r\n", __FILE__, __LINE__);
     preferences.putString(PREFERENCES_FILENAME_KEY, "");
   }
-
-  // Mount SPIFFS
-  filesystem_init();
 
   Log_info("Firmware version %s", FW_VERSION_STRING);
   Log_info("Arduino version %d.%d.%d", ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH);
