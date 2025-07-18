@@ -15,6 +15,7 @@ static const SpecialFunctionMap specialFunctionMap[] = {
     {"restart_playlist", SF_RESTART_PLAYLIST},
     {"rewind", SF_REWIND},
     {"send_to_me", SF_SEND_TO_ME},
+    {"guest_mode", SF_GUEST_MODE},
 };
 
 SPECIAL_FUNCTION parseSpecialFunction(String &special_function_str)
@@ -31,7 +32,7 @@ SPECIAL_FUNCTION parseSpecialFunction(String &special_function_str)
   return SF_NONE;
 }
 
-bool parseSpecialFunctionToStr(char *buffer,size_t buffer_size, SPECIAL_FUNCTION special_function)
+bool parseSpecialFunctionToStr(char *buffer, size_t buffer_size, SPECIAL_FUNCTION special_function)
 {
   for (const SpecialFunctionMap &entry : specialFunctionMap)
   {

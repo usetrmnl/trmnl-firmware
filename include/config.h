@@ -3,9 +3,20 @@
 
 #define FW_MAJOR_VERSION 1
 #define FW_MINOR_VERSION 5
-#define FW_PATCH_VERSION 6
+#define FW_PATCH_VERSION 12
 
-#define LOG_MAX_NOTES_NUMBER 5
+// Helper macros for stringification
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+
+#ifndef FW_VERSION_SUFFIX
+#define FW_VERSION_SUFFIX ""
+#endif
+
+// Compile-time firmware version string
+#define FW_VERSION_STRING TOSTRING(FW_MAJOR_VERSION) "." TOSTRING(FW_MINOR_VERSION) "." TOSTRING(FW_PATCH_VERSION) FW_VERSION_SUFFIX
+
+#define LOG_MAX_NOTES_NUMBER 10
 
 #define PREFERENCES_API_KEY "api_key"
 #define PREFERENCES_API_KEY_DEFAULT ""
@@ -50,23 +61,31 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 };
 
 #if defined(BOARD_TRMNL)
-#define PIN_RESET 9
 #define PIN_INTERRUPT 2
+#define DEVICE_MODEL "og"
 #elif defined(BOARD_WAVESHARE_ESP32_DRIVER)
-#define PIN_RESET 25
 #define PIN_INTERRUPT 33
+#define DEVICE_MODEL "waveshare"
 #define FAKE_BATTERY_VOLTAGE
 #elif defined(BOARD_SEEED_XIAO_ESP32C3)
+#define DEVICE_MODEL "seeed_esp32c3"
 #define PIN_INTERRUPT 9
-#define PIN_RESET 9
 #define FAKE_BATTERY_VOLTAGE
 #elif defined(BOARD_SEEED_XIAO_ESP32S3)
+#define DEVICE_MODEL "seeed_esp32s3"
 #define PIN_INTERRUPT 0
-#define PIN_RESET 0
 #define FAKE_BATTERY_VOLTAGE
+#elif defined(BOARD_XIAO_EPAPER_DISPLAY)
+#define DEVICE_MODEL "xiao_epaper_display"
+#define PIN_INTERRUPT 5     //with silkscreen "KEY3"
+#define PIN_RESET 0
 #endif
 
+#if defined(BOARD_XIAO_EPAPER_DISPLAY)
+#define PIN_BATTERY 1
+#else
 #define PIN_BATTERY 3
+#endif
 
 // #define FAKE_BATTERY_VOLTAGE // Uncomment to report 4.2V instead of reading ADC
 

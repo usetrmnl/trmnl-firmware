@@ -1,9 +1,14 @@
 name: build
 
-on: [push, pull_request]
+on:
+  push:
+    branches: ["**"]
+    tags: ["**"]
+  pull_request:
+  workflow_dispatch:
 
 jobs:
-  build:
+  build-test:
     strategy:
       fail-fast: false
       max-parallel: 3
@@ -12,7 +17,7 @@ jobs:
 
     runs-on: ${{ matrix.os }}
 
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v4
@@ -26,7 +31,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.x"
 
       - uses: maxim-lobanov/setup-xcode@v1
         if: matrix.os == 'macos-15'
@@ -55,3 +60,19 @@ jobs:
 
       - name: static analysis
         run: pio check --skip-packages --fail-on-defect high
+
+  publish-engineering-build:
+    needs: build-test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    uses: ./.github/workflows/publish-firmware.yml
+    with:
+      include_git_hash_in_firmware_version: true
+      filename_suffix_type: git_short_hash
+
+  publish-tagged-build:
+    needs: build-test
+    if: startsWith(github.ref, 'refs/tags/')
+    uses: ./.github/workflows/publish-firmware.yml
+    with:
+      include_git_hash_in_firmware_version: false
+      filename_suffix_type: git_tag

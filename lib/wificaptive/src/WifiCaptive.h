@@ -9,6 +9,7 @@
 #include "Preferences.h"
 #include "WifiCaptivePage.h"
 #include <ArduinoJson.h>
+#include "wifi-types.h"
 
 #define WIFI_SSID "TRMNL"
 #define WIFI_PASSWORD NULL
@@ -16,7 +17,7 @@
 // Define the DNS interval in milliseconds between processing DNS requests
 #define DNS_INTERVAL 60
 // Define the maximum number of clients that can connect to the server
-#define MAX_CLIENTS 1
+#define MAX_CLIENTS 4
 // Define the WiFi channel to be used (channel 6 in this case)
 #define WIFI_CHANNEL 6
 // Define the maximum number of possible saved credentials
@@ -25,8 +26,6 @@
 #define WIFI_CONNECTION_ATTEMPTS 3
 // Define max connection timeout
 #define CONNECTION_TIMEOUT 15000
-// Local IP URL
-#define LocalIPURL "http://4.3.2.1"
 
 #define WIFI_SSID_KEY(i) ("wifi_" + String(i) + "_ssid").c_str()
 #define WIFI_PSWD_KEY(i) ("wifi_" + String(i) + "_pswd").c_str()
@@ -36,19 +35,6 @@
 class WifiCaptive
 {
 private:
-    struct WifiCredentials
-    {
-        String ssid;
-        String pswd;
-    };
-    struct Network
-    {
-        String ssid;
-        int32_t rssi;
-        bool open;
-        bool saved;
-    };
-
     DNSServer *_dnsServer;
     AsyncWebServer *_server;
     String _ssid = "";
@@ -60,18 +46,18 @@ private:
     WifiCredentials _savedWifis[WIFI_MAX_SAVED_CREDS];
 
     void setUpDNSServer(DNSServer &dnsServer, const IPAddress &localIP);
-    void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP);
-    uint8_t connect(String ssid, String pass);
+    uint8_t connect(const WifiCredentials credentials);
     uint8_t waitForConnectResult(uint32_t timeout);
     uint8_t waitForConnectResult();
     void readWifiCredentials();
-    void saveWifiCredentials(String ssid, String pass);
+    void saveWifiCredentials(const WifiCredentials credentials);
     void saveLastUsedWifiIndex(int index);
     int readLastUsedWifiIndex();
     void saveApiServer(String url);
-    std::vector<WifiCredentials> matchNetworks(std::vector<Network> &scanResults, WifiCaptive::WifiCredentials wifiCredentials[]);
+    std::vector<WifiCredentials> matchNetworks(std::vector<Network> &scanResults, WifiCredentials wifiCredentials[]);
     std::vector<Network> getScannedUniqueNetworks(bool runScan);
-    std::vector<Network> combineNetworks(std::vector<Network> &scanResults, WifiCaptive::WifiCredentials wifiCredentials[]);
+    std::vector<Network> combineNetworks(std::vector<Network> &scanResults, WifiCredentials wifiCredentials[]);
+    bool tryConnectWithRetries(const WifiCredentials creds, int last_used_index);
 
 public:
     /// @brief Starts WiFi configuration portal.

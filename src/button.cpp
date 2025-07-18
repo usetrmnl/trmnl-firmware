@@ -1,3 +1,4 @@
+#include <Arduino.h>
 #include "trmnl_log.h"
 #include <config.h>
 #include "button.h"
@@ -44,4 +45,5 @@ ButtonPressResult read_button_presses()
 const char *ButtonPressResultNames[] = {
     "LongPress",
     "DoubleClick",
-    "NoAction"};
+    "NoAction",
+    "SoftReset"};

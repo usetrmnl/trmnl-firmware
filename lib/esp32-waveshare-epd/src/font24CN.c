@@ -37,6 +37,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "fonts.h"
+#pragma GCC diagnostic ignored "-Wmissing-braces"
 
 // 
 //  Font data for Courier New 12pt

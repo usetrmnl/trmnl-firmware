@@ -270,7 +270,7 @@ void EPD_7IN5BC_Display(const UBYTE *blackimage, const UBYTE *ryimage)
 
 void EPD_7IN5BC_DisplayHalfScreen(const UBYTE *blackimage, const UBYTE *ryimage)
 {
-    UBYTE Data_Black, Data_RY, Data;
+    UBYTE Data_Black, Data_RY, Data = 0;
     UDOUBLE i, j, Width, Height;
     Width = (EPD_7IN5BC_WIDTH % 8 == 0)? (EPD_7IN5BC_WIDTH / 8 ): (EPD_7IN5BC_WIDTH / 8 + 1);
     Height = EPD_7IN5BC_HEIGHT;

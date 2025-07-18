@@ -1,136 +1,12 @@
 #include "WifiCaptive.h"
+#include <WiFi.h>
 #include <trmnl_log.h>
+#include "WebServer.h"
 
 void WifiCaptive::setUpDNSServer(DNSServer &dnsServer, const IPAddress &localIP)
 {
     dnsServer.setTTL(3600);
     dnsServer.start(53, "*", localIP);
-}
-
-void WifiCaptive::setUpWebserver(AsyncWebServer &server, const IPAddress &localIP)
-{
-    //======================== Webserver ========================
-    // WARNING IOS (and maybe macos) WILL NOT POP UP IF IT CONTAINS THE WORD "Success" https://www.esp8266.com/viewtopic.php?f=34&t=4398
-    // SAFARI (IOS) IS STUPID, G-ZIPPED FILES CAN'T END IN .GZ https://github.com/homieiot/homie-esp8266/issues/476 this is fixed by the webserver serve static function.
-    // SAFARI (IOS) there is a 128KB limit to the size of the HTML. The HTML can reference external resources/images that bring the total over 128KB
-    // SAFARI (IOS) popup browser has some severe limitations (javascript disabled, cookies disabled)
-
-    // Required
-    server.on("/connecttest.txt", [](AsyncWebServerRequest *request)
-              { request->redirect("http://logout.net"); }); // windows 11 captive portal workaround
-    server.on("/wpad.dat", [](AsyncWebServerRequest *request)
-              { request->send(404); }); // Honestly don't understand what this is but a 404 stops win 10 keep calling this repeatedly and panicking the esp32 :)
-
-    // Background responses: Probably not all are Required, but some are. Others might speed things up?
-    // A Tier (commonly used by modern systems)
-    server.on("/generate_204", [](AsyncWebServerRequest *request)
-              { request->redirect(LocalIPURL); }); // android captive portal redirect
-    server.on("/redirect", [](AsyncWebServerRequest *request)
-              { request->redirect(LocalIPURL); }); // microsoft redirect
-    server.on("/hotspot-detect.html", [](AsyncWebServerRequest *request)
-              { request->redirect(LocalIPURL); }); // apple call home
-    server.on("/canonical.html", [](AsyncWebServerRequest *request)
-              { request->redirect(LocalIPURL); }); // firefox captive portal call home
-    server.on("/success.txt", [](AsyncWebServerRequest *request)
-              { request->send(200); }); // firefox captive portal call home
-    server.on("/ncsi.txt", [](AsyncWebServerRequest *request)
-              { request->redirect(LocalIPURL); }); // windows call home
-
-    // return 404 to webpage icon
-    server.on("/favicon.ico", [](AsyncWebServerRequest *request)
-              { request->send(404); }); // webpage icon
-
-    // Serve index.html
-    server.on("/", HTTP_ANY, [&](AsyncWebServerRequest *request)
-              {
-		AsyncWebServerResponse *response = request->beginResponse(200, "text/html", INDEX_HTML, INDEX_HTML_LEN);
-		response->addHeader("Content-Encoding", "gzip");
-    	request->send(response); });
-
-    // Servce logo.svg
-    server.on("/logo.svg", HTTP_ANY, [&](AsyncWebServerRequest *request)
-              {
-		AsyncWebServerResponse *response = request->beginResponse(200, "text/html", LOGO_SVG, LOGO_SVG_LEN);
-		response->addHeader("Content-Encoding", "gzip");
-		response->addHeader("Content-Type", "image/svg+xml");
-    	request->send(response); });
-
-    server.on("/soft-reset", HTTP_ANY, [&](AsyncWebServerRequest *request)
-              {
-		resetSettings();
-		if (_resetcallback != NULL) {
-			_resetcallback(); // @CALLBACK
-		}
-		request->send(200); });
-
-    auto scanGET = server.on("/scan", HTTP_GET, [&](AsyncWebServerRequest *request)
-                             {
-		String json = "[";
-		int n = WiFi.scanComplete();
-		if (n == WIFI_SCAN_FAILED) {
-			WiFi.scanNetworks(true);
-			return request->send(202);
-		} else if(n == WIFI_SCAN_RUNNING){
-			return request->send(202);
-		} else {
-			// Data structure to store the highest RSSI for each SSID
-            // Warning: DO NOT USE true on this function in an async context!
-			std::vector<Network> uniqueNetworks = getScannedUniqueNetworks(false);
-            std::vector<Network> combinedNetworks = combineNetworks(uniqueNetworks, _savedWifis);
-
-			// Generate JSON response
-			size_t size = 0;
-			for (const auto& network : combinedNetworks)
-			{
-				String ssid = network.ssid;
-				String rssi = String(network.rssi);
-
-				// Escape invalid characters
-				ssid.replace("\\","\\\\");
-				ssid.replace("\"","\\\"");
-				json+= "{";
-				json+= "\"name\":\""+ssid+"\",";
-				json+= "\"rssi\":\""+rssi+"\",";
-				json+= "\"open\":"+String(network.open == WIFI_AUTH_OPEN ? "true,": "false,");
-                json+= "\"saved\":"+String(network.saved ? "true": "false");
-				json+= "}";
-
-				size += 1;
-
-				if (size != combinedNetworks.size())
-				{
-					json+= ",";
-				}
-			}
-
-            WiFi.scanDelete();
-			Serial.println(json);
-
-			if (WiFi.scanComplete() == -2){
-				WiFi.scanNetworks(true);
-			}
-		}
-		json += "]";
-		request->send(200, "application/json", json);
-		json = String(); });
-
-    AsyncCallbackJsonWebHandler *handler = new AsyncCallbackJsonWebHandler("/connect", [&](AsyncWebServerRequest *request, JsonVariant &json)
-                                                                           {
-		JsonObject data = json.as<JsonObject>();
-		String ssid = data["ssid"];
-		String pswd = data["pswd"];
-        String api_server = data["server"];
-		_ssid = ssid;
-		_password = pswd;
-        _api_server = api_server;
-		String mac = WiFi.macAddress();
-		String message =  "{\"ssid\":\"" + _ssid +"\",\"mac\":\"" + mac +"\"}";
-		request->send(200, "application/json", message); });
-
-    server.addHandler(handler);
-
-    server.onNotFound([](AsyncWebServerRequest *request)
-                      { request->redirect(LocalIPURL); });
 }
 
 bool WifiCaptive::startPortal()
@@ -168,7 +44,28 @@ bool WifiCaptive::startPortal()
 
     // configure DSN and WEB server
     setUpDNSServer(*_dnsServer, localIP);
-    setUpWebserver(*_server, localIP);
+
+    WifiOperationCallbacks callbacks = {
+        .resetSettings = [this]()
+        {
+            resetSettings();
+            if (_resetcallback != NULL)
+            {
+                _resetcallback(); // @CALLBACK
+            } },
+        .setConnectionCredentials = [this](const WifiCredentials credentials, const String api_server)
+        {
+            _ssid = credentials.ssid;
+            _password = credentials.pswd;
+            _api_server = api_server; },
+        .getAnnotatedNetworks = [this](bool runScan)
+        {
+            // Warning: DO NOT USE true on this function in an async context!
+            std::vector<Network> uniqueNetworks = getScannedUniqueNetworks(false);
+            std::vector<Network> combinedNetworks = combineNetworks(uniqueNetworks, _savedWifis);
+            return combinedNetworks; }};
+
+    setUpWebserver(*_server, localIP, callbacks);
 
     // begin serving
     _server->begin();
@@ -190,10 +87,11 @@ bool WifiCaptive::startPortal()
         }
         else
         {
-            bool res = connect(_ssid, _password) == WL_CONNECTED;
+            WifiCredentials credentials = {_ssid, _password};
+            bool res = connect(credentials) == WL_CONNECTED;
             if (res)
             {
-                saveWifiCredentials(_ssid, _password);
+                saveWifiCredentials(credentials);
                 saveApiServer(_api_server);
                 succesfullyConnected = true;
                 break;
@@ -256,16 +154,17 @@ void WifiCaptive::resetSettings()
     }
 
     WiFi.disconnect(true, true);
+    WiFi.eraseAP();
 }
 
-uint8_t WifiCaptive::connect(String ssid, String pass)
+uint8_t WifiCaptive::connect(const WifiCredentials credentials)
 {
     uint8_t connRes = (uint8_t)WL_NO_SSID_AVAIL;
 
-    if (ssid != "")
+    if (credentials.ssid != "")
     {
         WiFi.enableSTA(true);
-        WiFi.begin(ssid.c_str(), pass.c_str());
+        WiFi.begin(credentials.ssid.c_str(), credentials.pswd.c_str());
         connRes = waitForConnectResult();
     }
 
@@ -331,14 +230,14 @@ void WifiCaptive::readWifiCredentials()
     preferences.end();
 }
 
-void WifiCaptive::saveWifiCredentials(String ssid, String pass)
+void WifiCaptive::saveWifiCredentials(const WifiCredentials credentials)
 {
-    Log_info("Saving wifi credentials: %s", ssid.c_str());
+    Log_info("Saving wifi credentials: %s", credentials.ssid.c_str());
 
     // Check if the credentials already exist
     for (u16_t i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
     {
-        if (_savedWifis[i].ssid == ssid && _savedWifis[i].pswd == pass)
+        if (_savedWifis[i].ssid == credentials.ssid && _savedWifis[i].pswd == credentials.pswd)
         {
             return; // Avoid saving duplicate networks
         }
@@ -349,7 +248,7 @@ void WifiCaptive::saveWifiCredentials(String ssid, String pass)
         _savedWifis[i] = _savedWifis[i - 1];
     }
 
-    _savedWifis[0] = {ssid, pass};
+    _savedWifis[0] = credentials;
 
     Preferences preferences;
     preferences.begin("wificaptive", false);
@@ -421,7 +320,7 @@ void WifiCaptive::saveApiServer(String url)
     preferences.end();
 }
 
-std::vector<WifiCaptive::Network> WifiCaptive::getScannedUniqueNetworks(bool runScan)
+std::vector<Network> WifiCaptive::getScannedUniqueNetworks(bool runScan)
 {
     std::vector<Network> uniqueNetworks;
     int n = WiFi.scanComplete();
@@ -486,7 +385,7 @@ std::vector<WifiCaptive::Network> WifiCaptive::getScannedUniqueNetworks(bool run
             }
             if (!found)
             {
-                uniqueNetworks.push_back({ssid, rssi, open});
+                uniqueNetworks.push_back({ssid, rssi, open, false});
             }
         }
     }
@@ -500,9 +399,9 @@ std::vector<WifiCaptive::Network> WifiCaptive::getScannedUniqueNetworks(bool run
     return uniqueNetworks;
 }
 
-std::vector<WifiCaptive::WifiCredentials> WifiCaptive::matchNetworks(
-    std::vector<WifiCaptive::Network> &scanResults,
-    WifiCaptive::WifiCredentials savedWifis[])
+std::vector<WifiCredentials> WifiCaptive::matchNetworks(
+    std::vector<Network> &scanResults,
+    WifiCredentials savedWifis[])
 {
     // sort scan results by RSSI
     std::sort(scanResults.begin(), scanResults.end(), [](const Network &a, const Network &b)
@@ -523,9 +422,9 @@ std::vector<WifiCaptive::WifiCredentials> WifiCaptive::matchNetworks(
     return sortedWifis;
 }
 
-std::vector<WifiCaptive::Network> WifiCaptive::combineNetworks(
-    std::vector<WifiCaptive::Network> &scanResults,
-    WifiCaptive::WifiCredentials savedWifis[])
+std::vector<Network> WifiCaptive::combineNetworks(
+    std::vector<Network> &scanResults,
+    WifiCredentials savedWifis[])
 {
     std::vector<Network> combinedNetworks;
     for (auto &network : scanResults)
@@ -571,7 +470,6 @@ bool WifiCaptive::autoConnect()
     Log_info("Trying to autoconnect to wifi...");
     readWifiCredentials();
 
-    // if last used network is available, try to connect to it
     int last_used_index = readLastUsedWifiIndex();
 
     if (_savedWifis[last_used_index].ssid != "")
@@ -581,32 +479,15 @@ bool WifiCaptive::autoConnect()
         WiFi.setMinSecurity(WIFI_AUTH_OPEN);
         WiFi.mode(WIFI_STA);
 
-        for (int attempt = 0; attempt < WIFI_CONNECTION_ATTEMPTS; attempt++)
+        if (tryConnectWithRetries(_savedWifis[last_used_index], last_used_index))
         {
-            Log_info("Attempt %d to connect to %s", attempt + 1, _savedWifis[last_used_index].ssid.c_str());
-            connect(_savedWifis[last_used_index].ssid, _savedWifis[last_used_index].pswd);
-
-            // Check if connected
-            if (WiFi.status() == WL_CONNECTED)
-            {
-                Log_info("Connected to %s", _savedWifis[last_used_index].ssid.c_str());
-                return true;
-            }
-            WiFi.disconnect();
-            
-            // Exponential backoff: 2s, 4s, 8s delays between attempts
-            if (attempt < WIFI_CONNECTION_ATTEMPTS - 1) {
-                uint32_t backoff_delay = 2000 * (1 << attempt); // 2^attempt * 2000ms
-                Log_info("Connection failed, waiting %d ms before retry...", backoff_delay);
-                delay(backoff_delay);
-            }
+            return true;
         }
     }
 
     Log_info("Last used network unavailable, scanning for known networks...");
     std::vector<Network> scanResults = getScannedUniqueNetworks(true);
-    std::vector<WifiCaptive::WifiCredentials> sortedNetworks = matchNetworks(scanResults, _savedWifis);
-    // if no networks found, try to connect to saved wifis
+    std::vector<WifiCredentials> sortedNetworks = matchNetworks(scanResults, _savedWifis);
     if (sortedNetworks.size() == 0)
     {
         Log_info("No matched networks found in scan, trying all saved networks...");
@@ -622,39 +503,48 @@ bool WifiCaptive::autoConnect()
         }
 
         Log_info("Trying to connect to saved network %s...", network.ssid.c_str());
-
-        for (int attempt = 0; attempt < WIFI_CONNECTION_ATTEMPTS; attempt++)
+        int found_index = -1;
+        for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
         {
-            Log_info("Attempt %d to connect to %s", attempt + 1, network.ssid.c_str());
-            connect(network.ssid, network.pswd);
-
-            // Check if connected
-            if (WiFi.status() == WL_CONNECTED)
+            if (_savedWifis[i].ssid == network.ssid)
             {
-                Log_info("Connected to %s", network.ssid.c_str());
-                // success! save the index of the last used network
-                for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
-                {
-                    if (_savedWifis[i].ssid == network.ssid)
-                    {
-                        saveLastUsedWifiIndex(i);
-                        break;
-                    }
-                }
-                return true;
+                found_index = i;
+                break;
             }
-            WiFi.disconnect();
-            
-            // Exponential backoff: 2s, 4s, 8s delays between attempts
-            if (attempt < WIFI_CONNECTION_ATTEMPTS - 1) {
-                uint32_t backoff_delay = 2000 * (1 << attempt); // 2^attempt * 2000ms
-                Log_info("Connection failed, waiting %d ms before retry...", backoff_delay);
-                delay(backoff_delay);
-            }
+        }
+        if (tryConnectWithRetries(network, found_index))
+        {
+            return true;
         }
     }
 
     Log_info("Failed to connect to any network");
+    return false;
+}
+
+bool WifiCaptive::tryConnectWithRetries(const WifiCredentials creds, int last_used_index)
+{
+    for (int attempt = 0; attempt < WIFI_CONNECTION_ATTEMPTS; attempt++)
+    {
+        Log_info("Attempt %d to connect to %s", attempt + 1, creds.ssid.c_str());
+        connect(creds);
+        if (WiFi.status() == WL_CONNECTED)
+        {
+            Log_info("Connected to %s", creds.ssid.c_str());
+            if (last_used_index >= 0)
+            {
+                saveLastUsedWifiIndex(last_used_index);
+            }
+            return true;
+        }
+        WiFi.disconnect();
+        if (attempt < WIFI_CONNECTION_ATTEMPTS - 1)
+        {
+            uint32_t backoff_delay = 2000 * (1 << attempt);
+            Log_info("Connection failed, waiting %d ms before retry...", backoff_delay);
+            delay(backoff_delay);
+        }
+    }
     return false;
 }
 
