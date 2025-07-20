@@ -223,9 +223,9 @@ void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG)
     UBYTE *BlackImage;
     /* you have to edit the startup_stm32fxxx.s file and set a big enough heap size */
     UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
-    
-    Log_error("free heap - %d", ESP.getFreeHeap());
-    Log_error("free alloc heap - %d", ESP.getMaxAllocHeap());
+
+    Log_info("free heap - %d", ESP.getFreeHeap());
+    Log_info("free alloc heap - %d", ESP.getMaxAllocHeap());
     if ((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL)
     {
         Log_fatal("Failed to apply for black memory...");
@@ -277,8 +277,8 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     UBYTE *BlackImage;
     /* you have to edit the startup_stm32fxxx.s file and set a big enough heap size */
     UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
-    Log_error("free heap - %d", ESP.getFreeHeap());
-    Log_error("free alloc heap - %d", ESP.getMaxAllocHeap());
+    Log_info("free heap - %d", ESP.getFreeHeap());
+    Log_info("free alloc heap - %d", ESP.getMaxAllocHeap());
     if ((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL)
     {
         Log_fatal("Failed to apply for black memory...");
@@ -420,8 +420,8 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     UBYTE *BlackImage;
     /* you have to edit the startup_stm32fxxx.s file and set a big enough heap size */
     UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
-    Log_error("free heap - %d", ESP.getFreeHeap());
-    Log_error("free alloc heap - %d", ESP.getMaxAllocHeap());
+    Log_info("free heap - %d", ESP.getFreeHeap());
+    Log_info("free alloc heap - %d", ESP.getMaxAllocHeap());
     if ((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL)
     {
         Log_fatal("Failed to apply for black memory...");

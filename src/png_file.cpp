@@ -9,7 +9,7 @@ File pngfile; // Global file handle
 
 void *pngOpen(const char *filename, int32_t *size)
 {
-  Serial.printf("Attempting to open %s from SPIFFS\n", filename);
+  Log_verbose("Attempting to open %s from SPIFFS", filename);
   pngfile = SPIFFS.open(filename, "r");
 
   if (!pngfile)
