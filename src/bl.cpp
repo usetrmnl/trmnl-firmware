@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <bl.h>
+#include <trmnl_log.h>
 #include <types.h>
 #include <ArduinoLog.h>
 #include <WifiCaptive.h>
@@ -84,6 +85,7 @@ static bool saveCurrentFileName(String &name);
 static bool checkCurrentFileName(String &newName);
 static DeviceStatusStamp getDeviceStatusStamp();
 void log_nvs_usage();
+
 
 void wait_for_serial()
 {
@@ -272,15 +274,13 @@ void bl_init(void)
     }
     else
     {
-      Log.fatal("%s [%d]: Connection failed! WL Status: %d\r\n", __FILE__, __LINE__, WiFi.status());
+      Log_fatal_submit("Connection failed! WL Status: %d", WiFi.status());
 
       if (current_msg != WIFI_FAILED)
       {
         showMessageWithLogo(WIFI_FAILED);
         current_msg = WIFI_FAILED;
       }
-
-      submit_log("wifi connection failed, current WL Status: %d", WiFi.status());
 
       // Go to deep sleep
       wifiErrorDeepSleep();
@@ -298,13 +298,11 @@ void bl_init(void)
     res = WifiCaptivePortal.startPortal();
     if (!res)
     {
-      Log.error("%s [%d]: Failed to connect or hit timeout\r\n", __FILE__, __LINE__);
+      Log_error_submit("Failed to connect or hit timeout");
 
       WiFi.disconnect(true);
 
       showMessageWithLogo(WIFI_FAILED);
-
-      submit_log("connection to the new WiFi failed");
 
       // Go to deep sleep
       wifiErrorDeepSleep();
@@ -327,6 +325,11 @@ void bl_init(void)
 
   Log.info("%s [%d]: Time since last sleep: %d\r\n", __FILE__, __LINE__, time_since_sleep);
 
+  Log_verbose("example log_verbose");
+  Log_info("example log_info");
+  Log_error("example log_error");
+  Log_fatal("example log_fatal");
+
   if (!preferences.isKey(PREFERENCES_API_KEY) || !preferences.isKey(PREFERENCES_FRIENDLY_ID))
   {
     Log.info("%s [%d]: API key or friendly ID not saved\r\n", __FILE__, __LINE__);
@@ -337,6 +340,8 @@ void bl_init(void)
   {
     Log.info("%s [%d]: API key and friendly ID saved\r\n", __FILE__, __LINE__);
   }
+
+  submitStoredLogs();
 
   log_retry = true;
 
@@ -389,9 +394,11 @@ void bl_init(void)
 
   else
   {
-    Log.info("%s [%d]: Connection done successfully. Retries counter reset.\r\n", __FILE__, __LINE__);
+    Log_info("Connection done successfully. Retries counter reset.");
     preferences.putInt(PREFERENCES_CONNECT_API_RETRY_COUNT, 1);
   }
+
+  submitStoredLogs();
 
   if (request_result == HTTPS_NO_REGISTER && need_to_refresh_display == 1)
   {
@@ -482,11 +489,6 @@ void bl_init(void)
     break;
   }
 
-  if (request_result != HTTPS_NO_ERR && request_result != HTTPS_PLUGIN_NOT_ATTACHED)
-  {
-    submitStoredLogs();
-  }
-
   // display go to sleep
   display_sleep();
   if (!update_firmware)
@@ -517,7 +519,7 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   }
   else
   {
-    Log.error("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY);
+    Log.info("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY);
   }
 
   if (preferences.isKey(PREFERENCES_FRIENDLY_ID))
@@ -527,7 +529,7 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   }
   else
   {
-    Log.error("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_FRIENDLY_ID);
+    Log.info("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_FRIENDLY_ID);
   }
 
   inputs.refreshRate = SLEEP_TIME_TO_SLEEP;
@@ -539,7 +541,7 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   }
   else
   {
-    Log.error("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_SLEEP_TIME_KEY);
+    Log.info("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_SLEEP_TIME_KEY);
   }
 
   inputs.macAddress = WiFi.macAddress();
@@ -584,11 +586,7 @@ static https_request_err_e downloadAndShow()
     }
     else
     {
-      Log.error("%s [%d]: Failed to resolve hostname on attempt %d\r\n", __FILE__, __LINE__, attempt);
-      if (attempt == 5)
-      {
-        submit_log("Failed to resolve hostname after 5 attempts, continuing...");
-      }
+      Log_error_submit("Failed to resolve hostname on attempt %d", attempt);
       delay(2000);
     }
   }
@@ -599,8 +597,7 @@ static https_request_err_e downloadAndShow()
 
   if (apiDisplayResult.error != HTTPS_NO_ERR)
   {
-    Log.error("%s [%d]: Error fetching API display: %d, detail: %s\r\n", __FILE__, __LINE__, apiDisplayResult.error, apiDisplayResult.error_detail.c_str());
-    submit_log("Error fetching API display: %d, detail: %s", apiDisplayResult.error, apiDisplayResult.error_detail.c_str());
+    Log_error_submit("Error fetching API display: %d, detail: %s", apiDisplayResult.error, apiDisplayResult.error_detail.c_str());
     return apiDisplayResult.error;
   }
 
@@ -637,7 +634,7 @@ static https_request_err_e downloadAndShow()
             {
               // To avoid surprising behaviour if the server returned a timeout of more than 65 seconds
               // we will send a log message back to the server and truncate the timeout to the maximum.
-              submit_log("Requested image URL timeout too large (%d ms). Using maximum of %d ms.", requestedTimeout, UINT16_MAX);
+              Log_info_submit("Requested image URL timeout too large (%d ms). Using maximum of %d ms.", requestedTimeout, UINT16_MAX);
               https.setTimeout(UINT16_MAX);
             }
             else
@@ -657,9 +654,7 @@ static https_request_err_e downloadAndShow()
           // httpCode will be negative on error
           if (httpCode < 0)
           {
-            Log.error("%s [%d]: [HTTPS] GET... failed, error: %d (%s)\r\n", __FILE__, __LINE__, httpCode, https.errorToString(httpCode).c_str());
-
-            submit_log("HTTP Client failed with error: %s", https.errorToString(httpCode).c_str());
+            Log_error_submit("[HTTPS] GET... failed, error: %d (%s)", httpCode, https.errorToString(httpCode).c_str());
 
             return HTTPS_REQUEST_FAILED;
           }
@@ -670,9 +665,7 @@ static https_request_err_e downloadAndShow()
           // file found at server
           if (httpCode != HTTP_CODE_OK && httpCode != HTTP_CODE_MOVED_PERMANENTLY)
           {
-            Log.error("%s [%d]: [HTTPS] GET... failed, code: %d (%s)\r\n", __FILE__, __LINE__, httpCode, https.errorToString(httpCode).c_str());
-
-            submit_log("HTTPS returned code is not OK. Code: %d", httpCode);
+            Log_error_submit("[HTTPS] GET... failed, code: %d (%s)", httpCode, https.errorToString(httpCode).c_str());
             return HTTPS_REQUEST_FAILED;
           }
           Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, https.getSize());
@@ -680,9 +673,7 @@ static https_request_err_e downloadAndShow()
           uint32_t counter = 0;
           if (content_size > DISPLAY_BMP_IMAGE_SIZE)
           {
-            Log.error("%s [%d]: Receiving failed. Bad file size\r\n", __FILE__, __LINE__);
-
-            submit_log("HTTPS request error. Returned code - %d, available bytes - %d, received bytes - %d", httpCode, https.getSize(), counter);
+            Log_error_submit("Receiving failed. Bad file size");
 
             return HTTPS_REQUEST_FAILED;
           }
@@ -715,10 +706,9 @@ static https_request_err_e downloadAndShow()
           if (counter != content_size)
           {
 
-            Log.error("%s [%d]: Receiving failed. Read: %d\r\n", __FILE__, __LINE__, counter);
+            Log_error_submit("Receiving failed. Read: %d", counter);
 
             // display_show_msg(const_cast<uint8_t *>(default_icon), API_SIZE_ERROR);
-            submit_log("HTTPS request error. Returned code - %d, available bytes - %d, received bytes - %d", httpCode, https.getSize(), counter);
 
             return HTTPS_WRONG_IMAGE_SIZE;
           }
@@ -856,7 +846,7 @@ static https_request_err_e downloadAndShow()
           if (isPNG && png_res != PNG_NO_ERR)
           {
             filesystem_file_delete("/current.png");
-            submit_log("error parsing image file - %s", error.c_str());
+            Log_error_submit("error parsing image file - %s", error.c_str());
 
             return HTTPS_WRONG_IMAGE_FORMAT;
           }
@@ -867,8 +857,7 @@ static https_request_err_e downloadAndShow()
 
   if (result == HTTPS_UNABLE_TO_CONNECT)
   {
-    Log_error("unable to connect");
-    submit_log("unable to connect to the API");
+    Log_error_submit("unable to connect");
   }
 
   if (send_log)
@@ -1330,20 +1319,18 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
 
             if (!filesystem_read_from_file("/current.bmp", buffer, DISPLAY_BMP_IMAGE_SIZE))
             {
-              Log.info("%s [%d]: Error reading image!\r\n", __FILE__, __LINE__);
+              Log_error_submit("Error reading image!");
               free(buffer);
               buffer = nullptr;
-              submit_log("Error reading image!");
               return HTTPS_WRONG_IMAGE_FORMAT;
             }
 
             bmp_err_e bmp_parse_result = parseBMPHeader(buffer, image_reverse);
             if (bmp_parse_result != BMP_NO_ERR)
             {
-              Log.info("%s [%d]: Error parsing BMP header, code: %d\r\n", __FILE__, __LINE__, bmp_parse_result);
+              Log_error_submit("Error parsing BMP header, code: %d", bmp_parse_result);
               free(buffer);
               buffer = nullptr;
-              submit_log("Error parsing BMP header, code: %d", bmp_parse_result);
               return HTTPS_WRONG_IMAGE_FORMAT;
             }
           }
@@ -1355,10 +1342,9 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
 
             if (png_parse_result != PNG_NO_ERR)
             {
-              Log.info("%s [%d]: Error parsing PNG header, code: %d\r\n", __FILE__, __LINE__, png_parse_result);
+              Log_error_submit("Error parsing PNG header, code: %d", png_parse_result);
               free(buffer);
               buffer = nullptr;
-              submit_log("Error parsing PNG header, code: %d", png_parse_result);
               return HTTPS_WRONG_IMAGE_FORMAT;
             }
           }
@@ -1584,7 +1570,7 @@ static void getDeviceCredentials()
           }
           else
           {
-            Log.info("%s [%d]: [HTTPS] Unable to connect\r\n", __FILE__, __LINE__);
+            Log_error_submit("[HTTPS] Unable to connect");
 
             if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
             {
@@ -1594,12 +1580,11 @@ static void getDeviceCredentials()
             {
               showMessageWithLogo(WIFI_WEAK);
             }
-            submit_log("returned code is not OK. Code - %d", httpCode);
           }
         }
         else
         {
-          Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
+          Log_error_submit("[HTTPS] GET... failed, error: %s", https.errorToString(httpCode).c_str());
           if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
           {
             showMessageWithLogo(API_ERROR);
@@ -1608,16 +1593,14 @@ static void getDeviceCredentials()
           {
             showMessageWithLogo(WIFI_WEAK);
           }
-          submit_log("HTTP Client failed with error: %s", https.errorToString(httpCode).c_str());
         }
 
         https.end();
       }
       else
       {
-        Log.error("%s [%d]: [HTTPS] Unable to connect\r\n", __FILE__, __LINE__);
+        Log_error_submit("[HTTPS] Unable to connect");
         showMessageWithLogo(WIFI_INTERNAL_ERROR);
-        submit_log("unable to connect to the API");
       }
       Log.info("%s [%d]: status - %d\r\n", __FILE__, __LINE__, status);
       if (status)
@@ -1669,7 +1652,7 @@ static void getDeviceCredentials()
               {
                 free(buffer);
                 buffer = nullptr;
-                Log.error("%s [%d]: Receiving failed. Read: %d\r\n", __FILE__, __LINE__, counter);
+                Log_error_submit("Receiving failed. Read: %d", counter);
                 if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
                 {
                   showMessageWithLogo(API_SIZE_ERROR);
@@ -1678,12 +1661,11 @@ static void getDeviceCredentials()
                 {
                   showMessageWithLogo(WIFI_WEAK);
                 }
-                submit_log("Receiving failed. Read: %d", counter);
               }
             }
             else
             {
-              Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
+              Log_error_submit("[HTTPS] GET... failed, error: %s", https.errorToString(httpCode).c_str());
               https.end();
               if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
               {
@@ -1693,12 +1675,11 @@ static void getDeviceCredentials()
               {
                 showMessageWithLogo(WIFI_WEAK);
               }
-              submit_log("HTTPS received code is not OK. Code: %d", httpCode);
             }
           }
           else
           {
-            Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
+            Log_error_submit("[HTTPS] GET... failed, error: %s", https.errorToString(httpCode).c_str());
             if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
             {
               showMessageWithLogo(API_ERROR);
@@ -1707,12 +1688,11 @@ static void getDeviceCredentials()
             {
               showMessageWithLogo(WIFI_WEAK);
             }
-            submit_log("HTTP Client failed with error: %s", https.errorToString(httpCode).c_str());
           }
         }
         else
         {
-          Log.error("%s [%d]: unable to connect\r\n", __FILE__, __LINE__);
+          Log_error_submit("unable to connect");
           if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
           {
             showMessageWithLogo(API_ERROR);
@@ -1721,7 +1701,6 @@ static void getDeviceCredentials()
           {
             showMessageWithLogo(WIFI_WEAK);
           }
-          submit_log("unable to connect to the API");
         }
       }
       // End extra scoping block
@@ -1731,9 +1710,8 @@ static void getDeviceCredentials()
   }
   else
   {
-    Log.error("%s [%d]: Unable to create client\r\n", __FILE__, __LINE__);
+    Log_error_submit("Unable to create client");
     showMessageWithLogo(WIFI_INTERNAL_ERROR);
-    submit_log("unable to create the client");
   }
 }
 
@@ -1827,6 +1805,7 @@ static void checkAndPerformFirmwareUpdate(void)
  */
 static void goToSleep(void)
 {
+  submitStoredLogs();
   WiFi.disconnect(true);
   filesystem_deinit();
   uint32_t time_to_sleep = SLEEP_TIME_TO_SLEEP;
@@ -1950,6 +1929,7 @@ bool storeLogString(const char *log_buffer)
   return true;
 }
 
+
 uint32_t getTime(void)
 {
   time_t now;
@@ -1965,6 +1945,11 @@ uint32_t getTime(void)
 
 static void submitStoredLogs(void)
 {
+  if (WiFi.isConnected() == false)
+  {
+    Log_info("WiFi not connected; not submitting stored logs.");
+    return;
+  }
   String log = storedLogs.gather_stored_logs();
 
   String api_key = "";
@@ -2002,8 +1987,7 @@ static void writeImageToFile(const char *name, uint8_t *in_buffer, size_t size)
   size_t res = filesystem_write_to_file(name, in_buffer, size);
   if (res != size)
   {
-    Log.error("%s [%d]: File writing ERROR. Result - %d\r\n", __FILE__, __LINE__, res);
-    submit_log("error writing file - %s. Written - %d bytes", name, res);
+    Log_error_submit("File writing ERROR. Result - %d", res);
   }
   else
   {
@@ -2205,19 +2189,19 @@ void logWithAction(LogAction action, const char *message, time_t time, int line,
 
   switch (action)
   {
-  case LOG_ACTION_STORE:
-    storeLogString(json_string.c_str());
-    break;
-  case LOG_ACTION_SUBMIT:
-    submitLogString(json_string.c_str());
-    break;
-  case LOG_ACTION_SUBMIT_OR_STORE:
-    if (!submitLogString(json_string.c_str()))
-    {
-      Log_info("Was unable to send log to API; saving locally for later.");
+    case LOG_ACTION_STORE:
       storeLogString(json_string.c_str());
-    }
-    break;
+      break;
+    case LOG_ACTION_SUBMIT:
+      submitLogString(json_string.c_str());
+      break;
+    case LOG_ACTION_SUBMIT_OR_STORE:
+      if (!submitLogString(json_string.c_str()))
+      {
+        Log_info("Was unable to send log to API; saving locally for later.");
+        storeLogString(json_string.c_str());
+      }
+      break;
   }
 
   preferences.putUInt(PREFERENCES_LOG_ID_KEY, ++log_id);
