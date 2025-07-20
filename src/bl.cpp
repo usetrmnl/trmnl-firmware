@@ -83,10 +83,7 @@ static uint8_t *storedLogoOrDefault(void);
 static bool saveCurrentFileName(String &name);
 static bool checkCurrentFileName(String &newName);
 static DeviceStatusStamp getDeviceStatusStamp();
-void submitLog(const char *format, time_t time, int line, const char *file, ...);
 void log_nvs_usage();
-
-#define submit_log(format, ...) submitLog(format, getTime(), __LINE__, __FILE__, ##__VA_ARGS__);
 
 void wait_for_serial()
 {
@@ -1915,36 +1912,42 @@ static float readBatteryVoltage(void)
 }
 
 /**
- * @brief Function to send the log note
+ * @brief Function to submit a log string to the API
  * @param log_buffer pointer to the buffer that contains log note
- * @param size size of buffer
- * @return none
+ * @return bool true if successful, false if failed
  */
-static void submitOrSaveLogString(const char *log_buffer, size_t size)
+bool submitLogString(const char *log_buffer)
 {
   String api_key = "";
   if (preferences.isKey(PREFERENCES_API_KEY))
   {
     api_key = preferences.getString(PREFERENCES_API_KEY, PREFERENCES_API_KEY_DEFAULT);
-    Log.info("%s [%d]: %s key exists. Value - %s\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY, api_key.c_str());
+    Log_info("%s key exists. Value - %s", PREFERENCES_API_KEY, api_key.c_str());
   }
   else
   {
-    Log.error("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY);
+    Log_info("%s key not exists.", PREFERENCES_API_KEY);
+    return false;
   }
 
   LogApiInput input{api_key, log_buffer};
-  auto submitLogToApiResult = submitLogToApi(input, preferences.getString(PREFERENCES_API_URL, API_BASE_URL).c_str());
-  if (!submitLogToApiResult)
+  return submitLogToApi(input, preferences.getString(PREFERENCES_API_URL, API_BASE_URL).c_str());
+}
+
+/**
+ * @brief Function to store a log string locally
+ * @param log_buffer pointer to the buffer that contains log note
+ * @return bool true if successful, false if failed
+ */
+bool storeLogString(const char *log_buffer)
+{
+  LogStoreResult store_result = storedLogs.store_log(String(log_buffer));
+  if (store_result.status != LogStoreResult::SUCCESS)
   {
-    Log_info("Was unable to send log to API; saving locally for later.");
-    // log not send
-    LogStoreResult store_result = storedLogs.store_log(String(log_buffer));
-    if (store_result.status != LogStoreResult::SUCCESS)
-    {
-      Log_error("Failed to store log: %s", store_result.message);
-    }
+    Log_error("Failed to store log: %s", store_result.message);
+    return false;
   }
+  return true;
 }
 
 uint32_t getTime(void)
@@ -2182,25 +2185,16 @@ DeviceStatusStamp getDeviceStatusStamp()
   return deviceStatus;
 }
 
-void submitLog(const char *format, time_t time, int line, const char *file, ...)
+void logWithAction(LogAction action, const char *message, time_t time, int line, const char *file)
 {
   uint32_t log_id = preferences.getUInt(PREFERENCES_LOG_ID_KEY, 1);
-
-  char log_message[1024];
-
-  va_list args;
-  va_start(args, file);
-
-  vsnprintf(log_message, sizeof(log_message), format, args);
-
-  va_end(args);
 
   LogWithDetails input = {
       .deviceStatusStamp = getDeviceStatusStamp(),
       .timestamp = time,
       .codeline = line,
       .sourceFile = file,
-      .logMessage = log_message,
+      .logMessage = message,
       .logId = log_id,
       .filenameCurrent = preferences.getString(PREFERENCES_FILENAME_KEY, ""),
       .filenameNew = new_filename,
@@ -2209,7 +2203,22 @@ void submitLog(const char *format, time_t time, int line, const char *file, ...)
 
   String json_string = serialize_log(input);
 
-  submitOrSaveLogString(json_string.c_str(), json_string.length());
+  switch (action)
+  {
+  case LOG_ACTION_STORE:
+    storeLogString(json_string.c_str());
+    break;
+  case LOG_ACTION_SUBMIT:
+    submitLogString(json_string.c_str());
+    break;
+  case LOG_ACTION_SUBMIT_OR_STORE:
+    if (!submitLogString(json_string.c_str()))
+    {
+      Log_info("Was unable to send log to API; saving locally for later.");
+      storeLogString(json_string.c_str());
+    }
+    break;
+  }
 
   preferences.putUInt(PREFERENCES_LOG_ID_KEY, ++log_id);
 }
