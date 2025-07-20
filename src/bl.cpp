@@ -75,7 +75,6 @@ static void submitOrSaveLogString(const char *log_buffer, size_t size); // log s
 static void submitStoredLogs(void);
 static void writeSpecialFunction(SPECIAL_FUNCTION function);
 static void writeImageToFile(const char *name, uint8_t *in_buffer, size_t size);
-static uint32_t getTime(void);
 static void showMessageWithLogo(MSG message_type);
 static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, const char *fw_version, String message);
 static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiResponse);
@@ -1948,7 +1947,7 @@ static void submitOrSaveLogString(const char *log_buffer, size_t size)
   }
 }
 
-static uint32_t getTime(void)
+uint32_t getTime(void)
 {
   time_t now;
   struct tm timeinfo;

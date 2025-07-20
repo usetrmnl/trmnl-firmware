@@ -15,4 +15,6 @@ void bl_init(void);
  */
 void bl_process(void);
 
+uint32_t getTime(void);
+
 #endif
