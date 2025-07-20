@@ -325,11 +325,6 @@ void bl_init(void)
 
   Log.info("%s [%d]: Time since last sleep: %d\r\n", __FILE__, __LINE__, time_since_sleep);
 
-  Log_verbose("example log_verbose");
-  Log_info("example log_info");
-  Log_error("example log_error");
-  Log_fatal("example log_fatal");
-
   if (!preferences.isKey(PREFERENCES_API_KEY) || !preferences.isKey(PREFERENCES_FRIENDLY_ID))
   {
     Log.info("%s [%d]: API key or friendly ID not saved\r\n", __FILE__, __LINE__);
