@@ -274,13 +274,13 @@ void bl_init(void)
     }
     else
     {
-      Log_fatal_submit("Connection failed! WL Status: %d", WiFi.status());
-
       if (current_msg != WIFI_FAILED)
       {
         showMessageWithLogo(WIFI_FAILED);
         current_msg = WIFI_FAILED;
       }
+
+      Log_fatal_submit("Connection failed! WL Status: %d", WiFi.status());
 
       // Go to deep sleep
       wifiErrorDeepSleep();
@@ -298,11 +298,11 @@ void bl_init(void)
     res = WifiCaptivePortal.startPortal();
     if (!res)
     {
-      Log_error_submit("Failed to connect or hit timeout");
-
       WiFi.disconnect(true);
 
       showMessageWithLogo(WIFI_FAILED);
+
+      Log_error("Failed to connect or hit timeout");
 
       // Go to deep sleep
       wifiErrorDeepSleep();
@@ -586,7 +586,7 @@ static https_request_err_e downloadAndShow()
     }
     else
     {
-      Log_error_submit("Failed to resolve hostname on attempt %d", attempt);
+      Log_error("Failed to resolve hostname on attempt %d", attempt);
       delay(2000);
     }
   }
@@ -1319,18 +1319,18 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
 
             if (!filesystem_read_from_file("/current.bmp", buffer, DISPLAY_BMP_IMAGE_SIZE))
             {
-              Log_error_submit("Error reading image!");
               free(buffer);
               buffer = nullptr;
+              Log_error_submit("Error reading image!");
               return HTTPS_WRONG_IMAGE_FORMAT;
             }
 
             bmp_err_e bmp_parse_result = parseBMPHeader(buffer, image_reverse);
             if (bmp_parse_result != BMP_NO_ERR)
             {
-              Log_error_submit("Error parsing BMP header, code: %d", bmp_parse_result);
               free(buffer);
               buffer = nullptr;
+              Log_error_submit("Error parsing BMP header, code: %d", bmp_parse_result);
               return HTTPS_WRONG_IMAGE_FORMAT;
             }
           }
@@ -1570,8 +1570,6 @@ static void getDeviceCredentials()
           }
           else
           {
-            Log_error_submit("[HTTPS] Unable to connect");
-
             if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
             {
               showMessageWithLogo(API_ERROR);
@@ -1580,11 +1578,11 @@ static void getDeviceCredentials()
             {
               showMessageWithLogo(WIFI_WEAK);
             }
+            Log_error_submit("[HTTPS] Unable to connect");
           }
         }
         else
         {
-          Log_error_submit("[HTTPS] GET... failed, error: %s", https.errorToString(httpCode).c_str());
           if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
           {
             showMessageWithLogo(API_ERROR);
@@ -1593,14 +1591,15 @@ static void getDeviceCredentials()
           {
             showMessageWithLogo(WIFI_WEAK);
           }
+          Log_error_submit("[HTTPS] GET... failed, error: %s", https.errorToString(httpCode).c_str());
         }
 
         https.end();
       }
       else
       {
-        Log_error_submit("[HTTPS] Unable to connect");
         showMessageWithLogo(WIFI_INTERNAL_ERROR);
+        Log_error_submit("[HTTPS] Unable to connect");
       }
       Log.info("%s [%d]: status - %d\r\n", __FILE__, __LINE__, status);
       if (status)
@@ -1652,7 +1651,6 @@ static void getDeviceCredentials()
               {
                 free(buffer);
                 buffer = nullptr;
-                Log_error_submit("Receiving failed. Read: %d", counter);
                 if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
                 {
                   showMessageWithLogo(API_SIZE_ERROR);
@@ -1661,11 +1659,11 @@ static void getDeviceCredentials()
                 {
                   showMessageWithLogo(WIFI_WEAK);
                 }
+                Log_error_submit("Receiving failed. Read: %d", counter);
               }
             }
             else
             {
-              Log_error_submit("[HTTPS] GET... failed, error: %s", https.errorToString(httpCode).c_str());
               https.end();
               if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
               {
@@ -1675,11 +1673,11 @@ static void getDeviceCredentials()
               {
                 showMessageWithLogo(WIFI_WEAK);
               }
+              Log_error_submit("[HTTPS] GET... failed, error: %s", https.errorToString(httpCode).c_str());
             }
           }
           else
           {
-            Log_error_submit("[HTTPS] GET... failed, error: %s", https.errorToString(httpCode).c_str());
             if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
             {
               showMessageWithLogo(API_ERROR);
@@ -1688,11 +1686,11 @@ static void getDeviceCredentials()
             {
               showMessageWithLogo(WIFI_WEAK);
             }
+            Log_error_submit("[HTTPS] GET... failed, error: %s", https.errorToString(httpCode).c_str());
           }
         }
         else
         {
-          Log_error_submit("unable to connect");
           if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
           {
             showMessageWithLogo(API_ERROR);
@@ -1701,6 +1699,7 @@ static void getDeviceCredentials()
           {
             showMessageWithLogo(WIFI_WEAK);
           }
+          Log_error_submit("unable to connect");
         }
       }
       // End extra scoping block
