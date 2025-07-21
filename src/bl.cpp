@@ -13,7 +13,6 @@
 #include <stdlib.h>
 #include <ESPAsyncWebServer.h>
 #include <AsyncTCP.h>
-#include <ImageData.h>
 #include <Preferences.h>
 #include <cstdint>
 #include <png_file.h>
@@ -35,6 +34,7 @@
 #include <nvs.h>
 #include <serialize_log.h>
 #include <preferences_persistence.h>
+#include "logo_small.h"
 
 bool pref_clear = false;
 String new_filename = "";
@@ -708,7 +708,8 @@ static https_request_err_e downloadAndShow()
             return HTTPS_WRONG_IMAGE_SIZE;
           }
 
-          Log.info("%s [%d]: Received successfully\r\n", __FILE__, __LINE__);
+          WiFi.disconnect(true); // no need for WiFi, save power starting here
+          Log.info("%s [%d]: Received successfully; WiFi off\r\n", __FILE__, __LINE__);
           bool bmp_rename = false;
 
           if (filesystem_file_exists("/current.bmp") || filesystem_file_exists("/current.png"))
@@ -1637,7 +1638,7 @@ static void getDeviceCredentials()
 
                 // show the image
                 String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
-                display_show_msg(buffer, FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
+                display_show_msg(storedLogoOrDefault(), FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
                 free(buffer);
                 buffer = nullptr;
                 need_to_refresh_display = 0;
@@ -1800,7 +1801,10 @@ static void checkAndPerformFirmwareUpdate(void)
 static void goToSleep(void)
 {
   submitStoredLogs();
-  WiFi.disconnect(true);
+  if (WiFi.status() == WL_CONNECTED) {
+    WiFi.disconnect();
+  }
+  WiFi.mode(WIFI_OFF); 
   filesystem_deinit();
   uint32_t time_to_sleep = SLEEP_TIME_TO_SLEEP;
   if (preferences.isKey(PREFERENCES_SLEEP_TIME_KEY))
@@ -1835,7 +1839,7 @@ static bool setClock()
   bool sync_status = false;
   struct tm timeinfo;
 
-  configTime(0, 0, "pool.ntp.org", "time.google.com", "time.windows.com");
+  configTime(0, 0, "time.google.com", "time.cloudflare.com");
   Log.info("%s [%d]: Time synchronization...\r\n", __FILE__, __LINE__);
 
   // Wait for time to be set
@@ -2060,11 +2064,7 @@ static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiRes
 
 static uint8_t *storedLogoOrDefault(void)
 {
-  if (filesystem_read_from_file("/logo.bmp", buffer, DEFAULT_IMAGE_SIZE))
-  {
-    return buffer;
-  }
-  return const_cast<uint8_t *>(default_icon);
+  return const_cast<uint8_t *>(logo_small);
 }
 
 static bool saveCurrentFileName(String &name)

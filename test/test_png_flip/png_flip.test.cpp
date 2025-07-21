@@ -64,7 +64,7 @@ void test_flip_image(void)
   memcpy(buffer, original, buffer_size);
 
   // Apply the flip operation
-  flip_image(buffer, width, height);
+  flip_image(buffer, width, height, true);
 
   // Verify the result
   TEST_ASSERT_EQUAL_HEX8_ARRAY(expected, buffer, buffer_size);
