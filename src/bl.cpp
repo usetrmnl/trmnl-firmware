@@ -34,6 +34,7 @@
 #include <serialize_log.h>
 #include <preferences_persistence.h>
 #include "logo_small.h"
+#include <wifi-helpers.h>
 
 bool pref_clear = false;
 String new_filename = "";
@@ -2170,7 +2171,7 @@ DeviceStatusStamp getDeviceStatusStamp()
   DeviceStatusStamp deviceStatus = {};
 
   deviceStatus.wifi_rssi_level = WiFi.RSSI();
-  parseWifiStatusToStr(deviceStatus.wifi_status, sizeof(deviceStatus.wifi_status), WiFi.status());
+  strncpy(deviceStatus.wifi_status, wifiStatusStr(WiFi.status()), sizeof(deviceStatus.wifi_status) - 1);
   deviceStatus.refresh_rate = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY);
   deviceStatus.time_since_last_sleep = time_since_sleep;
   snprintf(deviceStatus.current_fw_version, sizeof(deviceStatus.current_fw_version), "%s", FW_VERSION_STRING);
