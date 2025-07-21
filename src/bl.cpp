@@ -1866,7 +1866,7 @@ static bool setClock()
   bool sync_status = false;
   struct tm timeinfo;
 
-  configTime(0, 0, "pool.ntp.org", "time.google.com", "time.windows.com");
+  configTime(0, 0, "time.google.com", "time.cloudflare.com");
   Log.info("%s [%d]: Time synchronization...\r\n", __FILE__, __LINE__);
 
   // Wait for time to be set
