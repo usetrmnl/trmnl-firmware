@@ -20,4 +20,5 @@ const char *wifiStatusStr(wl_status_t wifi_status)
       return entry.name;
     }
   }
+  return nullptr;
 }
