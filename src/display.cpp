@@ -1,4 +1,4 @@
-#include "../lib/bb_epaper/Fonts/Roboto_Black_16.h"
+
 #include "DEV_Config.h"
 #include "Group5.h"
 #include "bb_epaper.h"
@@ -10,6 +10,8 @@
 #include <ctype.h> //iscntrl()
 #include <display.h>
 #include <trmnl_log.h>
+#include <bmp.h>
+#include "../lib/bb_epaper/Fonts/Roboto_Black_16.h"
 
 BBEPAPER bbep(EP75_800x480);
 
@@ -199,7 +201,6 @@ void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message,
 /**
  * @brief Function to show the image on the display
  * @param image_buffer pointer to the uint8_t image buffer
- * @param reverse shows if the color scheme is reverse
  * @return none
  */
 void display_show_image(uint8_t *image_buffer) {
@@ -209,7 +210,6 @@ void display_show_image(uint8_t *image_buffer) {
   const uint32_t buf_size = ((width + 7) / 8) * height; // size in bytes
 
   Log_info("show image for array");
-  if (*(uint16_t *)image_buffer == BB_BITMAP_MARKER)
     if (*(uint16_t *)image_buffer == BB_BITMAP_MARKER) {
       // G5 compressed image
       BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
@@ -217,18 +217,20 @@ void display_show_image(uint8_t *image_buffer) {
       bAlloc = true;
       int x = (width - pBBB->width) / 2;
       int y = (height - pBBB->height) / 2; // center it
-      bbep.fillScreen(
-          BBEP_WHITE); // draw the image centered on a white background
+      bbep.fillScreen(BBEP_WHITE); // draw the image centered on a white background
       bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
-    } else if (*(uint16_t *)image_buffer ==
-               BMP_SIGNATURE) { // This work-around is due to a lack of RAM; the
+    } else if (*(uint16_t *)image_buffer == BMP_SIGNATURE) { 
+        // This work-around is due to a lack of RAM; the
                                 // correct method would be to use loadBMP()
       int32_t height = *(int32_t *)&image_buffer[22];
+      if (height > 0) 
+      {
       flip_image(image_buffer + 62, bbep.width(), bbep.height(),
                  false); // fix bottom-up bitmap images
+      }
       if (image_buffer[54] == 0xff && image_buffer[55] == 0xff &&
           image_buffer[56] == 0xff && image_buffer[58] == 0x00 &&
-          mage_buffer[59] == 0x00 && image_buffer[60] == 0x00) {
+          image_buffer[59] == 0x00 && image_buffer[60] == 0x00) {
         uint32_t *d32 =
             (uint32_t
                  *)&image_buffer[62]; // get framebuffer as a 32-bit pointer

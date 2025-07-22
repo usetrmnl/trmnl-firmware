@@ -238,20 +238,6 @@ void bl_init(void)
   display_init();
 
 
-  #if 1
-   buffer = (uint8_t *)malloc(DEFAULT_IMAGE_SIZE);
-display_show_image(rover_topdown);
-delay(5000);
-display_show_image(storedLogoOrDefault());
-delay(5000);
-display_show_image(test);
-delay(5000);
-
- free(buffer);
-    buffer = nullptr;
-
-
-  #endif
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
   {
     Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
@@ -778,7 +764,7 @@ static https_request_err_e downloadAndShow()
           {
 
             Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
-            display_show_image(imagePointer,);
+            display_show_image(imagePointer);
 
             // Using filename from API response
             new_filename = apiDisplayResult.response.filename;
