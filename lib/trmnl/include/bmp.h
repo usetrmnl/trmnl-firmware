@@ -9,4 +9,6 @@ enum bmp_err_e
   BMP_INVALID_OFFSET,
 };
 
-bmp_err_e parseBMPHeader(uint8_t *data, bool &reserved);
+#define BMP_SIGNATURE 0x4d42
+
+bmp_err_e parseBMPHeader(uint8_t *data);

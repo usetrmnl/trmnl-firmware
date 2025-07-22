@@ -37,6 +37,10 @@
 #include "logo_small.h"
 #include <wifi-helpers.h>
 
+#include "rover_topdown.h"
+#include "testbmp.h"
+
+
 bool pref_clear = false;
 String new_filename = "";
 
@@ -233,12 +237,27 @@ void bl_init(void)
   Log.info("%s [%d]: Display init\r\n", __FILE__, __LINE__);
   display_init();
 
+
+  #if 1
+   buffer = (uint8_t *)malloc(DEFAULT_IMAGE_SIZE);
+display_show_image(rover_topdown);
+delay(5000);
+display_show_image(storedLogoOrDefault());
+delay(5000);
+display_show_image(test);
+delay(5000);
+
+ free(buffer);
+    buffer = nullptr;
+
+
+  #endif
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
   {
     Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
 
     buffer = (uint8_t *)malloc(DEFAULT_IMAGE_SIZE);
-    display_show_image(storedLogoOrDefault(), false, false);
+    display_show_image(storedLogoOrDefault());
     free(buffer);
     buffer = nullptr;
 
@@ -734,7 +753,6 @@ static https_request_err_e downloadAndShow()
             filesystem_file_rename("/current.bmp", "/last.bmp");
           }
 
-          bool image_reverse = false;
           if (isPNG)
           {
             writeImageToFile("/current.png", buffer, content_size);
@@ -746,7 +764,7 @@ static https_request_err_e downloadAndShow()
           }
           else
           {
-            bmp_res = parseBMPHeader(buffer, image_reverse);
+            bmp_res = parseBMPHeader(buffer);
             Log.info("%s [%d]: BMP Parsing result: %d\r\n", __FILE__, __LINE__, bmp_res);
           }
           Serial.println();
@@ -760,7 +778,7 @@ static https_request_err_e downloadAndShow()
           {
 
             Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
-            display_show_image(imagePointer, image_reverse, isPNG);
+            display_show_image(imagePointer,);
 
             // Using filename from API response
             new_filename = apiDisplayResult.response.filename;
@@ -811,7 +829,7 @@ static https_request_err_e downloadAndShow()
               writeImageToFile("/current.bmp", buffer, content_size);
             }
             Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
-            display_show_image(imagePointer, image_reverse, isPNG);
+            display_show_image(imagePointer);
 
             // Using filename from API response
             new_filename = apiDisplayResult.response.filename;
@@ -1236,7 +1254,6 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           result = HTTPS_SUCCESS;
           Log.info("%s [%d]: rewind success\r\n", __FILE__, __LINE__);
 
-          bool image_reverse = false;
           bool file_check_bmp = true;
           image_err_e image_proccess_response = PNG_WRONG_FORMAT;
           bmp_err_e bmp_proccess_response = BMP_NOT_BMP;
@@ -1248,7 +1265,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
             Log.info("Rewind BMP\n\r");
             buffer = (uint8_t *)malloc(DISPLAY_BMP_IMAGE_SIZE);
             file_check_bmp = filesystem_read_from_file(last_dot_file.c_str(), buffer, DISPLAY_BMP_IMAGE_SIZE);
-            bmp_proccess_response = parseBMPHeader(buffer, image_reverse);
+            bmp_proccess_response = parseBMPHeader(buffer);
           }
           else if (last_dot_file == "/last.png")
           {
@@ -1264,7 +1281,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
             case PNG_NO_ERR:
             {
               Log.info("Showing image\n\r");
-              display_show_image(buffer, image_reverse, isPNG);
+              display_show_image(buffer);
               need_to_refresh_display = 1;
             }
             break;
@@ -1278,7 +1295,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
             case BMP_NO_ERR:
             {
               Log.info("Showing image\n\r");
-              display_show_image(buffer, image_reverse, isPNG);
+              display_show_image(buffer);
               need_to_refresh_display = 1;
             }
             break;
@@ -1312,7 +1329,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           result = HTTPS_SUCCESS;
           Log.info("%s [%d]: send_to_me success\r\n", __FILE__, __LINE__);
 
-          bool image_reverse = false;
+    
 
           if (!filesystem_file_exists("/current.bmp") && !filesystem_file_exists("/current.png"))
           {
@@ -1335,7 +1352,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
               return HTTPS_WRONG_IMAGE_FORMAT;
             }
 
-            bmp_err_e bmp_parse_result = parseBMPHeader(buffer, image_reverse);
+            bmp_err_e bmp_parse_result = parseBMPHeader(buffer);
             if (bmp_parse_result != BMP_NO_ERR)
             {
               free(buffer);
@@ -1360,7 +1377,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           }
 
           Log.info("Showing image\n\r");
-          display_show_image(buffer, image_reverse, isPNG);
+          display_show_image(buffer);
           need_to_refresh_display = 1;
 
           free(buffer);
