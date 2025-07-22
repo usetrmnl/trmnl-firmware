@@ -54,7 +54,8 @@ void test_serialize_log(void)
     "special_function": "None",
     "battery_voltage": 4.2,
     "wake_reason": "Timer",
-    "free_heap_size": 50000
+    "free_heap_size": 50000,
+    "max_alloc_size": 40000
   })");
 
   auto result = serialize_log(input);
@@ -83,6 +84,7 @@ void test_serialize_log_with_retry(void)
     "battery_voltage": 4.2,
     "wake_reason": "Timer",
     "free_heap_size": 50000,
+    "max_alloc_size": 40000,
     "retry": 2
   })");
 
