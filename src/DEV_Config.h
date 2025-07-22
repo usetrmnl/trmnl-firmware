@@ -45,20 +45,27 @@
  * GPIO config
 **/
 #if defined(BOARD_TRMNL)
+// Xiao ESP32C3 plus 8-pin breakout
+//   #define EPD_SCK_PIN  8
+//   #define EPD_MOSI_PIN 10
+//   #define EPD_CS_PIN   21
+//   #define EPD_RST_PIN  5
+//   #define EPD_DC_PIN   4
+//   #define EPD_BUSY_PIN 20
 // Pin def for Xiao ESP32C3 + old EPD breakout
-   #define EPD_SCK_PIN  8
-   #define EPD_MOSI_PIN 10
-   #define EPD_CS_PIN   3
-   #define EPD_RST_PIN  2
-   #define EPD_DC_PIN   5
-   #define EPD_BUSY_PIN 7
-   // Pin definition for TRMNL Board
-//   #define EPD_SCK_PIN  7
-//   #define EPD_MOSI_PIN 8
-//   #define EPD_CS_PIN   6
-//   #define EPD_RST_PIN  10
+//   #define EPD_SCK_PIN  8
+//   #define EPD_MOSI_PIN 10
+//   #define EPD_CS_PIN   3
+//   #define EPD_RST_PIN  2
 //   #define EPD_DC_PIN   5
-//   #define EPD_BUSY_PIN 4
+//   #define EPD_BUSY_PIN 7
+   // Pin definition for TRMNL Board
+   #define EPD_SCK_PIN  7
+   #define EPD_MOSI_PIN 8
+   #define EPD_CS_PIN   6
+   #define EPD_RST_PIN  10
+   #define EPD_DC_PIN   5
+   #define EPD_BUSY_PIN 4
 
 #elif defined(BOARD_WAVESHARE_ESP32_DRIVER)
    // Pin definition for Waveshare ESP32 Driver Board

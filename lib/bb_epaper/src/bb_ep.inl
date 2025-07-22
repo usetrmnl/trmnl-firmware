@@ -43,8 +43,13 @@ const uint8_t u8Colors_3clr[16] = { // red and yellow are the same for these dis
     BBEP_BLACK, BBEP_WHITE, BBEP_RED, BBEP_RED, BBEP_BLACK, BBEP_RED, BBEP_BLACK, BBEP_RED,
     BBEP_RED, BBEP_BLACK, BBEP_RED, BBEP_BLACK, BBEP_RED, BBEP_BLACK, BBEP_RED, BBEP_BLACK
 };
+// 2-bit grayscale mode (bits are inverted)
+const uint8_t u8Colors_4gray[16] = {
+BBEP_GRAY3, BBEP_GRAY2, BBEP_GRAY1, BBEP_GRAY0, BBEP_GRAY3, BBEP_GRAY2, BBEP_GRAY1, BBEP_GRAY0,
+BBEP_GRAY3, BBEP_GRAY2, BBEP_GRAY1, BBEP_GRAY0, BBEP_GRAY3, BBEP_GRAY2, BBEP_GRAY1, BBEP_GRAY0
+};
 
-// the 4-color mode also applies to 2-bit grayscale mode
+// the 4-color mode
 const uint8_t u8Colors_4clr[16] = {  // black white red yellow
     BBEP_BLACK, BBEP_WHITE, BBEP_RED, BBEP_YELLOW, BBEP_BLACK, BBEP_WHITE, BBEP_RED, BBEP_YELLOW,
     BBEP_BLACK, BBEP_WHITE, BBEP_RED, BBEP_YELLOW, BBEP_BLACK, BBEP_WHITE, BBEP_RED, BBEP_YELLOW
@@ -983,7 +988,7 @@ const uint8_t epd426g_init[] PROGMEM =
     
     0x06, 0x0c, 0xae, 0xc7, 0xc3, 0xc0, 0x80, // set soft start
     0x04, 0x01, 0xdf, 0x01, 0x02, // driver output control
-    0x02, 0x3c, 0x01, // border waveform
+    0x02, 0x3c, 0x00, // border waveform (0=white, 3=black)
     0x02, 0x11, 0x01, // data entry mode
     0x05, 0x44, 0x00, 0x00, 0xdf, 0x01, // ram start/end
     0x05, 0x45, 0x00, 0x00, 0x1f, 0x03,
@@ -1026,6 +1031,31 @@ const uint8_t epd426_init_full[] PROGMEM =
     0x03, 0x4e, 0x00, 0x00,
     0x03, 0x4f, 0x00, 0x00,
     BUSY_WAIT, 
+    0x00 // end of table
+};
+
+// 1-bit fast update mode
+const uint8_t epd426_init_fast[] PROGMEM =
+{   
+    0x01, SSD1608_SW_RESET, 
+    BUSY_WAIT,
+    0x02, 0x18, 0x80, // read built-in temp sensor
+    
+    0x06, 0x0c, 0xae, 0xc7, 0xc3, 0xc0, 0x80, // set soft start
+    0x04, 0x01, 0xdf, 0x01, 0x02, // driver output control
+    0x02, 0x3c, 0x01, // border waveform
+    0x02, 0x11, 0x01, // data entry mode
+    0x05, 0x44, 0x00, 0x00, 0xdf, 0x01, // ram start/end
+    0x05, 0x45, 0x00, 0x00, 0x1f, 0x03,
+   
+    0x03, 0x4e, 0x00, 0x00,
+    0x03, 0x4f, 0x00, 0x00,
+    BUSY_WAIT,
+// secret sauce for doing a 1.5s update
+    0x02, 0x1a, 0x5a, // temp?
+    0x02, 0x22, 0x91, // ??
+    0x01, 0x20, // ??
+    BUSY_WAIT,
     0x00 // end of table
 };
 
@@ -1349,6 +1379,56 @@ const uint8_t epd213_inky_init_sequence_full[] PROGMEM = {
     0
 };
 
+// 2-bit (4 grayscale mode) for GDEY075T7 (older model)
+const uint8_t epd75_old_gray_init[] PROGMEM = {
+    2, 0x00, 0x1e, // soft reset
+    BUSY_WAIT,
+    6, 0x01, 0x07, 0x07, 0x3f, 0x3f, 0x09, // PSR
+    5, 0x06, 0x17, 0x17, 0x28, 0x17, // BSTS
+    5, 0x61, 0x03, 0x20, 0x01, 0xe0, // TRES
+    2, 0x15, 0x00, // DUSPI
+    2, 0x60, 0x22, // TCON
+    2, 0xe3, 0x22, // PWS
+    2, 0x00, 0x3f, // PSR
+    3, 0x50, 0x00, 0x07, // VCOM LUTBD (00=white border, 30=black border)
+    2, 0x82, 0x30, // -2.5v
+    43, 0x20, // LUT 0~3 gray
+      0x00, 0x0A, 0x00, 0x00, 0x00, 0x01, 0x60, 0x14, 0x14, 0x00, 0x00, 0x01,
+      0x00, 0x14, 0x0A, 0x00, 0x00, 0x01, 0x00, 0x13, 0x0A, 0x01, 0x00, 0x01,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    43, 0x21, // WW
+      0x40, 0x0A, 0x00, 0x00, 0x00, 0x01, 0x90, 0x14, 0x14, 0x00, 0x00, 0x01,
+      0x10, 0x14, 0x0A, 0x00, 0x00, 0x01, 0xA0, 0x13, 0x0A, 0x00, 0x00, 0x01, 
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    43, 0x22, // BW
+      0x40, 0x0A, 0x00, 0x00, 0x00, 0x01, 0x90, 0x14, 0x14, 0x00, 0x00, 0x01,
+      0x00, 0x14, 0x0A, 0x00, 0x00, 0x01, 0x99, 0x0C, 0x01, 0x03, 0x04, 0x01,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    43, 0x23, // WB
+      0x40, 0x0A, 0x00, 0x00, 0x00, 0x01, 0x90, 0x14, 0x14, 0x00, 0x00, 0x01,
+      0x00, 0x14, 0x0A, 0x00, 0x00, 0x01, 0x99, 0x0B, 0x04, 0x04, 0x01, 0x01,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    43, 0x24, // BB
+      0x80, 0x0A, 0x00, 0x00, 0x00, 0x01, 0x90, 0x14, 0x14, 0x00, 0x00, 0x01,
+      0x20, 0x14, 0x0A, 0x00, 0x00, 0x01, 0x50, 0x13, 0x01, 0x00, 0x00, 0x01,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    43, 0x25, // Border LUT
+      0x40, 0x0A, 0x00, 0x00, 0x00, 0x01, 0x90, 0x14, 0x14, 0x00, 0x00, 0x01,
+      0x10, 0x14, 0x0A, 0x00, 0x00, 0x01, 0xA0, 0x13, 0x0A, 0x00, 0x00, 0x01,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    2, 0xe0, 0x00, // CCSET
+    2, 0x41, 0x00, // TSE
+    1, 0x04, // Power on
+    BUSY_WAIT,
+    0 // end
+};
+
 // 2-bit (4 grayscale mode)
 const uint8_t epd75_gray_init[] PROGMEM = {
     2, 0x00, 0x1f, // panel setting
@@ -1571,7 +1651,8 @@ const EPD_PANEL panelDefs[] PROGMEM = {
     {240, 416, 0, epd37_init_sequence_full, NULL, epd37_init_sequence_part, 0, BBEP_CHIP_UC81xx, u8Colors_2clr}, // EP37_240x416
     {104, 212, 0, epd213_inky_init_sequence_full, NULL, NULL, 0, BBEP_CHIP_UC81xx, u8Colors_2clr}, // EP213_104x212, older InkyPHAT black and white
     {800, 480, 0, epd75_init_sequence_full, epd75_init_sequence_fast, epd75_init_sequence_partial, 0, BBEP_CHIP_UC81xx, u8Colors_2clr}, // EP75_800x480
-    {800, 480, 0, epd75_gray_init, NULL, NULL, BBEP_4GRAY, BBEP_CHIP_UC81xx, u8Colors_4clr}, // EP75_800x480_4GRAY
+    {800, 480, 0, epd75_gray_init, NULL, NULL, BBEP_4GRAY, BBEP_CHIP_UC81xx, u8Colors_4gray}, // EP75_800x480_4GRAY
+    {800, 480, 0, epd75_old_gray_init, NULL, NULL, BBEP_4GRAY, BBEP_CHIP_UC81xx, u8Colors_4gray}, // EP75_800x480_4GRAY_OLD
     {128, 296, 0, epd29_init_sequence_full, NULL, epd29_init_sequence_part, 0, BBEP_CHIP_UC81xx, u8Colors_2clr}, // Badger 2040 
     {122, 250, 1, epd213r_inky_init_sequence_full, NULL, NULL, BBEP_3COLOR, BBEP_CHIP_SSD16xx, u8Colors_3clr}, // EP213R_122x250 Inky phat 2.13" B/W/R
     {200, 200, 0, epd154_init_sequence_full, epd154_init_sequence_fast, epd154_init_sequence_part, 0, BBEP_CHIP_SSD16xx, u8Colors_2clr}, // EP154_200x200
@@ -1588,8 +1669,8 @@ const EPD_PANEL panelDefs[] PROGMEM = {
     {640, 384, 0, epd74r_init, NULL, NULL,  BBEP_3COLOR | BBEP_4BPP_DATA, BBEP_CHIP_UC81xx, u8Colors_3clr}, // EP74R_640x384, 3-color 640x384
     {600, 448, 0, epd583r_init, NULL, NULL,  BBEP_3COLOR | BBEP_4BPP_DATA, BBEP_CHIP_UC81xx, u8Colors_3clr}, // EP583R_600x448, 3-color 600x448
     {800, 480, 0, epd75r_init, NULL, NULL, BBEP_3COLOR | BBEP_RED_SWAPPED, BBEP_CHIP_UC81xx, u8Colors_3clr}, // EP75R_800x480, waveshare 7.5 800x480 B/W/R
-    {800, 480, 0, epd426_init_full, NULL, epd426_init_part, 0, BBEP_CHIP_SSD16xx, u8Colors_2clr},
-    {800, 480, 0, epd426g_init, NULL, NULL, BBEP_4GRAY, BBEP_CHIP_SSD16xx, u8Colors_4clr}, // 2-bit grayscale mode
+    {800, 480, 0, epd426_init_full, epd426_init_fast, epd426_init_part, 0, BBEP_CHIP_SSD16xx, u8Colors_2clr},
+    {800, 480, 0, epd426g_init, NULL, NULL, BBEP_4GRAY, BBEP_CHIP_SSD16xx, u8Colors_4gray}, // 2-bit grayscale mode
     {128, 296, 0, epd29r2_init_sequence_full, NULL, NULL, BBEP_RED_SWAPPED | BBEP_3COLOR, BBEP_CHIP_UC81xx, u8Colors_3clr}, // EP29R2_128x296 Adafruit 2.9" 128x296 Tricolor FeatherWing
     {640, 400, 0, epd41_init_sequence_full, NULL, NULL, BBEP_4BPP_DATA, BBEP_CHIP_UC81xx, u8Colors_2clr}, // EP41_640x400 Eink ED040TC1
     {1024, 576, 0, epd81c_init_full, NULL, NULL, BBEP_SPLIT_BUFFER | BBEP_7COLOR, BBEP_CHIP_UC81xx, u8Colors_spectra}, // 8.1" 1024x576 dual cable Spectra 6 EP81_SPECTRA_1024x576
@@ -1604,7 +1685,6 @@ int bbepSetPanelType(BBEPDISP *pBBEP, int iPanel)
     if (pBBEP == NULL || iPanel <= EP_PANEL_UNDEFINED || iPanel >= EP_PANEL_COUNT)
         return BBEP_ERROR_BAD_PARAMETER;
     
-    memset(pBBEP, 0, sizeof(BBEPDISP));
     pBBEP->native_width = pBBEP->width = panelDefs[iPanel].width;
     pBBEP->native_height = pBBEP->height = panelDefs[iPanel].height;
     pBBEP->x_offset = panelDefs[iPanel].x_offset;
@@ -1673,10 +1753,13 @@ int bbepCreateVirtual(BBEPDISP *pBBEP, int iWidth, int iHeight, int iFlags)
 // Put the ESP32 into light sleep for N milliseconds
 void bbepLightSleep(uint32_t u32Millis)
 {
+#ifdef ARDUINO_ARCH_ESP32
   esp_sleep_enable_timer_wakeup(u32Millis * 1000L);
   esp_light_sleep_start();
+#else
+  delay(u32Millis);
+#endif
 }
-
 //
 // Wait for the busy status line to show idle
 // The polarity of the busy signal is reversed on the UC81xx compared
@@ -1777,7 +1860,7 @@ void bbepSetAddrWindow(BBEPDISP *pBBEP, int x, int y, int cx, int cy)
         //        bbepCMD2(pBBEP, SSD1608_DATA_MODE, 0x3);
         bbepWriteCmd(pBBEP, SSD1608_SET_RAMXPOS);
         tx += pBBEP->x_offset;
-        if (pBBEP->type == EP7_960x640 || pBBEP->type == EP426_800x480) { // pixels, not bytes version
+        if (pBBEP->type == EP7_960x640 || pBBEP->type == EP426_800x480 || pBBEP->type == EP426_800x480_4GRAY) { // pixels, not bytes version
             if (pBBEP->type == EP7_960x640) {
                 tx <<= 3;
             }
@@ -1800,7 +1883,7 @@ void bbepSetAddrWindow(BBEPDISP *pBBEP, int x, int y, int cx, int cy)
         }
         
         bbepWriteCmd(pBBEP, SSD1608_SET_RAMYPOS);
-        if (pBBEP->type == EP426_800x480) { // flipped y
+        if (pBBEP->type == EP426_800x480 || pBBEP->type == EP426_800x480_4GRAY) { // flipped y
             uc[2] = (uint8_t)ty; // start y
             uc[3] = (uint8_t)(ty>>8);
             uc[0] = (uint8_t)(ty+cy-1); // end y
@@ -2079,7 +2162,7 @@ int bbepRefresh(BBEPDISP *pBBEP, int iMode)
         }
     } else {
         const uint8_t u8CMD[4] = {0xf7, 0xc7, 0xff, 0xc0}; // normal, fast, partial, partial2
-        if (pBBEP->iFlags & (BBEP_3COLOR | BBEP_4COLOR)) {
+        if (pBBEP->iFlags & (BBEP_4GRAY | BBEP_3COLOR | BBEP_4COLOR)) {
             iMode = REFRESH_FAST;
         } // 3/4-color = 0xc7
         if (iMode == REFRESH_PARTIAL && pBBEP->iFlags & BBEP_PARTIAL2) {

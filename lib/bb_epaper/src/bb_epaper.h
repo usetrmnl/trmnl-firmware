@@ -131,7 +131,8 @@ enum {
     EP37_240x416, // GDEY037T03
     EP213_104x212, // InkyPHAT 2.13 black and white
     EP75_800x480, // GDEY075T7
-    EP75_800x480_4GRAY, // GDEY075T7 in 4 grayscale mode
+    EP75_800x480_4GRAY, // GDEW075T7 in 4 grayscale mode
+    EP75_800x480_4GRAY_OLD, // GDEY075T7 in 4 grayscale mode
     EP29_128x296, // Pimoroni Badger2040
     EP213R_122x250, // Inky phat 2.13 B/W/R
     EP154_200x200, // waveshare
@@ -429,7 +430,11 @@ class BBEPAPER
     bool hasPartialRefresh();
 #ifndef __LINUX__
 #ifdef ARDUINO
+#ifdef SCK
     void initIO(int iDC, int iReset, int iBusy, int iCS = SS, int iMOSI = MOSI, int iSCLK = SCK, uint32_t u32Speed = 8000000);
+#else // no SCK/MOSI default pins
+    void initIO(int iDC, int iReset, int iBusy, int iCS, int iMOSI, int iSCLK, uint32_t u32Speed = 8000000);
+#endif
 #else // esp-idf?
     void initIO(int iDC, int iReset, int iBusy, int iCS, int iMOSI, int iSCLK, uint32_t u32Speed);
 #endif // ARDUINO
@@ -444,6 +449,7 @@ class BBEPAPER
     void setBuffer(uint8_t *pBuffer);
     int allocBuffer(bool bSecondPlane = true);
     void * getBuffer(void);
+    uint8_t * getCache(void);
     void freeBuffer(void);
     uint32_t capabilities();
     void setRotation(int iAngle);

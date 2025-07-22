@@ -240,7 +240,7 @@ void bl_init(void)
     Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
 
     buffer = (uint8_t *)malloc(DEFAULT_IMAGE_SIZE);
-    display_show_image(storedLogoOrDefault(), false, false);
+    display_show_image(storedLogoOrDefault(), false, DEFAULT_IMAGE_SIZE);
     free(buffer);
     buffer = nullptr;
 
@@ -743,11 +743,13 @@ static https_request_err_e downloadAndShow()
           if (isPNG)
           {
             writeImageToFile("/current.png", buffer, content_size);
-            delay(100);
-            free(buffer);
-            buffer = nullptr;
             Log.info("%s [%d]: Decoding png\r\n", __FILE__, __LINE__);
-            png_res = decodePNG("/current.png", decodedPng);
+            display_show_image(buffer, image_reverse, content_size);
+//            delay(100);
+//            free(buffer);
+//            buffer = nullptr;
+//            png_res = decodePNG("/current.png", decodedPng);
+            png_res = PNG_NO_ERR; // DEBUG
           }
           else
           {
@@ -756,7 +758,8 @@ static https_request_err_e downloadAndShow()
           }
           Serial.println();
           String error = "";
-          uint8_t *imagePointer = (decodedPng == nullptr) ? buffer : decodedPng;
+          uint8_t *imagePointer = buffer;
+//          uint8_t *imagePointer = (decodedPng == nullptr) ? buffer : decodedPng;
           bool lastImageExists = filesystem_file_exists("/last.bmp") || filesystem_file_exists("/last.png");
 
           switch (png_res)
@@ -764,8 +767,8 @@ static https_request_err_e downloadAndShow()
           case PNG_NO_ERR:
           {
 
-            Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
-            display_show_image(imagePointer, image_reverse, isPNG);
+           // Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
+           // display_show_image(imagePointer, image_reverse, isPNG);
 
             // Using filename from API response
             new_filename = apiDisplayResult.response.filename;
@@ -910,6 +913,7 @@ uint32_t downloadStream(WiFiClient *stream, int content_size, uint8_t *buffer)
 https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
 {
   https_request_err_e result = HTTPS_NO_ERR;
+  int file_size = 0;
 
   if (special_function == SF_NONE)
   {
@@ -1260,7 +1264,8 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           {
             isPNG = true;
             Log.info("Rewind PNG\n\r");
-            image_proccess_response = decodePNG(last_dot_file.c_str(), buffer);
+            buffer = display_read_file(last_dot_file.c_str(), &file_size);
+            image_proccess_response = PNG_NO_ERR; // DEBUG
           }
 
           if (file_check_bmp)
@@ -1270,7 +1275,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
             case PNG_NO_ERR:
             {
               Log.info("Showing image\n\r");
-              display_show_image(buffer, image_reverse, isPNG);
+              display_show_image(buffer, image_reverse, file_size);
               need_to_refresh_display = 1;
             }
             break;
@@ -1284,7 +1289,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
             case BMP_NO_ERR:
             {
               Log.info("Showing image\n\r");
-              display_show_image(buffer, image_reverse, isPNG);
+              display_show_image(buffer, image_reverse, DISPLAY_BMP_IMAGE_SIZE);
               need_to_refresh_display = 1;
             }
             break;
@@ -1355,8 +1360,8 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           else if (filesystem_file_exists("/current.png"))
           {
             Log.info("%s [%d]: send_to_me PNG\r\n", __FILE__, __LINE__);
-            isPNG = true;
-            image_err_e png_parse_result = decodePNG("/current.png", buffer);
+            image_err_e png_parse_result = PNG_NO_ERR; // DEBUG
+            buffer = display_read_file("/current.png", &file_size);
 
             if (png_parse_result != PNG_NO_ERR)
             {
@@ -1369,7 +1374,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           }
 
           Log.info("Showing image\n\r");
-          display_show_image(buffer, image_reverse, isPNG);
+          display_show_image(buffer, image_reverse, file_size);
           need_to_refresh_display = 1;
 
           free(buffer);

@@ -13,6 +13,3 @@ enum image_err_e
   PNG_FILE_NOT_FOUND
 };
 
-image_err_e processPNG(PNG *png, uint8_t *&decoded_buffer);
-
-image_err_e decodePNG(uint8_t *buffer, uint8_t *&decoded_buffer);

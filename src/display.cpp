@@ -1,7 +1,20 @@
 #include <Arduino.h>
 #include <display.h>
+#include <PNGdec.h>
+#include <SPIFFS.h>
 #include "DEV_Config.h"
+#define BB_EPAPER
+#ifdef BB_EPAPER
 #include "bb_epaper.h"
+#define ONE_BIT_PANEL EP426_800x480
+#define TWO_BIT_PANEL EP426_800x480_4GRAY
+//#define ONE_BIT_PANEL EP75_800x480
+//#define TWO_BIT_PANEL EP75_800x480_4GRAY_OLD
+BBEPAPER bbep(ONE_BIT_PANEL);
+#else
+#include "FastEPD.h"
+FASTEPD bbep;
+#endif
 #include "Group5.h"
 #include <config.h>
 #include "wifi_connect_qr.h"
@@ -11,8 +24,6 @@
 #include "png_flip.h"
 #include "../lib/bb_epaper/Fonts/Roboto_20.h"
 
-BBEPAPER bbep(EP75_800x480);
-
 /**
  * @brief Function to init the display
  * @param none
@@ -21,7 +32,12 @@ BBEPAPER bbep(EP75_800x480);
 void display_init(void)
 {
     Log_info("dev module start");
-    bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 10000000);
+#ifdef BB_EPAPER
+    bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
+#else
+    bbep.initPanel(BB_PANEL_EPDIY_V7);
+    bbep.setPanelSize(1448, 1072);
+#endif
     Log_info("dev module end");
 }
 
@@ -45,7 +61,11 @@ void display_reset(void)
 {
     Log_info("e-Paper Clear start");
     bbep.fillScreen(BBEP_WHITE);
-    bbep.refresh(REFRESH_FULL, true);
+#ifdef BB_EPAPER
+    bbep.refresh(REFRESH_FAST, true);
+#else
+    bbep.fullUpdate();
+#endif
     Log_info("e-Paper Clear end");
     // DEV_Delay_ms(500);
 }
@@ -224,19 +244,117 @@ void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message,
         bbep.print(lines[j]);
     }
 }
+/** 
+ * @brief Callback function for each line of PNG decoded
+ * @param PNGDRAW structure containing the current line and relevant info
+ * @return none
+ */
+void png_draw(PNGDRAW *pDraw)
+{
+    int x;
+    uint8_t ucInvert = 0;
+    uint8_t uc, ucMask, src, *s, *d, *pTemp = bbep.getCache(); // get some scratch memory (not from the stack)
 
-/**
+    if (pDraw->pPalette) {
+      if (pDraw->pPalette[0] == 0) {
+        ucInvert = 0xff;
+      }
+    }
+    s = (uint8_t *)pDraw->pPixels;
+    d = pTemp;
+    if (!pDraw->pUser) {
+        // 1-bit output, decode the single plane and write it
+        ucInvert = ~ucInvert; // the b/w polarity is reversed compared to 2-bpp mode
+        for (x=0; x<pDraw->iWidth; x+= 8) {
+          d[0] = s[0] ^ ucInvert;
+          d++; s++;
+        }
+    } else { // we need to split the 2-bit data into plane 0 and 1
+        src = *s++;
+        src ^= ucInvert;
+        ucMask = (*(int *)pDraw->pUser == 0) ? 0x40 : 0x80; // lower or upper source bit
+        for (x=0; x<pDraw->iWidth; x++) {
+            uc <<= 1;
+            if (src & ucMask) {
+                uc |= 1; // high bit of source pair
+            }
+            src <<= 2;
+            if ((x & 3) == 3) { // new input byte
+                src = *s++;
+                src ^= ucInvert;
+            }
+            if ((x & 7) == 7) { // new output byte
+                *d++ = uc;
+            }
+        }
+    }
+    bbep.writeData(pTemp, (pDraw->iWidth+7)/8);
+} /* png_draw() */
+/** 
+ * @brief Function to decode and display a PNG image from memory
+ *        The decoded lines are written directly into the EPD framebuffer
+ *        due to insufficient RAM to hold the fully decoded image
+ * @param pointer to the buffer holding the PNG file
+ * @param size of the PNG file
+ * @return -1 = error, 1 = 1-bit image, 2 = 2-bit image
+ */
+
+int png_to_epd(const uint8_t *pPNG, int iDataSize)
+{
+int iPlane, rc = -1;
+PNG *png = new PNG();
+
+    if (!png) return PNG_MEM_ERROR; // not enough memory for the decoder instance
+    rc = png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
+    if (rc == PNG_SUCCESS) {
+        if (png->getWidth() != bbep.width() || png->getHeight() != bbep.height()) {
+            Log_error("PNG image size doesn't match display size");
+            rc = -1;
+        } else if (png->getBpp() > 2) {
+            Log_error("Unsupported PNG bit depth (only 1 or 2-bpp supported)");
+            rc = -1;
+        } else { // okay to decode            
+            // Prepare target memory window (entire display)
+            if (png->getBpp() == 1) {
+              bbep.setPanelType(ONE_BIT_PANEL);
+              rc = 1; // return with the image bit depth
+            } else {
+              bbep.setPanelType(TWO_BIT_PANEL);
+              rc = 2;
+            }
+            bbep.setAddrWindow(0, 0, bbep.width(), bbep.height());
+            if (png->getBpp() == 1) { // 1-bit image (single plane)
+                bbep.startWrite(PLANE_0); // start writing image data to plane 0
+                png->decode(NULL, 0);
+            } else { // 2-bpp
+                bbep.startWrite(PLANE_0); // start writing image data to plane 0
+                iPlane = 0;
+                png->decode(&iPlane, 0); // tell PNGDraw to use bits for plane 0
+                png->close(); // start over for plane 1
+                iPlane = 1;
+                png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
+                bbep.startWrite(PLANE_1); // start writing image data to plane 1
+                png->decode(&iPlane, 0); // decode it again to get plane 1 data
+            }
+        }
+    }
+    free(png); // free the decoder instance
+    return rc;
+} /* png_to_epd() */
+/** 
  * @brief Function to show the image on the display
  * @param image_buffer pointer to the uint8_t image buffer
  * @param reverse shows if the color scheme is reverse
  * @return none
  */
-void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG)
+void display_show_image(uint8_t *image_buffer, bool reverse, int data_size)
 {
+    bool isPNG = true;
     auto width = display_width();
     auto height = display_height();
     uint32_t *d32;
     bool bAlloc = false;
+    int rc, iRefreshMode = REFRESH_FULL; // assume full (slow) refresh
     const uint32_t buf_size = ((width + 7)/8) * height; // size in bytes
 
     Log_info("Paint_NewImage %d", reverse);
@@ -251,10 +369,13 @@ void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG)
             d32++;
         }
     }
-    if (isPNG == true)
+    if (isPNG == true && data_size < DEFAULT_IMAGE_SIZE)
     {
         Log_info("Drawing PNG");
-        bbep.setBuffer(image_buffer);
+        rc = png_to_epd(image_buffer, data_size);
+        if (rc == 1) { // 1-bpp image
+            iRefreshMode = REFRESH_FAST;
+        }
     }
     else // uncompressed BMP or Group5 compressed image
     {
@@ -262,8 +383,10 @@ void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG)
         {
             // G5 compressed image
             BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
+#ifdef BB_EPAPER
             bbep.allocBuffer(false);
             bAlloc = true;
+#endif
             int x = (width - pBBB->width)/2;
             int y = (height - pBBB->height)/2; // center it
             bbep.fillScreen(BBEP_WHITE); // draw the image centered on a white background
@@ -272,17 +395,51 @@ void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG)
         else
         { // This work-around is due to a lack of RAM; the correct method would be to use loadBMP()
             flip_image(image_buffer+62, bbep.width(), bbep.height(), false); // fix bottom-up bitmap images
+#ifdef BB_EPAPER
             bbep.setBuffer(image_buffer+62); // uncompressed 1-bpp bitmap
+#endif
         }
+        bbep.writePlane(PLANE_0); // send image data to the EPD
+        iRefreshMode = REFRESH_FAST; // 1-bpp image means we can use fast update
     }
-    bbep.writePlane(PLANE_0); // send image data to the EPD
     Log_info("Display refresh start");
-    bbep.refresh(REFRESH_FULL, true);
+#ifdef BB_EPAPER
+    bbep.refresh(iRefreshMode, true);
     if (bAlloc) {
         bbep.freeBuffer();
     }
+#else
+    bbep.fullUpdate();
+#endif
     Log_info("display refresh end");
 }
+/**
+ * @brief Function to read an image from the file system
+ * @param filename
+ * @param pointer to file size returned
+ * @return pointer to allocated buffer
+ */
+uint8_t * display_read_file(const char *filename, int *file_size)
+{
+File f = SPIFFS.open(filename, "r");
+uint8_t *buffer;
+
+  if (!f) {
+    Serial.println("Failed to open file!");
+    *file_size = 0;
+    return nullptr;
+  }
+  *file_size = f.size();
+  buffer = (uint8_t *)malloc(*file_size);
+  if (!buffer) {
+    Serial.println("Memory allocation filed!");
+    *file_size = 0;
+    return nullptr;
+  }
+  f.read(buffer, *file_size);
+  f.close();
+  return buffer;
+} /* display_read_file() */
 
 /**
  * @brief Function to show the image with message on the display
@@ -298,8 +455,10 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     BB_RECT rect;
 
     Log_info("Paint_NewImage");
-    bbep.allocBuffer(false);
     Log_info("show image for array");
+#ifdef BB_EPAPER
+    bbep.allocBuffer(false);
+#endif
     if (*(uint16_t *)image_buffer == BB_BITMAP_MARKER)
     {
         // G5 compressed image
@@ -311,7 +470,9 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     }
     else
     {
+#ifdef BB_EPAPER
         memcpy(bbep.getBuffer(), image_buffer+62, Imagesize); // uncompressed 1-bpp bitmap
+#endif
     }
 
     bbep.setFont(Roboto_20);
@@ -455,10 +616,13 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     default:
         break;
     }
-
+#ifdef BB_EPAPER
     bbep.writePlane(PLANE_0);
     bbep.refresh(REFRESH_FULL, true);
     bbep.freeBuffer();
+#else
+    bbep.fullUpdate();
+#endif
     Log_info("display");
 }
 
@@ -474,16 +638,22 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
  */
 void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_id, bool id, const char *fw_version, String message)
 {
-    Log.info("Free heap at before display_show_msg - %d", ESP.getMaxAllocHeap());
+    Log.info("Free heap in display_show_msg - %d", ESP.getMaxAllocHeap());
+#ifdef BB_EPAPER
     bbep.allocBuffer(false);
     Log.info("Free heap after bbep.allocBuffer() - %d", ESP.getMaxAllocHeap());
+#endif
 
     if (message_type == WIFI_CONNECT)
     {
         Log_info("Display set to white");
         bbep.fillScreen(BBEP_WHITE);
+#ifdef BB_EPAPER
         bbep.writePlane(PLANE_0);
-        bbep.refresh(REFRESH_FULL, true);
+        bbep.refresh(REFRESH_FAST, true);
+#else
+        bbep.fullUpdate();
+#endif
         display_sleep(1000);
     }
 
@@ -506,7 +676,9 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     }
     else
     {
+#ifdef BB_EPAPER
         memcpy(bbep.getBuffer(), image_buffer+62, Imagesize); // uncompressed 1-bpp bitmap
+#endif
     }
 
     bbep.setFont(Roboto_20);
@@ -567,9 +739,13 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         break;
     }
     Log_info("Start drawing...");
+#ifdef BB_EPAPER
     bbep.writePlane(PLANE_0);
     bbep.refresh(REFRESH_FULL, true);
     bbep.freeBuffer();
+#else
+    bbep.fullUpdate();
+#endif
     Log_info("display");
 }
 
@@ -581,5 +757,10 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 void display_sleep(void)
 {
     Log_info("Goto Sleep...");
+#ifdef BB_EPAPER
     bbep.sleep(DEEP_SLEEP);
+#else
+    bbep.einkPower(0);
+    bbep.deInit();
+#endif
 }
