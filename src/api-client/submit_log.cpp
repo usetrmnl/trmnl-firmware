@@ -34,7 +34,8 @@ bool submitLogToApi(LogApiInput &input, const char *api_url)
                     https.setTimeout(15000);
                     https.setConnectTimeout(15000);
 
-                    Log_info("Send log - %s", payload.c_str());
+                    Log_info("Send log - |%s|", payload.c_str());
+
                     // start connection and send HTTP header
                     int httpCode = https.POST(payload);
 
