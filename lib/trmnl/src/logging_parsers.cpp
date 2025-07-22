@@ -1,17 +1,6 @@
 #include <string.h>
 
 typedef enum {
-    WL_NO_SHIELD        = 255,   // for compatibility with WiFi Shield library
-    WL_IDLE_STATUS      = 0,
-    WL_NO_SSID_AVAIL    = 1,
-    WL_SCAN_COMPLETED   = 2,
-    WL_CONNECTED        = 3,
-    WL_CONNECT_FAILED   = 4,
-    WL_CONNECTION_LOST  = 5,
-    WL_DISCONNECTED     = 6
-} wl_status_t;
-
-typedef enum {
     ESP_SLEEP_WAKEUP_UNDEFINED,    //!< In case of deep sleep, reset was not caused by exit from deep sleep
     ESP_SLEEP_WAKEUP_ALL,          //!< Not a wakeup cause, used to disable all wakeup sources with esp_sleep_disable_wakeup_source
     ESP_SLEEP_WAKEUP_EXT0,         //!< Wakeup caused by external signal using RTC_IO
@@ -27,28 +16,10 @@ typedef enum {
     ESP_SLEEP_WAKEUP_BT,           //!< Wakeup caused by BT (light sleep only)
 } esp_sleep_source_t;
 
-
-struct WifiStatusNode
-{
-  const char *name;
-  wl_status_t value;
-};
-
 struct WakeupReasonNode
 {
   const char *name;
   esp_sleep_source_t value;
-};
-
-static const WifiStatusNode wifiStatusMap[] = {
-    {"no_shield", WL_NO_SHIELD},
-    {"idle_status", WL_IDLE_STATUS},
-    {"no_ssid_avail", WL_NO_SSID_AVAIL},
-    {"scan_completed", WL_SCAN_COMPLETED},
-    {"connected", WL_CONNECTED},
-    {"connect_failed", WL_CONNECT_FAILED},
-    {"connection_lost", WL_CONNECTION_LOST},
-    {"disconnected", WL_DISCONNECTED},
 };
 
 static const WakeupReasonNode wakeupReasonMap[] = {
@@ -66,19 +37,6 @@ static const WakeupReasonNode wakeupReasonMap[] = {
     {"cocpu_trap_trig", ESP_SLEEP_WAKEUP_COCPU_TRAP_TRIG},
     {"bt", ESP_SLEEP_WAKEUP_BT},
 };
-
-bool parseWifiStatusToStr(char *buffer, size_t buffer_size, wl_status_t wifi_status)
-{
-  for (const WifiStatusNode &entry : wifiStatusMap)
-  {
-    if (wifi_status == entry.value)
-    {
-      strncpy(buffer, entry.name, buffer_size);
-      return true;
-    }
-  }
-  return false;
-}
 
 bool parseWakeupReasonToStr(char *buffer, size_t buffer_size, esp_sleep_source_t wakeup_reason)
 {

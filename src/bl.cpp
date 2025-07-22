@@ -34,6 +34,7 @@
 #include <serialize_log.h>
 #include <preferences_persistence.h>
 #include "logo_small.h"
+#include <wifi-helpers.h>
 
 bool pref_clear = false;
 String new_filename = "";
@@ -259,6 +260,17 @@ void bl_init(void)
   log_nvs_usage();
 
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
+
+// uncomment this to hardcode WiFi credentials (useful for testing wifi errors, etc.)
+// #define HARDCODED_WIFI
+#ifdef HARDCODED_WIFI
+  WifiCredentials hardcodedCreds = {.ssid = "ssid-goes-here", .pswd = "password-goes-here"};
+  Log_info("Hardcoded WiFi: connecting to SSID '%s'", hardcodedCreds.ssid.c_str());
+  auto connectResult = WifiCaptivePortal.connect(hardcodedCreds);
+  Log_info("Hardcoded WiFi: connect result '%s'", wifiStatusStr(connectResult));
+// goToSleep();
+#else
+
   if (WifiCaptivePortal.isSaved())
   {
     // WiFi saved, connection
@@ -316,6 +328,8 @@ void bl_init(void)
     Log.info("%s [%d]: WiFi connected\r\n", __FILE__, __LINE__);
     preferences.putInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT, 1);
   }
+
+#endif
 
   // clock synchronization
   if (setClock())
@@ -2170,7 +2184,7 @@ DeviceStatusStamp getDeviceStatusStamp()
   DeviceStatusStamp deviceStatus = {};
 
   deviceStatus.wifi_rssi_level = WiFi.RSSI();
-  parseWifiStatusToStr(deviceStatus.wifi_status, sizeof(deviceStatus.wifi_status), WiFi.status());
+  strncpy(deviceStatus.wifi_status, wifiStatusStr(WiFi.status()), sizeof(deviceStatus.wifi_status) - 1);
   deviceStatus.refresh_rate = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY);
   deviceStatus.time_since_last_sleep = time_since_sleep;
   snprintf(deviceStatus.current_fw_version, sizeof(deviceStatus.current_fw_version), "%s", FW_VERSION_STRING);
