@@ -30,7 +30,8 @@ ButtonPressResult read_button_presses()
       Log_info("Button time=%d pin=%d: detected double-click", elapsed, pin);
       return DoubleClick;
     }
-    else if (pin == HIGH && (elapsed > 500 && elapsed < BUTTON_HOLD_TIME))
+    else if (pin == HIGH && (elapsed > 4000
+       && elapsed < BUTTON_HOLD_TIME))
     {
       Log_info("Button time=%d pin=%d: detected no-action", elapsed, pin);
       return NoAction;
