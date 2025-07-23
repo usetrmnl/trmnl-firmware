@@ -1673,8 +1673,12 @@ int bbepCreateVirtual(BBEPDISP *pBBEP, int iWidth, int iHeight, int iFlags)
 // Put the ESP32 into light sleep for N milliseconds
 void bbepLightSleep(uint32_t u32Millis)
 {
-  esp_sleep_enable_timer_wakeup(u32Millis * 1000L);
-  esp_light_sleep_start();
+#ifdef DO_NOT_LIGHT_SLEEP
+    delay(u32Millis);
+#else
+    esp_sleep_enable_timer_wakeup(u32Millis * 1000L);
+    esp_light_sleep_start();
+#endif
 }
 
 //
