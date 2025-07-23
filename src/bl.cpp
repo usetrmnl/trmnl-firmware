@@ -112,8 +112,8 @@ void bl_init(void)
   Log_info("BL init success");
   pins_init();
 
-#if defined(BOARD_SEEED_XIAO_ESP32C3) || defined(BOARD_SEEED_XIAO_ESP32S3)
-  delay(3000);
+#if defined(BOARD_SEEED_XIAO_ESP32C3)
+  delay(2000);
 
   if (digitalRead(PIN_INTERRUPT) == LOW) {
     Log_info("Boot button pressed during startup, resetting WiFi credentials...");
