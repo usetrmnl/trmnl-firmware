@@ -11,6 +11,8 @@
 #define ONE_BIT_PANEL EP75_800x480
 #define TWO_BIT_PANEL EP75_800x480_4GRAY_OLD
 BBEPAPER bbep(ONE_BIT_PANEL);
+// Counts the number of partial updates to know when to do a full update
+RTC_DATA_ATTR int iUpdateCount = 0;
 #else
 #include "FastEPD.h"
 FASTEPD bbep;
@@ -272,20 +274,37 @@ void png_draw(PNGDRAW *pDraw)
     } else { // we need to split the 2-bit data into plane 0 and 1
         src = *s++;
         src ^= ucInvert;
-        ucMask = (*(int *)pDraw->pUser == 0) ? 0x40 : 0x80; // lower or upper source bit
-        for (x=0; x<pDraw->iWidth; x++) {
-            uc <<= 1;
-            if (src & ucMask) {
-                uc |= 1; // high bit of source pair
-            }
-            src <<= 2;
-            if ((x & 3) == 3) { // new input byte
-                src = *s++;
-                src ^= ucInvert;
-            }
-            if ((x & 7) == 7) { // new output byte
-                *d++ = uc;
-            }
+        if (*(int *)pDraw->pUser > 1) { // draw 2bpp data as 1-bit to use for partial update
+            for (x=0; x<pDraw->iWidth; x++) {
+                uc <<= 1;
+                if (src & 0xc0) { // non-white -> black
+                    uc |= 1; // high bit of source pair
+                }
+                src <<= 2;
+                if ((x & 3) == 3) { // new input byte
+                    src = *s++;
+                    src ^= ucInvert;
+                }
+                if ((x & 7) == 7) { // new output byte
+                    *d++ = uc;
+                }
+            } // for x
+        } else { // normal 0/1 split plane
+            ucMask = (*(int *)pDraw->pUser == 0) ? 0x40 : 0x80; // lower or upper source bit
+            for (x=0; x<pDraw->iWidth; x++) {
+                uc <<= 1;
+                if (src & ucMask) {
+                    uc |= 1; // high bit of source pair
+                }
+                src <<= 2;
+                if ((x & 3) == 3) { // new input byte
+                    src = *s++;
+                    src ^= ucInvert;
+                }
+                if ((x & 7) == 7) { // new output byte
+                    *d++ = uc;
+                }
+            } // for x
         }
     }
     bbep.writeData(pTemp, (pDraw->iWidth+7)/8);
@@ -296,10 +315,10 @@ void png_draw(PNGDRAW *pDraw)
  *        due to insufficient RAM to hold the fully decoded image
  * @param pointer to the buffer holding the PNG file
  * @param size of the PNG file
- * @return -1 = error, 1 = 1-bit image, 2 = 2-bit image
+ * @return refresh mode based on image type and presence of old image
  */
 
-int png_to_epd(const uint8_t *pPNG, int iDataSize)
+int png_to_epd(const uint8_t *pPNG, int iDataSize, const uint8_t *pPNG_old, int iDataSize_old)
 {
 int iPlane, rc = -1;
 PNG *png = new PNG();
@@ -313,19 +332,34 @@ PNG *png = new PNG();
         } else if (png->getBpp() > 2) {
             Log_error("Unsupported PNG bit depth (only 1 or 2-bpp supported)");
             rc = -1;
-        } else { // okay to decode            
+        } else { // okay to decode
+            Log.info("%s [%d]: Decoding %d-bpp png (current)\r\n", __FILE__, __LINE__, png->getBpp());
             // Prepare target memory window (entire display)
             if (png->getBpp() == 1) {
               bbep.setPanelType(ONE_BIT_PANEL);
-              rc = 1; // return with the image bit depth
+              rc = (iDataSize_old) ? REFRESH_PARTIAL : REFRESH_FAST; // the new image is 1bpp - try a partial update
             } else {
               bbep.setPanelType(TWO_BIT_PANEL);
-              rc = 2;
+              rc = REFRESH_FULL; // 4gray mode must be full refresh
+              iUpdateCount = 0; // grayscale mode resets the partial update counter
             }
             bbep.setAddrWindow(0, 0, bbep.width(), bbep.height());
             if (png->getBpp() == 1) { // 1-bit image (single plane)
                 bbep.startWrite(PLANE_0); // start writing image data to plane 0
                 png->decode(NULL, 0);
+                if (pPNG_old) { // decode the old image to do a partial update
+                    png->close();
+                    if (png->openRAM((uint8_t *)pPNG_old, iDataSize_old, png_draw) == PNG_SUCCESS) {
+                        Log.info("%s [%d]: preparing plane 1 for partial update\r\n", __FILE__, __LINE__);
+                        bbep.startWrite(PLANE_1); // 'old' data is written to plane 1
+                        if (png->getBpp() == 2) { // tell draw code to handle old 2bpp image differently
+                            iPlane = 2; // tell draw code to merge bits 0/1 per pixel
+                            png->decode(&iPlane, 0); // decode it into the old buffer
+                        } else {
+                            png->decode(NULL, 0);
+                        }
+                    }
+                }
             } else { // 2-bpp
                 bbep.startWrite(PLANE_0); // start writing image data to plane 0
                 iPlane = 0;
@@ -347,7 +381,8 @@ PNG *png = new PNG();
  * @param reverse shows if the color scheme is reverse
  * @return none
  */
-void display_show_image(uint8_t *image_buffer, bool reverse, int data_size)
+void display_show_image(uint8_t *image_buffer, int data_size, uint8_t *image_buffer_old, int data_size_old)
+//void display_show_image(uint8_t *image_buffer, bool reverse, int data_size)
 {
     bool isPNG = true;
     auto width = display_width();
@@ -357,8 +392,9 @@ void display_show_image(uint8_t *image_buffer, bool reverse, int data_size)
     int rc, iRefreshMode = REFRESH_FULL; // assume full (slow) refresh
     const uint32_t buf_size = ((width + 7)/8) * height; // size in bytes
 
-    Log_info("Paint_NewImage %d", reverse);
+   // Log_info("Paint_NewImage %d", reverse);
     Log_info("show image for array");
+#ifdef FUTURE
     if (reverse)
     {
         d32 = (uint32_t *)image_buffer; // get framebuffer as a 32-bit pointer
@@ -369,13 +405,11 @@ void display_show_image(uint8_t *image_buffer, bool reverse, int data_size)
             d32++;
         }
     }
+#endif
     if (isPNG == true && data_size < DEFAULT_IMAGE_SIZE)
     {
         Log_info("Drawing PNG");
-        rc = png_to_epd(image_buffer, data_size);
-        if (rc == 1) { // 1-bpp image
-            iRefreshMode = REFRESH_FAST;
-        }
+        iRefreshMode = png_to_epd(image_buffer, data_size, image_buffer_old, data_size_old);
     }
     else // uncompressed BMP or Group5 compressed image
     {
@@ -404,9 +438,16 @@ void display_show_image(uint8_t *image_buffer, bool reverse, int data_size)
     }
     Log_info("Display refresh start");
 #ifdef BB_EPAPER
+    if ((iUpdateCount & 7) == 0) {
+        Log.info("%s [%d]: Forcing full refresh; desired refresh mode was: %d\r\n", __FILE__, __LINE__, iRefreshMode);
+        iRefreshMode = REFRESH_FULL; // force full refresh every 8 partials
+    }
+    Log.info("%s [%d]: EPD refresh mode: %d\r\n", __FILE__, __LINE__, iRefreshMode);
     bbep.refresh(iRefreshMode, true);
     if (bAlloc) {
         bbep.freeBuffer();
+    } else {
+        iUpdateCount++;
     }
 #else
     bbep.fullUpdate();
