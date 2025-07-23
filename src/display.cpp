@@ -276,7 +276,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type) {
     int y = (height - pBBB->height) / 2; // center it
     bbep.fillScreen(
         BBEP_WHITE); // draw the image centered on a white background
-    bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
+    bbep.loadG5Image(image_buffer, x, y, BBEP_BLACK, BBEP_WHITE);
   } else {
     memcpy(bbep.getBuffer(), image_buffer + 62,
            Imagesize); // uncompressed 1-bpp bitmap
@@ -314,7 +314,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type) {
     bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
     bbep.print(string4);
 
-    bbep.loadG5Image(wifi_failed_qr, 639, 336, BBEP_WHITE, BBEP_BLACK);
+    bbep.loadG5Image(wifi_failed_qr, 639, 336, BBEP_BLACK, BBEP_WHITE);
   } break;
   case WIFI_INTERNAL_ERROR: {
     const char string1[] = "WiFi connected, but";
@@ -334,7 +334,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type) {
     bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
     bbep.print(string4);
 
-    bbep.loadG5Image(wifi_failed_qr, 639, 336, BBEP_WHITE, BBEP_BLACK);
+    bbep.loadG5Image(wifi_failed_qr, 639, 336, BBEP_BLACK, BBEP_WHITE);
   } break;
   case WIFI_WEAK: {
     const char string1[] = "WiFi connected but signal is weak";
@@ -446,7 +446,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type,
     BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
     int x = (width - pBBB->width) / 2;
     int y = (height - pBBB->height) / 2; // center it
-    bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
+    bbep.loadG5Image(image_buffer, x, y, BBEP_BLACK, BBEP_WHITE) ;
   } else {
     memcpy(bbep.getBuffer(), image_buffer + 62,
            Imagesize); // uncompressed 1-bpp bitmap
@@ -491,7 +491,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type,
     bbep.getStringBox(string4, &rect);
     bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
     bbep.print(string4);
-    bbep.loadG5Image(wifi_connect_qr, 639, 336, BBEP_WHITE, BBEP_BLACK);
+    bbep.loadG5Image(wifi_connect_qr, 639, 336, BBEP_BLACK, BBEP_WHITE);
   } break;
   case MAC_NOT_REGISTERED: {
     UWORD y_start = 340;

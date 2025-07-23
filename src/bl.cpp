@@ -39,6 +39,9 @@
 
 #include "rover_topdown.h"
 #include "testbmp.h"
+#include "fredogo.h"
+#include "flashinvaders.h"
+
 
 
 bool pref_clear = false;
@@ -237,7 +240,31 @@ void bl_init(void)
   Log.info("%s [%d]: Display init\r\n", __FILE__, __LINE__);
   display_init();
 
+ buffer = (uint8_t *)malloc(DEFAULT_IMAGE_SIZE);
+    display_show_image(rover_topdown);
+    delay(5000);
+    free(buffer);
+    buffer = nullptr;
 
+image_err_e e = decodePNGMem(flashinvaders, buffer);
+printf("%d", e);
+    display_show_image(buffer);
+ delay(5000);
+ free(buffer);
+   display_show_image(test); 
+delay(5000);
+    buffer = nullptr;
+e = decodePNGMem(logo, buffer);
+ display_show_image(buffer);
+
+ free(buffer);
+buffer = nullptr;
+delay(5000);
+ buffer = (uint8_t *)malloc(DEFAULT_IMAGE_SIZE);
+    display_show_image(rover_topdown);
+     free(buffer);
+    buffer = nullptr;
+  
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
   {
     Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
@@ -1235,7 +1262,6 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
         String action = apiResponse.action;
         if (action.equals("rewind"))
         {
-          bool isPNG = false;
           status = false;
           result = HTTPS_SUCCESS;
           Log.info("%s [%d]: rewind success\r\n", __FILE__, __LINE__);
@@ -1255,7 +1281,6 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           }
           else if (last_dot_file == "/last.png")
           {
-            isPNG = true;
             Log.info("Rewind PNG\n\r");
             image_proccess_response = decodePNG(last_dot_file.c_str(), buffer);
           }
@@ -1310,7 +1335,6 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
 
         if (action.equals("send_to_me"))
         {
-          bool isPNG = false;
           status = false;
           result = HTTPS_SUCCESS;
           Log.info("%s [%d]: send_to_me success\r\n", __FILE__, __LINE__);
@@ -1350,7 +1374,6 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           else if (filesystem_file_exists("/current.png"))
           {
             Log.info("%s [%d]: send_to_me PNG\r\n", __FILE__, __LINE__);
-            isPNG = true;
             image_err_e png_parse_result = decodePNG("/current.png", buffer);
 
             if (png_parse_result != PNG_NO_ERR)
