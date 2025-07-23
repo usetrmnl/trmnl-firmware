@@ -52,7 +52,7 @@ void test_decodePNG_Success()
 
   uint8_t *decoded_buffer = nullptr;
 
-  image_err_e result = decodePNG(png_data.data(), decoded_buffer);
+  image_err_e result = decodePNGFromMem(png_data.data(), decoded_buffer);
 
   TEST_ASSERT_EQUAL(PNG_NO_ERR, result);
   TEST_ASSERT_NOT_NULL(decoded_buffer);
@@ -72,7 +72,7 @@ void test_decodePNG_WrongSize()
 
   uint8_t *decoded_buffer = nullptr;
 
-  image_err_e result = decodePNG(png_data.data(), decoded_buffer);
+  image_err_e result = decodePNGFromMem(png_data.data(), decoded_buffer);
 
   TEST_ASSERT_EQUAL(PNG_BAD_SIZE, result);
 
@@ -91,7 +91,7 @@ void test_decodePNG_WrongDepth()
 
   uint8_t *decoded_buffer = nullptr;
 
-  image_err_e result = decodePNG(png_data.data(), decoded_buffer);
+  image_err_e result = decodePNGFromMem(png_data.data(), decoded_buffer);
 
   // Should fail with bad size error (which includes bpp check)
   TEST_ASSERT_EQUAL(PNG_BAD_SIZE, result);
@@ -107,7 +107,7 @@ void test_decodePNG_InvalidFormat()
   auto invalid_data = createInvalidPNGData();
   uint8_t *decoded_buffer = nullptr;
 
-  image_err_e result = decodePNG(invalid_data.data(), decoded_buffer);
+  image_err_e result = decodePNGFromMem(invalid_data.data(), decoded_buffer);
 
   TEST_ASSERT_EQUAL(PNG_WRONG_FORMAT, result);
 
