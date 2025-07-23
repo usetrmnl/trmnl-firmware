@@ -3,43 +3,21 @@
 #include <cstdio>
 
 #ifdef PIO_UNIT_TESTING
-class TestLogger : public Logger {
-private:
-    void log_with_level(const char* level, const char* format, va_list args) {
-        printf("  [test log:%s] ", level);
-        vprintf(format, args);
-        printf("\n");
-    }
 
-public:
-    void verbose(const char* format, ...) override {
-        va_list args;
-        va_start(args, format);
-        log_with_level("verbose", format, args);
-        va_end(args);
-    }
+// Unified logging function for tests
+void log_impl(LogLevel level, LogMode mode, const char* file, int line, const char* format, ...) {
+    va_list args;
+    va_start(args, format);
     
-    void info(const char* format, ...) override {
-        va_list args;
-        va_start(args, format);
-        log_with_level("info", format, args);
-        va_end(args);
-    }
+    const char* level_str = (level == LOG_VERBOSE) ? "verbose" : 
+                           (level == LOG_INFO) ? "info" : 
+                           (level == LOG_ERROR) ? "error" : "fatal";
     
-    void error(const char* format, ...) override {
-        va_list args;
-        va_start(args, format);
-        log_with_level("error", format, args);
-        va_end(args);
-    }
+    printf("  [test log:%s] %s:%d ", level_str, file, line);
+    vprintf(format, args);
+    printf("\n");
     
-    void fatal(const char* format, ...) override {
-        va_list args;
-        va_start(args, format);
-        log_with_level("fatal", format, args);
-        va_end(args);
-    }
-};
+    va_end(args);
+}
 
-Logger* g_logger = new TestLogger();
 #endif

@@ -23,7 +23,7 @@ image_err_e processPNG(PNG *png, uint8_t *&decoded_buffer)
 
   if (!(png->decode(nullptr, 0)))
   {
-    Log_error("PNG_SUCCESS");
+    Log_info("PNG_SUCCESS");
     return PNG_NO_ERR;
   }
   Log_error("PNG_DECODE_ERR");

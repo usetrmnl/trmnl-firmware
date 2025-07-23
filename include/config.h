@@ -2,8 +2,8 @@
 #define CONFIG_H
 
 #define FW_MAJOR_VERSION 1
-#define FW_MINOR_VERSION 5
-#define FW_PATCH_VERSION 11
+#define FW_MINOR_VERSION 6
+#define FW_PATCH_VERSION 0
 
 // Helper macros for stringification
 #define STRINGIFY(x) #x
@@ -64,8 +64,8 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #define PIN_INTERRUPT 2
 #define DEVICE_MODEL "og"
 #elif defined(BOARD_WAVESHARE_ESP32_DRIVER)
+#define PIN_INTERRUPT 33
 #define DEVICE_MODEL "waveshare"
-#define PIN_INTERRUPT 16
 #define FAKE_BATTERY_VOLTAGE
 #elif defined(BOARD_SEEED_XIAO_ESP32C3)
 #define DEVICE_MODEL "seeed_esp32c3"
@@ -95,7 +95,7 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 
 // #define FAKE_BATTERY_VOLTAGE // Uncomment to report 4.2V instead of reading ADC
 
-#define BUTTON_HOLD_TIME 5000
+#define BUTTON_HOLD_TIME 7000
 
 #define BUTTON_SOFT_RESET_TIME 15000
 
