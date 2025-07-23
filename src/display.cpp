@@ -444,7 +444,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type,
   // Load the image into the bb_epaper framebuffer
   if (*(uint16_t *)image_buffer == BB_BITMAP_MARKER) {
     // G5 compressed image
-//    bbep.fillScreen(BBEP_WHITE); // draw the image centered on a white background
+    bbep.fillScreen(BBEP_WHITE); // draw the image centered on a white background
     BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
     int x = (width - pBBB->width) / 2;
     int y = (height - pBBB->height) / 2; // center it
