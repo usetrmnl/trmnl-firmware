@@ -12,8 +12,8 @@ void captureEventData(WiFiEvent_t event, WiFiEventInfo_t info, WifiEventData *ev
     {
     case ARDUINO_EVENT_WIFI_STA_GOT_IP:
         Log_info("Wifi: Event STA_GOT_IP, IP: %s, Gateway: %s",
-                 (IPAddress(info.got_ip.ip_info.ip.addr)).toString(),
-                 (IPAddress(info.got_ip.ip_info.gw.addr)).toString());
+                 (IPAddress(info.got_ip.ip_info.ip.addr)).toString().c_str(),
+                 (IPAddress(info.got_ip.ip_info.gw.addr)).toString().c_str());
         break;
     case ARDUINO_EVENT_WIFI_STA_CONNECTED:
         Log_info("Wifi: Event STA_CONNECTED SSID: %s, BSSID: %s, channel: %d, authmode: %d",
