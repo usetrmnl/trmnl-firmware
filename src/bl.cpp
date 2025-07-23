@@ -724,6 +724,9 @@ static https_request_err_e downloadAndShow()
 
             return HTTPS_WRONG_IMAGE_SIZE;
           }
+
+          submitStoredLogs();
+
           WiFi.disconnect(true); // no need for WiFi, save power starting here
           Log.info("%s [%d]: Received successfully; WiFi off; WiFi off\r\n", __FILE__, __LINE__);
           bool bmp_rename = false;
