@@ -37,12 +37,6 @@
 #include "logo_small.h"
 #include <wifi-helpers.h>
 
-#include "rover_topdown.h"
-#include "testbmp.h"
-#include "fredogo.h"
-#include "flashinvaders.h"
-
-
 
 bool pref_clear = false;
 String new_filename = "";
@@ -240,31 +234,7 @@ void bl_init(void)
   Log.info("%s [%d]: Display init\r\n", __FILE__, __LINE__);
   display_init();
 
- buffer = (uint8_t *)malloc(DEFAULT_IMAGE_SIZE);
-    display_show_image(rover_topdown);
-    delay(5000);
-    free(buffer);
-    buffer = nullptr;
 
-image_err_e e = decodePNGMem(flashinvaders, buffer);
-printf("%d", e);
-    display_show_image(buffer);
- delay(5000);
- free(buffer);
-   display_show_image(test); 
-delay(5000);
-    buffer = nullptr;
-e = decodePNGMem(logo, buffer);
- display_show_image(buffer);
-
- free(buffer);
-buffer = nullptr;
-delay(5000);
- buffer = (uint8_t *)malloc(DEFAULT_IMAGE_SIZE);
-    display_show_image(rover_topdown);
-     free(buffer);
-    buffer = nullptr;
-  
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
   {
     Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);

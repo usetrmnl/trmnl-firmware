@@ -37,7 +37,6 @@ std::vector<uint8_t> readBMPFile(const char *filename)
 void test_parseBMPHeader_BMP_NO_ERR(void)
 {
   auto bmp_data = readBMPFile("./test.bmp");
-  bool image_reverse = false;
 
   bmp_err_e result = parseBMPHeader(bmp_data.data());
 

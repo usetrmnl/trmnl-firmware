@@ -12,6 +12,8 @@
 #include <trmnl_log.h>
 #include <bmp.h>
 #include "../lib/bb_epaper/Fonts/Roboto_Black_16.h"
+#include "../lib/bb_epaper/Fonts/Lora_12.h"
+
 
 BBEPAPER bbep(EP75_800x480);
 
@@ -265,7 +267,6 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type) {
   auto height = display_height();
   UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
   BB_RECT rect;
-
   Log_info("Paint_NewImage");
   bbep.allocBuffer(false);
   Log_info("show image for array");
@@ -314,7 +315,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type) {
     bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
     bbep.print(string4);
 
-    bbep.loadG5Image(wifi_failed_qr, 639, 336, BBEP_BLACK, BBEP_WHITE);
+    bbep.loadG5Image(wifi_failed_qr, 639, 336,BBEP_BLACK, BBEP_WHITE);
   } break;
   case WIFI_INTERNAL_ERROR: {
     const char string1[] = "WiFi connected, but";
@@ -391,7 +392,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type) {
     bbep.print(string1);
   } break;
   case TEST: {
-    bbep.setCursor(0, 40);
+    bbep.setCursor(300, 40);
     bbep.println("ABCDEFGHIYABCDEFGHIYABCDEFGHIYABCDEFGHIYABCDEFGHIY");
     bbep.println("abcdefghiyabcdefghiyabcdefghiyabcdefghiyabcdefghiy");
     bbep.println("A B C D E F G H I Y A B C D E F G H I Y A B C D E");
@@ -443,6 +444,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type,
   // Load the image into the bb_epaper framebuffer
   if (*(uint16_t *)image_buffer == BB_BITMAP_MARKER) {
     // G5 compressed image
+//    bbep.fillScreen(BBEP_WHITE); // draw the image centered on a white background
     BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
     int x = (width - pBBB->width) / 2;
     int y = (height - pBBB->height) / 2; // center it
@@ -492,7 +494,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type,
     bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
     bbep.print(string4);
     bbep.loadG5Image(wifi_connect_qr, 639, 336, BBEP_BLACK, BBEP_WHITE);
-  } break;
+} break;
   case MAC_NOT_REGISTERED: {
     UWORD y_start = 340;
     UWORD font_width = 18; // DEBUG

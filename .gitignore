@@ -8,3 +8,8 @@
 sdkconfig.*
 !sdkconfig.defaults
 
+._test.bmp
+._rover_topdown.bmp
+._logo.bmp
+src/._rover_topdown.h
+src/._testbmp.h
