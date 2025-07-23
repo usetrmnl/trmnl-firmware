@@ -502,6 +502,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
         int x = (width - pBBB->width)/2;
         int y = (height - pBBB->height)/2; // center it
+        bbep.fillScreen(BBEP_WHITE); // draw the image centered on a white background
         bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
     }
     else
@@ -559,7 +560,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     case MAC_NOT_REGISTERED:
     {
         UWORD y_start = 340;
-        UWORD font_width = 18; // DEBUG
+        UWORD font_width = 16; // DEBUG
         Paint_DrawMultilineText(0, y_start, message.c_str(), width, font_width, BBEP_BLACK, BBEP_WHITE, Roboto_Black_16, true);
     }
     break;
