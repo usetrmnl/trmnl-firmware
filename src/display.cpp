@@ -11,7 +11,11 @@
 #include "png_flip.h"
 #include "../lib/bb_epaper/Fonts/Roboto_Black_16.h"
 
+#if defined(BOARD_SEEED_RETERMINAL_E1002)
+BBEPAPER bbep(EP73_SPECTRA_800x480);
+#else
 BBEPAPER bbep(EP75_800x480);
+#endif
 
 /**
  * @brief Function to init the display
@@ -20,9 +24,8 @@ BBEPAPER bbep(EP75_800x480);
  */
 void display_init(void)
 {
-    Log_info("dev module start");
     bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 10000000);
-    Log_info("dev module end");
+    Log_info("Display init done");
 }
 
 /**
@@ -478,6 +481,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     bbep.allocBuffer(false);
     Log_info("Free heap after bbep.allocBuffer() - %d", ESP.getMaxAllocHeap());
 
+#if !defined(BOARD_SEEED_RETERMINAL_E1002)    //for E1002 the screen refresh takes long, remove this unnecessary refresh
     if (message_type == WIFI_CONNECT)
     {
         Log_info("Display set to white");
@@ -486,6 +490,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         bbep.refresh(REFRESH_FULL, true);
         display_sleep(1000);
     }
+#endif
 
     auto width = display_width();
     auto height = display_height();
@@ -581,6 +586,6 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
  */
 void display_sleep(void)
 {
-    Log_info("Goto Sleep...");
+    Log_info("Display goto sleep...");
     bbep.sleep(DEEP_SLEEP);
 }
