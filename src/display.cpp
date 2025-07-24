@@ -1,14 +1,14 @@
+#include <Arduino.h>
+#include <display.h>
 #include "DEV_Config.h"
-#include "Group5.h"
 #include "bb_epaper.h"
-#include "png_flip.h"
+#include "Group5.h"
+#include <config.h>
 #include "wifi_connect_qr.h"
 #include "wifi_failed_qr.h"
-#include <Arduino.h>
-#include <bmp.h>
-#include <config.h>
-#include <display.h>
 #include <trmnl_log.h>
+#include "png_flip.h"
+#include <bmp.h>
 #include "../lib/bb_epaper/Fonts/Roboto_Black_16.h"
 
 
@@ -55,18 +55,18 @@ void display_reset(void)
  * @brief Function to read the display height
  * @return uint16_t - height of display in pixels
  */
-uint16_t display_height() 
+uint16_t display_height()
 {
-    return bbep.height(); 
+    return bbep.height();
 }
 
 /**
  * @brief Function to read the display width
  * @return uint16_t - width of display in pixels
  */
-uint16_t display_width() 
+uint16_t display_width()
 {
-    return bbep.width(); 
+    return bbep.width();
 }
 
 /**
@@ -236,7 +236,7 @@ void display_show_image(uint8_t *image_buffer)
     auto width = display_width();
     auto height = display_height();
     bool bAlloc = false;
-    const uint32_t buf_size = ((width + 7) / 8) * height; // size in bytes
+    const uint32_t buf_size = ((width + 7)/8) * height; // size in bytes
 
     Log_info("show image for array");
     if (*(uint16_t *)image_buffer == BB_BITMAP_MARKER)
@@ -311,14 +311,14 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     {
         // G5 compressed image
         BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
-        int x = (width - pBBB->width) / 2;
-        int y = (height - pBBB->height) / 2; // center it
+        int x = (width - pBBB->width)/2;
+        int y = (height - pBBB->height)/2; // center it
         bbep.fillScreen(BBEP_WHITE); // draw the image centered on a white background
         bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
     }
     else
     {
-        memcpy(bbep.getBuffer(), image_buffer + 62, Imagesize); // uncompressed 1-bpp bitmap
+        memcpy(bbep.getBuffer(), image_buffer+62, Imagesize); // uncompressed 1-bpp bitmap
     }
 
     bbep.setFont(Roboto_Black_16);
@@ -330,11 +330,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     {
         const char string1[] = "Connect to TRMNL WiFi";
         bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, 430);
+        bbep.setCursor((bbep.width() - rect.w)/2, 430);
         bbep.println(string1);
         const char string2[] = "on your phone or computer";
         bbep.getStringBox(string2, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+        bbep.setCursor((bbep.width() - rect.w)/2, -1);
         bbep.print(string2);
     }
     break;
@@ -342,7 +342,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     {
         const char string1[] = "Can't establish WiFi";
         bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, 380);
+        bbep.setCursor((bbep.width() - 132 - rect.w)/2, 380);
         bbep.println(string1);
         const char string2[] = "connection. Hold button on";
         bbep.getStringBox(string2, &rect);
@@ -452,7 +452,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     break;
     case TEST:
     {
-        bbep.setCursor(300, 40);
+        bbep.setCursor(0, 40);
         bbep.println("ABCDEFGHIYABCDEFGHIYABCDEFGHIYABCDEFGHIYABCDEFGHIY");
         bbep.println("abcdefghiyabcdefghiyabcdefghiyabcdefghiyabcdefghiy");
         bbep.println("A B C D E F G H I Y A B C D E F G H I Y A B C D E");
@@ -479,9 +479,8 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
  * @param message additional message
  * @return none
  */
-void display_show_msg(uint8_t *image_buffer, MSG message_type,
-                      String friendly_id, bool id, const char *fw_version,
-                      String message)
+void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_id, bool id, const char
+*fw_version, String message)
 {
     Log_info("Free heap at before display_show_msg - %d", ESP.getMaxAllocHeap());
     bbep.allocBuffer(false);
@@ -510,13 +509,13 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type,
         // G5 compressed image
         bbep.fillScreen(BBEP_WHITE); // draw the image centered on a white background
         BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
-        int x = (width - pBBB->width) / 2;
-        int y = (height - pBBB->height) / 2; // center it
+        int x = (width - pBBB->width)/2;
+        int y = (height - pBBB->height)/2; // center it
         bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
     }
     else
     {
-        memcpy(bbep.getBuffer(), image_buffer + 62, Imagesize); // uncompressed 1-bpp bitmap
+        memcpy(bbep.getBuffer(), image_buffer+62, Imagesize); // uncompressed 1-bpp bitmap
     }
 
     bbep.setFont(Roboto_Black_16);
@@ -570,8 +569,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type,
     {
         UWORD y_start = 340;
         UWORD font_width = 18; // DEBUG
-        Paint_DrawMultilineText(0, y_start, message.c_str(), width, font_width,
-                                BBEP_BLACK, BBEP_WHITE, Roboto_Black_16, true);
+        Paint_DrawMultilineText(0, y_start, message.c_str(), width, font_width, BBEP_BLACK, BBEP_WHITE, Roboto_Black_16, true);
     }
     break;
     default:

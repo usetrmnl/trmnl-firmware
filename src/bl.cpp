@@ -37,7 +37,6 @@
 #include "logo_small.h"
 #include <wifi-helpers.h>
 
-
 bool pref_clear = false;
 String new_filename = "";
 
@@ -233,7 +232,6 @@ void bl_init(void)
   // EPD clear
   Log.info("%s [%d]: Display init\r\n", __FILE__, __LINE__);
   display_init();
-
 
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
   {
@@ -726,7 +724,6 @@ static https_request_err_e downloadAndShow()
 
           WiFi.disconnect(true); // no need for WiFi, save power starting here
           Log.info("%s [%d]: Received successfully; WiFi off\r\n", __FILE__, __LINE__);
-          bool bmp_rename = false;
 
           if (filesystem_file_exists("/current.bmp") || filesystem_file_exists("/current.png"))
           {
@@ -1237,8 +1234,8 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           Log.info("%s [%d]: rewind success\r\n", __FILE__, __LINE__);
 
           bool file_check_bmp = true;
-          image_err_e image_proccess_response = PNG_WRONG_FORMAT;
-          bmp_err_e bmp_proccess_response = BMP_NOT_BMP;
+          image_err_e image_process_response = PNG_WRONG_FORMAT;
+          bmp_err_e bmp_process_response = BMP_NOT_BMP;
 
           // showMessageWithLogo(MSG_FORMAT_ERROR);
           String last_dot_file = filesystem_file_exists("/last.bmp") ? "/last.bmp" : "/last.png";
@@ -1247,17 +1244,17 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
             Log.info("Rewind BMP\n\r");
             buffer = (uint8_t *)malloc(DISPLAY_BMP_IMAGE_SIZE);
             file_check_bmp = filesystem_read_from_file(last_dot_file.c_str(), buffer, DISPLAY_BMP_IMAGE_SIZE);
-            bmp_proccess_response = parseBMPHeader(buffer);
+            bmp_process_response = parseBMPHeader(buffer);
           }
           else if (last_dot_file == "/last.png")
           {
             Log.info("Rewind PNG\n\r");
-            image_proccess_response = decodePNG(last_dot_file.c_str(), buffer);
+            image_process_response = decodePNG(last_dot_file.c_str(), buffer);
           }
 
           if (file_check_bmp)
           {
-            switch (image_proccess_response)
+            switch (image_process_response)
             {
             case PNG_NO_ERR:
             {
@@ -1271,7 +1268,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
             }
             break;
             }
-            switch (bmp_proccess_response)
+            switch (bmp_process_response)
             {
             case BMP_NO_ERR:
             {
@@ -1310,7 +1307,6 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           Log.info("%s [%d]: send_to_me success\r\n", __FILE__, __LINE__);
 
     
-
           if (!filesystem_file_exists("/current.bmp") && !filesystem_file_exists("/current.png"))
           {
             Log.info("%s [%d]: No current image!\r\n", __FILE__, __LINE__);
