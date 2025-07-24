@@ -69,10 +69,9 @@ void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message,
 /**
  * @brief Function to show the image on the display
  * @param image_buffer pointer to the uint8_t image buffer
- * @param reverse shows if the color scheme is reverse
  * @return none
  */
-void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG);
+void display_show_image(uint8_t *image_buffer);
 
 /**
  * @brief Function to show the image with message on the display

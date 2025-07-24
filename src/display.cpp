@@ -6,9 +6,9 @@
 #include <config.h>
 #include "wifi_connect_qr.h"
 #include "wifi_failed_qr.h"
-#include <ctype.h> //iscntrl()
 #include <trmnl_log.h>
 #include "png_flip.h"
+#include <bmp.h>
 #include "../lib/bb_epaper/Fonts/Roboto_Black_16.h"
 
 BBEPAPER bbep(EP75_800x480);
@@ -32,8 +32,8 @@ void display_init(void)
  */
 void display_sleep(uint32_t u32Millis)
 {
-  esp_sleep_enable_timer_wakeup(u32Millis * 1000L);
-  esp_light_sleep_start();
+    esp_sleep_enable_timer_wakeup(u32Millis * 1000L);
+    esp_light_sleep_start();
 }
 
 /**
@@ -228,57 +228,64 @@ void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message,
 /**
  * @brief Function to show the image on the display
  * @param image_buffer pointer to the uint8_t image buffer
- * @param reverse shows if the color scheme is reverse
  * @return none
  */
-void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG)
+void display_show_image(uint8_t *image_buffer)
 {
     auto width = display_width();
     auto height = display_height();
-    uint32_t *d32;
     bool bAlloc = false;
     const uint32_t buf_size = ((width + 7)/8) * height; // size in bytes
 
-    Log_info("Paint_NewImage %d", reverse);
     Log_info("show image for array");
-    if (reverse)
+    if (*(uint16_t *)image_buffer == BB_BITMAP_MARKER)
     {
-        d32 = (uint32_t *)image_buffer; // get framebuffer as a 32-bit pointer
-        Log_info("inverse the image");
-        for (size_t i = 0; i < buf_size; i+=sizeof(uint32_t))
-        {
-            d32[0] = ~d32[0];
-            d32++;
-        }
+        // G5 compressed image
+        BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
+        bbep.allocBuffer(false);
+        bAlloc = true;
+        int x = (width - pBBB->width) / 2;
+        int y = (height - pBBB->height) / 2; // center it
+        bbep.fillScreen(
+            BBEP_WHITE); // draw the image centered on a white background
+        bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
     }
-    if (isPNG == true)
+    else if (*(uint16_t *)image_buffer == BMP_SIGNATURE)
+    {
+        // This work-around is due to a lack of RAM; the
+        // correct method would be to use loadBMP()
+        int32_t height = *(int32_t *)&image_buffer[22];
+        if (height > 0)
+        {
+            flip_image(image_buffer + 62, bbep.width(), bbep.height(),
+                       false); // fix bottom-up bitmap images
+        }
+        if (image_buffer[54] == 0xff && image_buffer[55] == 0xff &&
+            image_buffer[56] == 0xff && image_buffer[58] == 0x00 &&
+            image_buffer[59] == 0x00 && image_buffer[60] == 0x00)
+        {
+            uint32_t *d32 =
+                (uint32_t
+                     *)&image_buffer[62]; // get framebuffer as a 32-bit pointer
+            Log_info("inverse the image");
+            for (size_t i = 0; i < buf_size; i += sizeof(uint32_t))
+            {
+                d32[0] = ~d32[0];
+                d32++;
+            }
+        }
+        bbep.setBuffer(image_buffer + 62); // uncompressed 1-bpp bitmap
+    }
+    else
     {
         Log_info("Drawing PNG");
         bbep.setBuffer(image_buffer);
     }
-    else // uncompressed BMP or Group5 compressed image
-    {
-        if (*(uint16_t *)image_buffer == BB_BITMAP_MARKER)
-        {
-            // G5 compressed image
-            BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
-            bbep.allocBuffer(false);
-            bAlloc = true;
-            int x = (width - pBBB->width)/2;
-            int y = (height - pBBB->height)/2; // center it
-            bbep.fillScreen(BBEP_WHITE); // draw the image centered on a white background
-            bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
-        }
-        else
-        { // This work-around is due to a lack of RAM; the correct method would be to use loadBMP()
-            flip_image(image_buffer+62, bbep.width(), bbep.height(), false); // fix bottom-up bitmap images
-            bbep.setBuffer(image_buffer+62); // uncompressed 1-bpp bitmap
-        }
-    }
     bbep.writePlane(PLANE_0); // send image data to the EPD
     Log_info("Display refresh start");
     bbep.refresh(REFRESH_FULL, true);
-    if (bAlloc) {
+    if (bAlloc)
+    {
         bbep.freeBuffer();
     }
     Log_info("display refresh end");
@@ -296,7 +303,6 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     auto height = display_height();
     UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
     BB_RECT rect;
-
     Log_info("Paint_NewImage");
     bbep.allocBuffer(false);
     Log_info("show image for array");
@@ -472,7 +478,8 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
  * @param message additional message
  * @return none
  */
-void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_id, bool id, const char *fw_version, String message)
+void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_id, bool id, const char
+*fw_version, String message)
 {
     Log_info("Free heap at before display_show_msg - %d", ESP.getMaxAllocHeap());
     bbep.allocBuffer(false);
@@ -499,6 +506,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     if (*(uint16_t *)image_buffer == BB_BITMAP_MARKER)
     {
         // G5 compressed image
+        bbep.fillScreen(BBEP_WHITE); // draw the image centered on a white background
         BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
         int x = (width - pBBB->width)/2;
         int y = (height - pBBB->height)/2; // center it

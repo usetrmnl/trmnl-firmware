@@ -33,10 +33,10 @@ image_err_e processPNG(PNG *png, uint8_t *&decoded_buffer)
 /**
  * @brief Function to decode png from buffer
  * @param buffer pointer to the buffer
- * @param decodded_buffer Buffer where decoded PNG bitmap save
+ * @param decoded_buffer Buffer where decoded PNG bitmap save
  * @return image_err_e error code
  */
-image_err_e decodePNG(uint8_t *buffer, uint8_t *&decoded_buffer)
+image_err_e decodePNGFromMem(uint8_t *buffer, uint8_t *&decoded_buffer)
 {
   PNG *png = new PNG();
 
