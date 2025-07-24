@@ -27,7 +27,7 @@ bmp_err_e parseBMPHeader(uint8_t *data)
  // Get the offset of the pixel data
   uint32_t dataOffset = *(uint32_t *)&data[10];
 // Display BMP information
-  printf("BMP Header Information:\r\nWidth: %d\r\nHeight: %d\r\nBits per Pixel: %d\r\nCompression Method: %d\r\nImage Data Size: %d\r\nColor Table Entries: %d\r\nData offset: %d", width, height, bitsPerPixel, compressionMethod, imageDataSize, colorTableEntries, dataOffset);
+  Log_info("BMP Header Information:\r\nWidth: %d\r\nHeight: %d\r\nBits per Pixel: %d\r\nCompression Method: %d\r\nImage Data Size: %d\r\nColor Table Entries: %d\r\nData offset: %d", width, height, bitsPerPixel, compressionMethod, imageDataSize, colorTableEntries, dataOffset);
 
   if (width != 800 || abs(height) != 480 || bitsPerPixel != 1 || imageDataSize != 48000 || colorTableEntries != 2)
     return BMP_BAD_SIZE;
