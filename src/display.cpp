@@ -309,6 +309,66 @@ void png_draw(PNGDRAW *pDraw)
     }
     bbep.writeData(pTemp, (pDraw->iWidth+7)/8);
 } /* png_draw() */
+
+//
+// A table to accelerate the testing of 2-bit images for the number
+// of unique colors. Each entry sets bits 0-3 depending on the presence
+// of colors 0-3 in each 2-bit pixel
+//
+const uint8_t ucTwoBitFlags[256] = {
+0x01,0x03,0x05,0x09,0x03,0x03,0x07,0x0b,0x05,0x07,0x05,0x0d,0x09,0x0b,0x0d,0x09,
+0x03,0x03,0x07,0x0b,0x03,0x03,0x07,0x0b,0x07,0x07,0x07,0x0f,0x0b,0x0b,0x0f,0x0b,
+0x05,0x07,0x05,0x0d,0x07,0x07,0x07,0x0f,0x05,0x07,0x05,0x0d,0x0d,0x0f,0x0d,0x0d,
+0x09,0x0b,0x0d,0x09,0x0b,0x0b,0x0f,0x0b,0x0d,0x0f,0x0d,0x0d,0x09,0x0b,0x0d,0x09,
+0x03,0x03,0x07,0x0b,0x03,0x03,0x07,0x0b,0x07,0x07,0x07,0x0f,0x0b,0x0b,0x0f,0x0b,
+0x03,0x03,0x07,0x0b,0x03,0x02,0x06,0x0a,0x07,0x06,0x06,0x0e,0x0b,0x0a,0x0e,0x0a,
+0x07,0x07,0x07,0x0f,0x07,0x06,0x06,0x0e,0x07,0x06,0x06,0x0e,0x0f,0x0e,0x0e,0x0e,
+0x0b,0x0b,0x0f,0x0b,0x0b,0x0a,0x0e,0x0a,0x0f,0x0e,0x0e,0x0e,0x0b,0x0a,0x0e,0x0a,
+0x05,0x07,0x05,0x0d,0x07,0x07,0x07,0x0f,0x05,0x07,0x05,0x0d,0x0d,0x0f,0x0d,0x0d,
+0x07,0x07,0x07,0x0f,0x07,0x06,0x06,0x0e,0x07,0x06,0x06,0x0e,0x0f,0x0e,0x0e,0x0e,
+0x05,0x07,0x05,0x0d,0x07,0x06,0x06,0x0e,0x05,0x06,0x04,0x0c,0x0d,0x0e,0x0c,0x0c,
+0x0d,0x0f,0x0d,0x0d,0x0f,0x0e,0x0e,0x0e,0x0d,0x0e,0x0c,0x0c,0x0d,0x0e,0x0c,0x0c,
+0x09,0x0b,0x0d,0x09,0x0b,0x0b,0x0f,0x0b,0x0d,0x0f,0x0d,0x0d,0x09,0x0b,0x0d,0x09,
+0x0b,0x0b,0x0f,0x0b,0x0b,0x0a,0x0e,0x0a,0x0f,0x0e,0x0e,0x0e,0x0b,0x0a,0x0e,0x0a,
+0x0d,0x0f,0x0d,0x0d,0x0f,0x0e,0x0e,0x0e,0x0d,0x0e,0x0c,0x0c,0x0d,0x0e,0x0c,0x0c,
+0x09,0x0b,0x0d,0x09,0x0b,0x0a,0x0e,0x0a,0x0d,0x0e,0x0c,0x0c,0x09,0x0a,0x0c,0x08
+};
+
+void png_draw_count(PNGDRAW *pDraw)
+{
+    int x, *pFlags = (int *)pDraw->pUser;
+    uint8_t *s, set_bits;
+
+    set_bits = pFlags[0]; // use a local var
+    s = (uint8_t *)pDraw->pPixels;
+    for (x=0; x<pDraw->iWidth; x+=4) {
+        set_bits |= ucTwoBitFlags[*s++]; // do 4 pixels at a time
+    } // for x
+    pFlags[0] = set_bits; // put it back in the flags array
+} /* png_draw_count() */
+/** 
+ * @brief Function to decode a PNG and count the number of unique colors
+ *        This is needed because 2-bit (4gray) images can sometimes contain
+ *        only 2 unique colors. This will allow us to use partial (non-flickering)
+ *        updates on these images.
+ * @param pointer to the PNG class instance
+ * @param pointer to the buffer holding the PNG file
+ * @param size of the PNG file
+ * @return the number of unique colors in the image (2 to 4)
+ */
+int png_count_colors(PNG *png, const uint8_t *pData, int iDataSize)
+{
+int i, iColors = 0;
+    png->openRAM((uint8_t *)pData, iDataSize, png_draw_count);
+    png->decode(&i, 0);
+    png->close();
+    if (i & 1) iColors++;
+    if (i & 2) iColors++;
+    if (i & 4) iColors++;
+    if (i & 8) iColors++;
+    Log.info("%s [%d]: png_count_colors: %d\r\n", __FILE__, __LINE__, iColors);
+    return iColors;
+} /* png_count_colors() */
 /** 
  * @brief Function to decode and display a PNG image from memory
  *        The decoded lines are written directly into the EPD framebuffer
@@ -325,6 +385,7 @@ PNG *png = new PNG();
 
     if (!png) return PNG_MEM_ERROR; // not enough memory for the decoder instance
     rc = png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
+    png->close();
     if (rc == PNG_SUCCESS) {
         if (png->getWidth() != bbep.width() || png->getHeight() != bbep.height()) {
             Log_error("PNG image size doesn't match display size");
@@ -335,24 +396,31 @@ PNG *png = new PNG();
         } else { // okay to decode
             Log.info("%s [%d]: Decoding %d-bpp png (current)\r\n", __FILE__, __LINE__, png->getBpp());
             // Prepare target memory window (entire display)
-            if (png->getBpp() == 1) {
-              bbep.setPanelType(ONE_BIT_PANEL);
-              rc = (iDataSize_old) ? REFRESH_PARTIAL : REFRESH_FAST; // the new image is 1bpp - try a partial update
-            } else {
-              bbep.setPanelType(TWO_BIT_PANEL);
-              rc = REFRESH_FULL; // 4gray mode must be full refresh
-              iUpdateCount = 0; // grayscale mode resets the partial update counter
-            }
             bbep.setAddrWindow(0, 0, bbep.width(), bbep.height());
-            if (png->getBpp() == 1) { // 1-bit image (single plane)
+            if (png->getBpp() == 1 || png_count_colors(png, pPNG, iDataSize) == 2) { // 1-bit image (single plane)
+                bbep.setPanelType(ONE_BIT_PANEL);
+                if (iDataSize_old) {
+                    rc = REFRESH_PARTIAL; // the new image is 1bpp - try a partial update
+                } else {
+                    rc = REFRESH_FAST;
+                    iUpdateCount = 0; // starting from a full update; reset the counter
+                }
                 bbep.startWrite(PLANE_0); // start writing image data to plane 0
-                png->decode(NULL, 0);
+                png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
+                if (png->getBpp() == 1) {
+                    png->decode(NULL, 0);
+                } else { // convert the 2-bit image to 1-bit output
+                    Log.info("%s [%d]: Current png only has 2 unique colors!\n", __FILE__, __LINE__);
+                    iPlane = 2;
+                    png->decode(&iPlane, 0);
+                }
+                png->close();
                 if (pPNG_old) { // decode the old image to do a partial update
-                    png->close();
                     if (png->openRAM((uint8_t *)pPNG_old, iDataSize_old, png_draw) == PNG_SUCCESS) {
                         Log.info("%s [%d]: preparing plane 1 for partial update\r\n", __FILE__, __LINE__);
                         bbep.startWrite(PLANE_1); // 'old' data is written to plane 1
                         if (png->getBpp() == 2) { // tell draw code to handle old 2bpp image differently
+                            Log.info("%s [%d]: old png only has 2 unique colors!\n", __FILE__, __LINE__);
                             iPlane = 2; // tell draw code to merge bits 0/1 per pixel
                             png->decode(&iPlane, 0); // decode it into the old buffer
                         } else {
@@ -361,11 +429,17 @@ PNG *png = new PNG();
                     }
                 }
             } else { // 2-bpp
+                bbep.setPanelType(TWO_BIT_PANEL);
+                rc = REFRESH_FULL; // 4gray mode must be full refresh
+                iUpdateCount = 0; // grayscale mode resets the partial update counter
                 bbep.startWrite(PLANE_0); // start writing image data to plane 0
                 iPlane = 0;
+                Log.info("%s [%d]: decoding 4-gray plane 0\r\n", __FILE__, __LINE__);
+                png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
                 png->decode(&iPlane, 0); // tell PNGDraw to use bits for plane 0
                 png->close(); // start over for plane 1
                 iPlane = 1;
+                Log.info("%s [%d]: decoding 4-gray plane 1\r\n", __FILE__, __LINE__);
                 png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
                 bbep.startWrite(PLANE_1); // start writing image data to plane 1
                 png->decode(&iPlane, 0); // decode it again to get plane 1 data
@@ -435,6 +509,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, uint8_t *image_buf
         }
         bbep.writePlane(PLANE_0); // send image data to the EPD
         iRefreshMode = REFRESH_FAST; // 1-bpp image means we can use fast update
+        iUpdateCount = 0; // we're not doing partial updates from this type of drawing (yet)
     }
     Log_info("Display refresh start");
 #ifdef BB_EPAPER
