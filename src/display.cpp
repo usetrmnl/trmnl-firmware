@@ -11,7 +11,6 @@
 #include <bmp.h>
 #include "../lib/bb_epaper/Fonts/Roboto_Black_16.h"
 
-
 BBEPAPER bbep(EP75_800x480);
 
 /**
