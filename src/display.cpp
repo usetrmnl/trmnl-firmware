@@ -275,6 +275,8 @@ void png_draw(PNGDRAW *pDraw)
         src = *s++;
         src ^= ucInvert;
         if (*(int *)pDraw->pUser > 1) { // draw 2bpp data as 1-bit to use for partial update
+            ucInvert = ~ucInvert; // the invert rule is backwards for grayscale data
+            src = ~src;
             for (x=0; x<pDraw->iWidth; x++) {
                 uc <<= 1;
                 if (src & 0xc0) { // non-white -> black
@@ -339,6 +341,8 @@ void png_draw_count(PNGDRAW *pDraw)
     int x, *pFlags = (int *)pDraw->pUser;
     uint8_t *s, set_bits;
 
+    if (pDraw->y > 430) return; // Workaround to ignore the icon in the lower left corner
+
     set_bits = pFlags[0]; // use a local var
     s = (uint8_t *)pDraw->pPixels;
     for (x=0; x<pDraw->iWidth; x+=4) {
@@ -358,10 +362,12 @@ void png_draw_count(PNGDRAW *pDraw)
  */
 int png_count_colors(PNG *png, const uint8_t *pData, int iDataSize)
 {
-int i, iColors = 0;
+int i, iColors;
     png->openRAM((uint8_t *)pData, iDataSize, png_draw_count);
+    i = 0;
     png->decode(&i, 0);
     png->close();
+    iColors = 0;
     if (i & 1) iColors++;
     if (i & 2) iColors++;
     if (i & 4) iColors++;
