@@ -22,8 +22,7 @@ BBEPAPER bbep(EP75_800x480);
 void display_init(void)
 {
     Log_info("dev module start");
-    bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN,
-                EPD_SCK_PIN, 10000000);
+    bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 10000000);
     Log_info("dev module end");
 }
 
@@ -57,7 +56,7 @@ void display_reset(void)
  * @return uint16_t - height of display in pixels
  */
 uint16_t display_height() 
-{ 
+{
     return bbep.height(); 
 }
 
@@ -66,7 +65,7 @@ uint16_t display_height()
  * @return uint16_t - width of display in pixels
  */
 uint16_t display_width() 
-{ 
+{
     return bbep.width(); 
 }
 
@@ -147,8 +146,7 @@ void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message,
         int word_width = word_length * font_width;
 
         // Check if adding the word exceeds max_width
-        if (current_width + word_width + (current_width > 0 ? font_width : 0) <=
-            display_width_pixels)
+        if (current_width + word_width + (current_width > 0 ? font_width : 0) <= display_width_pixels)
         {
             // Add space before word if not the first word in the line
             if (current_width > 0 && line_pos < max_chars_per_line - 1)
@@ -170,8 +168,7 @@ void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message,
             // Current line is full, draw it
             if (line_pos > 0)
             {
-                lines[line_index][line_pos] =
-                    '\0'; // Null-terminate the current line
+                lines[line_index][line_pos] = '\0'; // Null-terminate the current line
                 line_index++;
                 line_count++;
 
@@ -305,8 +302,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
 {
     auto width = display_width();
     auto height = display_height();
-    UWORD Imagesize =
-        ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
+    UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
     BB_RECT rect;
     Log_info("Paint_NewImage");
     bbep.allocBuffer(false);
@@ -317,14 +313,12 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
         int x = (width - pBBB->width) / 2;
         int y = (height - pBBB->height) / 2; // center it
-        bbep.fillScreen(
-            BBEP_WHITE); // draw the image centered on a white background
-        bbep.loadG5Image(image_buffer, x, y, BBEP_BLACK, BBEP_WHITE);
+        bbep.fillScreen(BBEP_WHITE); // draw the image centered on a white background
+        bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
     }
     else
     {
-        memcpy(bbep.getBuffer(), image_buffer + 62,
-               Imagesize); // uncompressed 1-bpp bitmap
+        memcpy(bbep.getBuffer(), image_buffer + 62, Imagesize); // uncompressed 1-bpp bitmap
     }
 
     bbep.setFont(Roboto_Black_16);
@@ -363,7 +357,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
         bbep.print(string4);
 
-        bbep.loadG5Image(wifi_failed_qr, 639, 336, BBEP_BLACK, BBEP_WHITE);
+        bbep.loadG5Image(wifi_failed_qr, 639, 336, BBEP_WHITE, BBEP_BLACK);
     }
     break;
     case WIFI_INTERNAL_ERROR:
@@ -385,7 +379,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
         bbep.print(string4);
 
-        bbep.loadG5Image(wifi_failed_qr, 639, 336, BBEP_BLACK, BBEP_WHITE);
+        bbep.loadG5Image(wifi_failed_qr, 639, 336, BBEP_WHITE, BBEP_BLACK);
     }
     break;
     case WIFI_WEAK:
@@ -489,8 +483,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type,
                       String friendly_id, bool id, const char *fw_version,
                       String message)
 {
-    Log_info("Free heap at before display_show_msg - %d",
-             ESP.getMaxAllocHeap());
+    Log_info("Free heap at before display_show_msg - %d", ESP.getMaxAllocHeap());
     bbep.allocBuffer(false);
     Log_info("Free heap after bbep.allocBuffer() - %d", ESP.getMaxAllocHeap());
 
@@ -505,8 +498,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type,
 
     auto width = display_width();
     auto height = display_height();
-    UWORD Imagesize =
-        ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
+    UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
     BB_RECT rect;
 
     Log_info("Paint_NewImage");
@@ -516,17 +508,15 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type,
     if (*(uint16_t *)image_buffer == BB_BITMAP_MARKER)
     {
         // G5 compressed image
-        bbep.fillScreen(
-            BBEP_WHITE); // draw the image centered on a white background
+        bbep.fillScreen(BBEP_WHITE); // draw the image centered on a white background
         BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
         int x = (width - pBBB->width) / 2;
         int y = (height - pBBB->height) / 2; // center it
-        bbep.loadG5Image(image_buffer, x, y, BBEP_BLACK, BBEP_WHITE);
+        bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
     }
     else
     {
-        memcpy(bbep.getBuffer(), image_buffer + 62,
-               Imagesize); // uncompressed 1-bpp bitmap
+        memcpy(bbep.getBuffer(), image_buffer + 62, Imagesize); // uncompressed 1-bpp bitmap
     }
 
     bbep.setFont(Roboto_Black_16);
@@ -538,7 +528,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type,
         Log_info("friendly id case");
         const char string1[] = "Please sign up at usetrmnl.com/signup";
         bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, 400);
+        bbep.setCursor((bbep.width() - rect.w)/2, 400);
         bbep.println(string1);
 
         String string2 = "with Friendly ID ";
@@ -548,7 +538,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type,
         }
         string2 += " to finish setup";
         bbep.getStringBox(string2, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+        bbep.setCursor((bbep.width() - rect.w)/2, -1);
         bbep.print(string2);
     }
     break;
@@ -573,7 +563,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type,
         bbep.getStringBox(string4, &rect);
         bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
         bbep.print(string4);
-        bbep.loadG5Image(wifi_connect_qr, 639, 336, BBEP_BLACK, BBEP_WHITE);
+        bbep.loadG5Image(wifi_connect_qr, 639, 336, BBEP_WHITE, BBEP_BLACK);
     }
     break;
     case MAC_NOT_REGISTERED:
