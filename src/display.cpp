@@ -1,4 +1,3 @@
-#include "../lib/bb_epaper/Fonts/Roboto_Black_16.h"
 #include "DEV_Config.h"
 #include "Group5.h"
 #include "bb_epaper.h"
@@ -8,9 +7,10 @@
 #include <Arduino.h>
 #include <bmp.h>
 #include <config.h>
-#include <ctype.h> //iscntrl()
 #include <display.h>
 #include <trmnl_log.h>
+#include "../lib/bb_epaper/Fonts/Roboto_Black_16.h"
+
 
 BBEPAPER bbep(EP75_800x480);
 
@@ -56,13 +56,19 @@ void display_reset(void)
  * @brief Function to read the display height
  * @return uint16_t - height of display in pixels
  */
-uint16_t display_height() { return bbep.height(); }
+uint16_t display_height() 
+{ 
+    return bbep.height(); 
+}
 
 /**
  * @brief Function to read the display width
  * @return uint16_t - width of display in pixels
  */
-uint16_t display_width() { return bbep.width(); }
+uint16_t display_width() 
+{ 
+    return bbep.width(); 
+}
 
 /**
  * @brief Function to draw multi-line text onto the display
