@@ -854,6 +854,12 @@ static https_request_err_e downloadAndShow()
             break;
           }
 
+          if (imagePointer != nullptr) 
+          {
+            free(imagePointer);
+            imagePointer = nullptr;
+          }
+
           if (isPNG && png_res != PNG_NO_ERR)
           {
             filesystem_file_delete("/current.png");
@@ -1274,6 +1280,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
             }
             break;
             }
+
             switch (bmp_proccess_response)
             {
             case BMP_NO_ERR:
@@ -1291,10 +1298,11 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           }
           else
           {
-            free(buffer);
-            buffer = nullptr;
             showMessageWithLogo(MSG_FORMAT_ERROR);
           }
+          free(buffer);
+          buffer = nullptr;
+
         }
         else
         {
@@ -2042,10 +2050,7 @@ static void writeSpecialFunction(SPECIAL_FUNCTION function)
 
 static void showMessageWithLogo(MSG message_type)
 {
-  buffer = (uint8_t *)malloc(DEFAULT_IMAGE_SIZE);
   display_show_msg(storedLogoOrDefault(), message_type);
-  free(buffer);
-  buffer = nullptr;
 
   need_to_refresh_display = 1;
   preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
@@ -2053,10 +2058,7 @@ static void showMessageWithLogo(MSG message_type)
 
 static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, const char *fw_version, String message)
 {
-  buffer = (uint8_t *)malloc(DEFAULT_IMAGE_SIZE);
   display_show_msg(storedLogoOrDefault(), message_type, friendly_id, id, fw_version, message);
-  free(buffer);
-  buffer = nullptr;
 
   need_to_refresh_display = 1;
   preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
@@ -2070,10 +2072,7 @@ static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, c
  */
 static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiResponse)
 {
-  buffer = (uint8_t *)malloc(DEFAULT_IMAGE_SIZE);
   display_show_msg(storedLogoOrDefault(), message_type, "", false, "", apiResponse.message);
-  free(buffer);
-  buffer = nullptr;
 
   need_to_refresh_display = 1;
   preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
