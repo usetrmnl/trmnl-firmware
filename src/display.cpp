@@ -229,6 +229,56 @@ void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message,
 }
 
 /**
+ * @brief Function to render a bitmap, be compatible with the colored ePaper
+ * @param image_buffer pointer to the uint8_t image buffer
+ * @return true if the image buffer was allocated, false otherwise
+ */
+static bool display_render_bitmap(const uint8_t *image_buffer)
+{
+    bool bAlloc = false;
+
+#if defined(BOARD_SEEED_RETERMINAL_E1002)
+    //currently only reTerminal E1002 is using the 7color ePaper, and it's using ESP32-S3, RAM is not an issue
+    const unsigned char bmp_header[62] = {
+        // BITMAPFILEHEADER (14 bytes)
+        0x42, 0x4D,             // bfType: 'BM'
+        0x4E, 0xBB, 0x00, 0x00, // bfSize: 48062 bytes = 0x0000BB4E
+        0x00, 0x00,             // bfReserved1
+        0x00, 0x00,             // bfReserved2
+        0x3E, 0x00, 0x00, 0x00, // bfOffBits: 62 bytes (header + palette)
+
+        // BITMAPINFOHEADER (40 bytes)
+        0x28, 0x00, 0x00, 0x00, // biSize: 40 bytes
+        0x20, 0x03, 0x00, 0x00, // biWidth: 800 px (0x0320)
+        0x20, 0xFE, 0xFF, 0xFF, // biHeight: -480 (top-down)
+        0x01, 0x00,             // biPlanes: 1
+        0x01, 0x00,             // biBitCount: 1bpp
+        0x00, 0x00, 0x00, 0x00, // biCompression: BI_RGB (no compression)
+        0x80, 0xBB, 0x00, 0x00, // biSizeImage: 48000 bytes (0x0000BB80)
+        0x13, 0x0B, 0x00, 0x00, // biXPelsPerMeter: 2835 (72 DPI)
+        0x13, 0x0B, 0x00, 0x00, // biYPelsPerMeter: 2835 (72 DPI)
+        0x02, 0x00, 0x00, 0x00, // biClrUsed: 2 colors
+        0x00, 0x00, 0x00, 0x00, // biClrImportant: 0
+
+        // Color Table (8 bytes)
+        0x00, 0x00, 0x00, 0x00, // Color 0: Black (B,G,R,0)
+        0xFF, 0xFF, 0xFF, 0x00  // Color 1: White (B,G,R,0)
+    };
+    bbep.allocBuffer(false);
+    bAlloc = true;
+    uint8_t *p_buff = (uint8_t *)malloc(DISPLAY_BMP_IMAGE_SIZE);
+    memcpy(p_buff, bmp_header, 62);  // fillin a dummy header
+    memcpy(p_buff + 62, image_buffer, DISPLAY_BMP_IMAGE_SIZE - 62);
+    int ret = bbep.loadBMP(p_buff, 0, 0, BBEP_WHITE, BBEP_BLACK);  //loadBMP will handle bpp for the color ePaper
+    Log_verbose_serial("load BMP decoded from PNG, ret: %d", ret);
+    free(p_buff);
+#else
+    bbep.setBuffer((uint8_t *)image_buffer);
+#endif
+    return bAlloc;
+}
+
+/**
  * @brief Function to show the image on the display
  * @param image_buffer pointer to the uint8_t image buffer
  * @param reverse shows if the color scheme is reverse
@@ -256,13 +306,15 @@ void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG)
     if (isPNG == true)
     {
         Log_info("Drawing PNG");
-        bbep.setBuffer(image_buffer);
+        bAlloc = display_render_bitmap(image_buffer);
     }
     else // uncompressed BMP or Group5 compressed image
     {
         if (*(uint16_t *)image_buffer == BB_BITMAP_MARKER)
         {
             // G5 compressed image
+            Log_verbose_serial("Show G5 compressed bmp");
+
             BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
             bbep.allocBuffer(false);
             bAlloc = true;
@@ -274,7 +326,7 @@ void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG)
         else
         { // This work-around is due to a lack of RAM; the correct method would be to use loadBMP()
             flip_image(image_buffer+62, bbep.width(), bbep.height(), false); // fix bottom-up bitmap images
-            bbep.setBuffer(image_buffer+62); // uncompressed 1-bpp bitmap
+            bAlloc = display_render_bitmap(image_buffer+62); // uncompressed 1-bpp bitmap
         }
     }
     bbep.writePlane(PLANE_0); // send image data to the EPD
@@ -304,6 +356,8 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     if (*(uint16_t *)image_buffer == BB_BITMAP_MARKER)
     {
         // G5 compressed image
+        Log_verbose_serial("Show G5 compressed bmp");
+
         BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
         int x = (width - pBBB->width)/2;
         int y = (height - pBBB->height)/2; // center it
@@ -503,6 +557,8 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     if (*(uint16_t *)image_buffer == BB_BITMAP_MARKER)
     {
         // G5 compressed image
+        Log_verbose_serial("Show G5 compressed bmp");
+
         BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
         int x = (width - pBBB->width)/2;
         int y = (height - pBBB->height)/2; // center it
