@@ -346,7 +346,7 @@ std::vector<Network> WifiCaptive::getScannedUniqueNetworks(bool runScan)
             {
                 if (network.ssid == ssid)
                 {
-                    Serial.println("Equal SSID");
+                    Log_info_serial("Equal SSID");
                     found = true;
                     if (network.rssi < rssi)
                     {

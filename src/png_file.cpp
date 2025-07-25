@@ -14,7 +14,7 @@ void *pngOpen(const char *filename, int32_t *size)
 
   if (!pngfile)
   {
-    Serial.println("Failed to open file!");
+    Log_error_serial("Failed to open png file!");
     *size = 0;
     return nullptr;
   }

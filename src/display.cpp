@@ -242,12 +242,11 @@ void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG)
     bool bAlloc = false;
     const uint32_t buf_size = ((width + 7)/8) * height; // size in bytes
 
-    Log_info("Paint_NewImage %d", reverse);
-    Log_info("show image for array");
+    Log_info("display_show_image, reverse: %d, isPNG: %d", reverse, isPNG);
+
     if (reverse)
     {
         d32 = (uint32_t *)image_buffer; // get framebuffer as a 32-bit pointer
-        Log_info("inverse the image");
         for (size_t i = 0; i < buf_size; i+=sizeof(uint32_t))
         {
             d32[0] = ~d32[0];
@@ -284,7 +283,7 @@ void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG)
     if (bAlloc) {
         bbep.freeBuffer();
     }
-    Log_info("display refresh end");
+    Log_info("Display refresh end");
 }
 
 /**
@@ -300,9 +299,8 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
     BB_RECT rect;
 
-    Log_info("Paint_NewImage");
+    Log_info("display_show_msg, message_type: %d", message_type);
     bbep.allocBuffer(false);
-    Log_info("show image for array");
     if (*(uint16_t *)image_buffer == BB_BITMAP_MARKER)
     {
         // G5 compressed image
@@ -460,9 +458,10 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     }
 
     bbep.writePlane(PLANE_0);
+    Log_info("Display refresh start");
     bbep.refresh(REFRESH_FULL, true);
     bbep.freeBuffer();
-    Log_info("display");
+    Log_info("Display refresh end");
 }
 
 /**
@@ -477,7 +476,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
  */
 void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_id, bool id, const char *fw_version, String message)
 {
-    Log_info("Free heap at before display_show_msg - %d", ESP.getMaxAllocHeap());
+    Log_info("Free heap before bbep.allocBuffer() - %d", ESP.getMaxAllocHeap());
     bbep.allocBuffer(false);
     Log_info("Free heap after bbep.allocBuffer() - %d", ESP.getMaxAllocHeap());
 
@@ -497,8 +496,8 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
     BB_RECT rect;
 
-    Log_info("Paint_NewImage");
-    Log_info("show image for array");
+    Log_info("display_show_msg, message_type: %d, friendly_id: %s, id: %d, fw_version: %s, message: %s",
+             message_type, friendly_id.c_str(), id, fw_version, message.c_str());
 
     // Load the image into the bb_epaper framebuffer
     if (*(uint16_t *)image_buffer == BB_BITMAP_MARKER)
@@ -572,11 +571,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     default:
         break;
     }
-    Log_info("Start drawing...");
     bbep.writePlane(PLANE_0);
+    Log_info("Display refresh start");
     bbep.refresh(REFRESH_FULL, true);
     bbep.freeBuffer();
-    Log_info("display");
+    Log_info("Display refresh end");
 }
 
 /**

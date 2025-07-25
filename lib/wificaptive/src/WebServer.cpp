@@ -1,4 +1,5 @@
 #include "WebServer.h"
+#include <trmnl_log.h>
 #include <WiFi.h>
 
 void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperationCallbacks callbacks)
@@ -94,7 +95,7 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
             }
 
             WiFi.scanDelete();
-			Serial.println(json);
+			Log_info_serial("%s\r\n", json.c_str());
 
 			if (WiFi.scanComplete() == -2){
 				WiFi.scanNetworks(true);

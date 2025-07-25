@@ -749,7 +749,6 @@ static https_request_err_e downloadAndShow()
             bmp_res = parseBMPHeader(buffer, image_reverse);
             Log.info("%s [%d]: BMP Parsing result: %d\r\n", __FILE__, __LINE__, bmp_res);
           }
-          Serial.println();
           String error = "";
           uint8_t *imagePointer = (decodedPng == nullptr) ? buffer : decodedPng;
           bool lastImageExists = filesystem_file_exists("/last.bmp") || filesystem_file_exists("/last.png");
@@ -759,8 +758,9 @@ static https_request_err_e downloadAndShow()
           case PNG_NO_ERR:
           {
 
-            Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
+            Log.verbose("Free heap before display - %d\r\n", ESP.getMaxAllocHeap());
             display_show_image(imagePointer, image_reverse, isPNG);
+            Log.verbose("Free heap after display - %d\r\n", ESP.getMaxAllocHeap());
 
             // Using filename from API response
             new_filename = apiDisplayResult.response.filename;
@@ -810,8 +810,9 @@ static https_request_err_e downloadAndShow()
             {
               writeImageToFile("/current.bmp", buffer, content_size);
             }
-            Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
+            Log.verbose("Free heap before display - %d\r\n", ESP.getMaxAllocHeap());
             display_show_image(imagePointer, image_reverse, isPNG);
+            Log.verbose("Free heap after display - %d\r\n", ESP.getMaxAllocHeap());
 
             // Using filename from API response
             new_filename = apiDisplayResult.response.filename;
@@ -2111,7 +2112,7 @@ static bool checkCurrentFileName(String &newName)
 {
   String currentFilename = preferences.getString(PREFERENCES_FILENAME_KEY, "");
 
-  Log.error("%s [%d]: Current filename: %s\r\n", __FILE__, __LINE__, currentFilename);
+  Log.error("%s [%d]: Current filename: %s\r\n", __FILE__, __LINE__, currentFilename.c_str());
 
   if (currentFilename.equals(newName))
   {
