@@ -81,7 +81,8 @@ enum {
     PLANE_0=0,
     PLANE_1,
     PLANE_BOTH,
-    PLANE_DUPLICATE // duplicate 0 to both 0 and 1
+    PLANE_DUPLICATE, // duplicate 0 to both 0 and 1
+    PLANE_0_TO_1 // send plane 0 to plane 1 memory
 };
 #ifndef __ONEBITDISPLAY__
 // 5 possible font sizes: 8x8, 16x32, 6x8, 12x16 (stretched from 6x8 with smoothing), 16x16 (stretched from 8x8)
@@ -441,7 +442,7 @@ class BBEPAPER
 #else // __LINUX__
     void initIO(int iDC, int iReset, int iBusy, int iCS, int iSPIChannel, uint32_t u32Speed = 8000000);
 #endif
-    int writePlane(int iPlane = PLANE_BOTH);
+    int writePlane(int iPlane = PLANE_BOTH, bool bInvert = false);
     void startWrite(int iPlane);
     void writeData(uint8_t *pData, int iLen);
     void writeCmd(uint8_t u8Cmd);

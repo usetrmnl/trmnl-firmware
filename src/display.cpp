@@ -514,8 +514,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, uint8_t *image_buf
 #endif
         }
         bbep.writePlane(PLANE_0); // send image data to the EPD
-        iRefreshMode = REFRESH_FAST; // 1-bpp image means we can use fast update
-        iUpdateCount = 0; // we're not doing partial updates from this type of drawing (yet)
+        iUpdateCount = 0; // reset the update count when woken by button press of BMP file is shown 
     }
     Log_info("Display refresh start");
 #ifdef BB_EPAPER
@@ -523,13 +522,16 @@ void display_show_image(uint8_t *image_buffer, int data_size, uint8_t *image_buf
         Log.info("%s [%d]: Forcing full refresh; desired refresh mode was: %d\r\n", __FILE__, __LINE__, iRefreshMode);
         iRefreshMode = REFRESH_FULL; // force full refresh every 8 partials
     }
+    if (iUpdateCount == 1) {
+        Log.info("%s [%d]: Forcing fast refresh (not partial) since the logo was just shown\r\n", __FILE__, __LINE__);
+        iRefreshMode = REFRESH_FAST;
+    }
     Log.info("%s [%d]: EPD refresh mode: %d\r\n", __FILE__, __LINE__, iRefreshMode);
     bbep.refresh(iRefreshMode, true);
     if (bAlloc) {
         bbep.freeBuffer();
-    } else {
-        iUpdateCount++;
     }
+    iUpdateCount++;
 #else
     bbep.fullUpdate();
 #endif

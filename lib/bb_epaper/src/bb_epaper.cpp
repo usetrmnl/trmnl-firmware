@@ -91,11 +91,11 @@ void BBEPAPER::initIO(int iDC, int iReset, int iBusy, int iCS, int iSPIChannel, 
 	bbepInitIO(&_bbep, u32Speed);
 } /* initIO() */
 #endif
-int BBEPAPER::writePlane(int iPlane)
+int BBEPAPER::writePlane(int iPlane, bool bInvert)
 {
     long l = millis();
     int rc;
-    rc = bbepWritePlane(&_bbep, iPlane);
+    rc = bbepWritePlane(&_bbep, iPlane, (int)bInvert);
     _bbep.iDataTime = (int)(millis() - l);
     return rc;
 } /* writePlane() */
