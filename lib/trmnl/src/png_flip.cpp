@@ -64,4 +64,3 @@ void horizontal_mirror(unsigned char *buffer, int width, int height) {
         }
     }
 }
-

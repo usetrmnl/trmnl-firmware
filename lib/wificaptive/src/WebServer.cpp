@@ -1,4 +1,5 @@
 #include "WebServer.h"
+#include <WiFi.h>
 
 void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperationCallbacks callbacks)
 {

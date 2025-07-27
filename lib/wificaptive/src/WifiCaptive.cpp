@@ -1,6 +1,11 @@
 #include "WifiCaptive.h"
+#include <WiFi.h>
 #include <trmnl_log.h>
 #include "WebServer.h"
+#include "wifi-helpers.h"
+#include "esp_event.h"
+#include "esp_wifi.h"
+#include "connect.h"
 
 void WifiCaptive::setUpDNSServer(DNSServer &dnsServer, const IPAddress &localIP)
 {
@@ -117,8 +122,9 @@ bool WifiCaptive::startPortal()
     {
         Log_info("Not connected after AP disconnect");
         WiFi.mode(WIFI_STA);
-        WiFi.begin(_ssid.c_str(), _password.c_str());
-        waitForConnectResult();
+
+        auto result = initiateConnectionAndWaitForOutcome({_ssid, _password});
+        status = result.status;
     }
 
     // stop dsn
@@ -153,54 +159,22 @@ void WifiCaptive::resetSettings()
     }
 
     WiFi.disconnect(true, true);
+    WiFi.eraseAP();
 }
 
-uint8_t WifiCaptive::connect(const WifiCredentials credentials)
+wl_status_t WifiCaptive::connect(const WifiCredentials credentials)
 {
-    uint8_t connRes = (uint8_t)WL_NO_SSID_AVAIL;
+    wl_status_t connRes = WL_NO_SSID_AVAIL;
 
     if (credentials.ssid != "")
     {
         WiFi.enableSTA(true);
-        WiFi.begin(credentials.ssid.c_str(), credentials.pswd.c_str());
-        connRes = waitForConnectResult();
+
+        auto result = initiateConnectionAndWaitForOutcome(credentials);
+        connRes = result.status;
     }
 
     return connRes;
-}
-
-/**
- * waitForConnectResult
- * @param  uint16_t timeout  in seconds
- * @return uint8_t  WL Status
- */
-uint8_t WifiCaptive::waitForConnectResult(uint32_t timeout)
-{
-    if (timeout == 0)
-    {
-        return WiFi.waitForConnectResult();
-    }
-
-    unsigned long timeoutmillis = millis() + timeout;
-    uint8_t status = WiFi.status();
-
-    while (millis() < timeoutmillis)
-    {
-        status = WiFi.status();
-        // @todo detect additional states, connect happens, then dhcp then get ip, there is some delay here, make sure not to timeout if waiting on IP
-        if (status == WL_CONNECTED || status == WL_CONNECT_FAILED)
-        {
-            return status;
-        }
-        delay(100);
-    }
-
-    return status;
-}
-
-uint8_t WifiCaptive::waitForConnectResult()
-{
-    return waitForConnectResult(CONNECTION_TIMEOUT);
 }
 
 void WifiCaptive::setResetSettingsCallback(std::function<void()> func)

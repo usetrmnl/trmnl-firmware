@@ -21,6 +21,7 @@ String serialize_log(const LogWithDetails &input)
   json_log["battery_voltage"] = input.deviceStatusStamp.battery_voltage;
   json_log["wake_reason"] = input.deviceStatusStamp.wakeup_reason;
   json_log["free_heap_size"] = input.deviceStatusStamp.free_heap_size;
+  json_log["max_alloc_size"] = input.deviceStatusStamp.max_alloc_size;
 
   if (input.logRetry)
   {

@@ -129,6 +129,9 @@ void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message,
     bbep.setFont(font);
     bbep.setTextColor(color_fg, color_bg);
 
+    bbep.setFont(font);
+    bbep.setTextColor(color_fg, color_bg);
+
     while (i <= text_len && line_index < MAX_LINES)
     {
         word_length = 0;
@@ -274,6 +277,7 @@ void png_draw(PNGDRAW *pDraw)
     } else { // we need to split the 2-bit data into plane 0 and 1
         src = *s++;
         src ^= ucInvert;
+        uc = 0; // suppress warning/error
         if (*(int *)pDraw->pUser > 1) { // draw 2bpp data as 1-bit to use for partial update
             ucInvert = ~ucInvert; // the invert rule is backwards for grayscale data
             src = ~src;
@@ -372,7 +376,7 @@ int i, iColors;
     if (i & 2) iColors++;
     if (i & 4) iColors++;
     if (i & 8) iColors++;
-    Log.info("%s [%d]: png_count_colors: %d\r\n", __FILE__, __LINE__, iColors);
+    Log_info("%s [%d]: png_count_colors: %d\r\n", __FILE__, __LINE__, iColors);
     return iColors;
 } /* png_count_colors() */
 /** 
@@ -400,7 +404,7 @@ PNG *png = new PNG();
             Log_error("Unsupported PNG bit depth (only 1 or 2-bpp supported)");
             rc = -1;
         } else { // okay to decode
-            Log.info("%s [%d]: Decoding %d-bpp png (current)\r\n", __FILE__, __LINE__, png->getBpp());
+            Log_info("%s [%d]: Decoding %d-bpp png (current)\r\n", __FILE__, __LINE__, png->getBpp());
             // Prepare target memory window (entire display)
             bbep.setAddrWindow(0, 0, bbep.width(), bbep.height());
             if (png->getBpp() == 1 || png_count_colors(png, pPNG, iDataSize) == 2) { // 1-bit image (single plane)
@@ -416,17 +420,17 @@ PNG *png = new PNG();
                 if (png->getBpp() == 1) {
                     png->decode(NULL, 0);
                 } else { // convert the 2-bit image to 1-bit output
-                    Log.info("%s [%d]: Current png only has 2 unique colors!\n", __FILE__, __LINE__);
+                    Log_info("%s [%d]: Current png only has 2 unique colors!\n", __FILE__, __LINE__);
                     iPlane = 2;
                     png->decode(&iPlane, 0);
                 }
                 png->close();
                 if (pPNG_old) { // decode the old image to do a partial update
                     if (png->openRAM((uint8_t *)pPNG_old, iDataSize_old, png_draw) == PNG_SUCCESS) {
-                        Log.info("%s [%d]: preparing plane 1 for partial update\r\n", __FILE__, __LINE__);
+                        Log_info("%s [%d]: preparing plane 1 for partial update\r\n", __FILE__, __LINE__);
                         bbep.startWrite(PLANE_1); // 'old' data is written to plane 1
                         if (png->getBpp() == 2) { // tell draw code to handle old 2bpp image differently
-                            Log.info("%s [%d]: old png only has 2 unique colors!\n", __FILE__, __LINE__);
+                            Log_info("%s [%d]: old png only has 2 unique colors!\n", __FILE__, __LINE__);
                             iPlane = 2; // tell draw code to merge bits 0/1 per pixel
                             png->decode(&iPlane, 0); // decode it into the old buffer
                         } else {
@@ -440,12 +444,12 @@ PNG *png = new PNG();
                 iUpdateCount = 0; // grayscale mode resets the partial update counter
                 bbep.startWrite(PLANE_0); // start writing image data to plane 0
                 iPlane = 0;
-                Log.info("%s [%d]: decoding 4-gray plane 0\r\n", __FILE__, __LINE__);
+                Log_info("%s [%d]: decoding 4-gray plane 0\r\n", __FILE__, __LINE__);
                 png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
                 png->decode(&iPlane, 0); // tell PNGDraw to use bits for plane 0
                 png->close(); // start over for plane 1
                 iPlane = 1;
-                Log.info("%s [%d]: decoding 4-gray plane 1\r\n", __FILE__, __LINE__);
+                Log_info("%s [%d]: decoding 4-gray plane 1\r\n", __FILE__, __LINE__);
                 png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
                 bbep.startWrite(PLANE_1); // start writing image data to plane 1
                 png->decode(&iPlane, 0); // decode it again to get plane 1 data
@@ -467,10 +471,9 @@ void display_show_image(uint8_t *image_buffer, int data_size, uint8_t *image_buf
     bool isPNG = true;
     auto width = display_width();
     auto height = display_height();
-    uint32_t *d32;
+//    uint32_t *d32;
     bool bAlloc = false;
-    int rc, iRefreshMode = REFRESH_FULL; // assume full (slow) refresh
-    const uint32_t buf_size = ((width + 7)/8) * height; // size in bytes
+    int iRefreshMode = REFRESH_FULL; // assume full (slow) refresh
 
    // Log_info("Paint_NewImage %d", reverse);
     Log_info("show image for array");
@@ -478,9 +481,13 @@ void display_show_image(uint8_t *image_buffer, int data_size, uint8_t *image_buf
     if (reverse)
     {
         d32 = (uint32_t *)image_buffer; // get framebuffer as a 32-bit pointer
+        d32 = (uint32_t *)image_buffer; // get framebuffer as a 32-bit pointer
         Log_info("inverse the image");
         for (size_t i = 0; i < buf_size; i+=sizeof(uint32_t))
+        for (size_t i = 0; i < buf_size; i+=sizeof(uint32_t))
         {
+            d32[0] = ~d32[0];
+            d32++;
             d32[0] = ~d32[0];
             d32++;
         }
@@ -519,14 +526,14 @@ void display_show_image(uint8_t *image_buffer, int data_size, uint8_t *image_buf
     Log_info("Display refresh start");
 #ifdef BB_EPAPER
     if ((iUpdateCount & 7) == 0) {
-        Log.info("%s [%d]: Forcing full refresh; desired refresh mode was: %d\r\n", __FILE__, __LINE__, iRefreshMode);
+        Log_info("%s [%d]: Forcing full refresh; desired refresh mode was: %d\r\n", __FILE__, __LINE__, iRefreshMode);
         iRefreshMode = REFRESH_FULL; // force full refresh every 8 partials
     }
     if (iUpdateCount == 1) {
-        Log.info("%s [%d]: Forcing fast refresh (not partial) since the logo was just shown\r\n", __FILE__, __LINE__);
+        Log_info("%s [%d]: Forcing fast refresh (not partial) since the logo was just shown\r\n", __FILE__, __LINE__);
         iRefreshMode = REFRESH_FAST;
     }
-    Log.info("%s [%d]: EPD refresh mode: %d\r\n", __FILE__, __LINE__, iRefreshMode);
+    Log_info("%s [%d]: EPD refresh mode: %d\r\n", __FILE__, __LINE__, iRefreshMode);
     bbep.refresh(iRefreshMode, true);
     if (bAlloc) {
         bbep.freeBuffer();
@@ -762,10 +769,10 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
  */
 void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_id, bool id, const char *fw_version, String message)
 {
-    Log.info("Free heap in display_show_msg - %d", ESP.getMaxAllocHeap());
+    Log_info("Free heap in display_show_msg - %d", ESP.getMaxAllocHeap());
 #ifdef BB_EPAPER
     bbep.allocBuffer(false);
-    Log.info("Free heap after bbep.allocBuffer() - %d", ESP.getMaxAllocHeap());
+    Log_info("Free heap after bbep.allocBuffer() - %d", ESP.getMaxAllocHeap());
 #endif
 
     if (message_type == WIFI_CONNECT)

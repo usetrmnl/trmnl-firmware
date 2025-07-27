@@ -58,7 +58,7 @@ bool filesystem_read_from_file(const char *name, uint8_t *out_buffer, size_t siz
     }
     else
     {
-        Log_error("file %s doesn\'t exists", name);
+        Log_info("file %s doesn\'t exists", name);
         return false;
     }
 }
@@ -141,7 +141,7 @@ bool filesystem_file_exists(const char *name)
     }
     else
     {
-        Log_error("file %s not exists.", name);
+        Log_info("file %s not exists.", name);
         return false;
     }
 }
@@ -196,7 +196,7 @@ bool filesystem_file_rename(const char *old_name, const char *new_name)
     }
     else
     {
-        Log_error("file %s not exists.", old_name);
+        Log_info("file %s not exists.", old_name);
         return false;
     }
 }
