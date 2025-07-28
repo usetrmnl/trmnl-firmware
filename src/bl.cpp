@@ -658,7 +658,7 @@ static https_request_err_e downloadAndShow()
           // start connection and send HTTP header
           int httpCode = https.GET();
           int content_size = https.getSize();
-          uint8_t *buffer_old = nullptr;
+          uint8_t *buffer_old = nullptr; // Disable partial update for now
           int file_size_old = 0;
 
           // httpCode will be negative on error
@@ -723,7 +723,6 @@ static https_request_err_e downloadAndShow()
             return HTTPS_WRONG_IMAGE_SIZE;
           }
           WiFi.disconnect(true); // no need for WiFi, save power starting here
-          WiFi.disconnect(true); // no need for WiFi, save power starting here
           Log.info("%s [%d]: Received successfully; WiFi off; WiFi off\r\n", __FILE__, __LINE__);
           bool bmp_rename = false;
 
@@ -733,10 +732,11 @@ static https_request_err_e downloadAndShow()
             filesystem_file_delete("/last.png");
             filesystem_file_rename("/current.png", "/last.png");
             filesystem_file_rename("/current.bmp", "/last.bmp");
-            if (filesystem_file_exists("/last.png")) {
-                buffer_old = display_read_file("/last.png", &file_size_old);
-                Log.info("%s [%d]: Reading last.png to use for partial update, size = %d\r\n", __FILE__, __LINE__, file_size_old);
-            }
+// Disable partial update (for now)
+//            if (filesystem_file_exists("/last.png")) {
+//                buffer_old = display_read_file("/last.png", &file_size_old);
+//                Log.info("%s [%d]: Reading last.png to use for partial update, size = %d\r\n", __FILE__, __LINE__, file_size_old);
+//            }
           }
 
           bool image_reverse = false;
@@ -1359,10 +1359,11 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
             Log.info("%s [%d]: send_to_me PNG\r\n", __FILE__, __LINE__);
             image_err_e png_parse_result = PNG_NO_ERR; // DEBUG
             buffer = display_read_file("/current.png", &file_size);
-            if (filesystem_file_exists("/last.png")) {
-                buffer_old = display_read_file("/last.png", &file_size_old);
-                Log.info("%s [%d]: loading last PNG for partial update\r\n", __FILE__, __LINE__);
-            }
+// Disable partial update for now
+//            if (filesystem_file_exists("/last.png")) {
+//                buffer_old = display_read_file("/last.png", &file_size_old);
+//                Log.info("%s [%d]: loading last PNG for partial update\r\n", __FILE__, __LINE__);
+//            }
             if (png_parse_result != PNG_NO_ERR)
             {
               Log_error_submit("Error parsing PNG header, code: %d", png_parse_result);
