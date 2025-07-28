@@ -413,7 +413,7 @@ PNG *png = new PNG();
                     rc = REFRESH_PARTIAL; // the new image is 1bpp - try a partial update
                 } else {
                     rc = REFRESH_FAST;
-                    iUpdateCount = 0; // starting from a full update; reset the counter
+                    //iUpdateCount = 0; // starting from a full update; reset the counter
                 }
                 bbep.startWrite(PLANE_0); // start writing image data to plane 0
                 png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
@@ -521,7 +521,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, uint8_t *image_buf
 #endif
         }
         bbep.writePlane(PLANE_0); // send image data to the EPD
-        iUpdateCount = 0; // reset the update count when woken by button press of BMP file is shown 
+//        iUpdateCount = 0; // reset the update count when woken by button press of BMP file is shown 
     }
     Log_info("Display refresh start");
 #ifdef BB_EPAPER
@@ -529,10 +529,10 @@ void display_show_image(uint8_t *image_buffer, int data_size, uint8_t *image_buf
         Log_info("%s [%d]: Forcing full refresh; desired refresh mode was: %d\r\n", __FILE__, __LINE__, iRefreshMode);
         iRefreshMode = REFRESH_FULL; // force full refresh every 8 partials
     }
-    if (iUpdateCount == 1) {
-        Log_info("%s [%d]: Forcing fast refresh (not partial) since the logo was just shown\r\n", __FILE__, __LINE__);
-        iRefreshMode = REFRESH_FAST;
-    }
+//    if (iUpdateCount == 1) {
+//        Log_info("%s [%d]: Forcing fast refresh (not partial) since the logo was just shown\r\n", __FILE__, __LINE__);
+//        iRefreshMode = REFRESH_FAST;
+//    }
     Log_info("%s [%d]: EPD refresh mode: %d\r\n", __FILE__, __LINE__, iRefreshMode);
     bbep.refresh(iRefreshMode, true);
     if (bAlloc) {
