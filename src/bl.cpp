@@ -40,8 +40,7 @@
 bool pref_clear = false;
 String new_filename = "";
 
-uint8_t *buffer = nullptr;
-uint8_t *decodedPng = nullptr;
+uint8_t *buffer = nullptr, *buffer_old = nullptr;
 char filename[1024];      // image URL
 char binUrl[1024];        // update URL
 char message_buffer[128]; // message to show on the screen
@@ -238,7 +237,7 @@ void bl_init(void)
     Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
 
     buffer = (uint8_t *)malloc(DEFAULT_IMAGE_SIZE);
-    display_show_image(storedLogoOrDefault(), false, false);
+    display_show_image(storedLogoOrDefault(), DEFAULT_IMAGE_SIZE, nullptr, 0);
     free(buffer);
     buffer = nullptr;
 
@@ -659,6 +658,8 @@ static https_request_err_e downloadAndShow()
           // start connection and send HTTP header
           int httpCode = https.GET();
           int content_size = https.getSize();
+          uint8_t *buffer_old = nullptr; // Disable partial update for now
+          int file_size_old = 0;
 
           // httpCode will be negative on error
           if (httpCode < 0)
@@ -721,9 +722,8 @@ static https_request_err_e downloadAndShow()
 
             return HTTPS_WRONG_IMAGE_SIZE;
           }
-
           WiFi.disconnect(true); // no need for WiFi, save power starting here
-          Log.info("%s [%d]: Received successfully; WiFi off\r\n", __FILE__, __LINE__);
+          Log.info("%s [%d]: Received successfully; WiFi off; WiFi off\r\n", __FILE__, __LINE__);
           bool bmp_rename = false;
 
           if (filesystem_file_exists("/current.bmp") || filesystem_file_exists("/current.png"))
@@ -732,17 +732,24 @@ static https_request_err_e downloadAndShow()
             filesystem_file_delete("/last.png");
             filesystem_file_rename("/current.png", "/last.png");
             filesystem_file_rename("/current.bmp", "/last.bmp");
+// Disable partial update (for now)
+//            if (filesystem_file_exists("/last.png")) {
+//                buffer_old = display_read_file("/last.png", &file_size_old);
+//                Log.info("%s [%d]: Reading last.png to use for partial update, size = %d\r\n", __FILE__, __LINE__, file_size_old);
+//            }
           }
 
           bool image_reverse = false;
           if (isPNG)
           {
             writeImageToFile("/current.png", buffer, content_size);
-            delay(100);
-            free(buffer);
-            buffer = nullptr;
             Log.info("%s [%d]: Decoding png\r\n", __FILE__, __LINE__);
-            png_res = decodePNG("/current.png", decodedPng);
+            display_show_image(buffer, content_size, buffer_old, file_size_old);
+//            delay(100);
+//            free(buffer);
+//            buffer = nullptr;
+//            png_res = decodePNG("/current.png", decodedPng);
+            png_res = PNG_NO_ERR; // DEBUG
           }
           else
           {
@@ -751,7 +758,8 @@ static https_request_err_e downloadAndShow()
           }
           Serial.println();
           String error = "";
-          uint8_t *imagePointer = (decodedPng == nullptr) ? buffer : decodedPng;
+          uint8_t *imagePointer = buffer;
+//          uint8_t *imagePointer = (decodedPng == nullptr) ? buffer : decodedPng;
           bool lastImageExists = filesystem_file_exists("/last.bmp") || filesystem_file_exists("/last.png");
 
           switch (png_res)
@@ -759,8 +767,8 @@ static https_request_err_e downloadAndShow()
           case PNG_NO_ERR:
           {
 
-            Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
-            display_show_image(imagePointer, image_reverse, isPNG);
+           // Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
+           // display_show_image(imagePointer, image_reverse, isPNG);
 
             // Using filename from API response
             new_filename = apiDisplayResult.response.filename;
@@ -811,7 +819,7 @@ static https_request_err_e downloadAndShow()
               writeImageToFile("/current.bmp", buffer, content_size);
             }
             Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
-            display_show_image(imagePointer, image_reverse, isPNG);
+            display_show_image(buffer, content_size, nullptr, 0);
 
             // Using filename from API response
             new_filename = apiDisplayResult.response.filename;
@@ -904,6 +912,7 @@ uint32_t downloadStream(WiFiClient *stream, int content_size, uint8_t *buffer)
 https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
 {
   https_request_err_e result = HTTPS_NO_ERR;
+  int file_size = 0, file_size_old = 0;
 
   if (special_function == SF_NONE)
   {
@@ -1254,7 +1263,8 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           {
             isPNG = true;
             Log.info("Rewind PNG\n\r");
-            image_proccess_response = decodePNG(last_dot_file.c_str(), buffer);
+            buffer = display_read_file(last_dot_file.c_str(), &file_size);
+            image_proccess_response = PNG_NO_ERR; // DEBUG
           }
 
           if (file_check_bmp)
@@ -1264,7 +1274,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
             case PNG_NO_ERR:
             {
               Log.info("Showing image\n\r");
-              display_show_image(buffer, image_reverse, isPNG);
+              display_show_image(buffer, file_size, nullptr, 0);
               need_to_refresh_display = 1;
             }
             break;
@@ -1278,7 +1288,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
             case BMP_NO_ERR:
             {
               Log.info("Showing image\n\r");
-              display_show_image(buffer, image_reverse, isPNG);
+              display_show_image(buffer, DISPLAY_BMP_IMAGE_SIZE, nullptr, 0);
               need_to_refresh_display = 1;
             }
             break;
@@ -1347,9 +1357,13 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           else if (filesystem_file_exists("/current.png"))
           {
             Log.info("%s [%d]: send_to_me PNG\r\n", __FILE__, __LINE__);
-            isPNG = true;
-            image_err_e png_parse_result = decodePNG("/current.png", buffer);
-
+            image_err_e png_parse_result = PNG_NO_ERR; // DEBUG
+            buffer = display_read_file("/current.png", &file_size);
+// Disable partial update for now
+//            if (filesystem_file_exists("/last.png")) {
+//                buffer_old = display_read_file("/last.png", &file_size_old);
+//                Log.info("%s [%d]: loading last PNG for partial update\r\n", __FILE__, __LINE__);
+//            }
             if (png_parse_result != PNG_NO_ERR)
             {
               Log_error_submit("Error parsing PNG header, code: %d", png_parse_result);
@@ -1360,7 +1374,8 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           }
 
           Log.info("Showing image\n\r");
-          display_show_image(buffer, image_reverse, isPNG);
+//          display_show_image(buffer, image_reverse, file_size);
+          display_show_image(buffer, file_size, buffer_old, file_size_old);
           need_to_refresh_display = 1;
 
           free(buffer);
@@ -2078,6 +2093,10 @@ static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiRes
 
 static uint8_t *storedLogoOrDefault(void)
 {
+  if (filesystem_read_from_file("/logo.bmp", buffer, DEFAULT_IMAGE_SIZE))
+  {
+    return buffer;
+  }
   return const_cast<uint8_t *>(logo_small);
 }
 
