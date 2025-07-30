@@ -589,6 +589,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     Log_info("show image for array");
 #ifdef BB_EPAPER
     bbep.allocBuffer(false);
+    bbep.fillScreen(BBEP_WHITE); // white background
 #endif
     if (*(uint16_t *)image_buffer == BB_BITMAP_MARKER)
     {
@@ -596,7 +597,6 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
         int x = (width - pBBB->width)/2;
         int y = (height - pBBB->height)/2; // center it
-        bbep.fillScreen(BBEP_WHITE); // draw the image centered on a white background
         bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
     }
     else
