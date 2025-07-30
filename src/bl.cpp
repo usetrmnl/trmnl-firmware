@@ -15,7 +15,7 @@
 #include <AsyncTCP.h>
 #include <Preferences.h>
 #include <cstdint>
-#include <png_file.h>
+#include "png.h"
 #include <bmp.h>
 #include <Update.h>
 #include <math.h>
