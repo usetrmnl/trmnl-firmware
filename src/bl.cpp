@@ -1908,18 +1908,21 @@ static float readBatteryVoltage(void)
     int32_t adc;
     int32_t sensorValue;
 
+    analogReadResolution(8);
     analogReadMilliVolts(PIN_BATTERY); // throw away first reading
     // There is something strange happening on some PCBs where the ADC needs a lot of reads
     // averaged together to give a good reading. On others, it doesn't take very many
     // We shall try with 8 reads and if the voltage seems super low, we'll try again with 128
     adc = 0;
     for (uint8_t i = 0; i < 8; i++) {
+      analogReadResolution(8);
       adc += analogReadMilliVolts(PIN_BATTERY);
     }
     sensorValue = (adc / 8) * 2;
     if (sensorValue < 3000) { // This ADC needs some help; try again with a larger count
         adc = 0;
         for (uint8_t i = 0; i < 128; i++) {
+            analogReadResolution(8);
             adc += analogReadMilliVolts(PIN_BATTERY);
         }
         sensorValue = (adc / 128) * 2;
