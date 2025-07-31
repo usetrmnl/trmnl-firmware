@@ -1893,7 +1893,6 @@ static bool setClock()
  * @param none
  * @return float voltage in Volts
  */
-#define ADC_AVERAGE_SAMPLES 8
 static float readBatteryVoltage(void)
 {
 #ifdef FAKE_BATTERY_VOLTAGE
@@ -1906,14 +1905,25 @@ static float readBatteryVoltage(void)
     digitalWrite(adcEnPin, HIGH);
   #endif
     Log.info("%s [%d]: Battery voltage reading...\r\n", __FILE__, __LINE__);
-    int32_t adc = 0;
+    int32_t adc;
+    int32_t sensorValue;
+
     analogReadMilliVolts(PIN_BATTERY); // throw away first reading
-    for (uint8_t i = 0; i < ADC_AVERAGE_SAMPLES; i++)
-    {
+    // There is something strange happening on some PCBs where the ADC needs a lot of reads
+    // averaged together to give a good reading. On others, it doesn't take very many
+    // We shall try with 8 reads and if the voltage seems super low, we'll try again with 128
+    adc = 0;
+    for (uint8_t i = 0; i < 8; i++) {
       adc += analogReadMilliVolts(PIN_BATTERY);
     }
-
-    int32_t sensorValue = (adc / ADC_AVERAGE_SAMPLES) * 2;
+    sensorValue = (adc / 8) * 2;
+    if (sensorValue < 3000) { // This ADC needs some help; try again with a larger count
+        adc = 0;
+        for (uint8_t i = 0; i < 128; i++) {
+            adc += analogReadMilliVolts(PIN_BATTERY);
+        }
+        sensorValue = (adc / 128) * 2;
+    }
     Log.info("%s [%d]: Battery sensorValue = %d\r\n", __FILE__, __LINE__, (int)sensorValue);
     float voltage = sensorValue / 1000.0;
     return voltage;
