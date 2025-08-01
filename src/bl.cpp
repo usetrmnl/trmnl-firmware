@@ -47,7 +47,7 @@ char message_buffer[128]; // message to show on the screen
 uint32_t time_since_sleep;
 image_err_e png_res = PNG_DECODE_ERR;
 bmp_err_e bmp_res = BMP_NOT_BMP;
-
+static float vBatt;
 bool status = false;          // need to download a new image
 bool update_firmware = false; // need to download a new firmware
 bool reset_firmware = false;  // need to reset credentials
@@ -110,6 +110,7 @@ void bl_init(void)
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
   Log_info("BL init success");
   pins_init();
+  vBatt = readBatteryVoltage(); // Read the battery voltage BEFORE WiFi is turned on
 
 #if defined(BOARD_SEEED_XIAO_ESP32C3) || defined(BOARD_SEEED_XIAO_ESP32S3)
   delay(3000);
@@ -554,7 +555,7 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
 
   inputs.macAddress = WiFi.macAddress();
 
-  inputs.batteryVoltage = readBatteryVoltage();
+  inputs.batteryVoltage = vBatt; //readBatteryVoltage();
 
   inputs.firmwareVersion = String(FW_VERSION_STRING);
 
@@ -1904,14 +1905,29 @@ static float readBatteryVoltage(void)
     digitalWrite(adcEnPin, HIGH);
   #endif
     Log.info("%s [%d]: Battery voltage reading...\r\n", __FILE__, __LINE__);
-    int32_t adc = 0;
-    for (uint8_t i = 0; i < 128; i++)
-    {
+    int32_t adc;
+    int32_t sensorValue;
+
+    analogReadResolution(8);
+    analogReadMilliVolts(PIN_BATTERY); // throw away first reading
+    // There is something strange happening on some PCBs where the ADC needs a lot of reads
+    // averaged together to give a good reading. On others, it doesn't take very many
+    // We shall try with 8 reads and if the voltage seems super low, we'll try again with 128
+    adc = 0;
+    for (uint8_t i = 0; i < 8; i++) {
+      analogReadResolution(8);
       adc += analogReadMilliVolts(PIN_BATTERY);
     }
-
-    int32_t sensorValue = (adc / 128) * 2;
-
+    sensorValue = (adc / 8) * 2;
+    if (sensorValue < 3000) { // This ADC needs some help; try again with a larger count
+        adc = 0;
+        for (uint8_t i = 0; i < 128; i++) {
+            analogReadResolution(8);
+            adc += analogReadMilliVolts(PIN_BATTERY);
+        }
+        sensorValue = (adc / 128) * 2;
+    }
+    Log.info("%s [%d]: Battery sensorValue = %d\r\n", __FILE__, __LINE__, (int)sensorValue);
     float voltage = sensorValue / 1000.0;
     return voltage;
 #endif // FAKE_BATTERY_VOLTAGE
@@ -2188,7 +2204,7 @@ DeviceStatusStamp getDeviceStatusStamp()
   deviceStatus.time_since_last_sleep = time_since_sleep;
   snprintf(deviceStatus.current_fw_version, sizeof(deviceStatus.current_fw_version), "%s", FW_VERSION_STRING);
   parseSpecialFunctionToStr(deviceStatus.special_function, sizeof(deviceStatus.special_function), special_function);
-  deviceStatus.battery_voltage = readBatteryVoltage();
+  deviceStatus.battery_voltage = vBatt; //readBatteryVoltage()
   parseWakeupReasonToStr(deviceStatus.wakeup_reason, sizeof(deviceStatus.wakeup_reason), esp_sleep_get_wakeup_cause());
   deviceStatus.free_heap_size = ESP.getFreeHeap();
   deviceStatus.max_alloc_size = ESP.getMaxAllocHeap();
