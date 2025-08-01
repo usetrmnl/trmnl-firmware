@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TRMNL Advanced Configuration</title>
+  <style>
+    table {
+      border-spacing: 1;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 4px;
+      overflow: hidden;
+      width: 100%;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    table td,
+    table th {
+      padding-left: 8px;
+      text-align: left;
+    }
+
+    table td {
+      text-align: right;
+    }
+
+    table tbody tr {
+      height: 30px;
+      border-bottom: 1px solid #BBBB;
+      font-size: 16px;
+    }
+
+    table tbody.hoverable tr:hover {
+      background: #f2f2f2;
+    }
+
+    .selected {
+      background-color: #BBBB;
+    }
+
+    body {
+      font: 400 14px 'Calibri', 'Arial';
+    }
+
+    blockquote {
+      color: white;
+      text-align: center;
+    }
+
+    #loader-wrapper {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 9999;
+    }
+
+    #loader {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 60px;
+      height: 60px;
+    }
+
+    #loader:before {
+      content: "";
+      display: block;
+      position: absolute;
+      border-style: solid;
+      border-color: #fff;
+      border-top-color: transparent;
+      border-width: 6px;
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      top: 10px;
+      left: 10px;
+      animation: loader-spin 1s linear infinite;
+    }
+
+    @keyframes loader-spin {
+      0% {
+        transform: rotate(0);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+
+    #loader-wrapper {
+      display: none;
+    }
+
+    .div-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 30px 30px 30px 30px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      margin-bottom: 20px;
+      width: 100%;
+    }
+
+    label {
+      font-size: 18px;
+      margin-bottom: 5px;
+    }
+
+    input {
+      border-width: 1px;
+      border-radius: .75rem;
+      font-size: 16px;
+      padding: 5px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    input:focus {
+      outline: none;
+      border: 2px solid #F86527;
+      border-radius: .75rem;
+    }
+
+    input::placeholder {
+      opacity: 70%;
+    }
+
+    .button {
+      color: #fff;
+      border: none;
+      padding: 8px 18px;
+      font-size: 18px;
+      border-radius: 5px;
+    }
+
+    .button:disabled {
+      opacity: .65;
+    }
+
+    .button-success {
+      background-color: #F86527;
+    }
+
+    .button-primary {
+      background-color: #e4eaf0;
+      color: #212529;
+    }
+
+    .button-primary:hover:not([disabled]) {
+      background-color: #d7dfe8;
+    }
+
+    .button-secondary {
+      background-color: #343a40;
+    }
+
+    .button-secondary:hover:not([disabled]) {
+      background-color: #3e444a;
+    }
+
+    .button:hover:not([disabled]) {
+      filter: saturate(0.8);
+    }
+
+    h1 {
+      text-align: center;
+    }
+
+    .alert-primary {
+      color: #383d41;
+      background-color: #e2e3e5;
+      border-color: #d6d8db;
+    }
+
+    .alert-warning {
+      color: #856404;
+      background-color: #fff3cd;
+      border-color: #ffeeba;
+    }
+
+    .alert {
+      position: relative;
+      padding: .75rem 1.25rem;
+      margin-bottom: 1rem;
+      border: 1px solid transparent;
+      border-radius: .25rem;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .loader {
+      border: 6px solid #f3f3f3;
+      border-radius: 50%;
+      border-top: 6px solid #F86527;
+      width: 40px;
+      height: 40px;
+      -webkit-animation: spin 2s linear infinite;
+      animation: spin 2s linear infinite;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgb(0, 0, 0);
+      background-color: rgba(0, 0, 0, 0.4);
+    }
+
+    .modal-content {
+      background-color: #fefefe;
+      margin: 15% auto;
+      padding: 20px;
+      border: 1px solid #888;
+      width: 80%;
+      max-width: 500px;
+      position: relative;
+    }
+
+    .close {
+      color: #aaa;
+      float: right;
+      font-size: 28px;
+      font-weight: bold;
+    }
+
+    .close:hover,
+    .close:focus {
+      color: black;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .button {
+      padding: 10px 20px;
+      margin: 5px;
+      cursor: pointer;
+    }
+
+    .modal-footer {
+      text-align: right;
+      margin-top: 20px;
+    }
+
+    @-webkit-keyframes spin {
+      0% {
+        -webkit-transform: rotate(0deg);
+      }
+
+      100% {
+        -webkit-transform: rotate(360deg);
+      }
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
+  <script>
+    function confirmSoftReset() {
+      document.getElementById('confirmationModal').style.display = 'block';
+    }
+
+    function confirmCustomServer() {
+      document.getElementById('customServerWarningModal').style.display = 'block';
+    }
+
+    function showCustomServerInput() {
+      document.getElementById('custom_server_form_group').style.display = 'flex';
+      closeCustomServerModal();
+    }
+
+    function closeCustomServerModal() {
+      document.getElementById('customServerWarningModal').style.display = 'none';
+    }
+
+    function softReset() {
+      closeModal();
+      showLoader();
+      fetch('/soft-reset', {
+        method: 'GET',
+      })
+        .then(_ => {
+          hideLoader();
+          displayAlert('Soft reset completed successfully. Your settings have been restored to their default values.', "primary");
+        })
+        .catch(_ => {
+          hideLoader();
+          displayAlert('An error occurred during the soft reset. Please try again or contact support if the issue persists.', "warning");
+        });
+    }
+
+    function closeModal() {
+      document.getElementById('confirmationModal').style.display = 'none';
+    }
+
+    function displayAlert(message, type) {
+      var messageBox = document.getElementById("message");
+      messageBox.style.display = "block";
+      messageBox.textContent = message;
+      messageBox.classList.remove("alert-primary");
+      messageBox.classList.remove("alert-warning");
+      messageBox.classList.add(`alert-${type}`);
+    }
+
+    function showLoader() {
+      var loader = document.getElementById("loader-wrapper");
+      loader.style.display = "block";
+    }
+
+    function hideLoader() {
+      var loader = document.getElementById("loader-wrapper");
+      loader.style.display = "none";
+    }
+
+    function goBack() {
+      window.location.href = 'index.html';
+    }
+
+    function runTest() {
+  showLoader();
+  fetch('/run-test')
+    .then(res => res.json())
+    .then(data => {
+      hideLoader();
+      const output = document.getElementById("test-output");
+      let resultText = " ";
+      let Threshold = data.Threshold ? "true" : "false";
+      if (Threshold === "false") {
+      resultText = data.testPassed
+        ? `Test Passed\n`
+        : `Test Failed\n`;
+      resultText += `Initial Temp: ${data.initialTemp} °C\n`;
+      resultText += `Final Temp: ${data.finalTemp} °C`;
+      }
+      else{
+        resultText = "Initial temperature exceeds the threshold (More than 55 °C).\n";
+      }
+
+      output.textContent = resultText;
+      output.style.display = "block";
+      output.classList.remove("alert-warning");
+      output.classList.add(data.testPassed ? "alert-primary" : "alert-warning");
+    })
+    .catch(err => {
+      hideLoader();
+      const output = document.getElementById("test-output");
+      output.textContent = "Error running test.";
+      output.style.display = "block";
+      output.classList.remove("alert-primary");
+      output.classList.add("alert-warning");
+    });
+}
+
+  </script>
+</head>
+
+<body>
+  <img src="/logo.svg" style="margin-left: auto; margin-right: auto; width: 50%; display: block;" />
+  <h1>Advanced Configuration</h1>
+  <div class="div-container">
+    <div class="form-group" id="custom_server_form_group" style="display: none;">
+      <label for="server">API Server</label>
+      <input type="url" id="server" name="server" placeholder="Enter your custom server without a trailing / (e.g. https://trmnl.app)">
+    </div>
+    <div class="form-group">
+      <div class="alert alert-primary" id="message" role="alert" style="display: none;"></div>
+    </div>
+    <span>
+      <button id="btnRefresh" class="button button-secondary" onclick="confirmSoftReset()">Soft Reset</button>
+      <button id="btnCustomServer" class="button button-primary" onclick="confirmCustomServer()">Custom Server</button>
+    </span>
+    <span style="margin-top: 20px;">
+      <button id="btnTest" class="button button-success" onclick="runTest()">Run Sensor Test</button>
+    </span>
+    <div class="form-group">
+      <div class="alert alert-primary" id="test-output" role="alert" style="display: none;"></div>
+    </div>
+    <span style="margin-top: 20px;">
+      <button id="btnBack" class="button button-primary" onclick="goBack()">Back to Wi-Fi</button>
+    </span>
+  </div>
+  <div id="loader-wrapper">
+    <div id="loader"></div>
+  </div>
+  <!-- Confirmation Modal -->
+  <div id="confirmationModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeModal()">&times;</span>
+      <p>Are you sure? Soft resetting your TRMNL device will delete all WiFi credentials,
+        clear your Device's ID, and reset your API key.</p>
+      <div class="modal-footer">
+        <button class="button button-success" onclick="softReset()">Yes</button>
+        <button class="button button-primary" onclick="closeModal()">No</button>
+      </div>
+    </div>
+  </div>
+  <!-- Custom Server Warning Modal -->
+  <div id="customServerWarningModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeCustomServerModal()">&times;</span>
+      <p>This button allows you to specify a custom API server (also known as BYOS) for your device.
+         Most users don't want this, and will use the official server with their TRMNL. 
+         Are you sure you want to have a custom server specified?</p>
+      <div class="modal-footer">
+        <button class="button button-success" onclick="showCustomServerInput()">Yes</button>
+        <button class="button button-primary" onclick="closeCustomServerModal()">No</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
