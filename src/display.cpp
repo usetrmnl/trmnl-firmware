@@ -43,6 +43,25 @@ void display_init(void)
     Log_info("dev module end");
 }
 
+void display_show_battery(float vBatt)
+{
+char szTemp[32];
+
+    bbep.allocBuffer(false);
+    bbep.fillScreen(BBEP_WHITE); // draw the image centered on a white background
+    bbep.setFont(Roboto_20);
+    bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
+    bbep.setCursor(0, 100);
+    sprintf(szTemp, "VBatt = %f", vBatt);
+    bbep.print(szTemp);
+    bbep.writePlane();
+    bbep.refresh(REFRESH_FULL, true);
+    bbep.sleep(DEEP_SLEEP);
+    while (1) {
+        vTaskDelay(1);
+    }
+} /* display_show_battery() */
+
 /**
  * @brief Function to sleep the ESP32 while saving power
  * @param u32Millis represents the sleep time in milliseconds
@@ -388,7 +407,7 @@ int i, iColors;
  * @return refresh mode based on image type and presence of old image
  */
 
-int png_to_epd(const uint8_t *pPNG, int iDataSize, const uint8_t *pPNG_old, int iDataSize_old)
+int png_to_epd(const uint8_t *pPNG, int iDataSize)
 {
 int iPlane, rc = -1;
 PNG *png = new PNG();
@@ -409,12 +428,7 @@ PNG *png = new PNG();
             bbep.setAddrWindow(0, 0, bbep.width(), bbep.height());
             if (png->getBpp() == 1 || png_count_colors(png, pPNG, iDataSize) == 2) { // 1-bit image (single plane)
                 bbep.setPanelType(ONE_BIT_PANEL);
-                if (iDataSize_old) {
-                    rc = REFRESH_PARTIAL; // the new image is 1bpp - try a partial update
-                } else {
-                    rc = REFRESH_FAST;
-                    //iUpdateCount = 0; // starting from a full update; reset the counter
-                }
+                rc = REFRESH_PARTIAL; // the new image is 1bpp - try a partial update
                 bbep.startWrite(PLANE_0); // start writing image data to plane 0
                 png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
                 if (png->getBpp() == 1) {
@@ -425,19 +439,6 @@ PNG *png = new PNG();
                     png->decode(&iPlane, 0);
                 }
                 png->close();
-                if (pPNG_old) { // decode the old image to do a partial update
-                    if (png->openRAM((uint8_t *)pPNG_old, iDataSize_old, png_draw) == PNG_SUCCESS) {
-                        Log_info("%s [%d]: preparing plane 1 for partial update\r\n", __FILE__, __LINE__);
-                        bbep.startWrite(PLANE_1); // 'old' data is written to plane 1
-                        if (png->getBpp() == 2) { // tell draw code to handle old 2bpp image differently
-                            Log_info("%s [%d]: old png only has 2 unique colors!\n", __FILE__, __LINE__);
-                            iPlane = 2; // tell draw code to merge bits 0/1 per pixel
-                            png->decode(&iPlane, 0); // decode it into the old buffer
-                        } else {
-                            png->decode(NULL, 0);
-                        }
-                    }
-                }
             } else { // 2-bpp
                 bbep.setPanelType(TWO_BIT_PANEL);
                 rc = REFRESH_FULL; // 4gray mode must be full refresh
@@ -465,8 +466,8 @@ PNG *png = new PNG();
  * @param reverse shows if the color scheme is reverse
  * @return none
  */
-void display_show_image(uint8_t *image_buffer, int data_size, uint8_t *image_buffer_old, int data_size_old)
-//void display_show_image(uint8_t *image_buffer, bool reverse, int data_size)
+void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
+
 {
     bool isPNG = true;
     auto width = display_width();
@@ -496,7 +497,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, uint8_t *image_buf
     if (isPNG == true && data_size < DEFAULT_IMAGE_SIZE)
     {
         Log_info("Drawing PNG");
-        iRefreshMode = png_to_epd(image_buffer, data_size, image_buffer_old, data_size_old);
+        iRefreshMode = png_to_epd(image_buffer, data_size);
     }
     else // uncompressed BMP or Group5 compressed image
     {
@@ -521,7 +522,8 @@ void display_show_image(uint8_t *image_buffer, int data_size, uint8_t *image_buf
 #endif
         }
         bbep.writePlane(PLANE_0); // send image data to the EPD
-//        iUpdateCount = 0; // reset the update count when woken by button press of BMP file is shown 
+        iRefreshMode = REFRESH_PARTIAL;
+        iUpdateCount = 1; // use partial update
     }
     Log_info("Display refresh start");
 #ifdef BB_EPAPER
@@ -534,7 +536,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, uint8_t *image_buf
 //        iRefreshMode = REFRESH_FAST;
 //    }
     Log_info("%s [%d]: EPD refresh mode: %d\r\n", __FILE__, __LINE__, iRefreshMode);
-    bbep.refresh(iRefreshMode, true);
+    bbep.refresh(iRefreshMode, bWait);
     if (bAlloc) {
         bbep.freeBuffer();
     }
