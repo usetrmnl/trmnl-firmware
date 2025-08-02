@@ -1276,7 +1276,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
             case PNG_NO_ERR:
             {
               Log.info("Showing image\n\r");
-              display_show_image(buffer, file_size, true
+              display_show_image(buffer, file_size, true);
               need_to_refresh_display = 1;
             }
             break;
