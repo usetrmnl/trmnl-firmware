@@ -22,11 +22,6 @@ ButtonPressResult read_button_presses()
     }
     else if (pin == HIGH && elapsed > BUTTON_MEDIUM_HOLD_TIME) // old double-click
     {
-      Log_info("Button time=%d pin=%d: NOT reset; waiting for double-click", elapsed, pin);
-      sampled_high = true;
-    }
-    else if (pin == LOW && sampled_high)
-    {
       Log_info("Button time=%d pin=%d: detected double-click", elapsed, pin);
       return DoubleClick;
     }
