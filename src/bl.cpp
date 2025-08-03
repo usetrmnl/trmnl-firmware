@@ -359,6 +359,11 @@ void bl_init(void)
   https_request_err_e request_result = downloadAndShow();
   Log.info("%s [%d]: request result - %d\r\n", __FILE__, __LINE__, request_result);
 
+  if (request_result == HTTPS_IMAGE_FILE_TOO_BIG)
+  {
+    showMessageWithLogo(MSG_TOO_BIG);
+  }
+
   if (!preferences.isKey(PREFERENCES_CONNECT_API_RETRY_COUNT))
   {
     preferences.putInt(PREFERENCES_CONNECT_API_RETRY_COUNT, 1);
@@ -683,10 +688,11 @@ static https_request_err_e downloadAndShow()
           Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, https.getSize());
 
           uint32_t counter = 0;
-          if (content_size > DISPLAY_BMP_IMAGE_SIZE)
+          if (content_size > MAX_IMAGE_SIZE)
           {
-            Log_error_submit("Receiving failed. Bad file size");
-
+            //Log_error_submit("Receiving failed; file size too big");
+            Log.info("%s [%d]: Receiving failed; file size too big: %d\r\n", __FILE__, __LINE__, content_size);
+            result = HTTPS_IMAGE_FILE_TOO_BIG;
             return HTTPS_REQUEST_FAILED;
           }
           WiFiClient *stream = https.getStreamPtr();
@@ -1909,7 +1915,7 @@ static float readBatteryVoltage(void)
     int32_t sensorValue;
 
     adc = 0;
-    analogRead(PIN_BATTERY); // This is needed to properly initialize the ADC BEFORE calling analogReadMilliVolts()
+    analogRead(3); // This is needed to properly initialize the ADC BEFORE calling analogReadMilliVolts()
     for (uint8_t i = 0; i < 8; i++) {
       adc += analogReadMilliVolts(PIN_BATTERY);
     }
@@ -2100,8 +2106,8 @@ static uint8_t *storedLogoOrDefault(void)
   {
     return buffer;
   }
-  //  return const_cast<uint8_t *>(logo_small);
-  return const_cast<uint8_t *>(loading);
+    return const_cast<uint8_t *>(logo_small);
+  //return const_cast<uint8_t *>(loading);
 }
 
 static bool saveCurrentFileName(String &name)

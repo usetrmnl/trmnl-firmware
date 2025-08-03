@@ -25,6 +25,8 @@ FASTEPD bbep;
 #include <trmnl_log.h>
 #include "png_flip.h"
 #include "../lib/bb_epaper/Fonts/Roboto_20.h"
+#include "../lib/bb_epaper/Fonts/Inter_14.h"
+extern char filename[];
 
 /**
  * @brief Function to init the display
@@ -49,7 +51,7 @@ char szTemp[32];
 
     bbep.allocBuffer(false);
     bbep.fillScreen(BBEP_WHITE); // draw the image centered on a white background
-    bbep.setFont(Roboto_20);
+    bbep.setFont(Inter_14); //Roboto_20);
     bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
     bbep.setCursor(0, 100);
     sprintf(szTemp, "VBatt = %f", vBatt);
@@ -608,7 +610,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
 #endif
     }
 
-    bbep.setFont(Roboto_20);
+    bbep.setFont(Inter_14); //Roboto_20);
     bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
 
     switch (message_type)
@@ -729,6 +731,30 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         bbep.print(string1);
     }
     break;
+    case MSG_TOO_BIG:
+    {
+        const char string1[] = "The image file from this URL is too large.";
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, 360);
+        bbep.println(string1);
+        if (strlen(filename) > 40) {
+            filename[40] = 0; // truncate and add elipses
+            strcat(filename, "...");
+        }
+        bbep.getStringBox(filename, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+        bbep.println(filename);
+
+        const char string2[] = "PNG images can be a maximum of";
+        bbep.getStringBox(string2, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+        bbep.println(string2);
+        String string3 = String(MAX_IMAGE_SIZE) + String(" bytes each and 1 or 2-bpp");
+        bbep.getStringBox(string3.c_str(), &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+        bbep.print(string3);
+    }
+    break;
     case MSG_FORMAT_ERROR:
     {
         const char string1[] = "The image format is incorrect";
@@ -814,7 +840,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 #endif
     }
 
-    bbep.setFont(Roboto_20);
+    bbep.setFont(Inter_14); //Roboto_20);
     bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
     switch (message_type)
     {
@@ -865,7 +891,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     {
         UWORD y_start = 340;
         UWORD font_width = 18; // DEBUG
-        Paint_DrawMultilineText(0, y_start, message.c_str(), width, font_width, BBEP_BLACK, BBEP_WHITE, Roboto_20, true);
+        Paint_DrawMultilineText(0, y_start, message.c_str(), width, font_width, BBEP_BLACK, BBEP_WHITE, Inter_14/*Roboto_20*/, true);
     }
     break;
     default:
