@@ -859,22 +859,18 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     {
         Log_info("wifi connect case");
 
-        String string1 = "FW: ";
+        String string1 = "TRMNL firmware ";
         string1 += fw_version;
         bbep.setCursor(40, 40); // place in upper left corner
         bbep.println(string1);
-        const char string2[] = "Connect phone or computer";
+        const char string2[] = "Connect your phone or computer to TRMNL WiFi network";
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, 386);
         bbep.println(string2);
-        const char string3[] = "to \"TRMNL\" WiFi network";
+        const char string3[] = "or scan the QR code for help";
         bbep.getStringBox(string3, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
-        bbep.println(string3);
-        const char string4[] = "or scan QR code for help.";
-        bbep.getStringBox(string4, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
-        bbep.print(string4);
+        bbep.print(string3);
         bbep.loadG5Image(wifi_connect_qr, bbep.width() - 40 - 58, 40, BBEP_WHITE, BBEP_BLACK); // 58x58 QR code
     }
     break;
