@@ -1909,19 +1909,11 @@ static float readBatteryVoltage(void)
     int32_t sensorValue;
 
     adc = 0;
+    analogRead(PIN_BATTERY); // This is needed to properly initialize the ADC BEFORE calling analogReadMilliVolts()
     for (uint8_t i = 0; i < 8; i++) {
-      analogReadResolution(8);
       adc += analogReadMilliVolts(PIN_BATTERY);
     }
     sensorValue = (adc / 8) * 2;
-    if (sensorValue < 3000) { // This ADC needs some help; try again with a larger count
-        adc = 0;
-        for (uint8_t i = 0; i < 128; i++) {
-            analogReadResolution(8);
-            adc += analogReadMilliVolts(PIN_BATTERY);
-        }
-        sensorValue = (adc / 128) * 2;
-    }
     Log.info("%s [%d]: Battery sensorValue = %d\r\n", __FILE__, __LINE__, (int)sensorValue);
     float voltage = sensorValue / 1000.0;
     return voltage;
