@@ -629,24 +629,16 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     break;
     case WIFI_FAILED:
     {
-        const char string1[] = "Can't establish WiFi";
+        const char string1[] = "Can't establish WiFi connection.";
         bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - 132 - rect.w)/2, 380);
+        bbep.setCursor((bbep.width() - rect.w)/2, 386);
         bbep.println(string1);
-        const char string2[] = "connection. Hold button on";
+        const char string2[] = "Hold button on the back to reset WiFi, or scan QR Code for help.";
         bbep.getStringBox(string2, &rect);
-        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.println(string2);
-        const char string3[] = "the back to reset WiFi";
-        bbep.getStringBox(string3, &rect);
-        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
-        bbep.println(string3);
-        const char string4[] = "or scan QR Code for help.";
-        bbep.getStringBox(string4, &rect);
-        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
-        bbep.print(string4);
 
-        bbep.loadG5Image(wifi_failed_qr, 639, 336, BBEP_WHITE, BBEP_BLACK);
+        bbep.loadG5Image(wifi_failed_qr, bbep.width() - 58 - 40, 40, BBEP_WHITE, BBEP_BLACK);
     }
     break;
     case WIFI_INTERNAL_ERROR:
@@ -869,22 +861,21 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 
         String string1 = "FW: ";
         string1 += fw_version;
-        bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, 330);
+        bbep.setCursor(40, 40); // place in upper left corner
         bbep.println(string1);
         const char string2[] = "Connect phone or computer";
         bbep.getStringBox(string2, &rect);
-        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
+        bbep.setCursor((bbep.width() - rect.w) / 2, 386);
         bbep.println(string2);
         const char string3[] = "to \"TRMNL\" WiFi network";
         bbep.getStringBox(string3, &rect);
-        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.println(string3);
         const char string4[] = "or scan QR code for help.";
         bbep.getStringBox(string4, &rect);
-        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.print(string4);
-        bbep.loadG5Image(wifi_connect_qr, 639, 336, BBEP_WHITE, BBEP_BLACK);
+        bbep.loadG5Image(wifi_connect_qr, bbep.width() - 40 - 58, 40, BBEP_WHITE, BBEP_BLACK); // 58x58 QR code
     }
     break;
     case MAC_NOT_REGISTERED:
