@@ -12,20 +12,20 @@ ButtonPressResult read_button_presses()
   {
     auto elapsed = millis() - time_start;
     auto pin = digitalRead(PIN_INTERRUPT);
-    if(pin == HIGH && elapsed > BUTTON_SOFT_RESET_TIME){
+    if(pin == LOW && elapsed > BUTTON_SOFT_RESET_TIME){
       return SoftReset;
     }
-    else if (pin == HIGH && elapsed > BUTTON_HOLD_TIME)
+    else if (pin == LOW && elapsed > BUTTON_HOLD_TIME)
     {
       Log_info("Button time=%d pin=%d: detected long press", elapsed, pin);
       return LongPress;
     }
-    else if (pin == HIGH && elapsed > BUTTON_MEDIUM_HOLD_TIME) // old double-click
+    else if (pin == LOW && elapsed > BUTTON_MEDIUM_HOLD_TIME) // old double-click
     {
       Log_info("Button time=%d pin=%d: detected double-click", elapsed, pin);
       return DoubleClick;
     }
-    else if (pin == LOW) // Releasing the button quickly = no special action
+    else if (pin == HIGH) // Releasing the button quickly = no special action
     {
       Log_info("Button time=%d pin=%d: detected no-action", elapsed, pin);
       return NoAction;
