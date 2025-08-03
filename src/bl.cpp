@@ -81,7 +81,7 @@ static void showMessageWithLogo(MSG message_type);
 static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, const char *fw_version, String message);
 static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiResponse);
 static void wifiErrorDeepSleep();
-static uint8_t *storedLogoOrDefault(void);
+static uint8_t *storedLogoOrDefault(int iType);
 static bool saveCurrentFileName(String &name);
 static bool checkCurrentFileName(String &newName);
 static DeviceStatusStamp getDeviceStatusStamp();
@@ -239,7 +239,7 @@ void bl_init(void)
     Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
 
     buffer = (uint8_t *)malloc(DEFAULT_IMAGE_SIZE);
-    display_show_image(storedLogoOrDefault(), DEFAULT_IMAGE_SIZE, false);
+    display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false);
     free(buffer);
     buffer = nullptr;
 
@@ -1674,7 +1674,7 @@ static void getDeviceCredentials()
 
                 // show the image
                 String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
-                display_show_msg(storedLogoOrDefault(), FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
+                display_show_msg(storedLogoOrDefault(0), FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
                 free(buffer);
                 buffer = nullptr;
                 need_to_refresh_display = 0;
@@ -2064,7 +2064,7 @@ static void writeSpecialFunction(SPECIAL_FUNCTION function)
 static void showMessageWithLogo(MSG message_type)
 {
   buffer = (uint8_t *)malloc(DEFAULT_IMAGE_SIZE);
-  display_show_msg(storedLogoOrDefault(), message_type);
+  display_show_msg(storedLogoOrDefault(0), message_type);
   free(buffer);
   buffer = nullptr;
 
@@ -2075,7 +2075,7 @@ static void showMessageWithLogo(MSG message_type)
 static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, const char *fw_version, String message)
 {
   buffer = (uint8_t *)malloc(DEFAULT_IMAGE_SIZE);
-  display_show_msg(storedLogoOrDefault(), message_type, friendly_id, id, fw_version, message);
+  display_show_msg(storedLogoOrDefault(0), message_type, friendly_id, id, fw_version, message);
   free(buffer);
   buffer = nullptr;
 
@@ -2092,7 +2092,7 @@ static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, c
 static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiResponse)
 {
   buffer = (uint8_t *)malloc(DEFAULT_IMAGE_SIZE);
-  display_show_msg(storedLogoOrDefault(), message_type, "", false, "", apiResponse.message);
+  display_show_msg(storedLogoOrDefault(0), message_type, "", false, "", apiResponse.message);
   free(buffer);
   buffer = nullptr;
 
@@ -2100,14 +2100,19 @@ static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiRes
   preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
 }
 
-static uint8_t *storedLogoOrDefault(void)
+// 0 = larger glyph, centered for message screens
+// 1 = small glyph, set in lower-right corner for loading screen
+static uint8_t *storedLogoOrDefault(int iType)
 {
-  if (filesystem_read_from_file("/logo.bmp", buffer, DEFAULT_IMAGE_SIZE))
-  {
-    return buffer;
-  }
+//  if (filesystem_read_from_file("/logo.bmp", buffer, DEFAULT_IMAGE_SIZE))
+//  {
+//    return buffer;
+//  }
+  if (iType == 0) {
     return const_cast<uint8_t *>(logo_small);
-  //return const_cast<uint8_t *>(loading);
+  } else {
+    return const_cast<uint8_t *>(loading);
+  }
 }
 
 static bool saveCurrentFileName(String &name)

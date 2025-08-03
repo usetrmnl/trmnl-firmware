@@ -25,7 +25,7 @@ FASTEPD bbep;
 #include <trmnl_log.h>
 #include "png_flip.h"
 #include "../lib/bb_epaper/Fonts/Roboto_20.h"
-#include "../lib/bb_epaper/Fonts/Inter_14.h"
+#include "../lib/bb_epaper/Fonts/nicoclean_8.h"
 extern char filename[];
 
 /**
@@ -51,7 +51,7 @@ char szTemp[32];
 
     bbep.allocBuffer(false);
     bbep.fillScreen(BBEP_WHITE); // draw the image centered on a white background
-    bbep.setFont(Inter_14); //Roboto_20);
+    bbep.setFont(nicoclean_8); //Roboto_20);
     bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
     bbep.setCursor(0, 100);
     sprintf(szTemp, "VBatt = %f", vBatt);
@@ -610,7 +610,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
 #endif
     }
 
-    bbep.setFont(Inter_14); //Roboto_20);
+    bbep.setFont(nicoclean_8); //Roboto_20);
     bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
 
     switch (message_type)
@@ -840,7 +840,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 #endif
     }
 
-    bbep.setFont(Inter_14); //Roboto_20);
+    bbep.setFont(nicoclean_8); //Roboto_20);
     bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
     switch (message_type)
     {
@@ -891,7 +891,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     {
         UWORD y_start = 340;
         UWORD font_width = 18; // DEBUG
-        Paint_DrawMultilineText(0, y_start, message.c_str(), width, font_width, BBEP_BLACK, BBEP_WHITE, Inter_14/*Roboto_20*/, true);
+        Paint_DrawMultilineText(0, y_start, message.c_str(), width, font_width, BBEP_BLACK, BBEP_WHITE, nicoclean_8/*Roboto_20*/, true);
     }
     break;
     default:
