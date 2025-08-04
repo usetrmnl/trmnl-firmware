@@ -38,7 +38,7 @@
 
 #define DISPLAY_BMP_IMAGE_SIZE 48062 // in bytes - 62 bytes - header; 48000 bytes - bitmap (480*800 1bpp) / 8
 #define DEFAULT_IMAGE_SIZE 48000
-
+#define MAX_IMAGE_SIZE 90000 // largest compressed image we can receive
 #define SLEEP_uS_TO_S_FACTOR 1000000           /* Conversion factor for micro seconds to seconds */
 #define SLEEP_TIME_TO_SLEEP 900                /* Time ESP32 will go to sleep (in seconds) */
 #define SLEEP_TIME_WHILE_NOT_CONNECTED 5       /* Time ESP32 will go to sleep (in seconds) */
@@ -90,7 +90,7 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 // #define FAKE_BATTERY_VOLTAGE // Uncomment to report 4.2V instead of reading ADC
 
 #define BUTTON_HOLD_TIME 5000
-
+#define BUTTON_MEDIUM_HOLD_TIME 1000
 #define BUTTON_SOFT_RESET_TIME 15000
 
 #define SERVER_MAX_RETRIES 3

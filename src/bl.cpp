@@ -35,12 +35,13 @@
 #include <serialize_log.h>
 #include <preferences_persistence.h>
 #include "logo_small.h"
+#include "loading.h"
 #include <wifi-helpers.h>
 
 bool pref_clear = false;
 String new_filename = "";
 
-uint8_t *buffer = nullptr, *buffer_old = nullptr;
+uint8_t *buffer = nullptr;
 char filename[1024];      // image URL
 char binUrl[1024];        // update URL
 char message_buffer[128]; // message to show on the screen
@@ -80,7 +81,7 @@ static void showMessageWithLogo(MSG message_type);
 static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, const char *fw_version, String message);
 static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiResponse);
 static void wifiErrorDeepSleep();
-static uint8_t *storedLogoOrDefault(void);
+static uint8_t *storedLogoOrDefault(int iType);
 static bool saveCurrentFileName(String &name);
 static bool checkCurrentFileName(String &newName);
 static DeviceStatusStamp getDeviceStatusStamp();
@@ -238,7 +239,7 @@ void bl_init(void)
     Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
 
     buffer = (uint8_t *)malloc(DEFAULT_IMAGE_SIZE);
-    display_show_image(storedLogoOrDefault(), DEFAULT_IMAGE_SIZE, nullptr, 0);
+    display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false);
     free(buffer);
     buffer = nullptr;
 
@@ -357,6 +358,11 @@ void bl_init(void)
   // OTA checking, image checking and drawing
   https_request_err_e request_result = downloadAndShow();
   Log.info("%s [%d]: request result - %d\r\n", __FILE__, __LINE__, request_result);
+
+  if (request_result == HTTPS_IMAGE_FILE_TOO_BIG)
+  {
+    showMessageWithLogo(MSG_TOO_BIG);
+  }
 
   if (!preferences.isKey(PREFERENCES_CONNECT_API_RETRY_COUNT))
   {
@@ -682,10 +688,11 @@ static https_request_err_e downloadAndShow()
           Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, https.getSize());
 
           uint32_t counter = 0;
-          if (content_size > DISPLAY_BMP_IMAGE_SIZE)
+          if (content_size > MAX_IMAGE_SIZE)
           {
-            Log_error_submit("Receiving failed. Bad file size");
-
+            //Log_error_submit("Receiving failed; file size too big");
+            Log.info("%s [%d]: Receiving failed; file size too big: %d\r\n", __FILE__, __LINE__, content_size);
+            result = HTTPS_IMAGE_FILE_TOO_BIG;
             return HTTPS_REQUEST_FAILED;
           }
           WiFiClient *stream = https.getStreamPtr();
@@ -745,7 +752,7 @@ static https_request_err_e downloadAndShow()
           {
             writeImageToFile("/current.png", buffer, content_size);
             Log.info("%s [%d]: Decoding png\r\n", __FILE__, __LINE__);
-            display_show_image(buffer, content_size, buffer_old, file_size_old);
+            display_show_image(buffer, content_size, true);
 //            delay(100);
 //            free(buffer);
 //            buffer = nullptr;
@@ -820,7 +827,7 @@ static https_request_err_e downloadAndShow()
               writeImageToFile("/current.bmp", buffer, content_size);
             }
             Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
-            display_show_image(buffer, content_size, nullptr, 0);
+            display_show_image(buffer, content_size, true);
 
             // Using filename from API response
             new_filename = apiDisplayResult.response.filename;
@@ -913,7 +920,7 @@ uint32_t downloadStream(WiFiClient *stream, int content_size, uint8_t *buffer)
 https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
 {
   https_request_err_e result = HTTPS_NO_ERR;
-  int file_size = 0, file_size_old = 0;
+  int file_size = 0;
 
   if (special_function == SF_NONE)
   {
@@ -1275,7 +1282,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
             case PNG_NO_ERR:
             {
               Log.info("Showing image\n\r");
-              display_show_image(buffer, file_size, nullptr, 0);
+              display_show_image(buffer, file_size, true);
               need_to_refresh_display = 1;
             }
             break;
@@ -1289,7 +1296,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
             case BMP_NO_ERR:
             {
               Log.info("Showing image\n\r");
-              display_show_image(buffer, DISPLAY_BMP_IMAGE_SIZE, nullptr, 0);
+              display_show_image(buffer, DISPLAY_BMP_IMAGE_SIZE, true);
               need_to_refresh_display = 1;
             }
             break;
@@ -1375,8 +1382,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           }
 
           Log.info("Showing image\n\r");
-//          display_show_image(buffer, image_reverse, file_size);
-          display_show_image(buffer, file_size, buffer_old, file_size_old);
+          display_show_image(buffer, file_size, true);
           need_to_refresh_display = 1;
 
           free(buffer);
@@ -1668,7 +1674,7 @@ static void getDeviceCredentials()
 
                 // show the image
                 String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
-                display_show_msg(storedLogoOrDefault(), FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
+                display_show_msg(storedLogoOrDefault(0), FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
                 free(buffer);
                 buffer = nullptr;
                 need_to_refresh_display = 0;
@@ -1908,25 +1914,12 @@ static float readBatteryVoltage(void)
     int32_t adc;
     int32_t sensorValue;
 
-    analogReadResolution(8);
-    analogReadMilliVolts(PIN_BATTERY); // throw away first reading
-    // There is something strange happening on some PCBs where the ADC needs a lot of reads
-    // averaged together to give a good reading. On others, it doesn't take very many
-    // We shall try with 8 reads and if the voltage seems super low, we'll try again with 128
     adc = 0;
+    analogRead(3); // This is needed to properly initialize the ADC BEFORE calling analogReadMilliVolts()
     for (uint8_t i = 0; i < 8; i++) {
-      analogReadResolution(8);
       adc += analogReadMilliVolts(PIN_BATTERY);
     }
     sensorValue = (adc / 8) * 2;
-    if (sensorValue < 3000) { // This ADC needs some help; try again with a larger count
-        adc = 0;
-        for (uint8_t i = 0; i < 128; i++) {
-            analogReadResolution(8);
-            adc += analogReadMilliVolts(PIN_BATTERY);
-        }
-        sensorValue = (adc / 128) * 2;
-    }
     Log.info("%s [%d]: Battery sensorValue = %d\r\n", __FILE__, __LINE__, (int)sensorValue);
     float voltage = sensorValue / 1000.0;
     return voltage;
@@ -2071,7 +2064,7 @@ static void writeSpecialFunction(SPECIAL_FUNCTION function)
 static void showMessageWithLogo(MSG message_type)
 {
   buffer = (uint8_t *)malloc(DEFAULT_IMAGE_SIZE);
-  display_show_msg(storedLogoOrDefault(), message_type);
+  display_show_msg(storedLogoOrDefault(0), message_type);
   free(buffer);
   buffer = nullptr;
 
@@ -2082,7 +2075,7 @@ static void showMessageWithLogo(MSG message_type)
 static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, const char *fw_version, String message)
 {
   buffer = (uint8_t *)malloc(DEFAULT_IMAGE_SIZE);
-  display_show_msg(storedLogoOrDefault(), message_type, friendly_id, id, fw_version, message);
+  display_show_msg(storedLogoOrDefault(0), message_type, friendly_id, id, fw_version, message);
   free(buffer);
   buffer = nullptr;
 
@@ -2099,7 +2092,7 @@ static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, c
 static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiResponse)
 {
   buffer = (uint8_t *)malloc(DEFAULT_IMAGE_SIZE);
-  display_show_msg(storedLogoOrDefault(), message_type, "", false, "", apiResponse.message);
+  display_show_msg(storedLogoOrDefault(0), message_type, "", false, "", apiResponse.message);
   free(buffer);
   buffer = nullptr;
 
@@ -2107,13 +2100,19 @@ static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiRes
   preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
 }
 
-static uint8_t *storedLogoOrDefault(void)
+// 0 = larger glyph, centered for message screens
+// 1 = small glyph, set in lower-right corner for loading screen
+static uint8_t *storedLogoOrDefault(int iType)
 {
-  if (filesystem_read_from_file("/logo.bmp", buffer, DEFAULT_IMAGE_SIZE))
-  {
-    return buffer;
+//  if (filesystem_read_from_file("/logo.bmp", buffer, DEFAULT_IMAGE_SIZE))
+//  {
+//    return buffer;
+//  }
+  if (iType == 0) {
+    return const_cast<uint8_t *>(logo_small);
+  } else {
+    return const_cast<uint8_t *>(loading);
   }
-  return const_cast<uint8_t *>(logo_small);
 }
 
 static bool saveCurrentFileName(String &name)

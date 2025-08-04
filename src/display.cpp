@@ -25,6 +25,8 @@ FASTEPD bbep;
 #include <trmnl_log.h>
 #include "png_flip.h"
 #include "../lib/bb_epaper/Fonts/Roboto_20.h"
+#include "../lib/bb_epaper/Fonts/nicoclean_8.h"
+extern char filename[];
 
 /**
  * @brief Function to init the display
@@ -42,6 +44,25 @@ void display_init(void)
 #endif
     Log_info("dev module end");
 }
+
+void display_show_battery(float vBatt)
+{
+char szTemp[32];
+
+    bbep.allocBuffer(false);
+    bbep.fillScreen(BBEP_WHITE); // draw the image centered on a white background
+    bbep.setFont(nicoclean_8); //Roboto_20);
+    bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
+    bbep.setCursor(0, 100);
+    sprintf(szTemp, "VBatt = %f", vBatt);
+    bbep.print(szTemp);
+    bbep.writePlane();
+    bbep.refresh(REFRESH_FULL, true);
+    bbep.sleep(DEEP_SLEEP);
+    while (1) {
+        vTaskDelay(1);
+    }
+} /* display_show_battery() */
 
 /**
  * @brief Function to sleep the ESP32 while saving power
@@ -388,7 +409,7 @@ int i, iColors;
  * @return refresh mode based on image type and presence of old image
  */
 
-int png_to_epd(const uint8_t *pPNG, int iDataSize, const uint8_t *pPNG_old, int iDataSize_old)
+int png_to_epd(const uint8_t *pPNG, int iDataSize)
 {
 int iPlane, rc = -1;
 PNG *png = new PNG();
@@ -409,12 +430,7 @@ PNG *png = new PNG();
             bbep.setAddrWindow(0, 0, bbep.width(), bbep.height());
             if (png->getBpp() == 1 || png_count_colors(png, pPNG, iDataSize) == 2) { // 1-bit image (single plane)
                 bbep.setPanelType(ONE_BIT_PANEL);
-                if (iDataSize_old) {
-                    rc = REFRESH_PARTIAL; // the new image is 1bpp - try a partial update
-                } else {
-                    rc = REFRESH_FAST;
-                    //iUpdateCount = 0; // starting from a full update; reset the counter
-                }
+                rc = REFRESH_PARTIAL; // the new image is 1bpp - try a partial update
                 bbep.startWrite(PLANE_0); // start writing image data to plane 0
                 png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
                 if (png->getBpp() == 1) {
@@ -425,19 +441,6 @@ PNG *png = new PNG();
                     png->decode(&iPlane, 0);
                 }
                 png->close();
-                if (pPNG_old) { // decode the old image to do a partial update
-                    if (png->openRAM((uint8_t *)pPNG_old, iDataSize_old, png_draw) == PNG_SUCCESS) {
-                        Log_info("%s [%d]: preparing plane 1 for partial update\r\n", __FILE__, __LINE__);
-                        bbep.startWrite(PLANE_1); // 'old' data is written to plane 1
-                        if (png->getBpp() == 2) { // tell draw code to handle old 2bpp image differently
-                            Log_info("%s [%d]: old png only has 2 unique colors!\n", __FILE__, __LINE__);
-                            iPlane = 2; // tell draw code to merge bits 0/1 per pixel
-                            png->decode(&iPlane, 0); // decode it into the old buffer
-                        } else {
-                            png->decode(NULL, 0);
-                        }
-                    }
-                }
             } else { // 2-bpp
                 bbep.setPanelType(TWO_BIT_PANEL);
                 rc = REFRESH_FULL; // 4gray mode must be full refresh
@@ -465,8 +468,8 @@ PNG *png = new PNG();
  * @param reverse shows if the color scheme is reverse
  * @return none
  */
-void display_show_image(uint8_t *image_buffer, int data_size, uint8_t *image_buffer_old, int data_size_old)
-//void display_show_image(uint8_t *image_buffer, bool reverse, int data_size)
+void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
+
 {
     bool isPNG = true;
     auto width = display_width();
@@ -496,7 +499,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, uint8_t *image_buf
     if (isPNG == true && data_size < DEFAULT_IMAGE_SIZE)
     {
         Log_info("Drawing PNG");
-        iRefreshMode = png_to_epd(image_buffer, data_size, image_buffer_old, data_size_old);
+        iRefreshMode = png_to_epd(image_buffer, data_size);
     }
     else // uncompressed BMP or Group5 compressed image
     {
@@ -521,7 +524,8 @@ void display_show_image(uint8_t *image_buffer, int data_size, uint8_t *image_buf
 #endif
         }
         bbep.writePlane(PLANE_0); // send image data to the EPD
-//        iUpdateCount = 0; // reset the update count when woken by button press of BMP file is shown 
+        iRefreshMode = REFRESH_PARTIAL;
+        iUpdateCount = 1; // use partial update
     }
     Log_info("Display refresh start");
 #ifdef BB_EPAPER
@@ -534,7 +538,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, uint8_t *image_buf
 //        iRefreshMode = REFRESH_FAST;
 //    }
     Log_info("%s [%d]: EPD refresh mode: %d\r\n", __FILE__, __LINE__, iRefreshMode);
-    bbep.refresh(iRefreshMode, true);
+    bbep.refresh(iRefreshMode, bWait);
     if (bAlloc) {
         bbep.freeBuffer();
     }
@@ -606,7 +610,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
 #endif
     }
 
-    bbep.setFont(Roboto_20);
+    bbep.setFont(nicoclean_8); //Roboto_20);
     bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
 
     switch (message_type)
@@ -625,24 +629,16 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     break;
     case WIFI_FAILED:
     {
-        const char string1[] = "Can't establish WiFi";
+        const char string1[] = "Can't establish WiFi connection.";
         bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - 132 - rect.w)/2, 380);
+        bbep.setCursor((bbep.width() - rect.w)/2, 386);
         bbep.println(string1);
-        const char string2[] = "connection. Hold button on";
+        const char string2[] = "Hold button on the back to reset WiFi, or scan QR Code for help.";
         bbep.getStringBox(string2, &rect);
-        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.println(string2);
-        const char string3[] = "the back to reset WiFi";
-        bbep.getStringBox(string3, &rect);
-        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
-        bbep.println(string3);
-        const char string4[] = "or scan QR Code for help.";
-        bbep.getStringBox(string4, &rect);
-        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
-        bbep.print(string4);
 
-        bbep.loadG5Image(wifi_failed_qr, 639, 336, BBEP_WHITE, BBEP_BLACK);
+        bbep.loadG5Image(wifi_failed_qr, bbep.width() - 58 - 40, 40, BBEP_WHITE, BBEP_BLACK);
     }
     break;
     case WIFI_INTERNAL_ERROR:
@@ -725,6 +721,30 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, 400);
         bbep.print(string1);
+    }
+    break;
+    case MSG_TOO_BIG:
+    {
+        const char string1[] = "The image file from this URL is too large.";
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, 360);
+        bbep.println(string1);
+        if (strlen(filename) > 40) {
+            filename[40] = 0; // truncate and add elipses
+            strcat(filename, "...");
+        }
+        bbep.getStringBox(filename, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+        bbep.println(filename);
+
+        const char string2[] = "PNG images can be a maximum of";
+        bbep.getStringBox(string2, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+        bbep.println(string2);
+        String string3 = String(MAX_IMAGE_SIZE) + String(" bytes each and 1 or 2-bpp");
+        bbep.getStringBox(string3.c_str(), &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+        bbep.print(string3);
     }
     break;
     case MSG_FORMAT_ERROR:
@@ -812,7 +832,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 #endif
     }
 
-    bbep.setFont(Roboto_20);
+    bbep.setFont(nicoclean_8); //Roboto_20);
     bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
     switch (message_type)
     {
@@ -839,31 +859,26 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     {
         Log_info("wifi connect case");
 
-        String string1 = "FW: ";
+        String string1 = "TRMNL firmware ";
         string1 += fw_version;
-        bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, 330);
+        bbep.setCursor(40, 40); // place in upper left corner
         bbep.println(string1);
-        const char string2[] = "Connect phone or computer";
+        const char string2[] = "Connect your phone or computer to TRMNL WiFi network";
         bbep.getStringBox(string2, &rect);
-        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
+        bbep.setCursor((bbep.width() - rect.w) / 2, 386);
         bbep.println(string2);
-        const char string3[] = "to \"TRMNL\" WiFi network";
+        const char string3[] = "or scan the QR code for help";
         bbep.getStringBox(string3, &rect);
-        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
-        bbep.println(string3);
-        const char string4[] = "or scan QR code for help.";
-        bbep.getStringBox(string4, &rect);
-        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
-        bbep.print(string4);
-        bbep.loadG5Image(wifi_connect_qr, 639, 336, BBEP_WHITE, BBEP_BLACK);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+        bbep.print(string3);
+        bbep.loadG5Image(wifi_connect_qr, bbep.width() - 40 - 58, 40, BBEP_WHITE, BBEP_BLACK); // 58x58 QR code
     }
     break;
     case MAC_NOT_REGISTERED:
     {
         UWORD y_start = 340;
         UWORD font_width = 18; // DEBUG
-        Paint_DrawMultilineText(0, y_start, message.c_str(), width, font_width, BBEP_BLACK, BBEP_WHITE, Roboto_20, true);
+        Paint_DrawMultilineText(0, y_start, message.c_str(), width, font_width, BBEP_BLACK, BBEP_WHITE, nicoclean_8/*Roboto_20*/, true);
     }
     break;
     default:
