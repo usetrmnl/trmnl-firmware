@@ -2,6 +2,8 @@
 #include <display.h>
 #include <PNGdec.h>
 #include <SPIFFS.h>
+#include <Preferences.h>
+#include <preferences_persistence.h>
 #include "DEV_Config.h"
 #define BB_EPAPER
 #ifdef BB_EPAPER
@@ -27,7 +29,7 @@ FASTEPD bbep;
 #include "../lib/bb_epaper/Fonts/Roboto_20.h"
 #include "../lib/bb_epaper/Fonts/nicoclean_8.h"
 extern char filename[];
-
+extern Preferences preferences;
 /**
  * @brief Function to init the display
  * @param none
@@ -533,10 +535,12 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
         Log_info("%s [%d]: Forcing full refresh; desired refresh mode was: %d\r\n", __FILE__, __LINE__, iRefreshMode);
         iRefreshMode = REFRESH_FULL; // force full refresh every 8 partials
     }
-//    if (iUpdateCount == 1) {
-//        Log_info("%s [%d]: Forcing fast refresh (not partial) since the logo was just shown\r\n", __FILE__, __LINE__);
-//        iRefreshMode = REFRESH_FAST;
-//    }
+    int refresh_seconds = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
+    if (refresh_seconds >= 30*60 && iRefreshMode == REFRESH_PARTIAL) {
+        // For users who set updates 30 minutes or longer, use the "fast" update to prevent ghosting
+        Log_info("%s [%d]: Forcing fast refresh (not partial) since the TRMNL refresh_rate is set to > 30 min\n", __FILE__, __LINE__);
+        iRefreshMode = REFRESH_FAST;
+    }
     Log_info("%s [%d]: EPD refresh mode: %d\r\n", __FILE__, __LINE__, iRefreshMode);
     bbep.refresh(iRefreshMode, bWait);
     if (bAlloc) {
@@ -638,7 +642,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.println(string2);
 
-        bbep.loadG5Image(wifi_failed_qr, bbep.width() - 58 - 40, 40, BBEP_WHITE, BBEP_BLACK);
+        bbep.loadG5Image(wifi_failed_qr, bbep.width() - 66 - 40, 40, BBEP_WHITE, BBEP_BLACK);
     }
     break;
     case WIFI_INTERNAL_ERROR:
@@ -861,7 +865,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 
         String string1 = "TRMNL firmware ";
         string1 += fw_version;
-        bbep.setCursor(40, 40); // place in upper left corner
+        bbep.setCursor(40, 48); // place in upper left corner
         bbep.println(string1);
         const char string2[] = "Connect your phone or computer to TRMNL WiFi network";
         bbep.getStringBox(string2, &rect);
@@ -871,7 +875,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         bbep.getStringBox(string3, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.print(string3);
-        bbep.loadG5Image(wifi_connect_qr, bbep.width() - 40 - 58, 40, BBEP_WHITE, BBEP_BLACK); // 58x58 QR code
+        bbep.loadG5Image(wifi_connect_qr, bbep.width() - 40 - 66, 40, BBEP_WHITE, BBEP_BLACK); // 66x66 QR code
     }
     break;
     case MAC_NOT_REGISTERED:
