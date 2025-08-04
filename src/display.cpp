@@ -642,7 +642,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.println(string2);
 
-        bbep.loadG5Image(wifi_failed_qr, bbep.width() - 58 - 40, 40, BBEP_WHITE, BBEP_BLACK);
+        bbep.loadG5Image(wifi_failed_qr, bbep.width() - 66 - 40, 40, BBEP_WHITE, BBEP_BLACK);
     }
     break;
     case WIFI_INTERNAL_ERROR:
@@ -865,7 +865,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 
         String string1 = "TRMNL firmware ";
         string1 += fw_version;
-        bbep.setCursor(40, 40); // place in upper left corner
+        bbep.setCursor(40, 48); // place in upper left corner
         bbep.println(string1);
         const char string2[] = "Connect your phone or computer to TRMNL WiFi network";
         bbep.getStringBox(string2, &rect);
@@ -875,7 +875,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         bbep.getStringBox(string3, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.print(string3);
-        bbep.loadG5Image(wifi_connect_qr, bbep.width() - 40 - 58, 40, BBEP_WHITE, BBEP_BLACK); // 58x58 QR code
+        bbep.loadG5Image(wifi_connect_qr, bbep.width() - 40 - 66, 40, BBEP_WHITE, BBEP_BLACK); // 66x66 QR code
     }
     break;
     case MAC_NOT_REGISTERED:
