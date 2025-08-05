@@ -2111,6 +2111,9 @@ static uint8_t *storedLogoOrDefault(int iType)
   if (iType == 0) {
     return const_cast<uint8_t *>(logo_small);
   } else {
+    // Force the loading screen to always use the slower update method because
+    // we don't know (yet) if the panel can handle the faster update modes
+    apiDisplayResult.response.maximum_compatibility = true;
     return const_cast<uint8_t *>(loading);
   }
 }

@@ -90,7 +90,7 @@ void display_reset(void)
     Log_info("e-Paper Clear start");
     bbep.fillScreen(BBEP_WHITE);
 #ifdef BB_EPAPER
-    if (apiDisplayResult.response.maximum_compatibility) {
+    if (!apiDisplayResult.response.maximum_compatibility) {
         bbep.refresh(REFRESH_FAST, true);
     } else {
         bbep.refresh(REFRESH_FULL, true); // incompatible panel
@@ -539,7 +539,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     }
     Log_info("Display refresh start");
 #ifdef BB_EPAPER
-    if ((iUpdateCount & 7) == 0 || apiDisplayResult.response.maximum_compatibility == false) {
+    if ((iUpdateCount & 7) == 0 || apiDisplayResult.response.maximum_compatibility == true) {
         Log_info("%s [%d]: Forcing full refresh; desired refresh mode was: %d\r\n", __FILE__, __LINE__, iRefreshMode);
         iRefreshMode = REFRESH_FULL; // force full refresh every 8 partials
     }
@@ -815,7 +815,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         bbep.fillScreen(BBEP_WHITE);
 #ifdef BB_EPAPER
         bbep.writePlane(PLANE_0);
-        if (apiDisplayResult.response.maximum_compatibility) {
+        if (!apiDisplayResult.response.maximum_compatibility) {
             bbep.refresh(REFRESH_FAST, true); // newer panel can handle the fast refresh
         } else {
             bbep.refresh(REFRESH_FULL, true); // incompatible panel (for now)
