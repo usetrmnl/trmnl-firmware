@@ -26,6 +26,7 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload)
       .image_url_timeout = doc["image_url_timeout"],
       .filename = doc["filename"] | "",
       .update_firmware = doc["update_firmware"],
+      .maximum_compatibility = doc["maximum_compatibility"] | false, // server doesn't return this flag if device.firmware_version <= 1.6.2
       .firmware_url = doc["firmware_url"] | "",
       .refresh_rate = doc["refresh_rate"],
       .reset_firmware = doc["reset_firmware"],

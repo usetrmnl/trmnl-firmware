@@ -40,7 +40,7 @@
 
 bool pref_clear = false;
 String new_filename = "";
-
+ApiDisplayResult apiDisplayResult;
 uint8_t *buffer = nullptr;
 char filename[1024];      // image URL
 char binUrl[1024];        // update URL
@@ -608,7 +608,7 @@ static https_request_err_e downloadAndShow()
 
   auto apiDisplayInputs = loadApiDisplayInputs(preferences);
 
-  auto apiDisplayResult = fetchApiDisplay(apiDisplayInputs);
+  apiDisplayResult = fetchApiDisplay(apiDisplayInputs);
 
   if (apiDisplayResult.error != HTTPS_NO_ERR)
   {
@@ -2111,6 +2111,9 @@ static uint8_t *storedLogoOrDefault(int iType)
   if (iType == 0) {
     return const_cast<uint8_t *>(logo_small);
   } else {
+    // Force the loading screen to always use the slower update method because
+    // we don't know (yet) if the panel can handle the faster update modes
+    apiDisplayResult.response.maximum_compatibility = true;
     return const_cast<uint8_t *>(loading);
   }
 }

@@ -24,12 +24,15 @@ FASTEPD bbep;
 #include "wifi_connect_qr.h"
 #include "wifi_failed_qr.h"
 #include <ctype.h> //iscntrl()
+#include <api-client/display.h>
 #include <trmnl_log.h>
 #include "png_flip.h"
 #include "../lib/bb_epaper/Fonts/Roboto_20.h"
 #include "../lib/bb_epaper/Fonts/nicoclean_8.h"
 extern char filename[];
 extern Preferences preferences;
+extern ApiDisplayResult apiDisplayResult;
+
 /**
  * @brief Function to init the display
  * @param none
@@ -87,7 +90,11 @@ void display_reset(void)
     Log_info("e-Paper Clear start");
     bbep.fillScreen(BBEP_WHITE);
 #ifdef BB_EPAPER
-    bbep.refresh(REFRESH_FAST, true);
+    if (!apiDisplayResult.response.maximum_compatibility) {
+        bbep.refresh(REFRESH_FAST, true);
+    } else {
+        bbep.refresh(REFRESH_FULL, true); // incompatible panel
+    }
 #else
     bbep.fullUpdate();
 #endif
@@ -482,6 +489,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
 
    // Log_info("Paint_NewImage %d", reverse);
     Log_info("show image for array");
+    Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef FUTURE
     if (reverse)
     {
@@ -531,7 +539,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     }
     Log_info("Display refresh start");
 #ifdef BB_EPAPER
-    if ((iUpdateCount & 7) == 0) {
+    if ((iUpdateCount & 7) == 0 || apiDisplayResult.response.maximum_compatibility == true) {
         Log_info("%s [%d]: Forcing full refresh; desired refresh mode was: %d\r\n", __FILE__, __LINE__, iRefreshMode);
         iRefreshMode = REFRESH_FULL; // force full refresh every 8 partials
     }
@@ -595,6 +603,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
 
     Log_info("Paint_NewImage");
     Log_info("show image for array");
+    Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef BB_EPAPER
     bbep.allocBuffer(false);
     bbep.fillScreen(BBEP_WHITE); // white background
@@ -794,6 +803,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
 void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_id, bool id, const char *fw_version, String message)
 {
     Log_info("Free heap in display_show_msg - %d", ESP.getMaxAllocHeap());
+    Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef BB_EPAPER
     bbep.allocBuffer(false);
     Log_info("Free heap after bbep.allocBuffer() - %d", ESP.getMaxAllocHeap());
@@ -805,7 +815,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         bbep.fillScreen(BBEP_WHITE);
 #ifdef BB_EPAPER
         bbep.writePlane(PLANE_0);
-        bbep.refresh(REFRESH_FAST, true);
+        if (!apiDisplayResult.response.maximum_compatibility) {
+            bbep.refresh(REFRESH_FAST, true); // newer panel can handle the fast refresh
+        } else {
+            bbep.refresh(REFRESH_FULL, true); // incompatible panel (for now)
+        }
 #else
         bbep.fullUpdate();
 #endif
