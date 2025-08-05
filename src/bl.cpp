@@ -40,7 +40,7 @@
 
 bool pref_clear = false;
 String new_filename = "";
-
+ApiDisplayResult apiDisplayResult;
 uint8_t *buffer = nullptr;
 char filename[1024];      // image URL
 char binUrl[1024];        // update URL
@@ -608,7 +608,7 @@ static https_request_err_e downloadAndShow()
 
   auto apiDisplayInputs = loadApiDisplayInputs(preferences);
 
-  auto apiDisplayResult = fetchApiDisplay(apiDisplayInputs);
+  apiDisplayResult = fetchApiDisplay(apiDisplayInputs);
 
   if (apiDisplayResult.error != HTTPS_NO_ERR)
   {

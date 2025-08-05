@@ -36,6 +36,7 @@ struct ApiDisplayResponse
   uint32_t image_url_timeout;
   String filename;
   bool update_firmware;
+  bool maximum_compatibility;
   String firmware_url;
   uint64_t refresh_rate;
   bool reset_firmware;
