@@ -1802,7 +1802,7 @@ const uint8_t epd75_init_sequence_full[] PROGMEM = {
     2, UC8151_PSR, 0x1f,
     5, UC8151_TRES, 0x03, 0x20, 0x01, 0xe0,
     2, 0x15, 0x00,
-    3, UC8151_CDI, 0x11, 0x07,
+    3, UC8151_CDI, 0x21, 0x07,
     2, UC8151_TCON, 0x22,
     //    4, UC8151_BTST, 0x17, 0x17, 0x17,
     //    2, UC8151_PFS, 0x00,
