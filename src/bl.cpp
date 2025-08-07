@@ -699,13 +699,7 @@ static https_request_err_e downloadAndShow()
           Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
           Log.info("%s [%d]: Stream timeout: %d\r\n", __FILE__, __LINE__, stream->getTimeout());
 
-          Log.info("%s [%d]: Stream available: %d\r\n", __FILE__, __LINE__, stream->available());
-
-          uint32_t timer = millis();
-          while (stream->available() < 4000 && millis() - timer < 1000)
-            ;
-
-          Log.info("%s [%d]: Stream available: %d\r\n", __FILE__, __LINE__, stream->available());
+          Log.info("%s [%d]: Stream available (may show as 0 and that's okay): %d\r\n", __FILE__, __LINE__, stream->available());
 
           bool isPNG = https.header("Content-Type") == "image/png";
 
