@@ -806,13 +806,13 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef BB_EPAPER
     bbep.allocBuffer(false);
+    bbep.fillScreen(BBEP_WHITE);
     Log_info("Free heap after bbep.allocBuffer() - %d", ESP.getMaxAllocHeap());
 #endif
 
     if (message_type == WIFI_CONNECT)
     {
         Log_info("Display set to white");
-        bbep.fillScreen(BBEP_WHITE);
 #ifdef BB_EPAPER
         bbep.writePlane(PLANE_0);
         if (!apiDisplayResult.response.maximum_compatibility) {
