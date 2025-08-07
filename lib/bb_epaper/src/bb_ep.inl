@@ -1796,13 +1796,13 @@ const uint8_t epd75_gray_init[] PROGMEM = {
 }; // 2-bit grayscale mode
 
 const uint8_t epd75_init_sequence_full[] PROGMEM = {
-    6, UC8151_PWR, 0x07, 0x07, 0x3f, 0x3f, 0x03,
+    5, UC8151_PWR, 0x07, 0x07, 0x3f, 0x3f,
     1, UC8151_PON,
     BUSY_WAIT,
     2, UC8151_PSR, 0x1f,
     5, UC8151_TRES, 0x03, 0x20, 0x01, 0xe0,
     2, 0x15, 0x00,
-    3, UC8151_CDI, 0x29, 0x07,
+    3, UC8151_CDI, 0x21, 0x07,
     2, UC8151_TCON, 0x22,
     //    4, UC8151_BTST, 0x17, 0x17, 0x17,
     //    2, UC8151_PFS, 0x00,
