@@ -359,9 +359,10 @@
         }
       }
 
-      // strip trailing slashes
       server = server.trim();
       server = server.replace(/\/+$/, '');
+
+      saveServerToStorage();
 
       var body = { ssid: ssid, pswd: pswd, server: server };
 
@@ -395,6 +396,7 @@
     function showCustomServerInput() {
       document.getElementById('custom_server_form_group').style.display = 'flex';
       closeCustomServerModal();
+      loadServerFromStorage();
     }
 
     function closeCustomServerModal() {
@@ -556,7 +558,25 @@
         });
     }
 
+    function loadServerFromStorage() {
+      const savedServer = localStorage.getItem('customServer');
+      if (savedServer) {
+        document.getElementById('server').value = savedServer;
+        document.getElementById('custom_server_form_group').style.display = 'flex';
+      }
+    }
+
+    function saveServerToStorage() {
+      const serverValue = document.getElementById('server').value;
+      if (serverValue) {
+        localStorage.setItem('customServer', serverValue);
+      } else {
+        localStorage.removeItem('customServer');
+      }
+    }
+
     setTimeout(getInfo, 500);
+    setTimeout(loadServerFromStorage, 100);
   </script>
 </head>
 

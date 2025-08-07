@@ -290,6 +290,18 @@
     function showCustomServerInput() {
       document.getElementById('custom_server_form_group').style.display = 'flex';
       closeCustomServerModal();
+      const savedServer = localStorage.getItem('customServer');
+      if (savedServer) {
+        document.getElementById('server').value = savedServer;
+      }
+    }
+
+    function loadServerFromStorage() {
+      const savedServer = localStorage.getItem('customServer');
+      if (savedServer) {
+        document.getElementById('server').value = savedServer;
+        document.getElementById('custom_server_form_group').style.display = 'flex';
+      }
     }
 
     function closeCustomServerModal() {
@@ -336,6 +348,10 @@
     }
 
     function goBack() {
+      const serverValue = document.getElementById('server').value;
+      if (serverValue) {
+        localStorage.setItem('customServer', serverValue);
+      }
       window.location.href = 'index.html';
     }
 
@@ -373,6 +389,11 @@
       output.classList.add("alert-warning");
     });
 }
+
+    // Load server value when page loads
+    window.onload = function() {
+      loadServerFromStorage();
+    };
 
   </script>
 </head>
