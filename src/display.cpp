@@ -549,6 +549,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
         Log_info("%s [%d]: Forcing fast refresh (not partial) since the TRMNL refresh_rate is set to > 30 min\n", __FILE__, __LINE__);
         iRefreshMode = REFRESH_FAST;
     }
+    if (!bWait) iRefreshMode = REFRESH_PARTIAL; // fast update when showing loading screen
     Log_info("%s [%d]: EPD refresh mode: %d\r\n", __FILE__, __LINE__, iRefreshMode);
     bbep.refresh(iRefreshMode, bWait);
     if (bAlloc) {
