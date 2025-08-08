@@ -731,7 +731,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     break;
     case FW_UPDATE_SUCCESS:
     {
-        const char string1[] = "Firmware update success. Device will restart..";
+        const char string1[] = "Firmware update success. Device will restart...";
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, 400);
         bbep.print(string1);
