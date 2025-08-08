@@ -81,7 +81,7 @@ static void showMessageWithLogo(MSG message_type);
 static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, const char *fw_version, String message);
 static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiResponse);
 static void wifiErrorDeepSleep();
-static uint8_t *storedLogoOrDefault(int iType);
+uint8_t *storedLogoOrDefault(int iType);
 static bool saveCurrentFileName(String &name);
 static bool checkCurrentFileName(String &newName);
 static DeviceStatusStamp getDeviceStatusStamp();
@@ -2096,7 +2096,7 @@ static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiRes
 
 // 0 = larger glyph, centered for message screens
 // 1 = small glyph, set in lower-right corner for loading screen
-static uint8_t *storedLogoOrDefault(int iType)
+uint8_t *storedLogoOrDefault(int iType)
 {
 //  if (filesystem_read_from_file("/logo.bmp", buffer, DEFAULT_IMAGE_SIZE))
 //  {

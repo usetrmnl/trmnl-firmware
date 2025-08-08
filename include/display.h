@@ -20,7 +20,20 @@ enum MSG
   MSG_FORMAT_ERROR,
   MSG_TOO_BIG,
   MAC_NOT_REGISTERED,
+  IMAGE_DECODE_ERROR,
   TEST,
+};
+
+// Current language (Latin alphabet only - for now)
+enum LANG
+{
+  LANG_EN = 0,
+  LANG_ES, // Spanish
+  LANG_IT, // Italian
+  LANG_FR, // French
+  LANG_PT, // Portuguese
+  LANG_DE, // German
+  LANG_PL, // Polish
 };
 
 /**

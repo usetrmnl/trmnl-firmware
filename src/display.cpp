@@ -2,6 +2,7 @@
 #include <display.h>
 #include <PNGdec.h>
 #include <SPIFFS.h>
+#include <lang_strings.h>
 #include <Preferences.h>
 #include <preferences_persistence.h>
 #include "DEV_Config.h"
@@ -32,6 +33,7 @@ FASTEPD bbep;
 extern char filename[];
 extern Preferences preferences;
 extern ApiDisplayResult apiDisplayResult;
+uint8_t *storedLogoOrDefault(int iType);
 
 /**
  * @brief Function to init the display
@@ -49,6 +51,33 @@ void display_init(void)
 #endif
     Log_info("dev module end");
 }
+
+/**
+ * @brief Simple multi-line text formatting using newline chars to indicate each line
+ * @param pointer to zero terminated string
+ * @param Y starting line (text baseline)
+ * @return none
+ */
+void display_centered_text(const char *pText, int y)
+{
+char szTemp[128]; // up to 127 characters per line when split
+char *d, *s = (char *)pText;
+BB_RECT rect;
+
+    d = szTemp;
+    bbep.setCursor(-1, y); // start on the requested line
+    while (*s) {
+        if (s[0] != '\n' && s[0] != 0) {
+            *d++ = *s++;
+        } else {
+            *d = 0; // terminate the temporary string and display it
+            bbep.getStringBox(szTemp, &rect);
+            bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+            bbep.println(szTemp);
+            d = szTemp;
+        }
+    }
+} /* display_centered_text() */
 
 void display_show_battery(float vBatt)
 {
@@ -415,7 +444,7 @@ int i, iColors;
  *        due to insufficient RAM to hold the fully decoded image
  * @param pointer to the buffer holding the PNG file
  * @param size of the PNG file
- * @return refresh mode based on image type and presence of old image
+ * @return refresh mode based on image type and presence of old image, or -1 for error
  */
 
 int png_to_epd(const uint8_t *pPNG, int iDataSize)
@@ -423,7 +452,10 @@ int png_to_epd(const uint8_t *pPNG, int iDataSize)
 int iPlane, rc = -1;
 PNG *png = new PNG();
 
-    if (!png) return PNG_MEM_ERROR; // not enough memory for the decoder instance
+    if (!png) {
+        Log_error("Insufficient memory to allocate PNG class instance");
+        return -1; // not enough memory for the decoder instance
+    }
     rc = png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
     png->close();
     if (rc == PNG_SUCCESS) {
@@ -510,6 +542,9 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     {
         Log_info("Drawing PNG");
         iRefreshMode = png_to_epd(image_buffer, data_size);
+        if (iRefreshMode < 0) { // an error occurred
+            display_show_msg(storedLogoOrDefault(0), IMAGE_DECODE_ERROR);
+        }
     }
     else // uncompressed BMP or Group5 compressed image
     {
@@ -549,8 +584,9 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
         Log_info("%s [%d]: Forcing fast refresh (not partial) since the TRMNL refresh_rate is set to > 30 min\n", __FILE__, __LINE__);
         iRefreshMode = REFRESH_FAST;
     }
+    if (!bWait) iRefreshMode = REFRESH_PARTIAL; // button press
     Log_info("%s [%d]: EPD refresh mode: %d\r\n", __FILE__, __LINE__, iRefreshMode);
-    bbep.refresh(iRefreshMode, bWait);
+    bbep.refresh(iRefreshMode, bWait || (iRefreshMode == REFRESH_FULL));
     if (bAlloc) {
         bbep.freeBuffer();
     }
@@ -599,10 +635,10 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     auto width = display_width();
     auto height = display_height();
     UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
-    BB_RECT rect;
+    char szTemp[256];
+    int iCurrentLanguage = LANG_EN; // DEBUG
 
-    Log_info("Paint_NewImage");
-    Log_info("show image for array");
+    Log_info("display_show_msg()");
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef BB_EPAPER
     bbep.allocBuffer(false);
@@ -628,146 +664,72 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
 
     switch (message_type)
     {
+
     case WIFI_CONNECT:
-    {
-        const char string1[] = "Connect to TRMNL WiFi";
-        bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - rect.w)/2, 430);
-        bbep.println(string1);
-        const char string2[] = "on your phone or computer";
-        bbep.getStringBox(string2, &rect);
-        bbep.setCursor((bbep.width() - rect.w)/2, -1);
-        bbep.print(string2);
-    }
+        display_centered_text(szWiFiConnect[iCurrentLanguage], 430);
     break;
+
     case WIFI_FAILED:
-    {
-        const char string1[] = "Can't establish WiFi connection.";
-        bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - rect.w)/2, 386);
-        bbep.println(string1);
-        const char string2[] = "Hold button on the back to reset WiFi, or scan QR Code for help.";
-        bbep.getStringBox(string2, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
-        bbep.println(string2);
-
+        display_centered_text(szWiFiFailed[iCurrentLanguage], 386);
         bbep.loadG5Image(wifi_failed_qr, bbep.width() - 66 - 40, 40, BBEP_WHITE, BBEP_BLACK);
-    }
     break;
-    case WIFI_INTERNAL_ERROR:
-    {
-        const char string1[] = "WiFi connected, but";
-        bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, 340);
-        bbep.println(string1);
-        const char string2[] = "API connection cannot be";
-        bbep.getStringBox(string2, &rect);
-        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
-        bbep.println(string2);
-        const char string3[] = "established. Try to refresh,";
-        bbep.getStringBox(string3, &rect);
-        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
-        bbep.println(string3);
-        const char string4[] = "or scan QR Code for help.";
-        bbep.getStringBox(string4, &rect);
-        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
-        bbep.print(string4);
 
+    case WIFI_INTERNAL_ERROR:
+        display_centered_text(szWiFiInternalError[iCurrentLanguage], 340);
         bbep.loadG5Image(wifi_failed_qr, 639, 336, BBEP_WHITE, BBEP_BLACK);
-    }
     break;
+
     case WIFI_WEAK:
-    {
-        const char string1[] = "WiFi connected but signal is weak";
-        bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, 400);
-        bbep.print(string1);
-    }
+        display_centered_text(szWiFiWeak[iCurrentLanguage], 400);
     break;
+
     case API_ERROR:
-    {
-        const char string1[] = "WiFi connected, TRMNL not responding.";
-        bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, 340);
-        bbep.println(string1);
-        const char string2[] = "Short click the button on back,";
-        bbep.getStringBox(string2, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
-        bbep.println(string2);
-        const char string3[] = "otherwise check your internet.";
-        bbep.getStringBox(string3, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
-        bbep.print(string3);
-    }
+        display_centered_text(szAPIError[iCurrentLanguage], 340);
     break;
+
     case API_SIZE_ERROR:
-    {
-        const char string1[] = "WiFi connected, TRMNL content malformed.";
-        bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, 400);
-        bbep.println(string1);
-        const char string2[] = "Wait or reset by holding button on back.";
-        bbep.getStringBox(string2, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
-        bbep.print(string2);
-    }
+        display_centered_text(szAPISizeError[iCurrentLanguage], 400);
     break;
+
     case FW_UPDATE:
-    {
-        const char string1[] = "Firmware update available! Starting now...";
-        bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, 400);
-        bbep.print(string1);
-    }
+        display_centered_text(szFirmwareAvailable[iCurrentLanguage], 400);
     break;
+
     case FW_UPDATE_FAILED:
-    {
-        const char string1[] = "Firmware update failed. Device will restart...";
-        bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, 400);
-        bbep.print(string1);
-    }
+        display_centered_text(szFirmwareFailure[iCurrentLanguage], 400);
     break;
+
     case FW_UPDATE_SUCCESS:
-    {
-        const char string1[] = "Firmware update success. Device will restart..";
-        bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, 400);
-        bbep.print(string1);
-    }
+        display_centered_text(szFirmwareSuccess[iCurrentLanguage], 400);
     break;
+
     case MSG_TOO_BIG:
-    {
-        const char string1[] = "The image file from this URL is too large.";
-        bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, 360);
-        bbep.println(string1);
         if (strlen(filename) > 40) {
             filename[40] = 0; // truncate and add elipses
             strcat(filename, "...");
         }
-        bbep.getStringBox(filename, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
-        bbep.println(filename);
+        sprintf(szTemp, szImageTooBig[iCurrentLanguage], filename, MAX_IMAGE_SIZE);
+        display_centered_text(szTemp, 360);
+    break;
 
-        const char string2[] = "PNG images can be a maximum of";
-        bbep.getStringBox(string2, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
-        bbep.println(string2);
-        String string3 = String(MAX_IMAGE_SIZE) + String(" bytes each and 1 or 2-bpp");
-        bbep.getStringBox(string3.c_str(), &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
-        bbep.print(string3);
-    }
+    case IMAGE_DECODE_ERROR:
+        if (strlen(filename) > 40) {
+            filename[40] = 0; // truncate and add elipses
+            strcat(filename, "...");
+        }
+        sprintf(szTemp, szImageDecodeError[iCurrentLanguage], filename);
+        display_centered_text(szTemp, 360);
     break;
+
     case MSG_FORMAT_ERROR:
-    {
-        const char string1[] = "The image format is incorrect";
-        bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, 400);
-        bbep.print(string1);
-    }
+        if (strlen(filename) > 40) {
+            filename[40] = 0; // truncate and add elipses
+            strcat(filename, "...");
+        }
+        sprintf(szTemp, szFormatError[iCurrentLanguage], filename);
+        display_centered_text(szTemp, 360);
     break;
+
     case TEST:
     {
         bbep.setCursor(0, 40);
@@ -812,8 +774,8 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 
     if (message_type == WIFI_CONNECT)
     {
-        Log_info("Display set to white");
 #ifdef BB_EPAPER
+        Log_info("Display set to white");
         bbep.writePlane(PLANE_0);
         if (!apiDisplayResult.response.maximum_compatibility) {
             bbep.refresh(REFRESH_FAST, true); // newer panel can handle the fast refresh
