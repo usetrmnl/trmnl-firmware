@@ -609,7 +609,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     bbep.allocBuffer(false);
     bbep.fillScreen(BBEP_WHITE); // white background
 #endif
-    if (*(uint16_t *)image_buffer == BB_BITMAP_MARKER)
+    if (image_buffer && *(uint16_t *)image_buffer == BB_BITMAP_MARKER)
     {
         // G5 compressed image
         BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
@@ -620,7 +620,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     else
     {
 #ifdef BB_EPAPER
-        memcpy(bbep.getBuffer(), image_buffer+62, Imagesize); // uncompressed 1-bpp bitmap
+        if (image_buffer) memcpy(bbep.getBuffer(), image_buffer+62, Imagesize); // uncompressed 1-bpp bitmap
 #endif
     }
 
@@ -836,7 +836,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     Log_info("show image for array");
 
     // Load the image into the bb_epaper framebuffer
-    if (*(uint16_t *)image_buffer == BB_BITMAP_MARKER)
+    if (image_buffer && *(uint16_t *)image_buffer == BB_BITMAP_MARKER)
     {
         // G5 compressed image
         BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
@@ -847,7 +847,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     else
     {
 #ifdef BB_EPAPER
-        memcpy(bbep.getBuffer(), image_buffer+62, Imagesize); // uncompressed 1-bpp bitmap
+        if (image_buffer) memcpy(bbep.getBuffer(), image_buffer+62, Imagesize); // uncompressed 1-bpp bitmap
 #endif
     }
 
