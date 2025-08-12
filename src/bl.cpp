@@ -1702,37 +1702,12 @@ static void downloadSetupImage()
  */
 static void getDeviceCredentials()
 {
-  bool shouldDownloadImage = false;
-  WiFiClientSecure *secureClient = new WiFiClientSecure;
-  WiFiClient *insecureClient = new WiFiClient;
+  bool shouldDownloadImage = performApiSetup();
 
-  secureClient->setInsecure();
-
-  bool isHttps = true;
-  if (preferences.getString(PREFERENCES_API_URL, API_BASE_URL).indexOf("https://") == -1)
+  Log.info("%s [%d]: status - %d\r\n", __FILE__, __LINE__, status);
+  if (shouldDownloadImage)
   {
-    isHttps = false;
-  }
-
-  // define client depending on the isHttps variable
-  WiFiClient *client = isHttps ? secureClient : insecureClient;
-
-  if (client)
-  {
-    shouldDownloadImage = performApiSetup();
-
-    Log.info("%s [%d]: status - %d\r\n", __FILE__, __LINE__, status);
-    if (shouldDownloadImage)
-    {
-      downloadSetupImage();
-    }
-    client->stop();
-    delete client;
-  }
-  else
-  {
-    Log_error_submit("Unable to create client");
-    showMessageWithLogo(WIFI_INTERNAL_ERROR);
+    downloadSetupImage();
   }
 }
 
