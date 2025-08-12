@@ -68,6 +68,7 @@ static https_request_err_e downloadAndShow(); // download and show the image
 static uint32_t downloadStream(WiFiClient *stream, int content_size, uint8_t *buffer);
 static https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse);
 static void getDeviceCredentials();                  // receiveing API key and Friendly ID
+static void downloadSetupImage(WiFiClient *client);  // download and display setup image
 static void resetDeviceCredentials(void);            // reset device credentials API key, Friendly ID, Wi-Fi SSID and password
 static void checkAndPerformFirmwareUpdate(void);     // OTA update
 static void goToSleep(void);                         // sleep preparing
@@ -1484,11 +1485,122 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
 }
 
 /**
+ * @brief Downloads and displays the setup image from the API response
+ * @param client WiFiClient to use for the HTTP request
+ * @return none
+ */
+static void downloadSetupImage(WiFiClient *client)
+{
+  HTTPClient https;
+  https.setTimeout(15000);
+  https.setConnectTimeout(15000);
+
+  status = false;
+  Log.info("%s [%d]: filename - %s\r\n", __FILE__, __LINE__, filename);
+
+  Log.info("%s [%d]: [HTTPS] Request to %s\r\n", __FILE__, __LINE__, filename);
+  if (https.begin(*client, filename))
+  { // HTTPS
+    Log.info("%s [%d]: [HTTPS] GET..\r\n", __FILE__, __LINE__);
+    // start connection and send HTTP header
+    int httpCode = https.GET();
+
+    // httpCode will be negative on error
+    if (httpCode > 0)
+    {
+      // HTTP header has been send and Server response header has been handled
+      Log.error("%s [%d]: [HTTPS] GET... code: %d\r\n", __FILE__, __LINE__, httpCode);
+      // file found at server
+      if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY)
+      {
+        Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, https.getSize());
+
+        WiFiClient *stream = https.getStreamPtr();
+
+        uint32_t counter = 0;
+        // Read and save BMP data to buffer
+        buffer = (uint8_t *)malloc(https.getSize());
+        if (stream->available() && https.getSize() == DISPLAY_BMP_IMAGE_SIZE)
+        {
+          counter = downloadStream(stream, DISPLAY_BMP_IMAGE_SIZE, buffer);
+        }
+        https.end();
+        if (counter == DISPLAY_BMP_IMAGE_SIZE)
+        {
+          Log.info("%s [%d]: Received successfully\r\n", __FILE__, __LINE__);
+
+          writeImageToFile("/logo.bmp", buffer, DEFAULT_IMAGE_SIZE);
+
+          // show the image
+          String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
+          display_show_msg(storedLogoOrDefault(0), FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
+          free(buffer);
+          buffer = nullptr;
+          need_to_refresh_display = 0;
+        }
+        else
+        {
+          free(buffer);
+          buffer = nullptr;
+          if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+          {
+            showMessageWithLogo(API_SIZE_ERROR);
+          }
+          else
+          {
+            showMessageWithLogo(WIFI_WEAK);
+          }
+          Log_error_submit("Receiving failed. Read: %d", counter);
+        }
+      }
+      else
+      {
+        https.end();
+        if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+        {
+          showMessageWithLogo(API_ERROR);
+        }
+        else
+        {
+          showMessageWithLogo(WIFI_WEAK);
+        }
+        Log_error_submit("[HTTPS] GET... failed, error: %s", https.errorToString(httpCode).c_str());
+      }
+    }
+    else
+    {
+      if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+      {
+        showMessageWithLogo(API_ERROR);
+      }
+      else
+      {
+        showMessageWithLogo(WIFI_WEAK);
+      }
+      Log_error_submit("[HTTPS] GET... failed, error: %s", https.errorToString(httpCode).c_str());
+    }
+  }
+  else
+  {
+    if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+    {
+      showMessageWithLogo(API_ERROR);
+    }
+    else
+    {
+      showMessageWithLogo(WIFI_WEAK);
+    }
+    Log_error_submit("unable to connect");
+  }
+}
+
+/**
  * @brief Function to getting the friendly id and API key
  * @return none
  */
 static void getDeviceCredentials()
 {
+  bool shouldDownloadImage = false;
   WiFiClientSecure *secureClient = new WiFiClientSecure;
   WiFiClient *insecureClient = new WiFiClient;
 
@@ -1555,6 +1667,7 @@ static void getDeviceCredentials()
             if (url_status == 200)
             {
               status = true;
+              shouldDownloadImage = true;
               Log.info("%s [%d]: status OK.\r\n", __FILE__, __LINE__);
 
               String api_key = apiResponse.api_key;
@@ -1628,105 +1741,9 @@ static void getDeviceCredentials()
         Log_error_submit("[HTTPS] Unable to connect");
       }
       Log.info("%s [%d]: status - %d\r\n", __FILE__, __LINE__, status);
-      if (status)
+      if (shouldDownloadImage)
       {
-        status = false;
-        Log.info("%s [%d]: filename - %s\r\n", __FILE__, __LINE__, filename);
-
-        Log.info("%s [%d]: [HTTPS] Request to %s\r\n", __FILE__, __LINE__, filename);
-        if (https.begin(*client, filename))
-        { // HTTPS
-          Log.info("%s [%d]: [HTTPS] GET..\r\n", __FILE__, __LINE__);
-          // start connection and send HTTP header
-          int httpCode = https.GET();
-
-          // httpCode will be negative on error
-          if (httpCode > 0)
-          {
-            // HTTP header has been send and Server response header has been handled
-            Log.error("%s [%d]: [HTTPS] GET... code: %d\r\n", __FILE__, __LINE__, httpCode);
-            // file found at server
-            if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY)
-            {
-              Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, https.getSize());
-
-              WiFiClient *stream = https.getStreamPtr();
-
-              uint32_t counter = 0;
-              // Read and save BMP data to buffer
-              buffer = (uint8_t *)malloc(https.getSize());
-              if (stream->available() && https.getSize() == DISPLAY_BMP_IMAGE_SIZE)
-              {
-                counter = downloadStream(stream, DISPLAY_BMP_IMAGE_SIZE, buffer);
-              }
-              https.end();
-              if (counter == DISPLAY_BMP_IMAGE_SIZE)
-              {
-                Log.info("%s [%d]: Received successfully\r\n", __FILE__, __LINE__);
-
-                writeImageToFile("/logo.bmp", buffer, DEFAULT_IMAGE_SIZE);
-
-                // show the image
-                String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
-                display_show_msg(storedLogoOrDefault(0), FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
-                free(buffer);
-                buffer = nullptr;
-                need_to_refresh_display = 0;
-              }
-              else
-              {
-                free(buffer);
-                buffer = nullptr;
-                if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
-                {
-                  showMessageWithLogo(API_SIZE_ERROR);
-                }
-                else
-                {
-                  showMessageWithLogo(WIFI_WEAK);
-                }
-                Log_error_submit("Receiving failed. Read: %d", counter);
-              }
-            }
-            else
-            {
-              https.end();
-              if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
-              {
-                showMessageWithLogo(API_ERROR);
-              }
-              else
-              {
-                showMessageWithLogo(WIFI_WEAK);
-              }
-              Log_error_submit("[HTTPS] GET... failed, error: %s", https.errorToString(httpCode).c_str());
-            }
-          }
-          else
-          {
-            if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
-            {
-              showMessageWithLogo(API_ERROR);
-            }
-            else
-            {
-              showMessageWithLogo(WIFI_WEAK);
-            }
-            Log_error_submit("[HTTPS] GET... failed, error: %s", https.errorToString(httpCode).c_str());
-          }
-        }
-        else
-        {
-          if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
-          {
-            showMessageWithLogo(API_ERROR);
-          }
-          else
-          {
-            showMessageWithLogo(WIFI_WEAK);
-          }
-          Log_error_submit("unable to connect");
-        }
+        downloadSetupImage(client);
       }
       // End extra scoping block
     }
