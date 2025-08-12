@@ -68,6 +68,7 @@ static https_request_err_e downloadAndShow(); // download and show the image
 static uint32_t downloadStream(WiFiClient *stream, int content_size, uint8_t *buffer);
 static https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse);
 static void getDeviceCredentials();                  // receiveing API key and Friendly ID
+static bool performApiSetup(WiFiClient *client);     // perform API setup call and return success
 static void downloadSetupImage(WiFiClient *client);  // download and display setup image
 static void resetDeviceCredentials(void);            // reset device credentials API key, Friendly ID, Wi-Fi SSID and password
 static void checkAndPerformFirmwareUpdate(void);     // OTA update
@@ -1485,6 +1486,141 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
 }
 
 /**
+ * @brief Performs API setup call to get credentials and image URL
+ * @param client WiFiClient to use for the HTTP request
+ * @return true if should continue to image download, false otherwise
+ */
+static bool performApiSetup(WiFiClient *client)
+{
+  HTTPClient https;
+  https.setTimeout(15000);
+  https.setConnectTimeout(15000);
+
+  Log.info("%s [%d]: [HTTPS] begin /api/setup/ ...\r\n", __FILE__, __LINE__);
+  char new_url[200];
+  strcpy(new_url, preferences.getString(PREFERENCES_API_URL, API_BASE_URL).c_str());
+  strcat(new_url, "/api/setup/");
+
+  if (https.begin(*client, new_url))
+  { // HTTPS
+    Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
+    Log.info("%s [%d]: [HTTPS] GET...\r\n", __FILE__, __LINE__);
+    // start connection and send HTTP header
+
+    https.addHeader("ID", WiFi.macAddress());
+    https.addHeader("Content-Type", "application/json");
+    https.addHeader("FW-Version", FW_VERSION_STRING);
+    Log.info("%s [%d]: Device MAC address: %s\r\n", __FILE__, __LINE__, WiFi.macAddress().c_str());
+
+    int httpCode = https.GET();
+
+    // httpCode will be negative on error
+    if (httpCode > 0)
+    {
+      // HTTP header has been send and Server response header has been handled
+      Log.info("%s [%d]: GET... code: %d\r\n", __FILE__, __LINE__, httpCode);
+      // file found at server
+      Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
+      if (httpCode == HTTP_CODE_OK)
+      {
+        Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, https.getSize());
+        String payload = https.getString();
+        Log.info("%s [%d]: Payload: %s\r\n", __FILE__, __LINE__, payload.c_str());
+
+        auto apiResponse = parseResponse_apiSetup(payload);
+
+        if (apiResponse.outcome == ApiSetupOutcome::DeserializationError)
+        {
+          Log.error("%s [%d]: JSON deserialization error.\r\n", __FILE__, __LINE__);
+          https.end();
+          client->stop();
+          return false;
+        }
+        uint16_t url_status = apiResponse.status;
+        if (url_status == 200)
+        {
+          status = true;
+          Log.info("%s [%d]: status OK.\r\n", __FILE__, __LINE__);
+
+          String api_key = apiResponse.api_key;
+          Log.info("%s [%d]: API key - %s\r\n", __FILE__, __LINE__, api_key.c_str());
+          size_t res = preferences.putString(PREFERENCES_API_KEY, api_key);
+          Log.info("%s [%d]: api key saved in the preferences - %d\r\n", __FILE__, __LINE__, res);
+
+          String friendly_id = apiResponse.friendly_id;
+          Log.info("%s [%d]: friendly ID - %s\r\n", __FILE__, __LINE__, friendly_id.c_str());
+          res = preferences.putString(PREFERENCES_FRIENDLY_ID, friendly_id);
+          Log.info("%s [%d]: friendly ID saved in the preferences - %d\r\n", __FILE__, __LINE__, res);
+
+          String image_url = apiResponse.image_url;
+          Log.info("%s [%d]: image_url - %s\r\n", __FILE__, __LINE__, image_url.c_str());
+          image_url.toCharArray(filename, image_url.length() + 1);
+
+          String message_str = apiResponse.message;
+          Log.info("%s [%d]: message - %s\r\n", __FILE__, __LINE__, message_str.c_str());
+          message_str.toCharArray(message_buffer, message_str.length() + 1);
+
+          Log.info("%s [%d]: status - %d\r\n", __FILE__, __LINE__, status);
+          return true;
+        }
+        else if (url_status == 404)
+        {
+          Log_info("MAC Address is not registered on server");
+
+          showMessageWithLogo(MAC_NOT_REGISTERED, apiResponse);
+
+          preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
+
+          display_sleep();
+          goToSleep();
+          return false;
+        }
+        else
+        {
+          Log.info("%s [%d]: status FAIL.\r\n", __FILE__, __LINE__);
+          status = false;
+          return false;
+        }
+      }
+      else
+      {
+        if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+        {
+          showMessageWithLogo(API_ERROR);
+        }
+        else
+        {
+          showMessageWithLogo(WIFI_WEAK);
+        }
+        Log_error_submit("[HTTPS] Unable to connect");
+        return false;
+      }
+    }
+    else
+    {
+      if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+      {
+        showMessageWithLogo(API_ERROR);
+      }
+      else
+      {
+        showMessageWithLogo(WIFI_WEAK);
+      }
+      Log_error_submit("[HTTPS] GET... failed, error: %s", https.errorToString(httpCode).c_str());
+      return false;
+    }
+
+    https.end();
+  }
+  else
+  {
+    showMessageWithLogo(WIFI_INTERNAL_ERROR);
+    Log_error_submit("[HTTPS] Unable to connect");
+    return false;
+  }
+}
+
+/**
  * @brief Downloads and displays the setup image from the API response
  * @param client WiFiClient to use for the HTTP request
  * @return none
@@ -1617,135 +1753,12 @@ static void getDeviceCredentials()
 
   if (client)
   {
+    shouldDownloadImage = performApiSetup(client);
+
+    Log.info("%s [%d]: status - %d\r\n", __FILE__, __LINE__, status);
+    if (shouldDownloadImage)
     {
-      // Add a scoping block for HTTPClient https to make sure it is destroyed before WiFiClientSecure *client is
-      HTTPClient https;
-      https.setTimeout(15000);
-      https.setConnectTimeout(15000);
-
-      Log.info("%s [%d]: [HTTPS] begin /api/setup/ ...\r\n", __FILE__, __LINE__);
-      char new_url[200];
-      strcpy(new_url, preferences.getString(PREFERENCES_API_URL, API_BASE_URL).c_str());
-      strcat(new_url, "/api/setup/");
-
-      if (https.begin(*client, new_url))
-      { // HTTPS
-        Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
-        Log.info("%s [%d]: [HTTPS] GET...\r\n", __FILE__, __LINE__);
-        // start connection and send HTTP header
-
-        https.addHeader("ID", WiFi.macAddress());
-        https.addHeader("Content-Type", "application/json");
-        https.addHeader("FW-Version", FW_VERSION_STRING);
-        Log.info("%s [%d]: Device MAC address: %s\r\n", __FILE__, __LINE__, WiFi.macAddress().c_str());
-
-        int httpCode = https.GET();
-
-        // httpCode will be negative on error
-        if (httpCode > 0)
-        {
-          // HTTP header has been send and Server response header has been handled
-          Log.info("%s [%d]: GET... code: %d\r\n", __FILE__, __LINE__, httpCode);
-          // file found at server
-          Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
-          if (httpCode == HTTP_CODE_OK)
-          {
-            Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, https.getSize());
-            String payload = https.getString();
-            Log.info("%s [%d]: Payload: %s\r\n", __FILE__, __LINE__, payload.c_str());
-
-            auto apiResponse = parseResponse_apiSetup(payload);
-
-            if (apiResponse.outcome == ApiSetupOutcome::DeserializationError)
-            {
-              Log.error("%s [%d]: JSON deserialization error.\r\n", __FILE__, __LINE__);
-              https.end();
-              client->stop();
-              return;
-            }
-            uint16_t url_status = apiResponse.status;
-            if (url_status == 200)
-            {
-              status = true;
-              shouldDownloadImage = true;
-              Log.info("%s [%d]: status OK.\r\n", __FILE__, __LINE__);
-
-              String api_key = apiResponse.api_key;
-              Log.info("%s [%d]: API key - %s\r\n", __FILE__, __LINE__, api_key.c_str());
-              size_t res = preferences.putString(PREFERENCES_API_KEY, api_key);
-              Log.info("%s [%d]: api key saved in the preferences - %d\r\n", __FILE__, __LINE__, res);
-
-              String friendly_id = apiResponse.friendly_id;
-              Log.info("%s [%d]: friendly ID - %s\r\n", __FILE__, __LINE__, friendly_id.c_str());
-              res = preferences.putString(PREFERENCES_FRIENDLY_ID, friendly_id);
-              Log.info("%s [%d]: friendly ID saved in the preferences - %d\r\n", __FILE__, __LINE__, res);
-
-              String image_url = apiResponse.image_url;
-              Log.info("%s [%d]: image_url - %s\r\n", __FILE__, __LINE__, image_url.c_str());
-              image_url.toCharArray(filename, image_url.length() + 1);
-
-              String message_str = apiResponse.message;
-              Log.info("%s [%d]: message - %s\r\n", __FILE__, __LINE__, message_str.c_str());
-              message_str.toCharArray(message_buffer, message_str.length() + 1);
-
-              Log.info("%s [%d]: status - %d\r\n", __FILE__, __LINE__, status);
-            }
-            else if (url_status == 404)
-            {
-              Log_info("MAC Address is not registered on server");
-
-              showMessageWithLogo(MAC_NOT_REGISTERED, apiResponse);
-
-              preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
-
-              display_sleep();
-              goToSleep();
-            }
-            else
-            {
-              Log.info("%s [%d]: status FAIL.\r\n", __FILE__, __LINE__);
-              status = false;
-            }
-          }
-          else
-          {
-            if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
-            {
-              showMessageWithLogo(API_ERROR);
-            }
-            else
-            {
-              showMessageWithLogo(WIFI_WEAK);
-            }
-            Log_error_submit("[HTTPS] Unable to connect");
-          }
-        }
-        else
-        {
-          if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
-          {
-            showMessageWithLogo(API_ERROR);
-          }
-          else
-          {
-            showMessageWithLogo(WIFI_WEAK);
-          }
-          Log_error_submit("[HTTPS] GET... failed, error: %s", https.errorToString(httpCode).c_str());
-        }
-
-        https.end();
-      }
-      else
-      {
-        showMessageWithLogo(WIFI_INTERNAL_ERROR);
-        Log_error_submit("[HTTPS] Unable to connect");
-      }
-      Log.info("%s [%d]: status - %d\r\n", __FILE__, __LINE__, status);
-      if (shouldDownloadImage)
-      {
-        downloadSetupImage(client);
-      }
-      // End extra scoping block
+      downloadSetupImage(client);
     }
     client->stop();
     delete client;
