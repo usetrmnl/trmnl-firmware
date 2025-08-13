@@ -76,8 +76,12 @@ char szTemp[32];
  */
 void display_sleep(uint32_t u32Millis)
 {
-  esp_sleep_enable_timer_wakeup(u32Millis * 1000L);
-  esp_light_sleep_start();
+#ifdef DO_NOT_LIGHT_SLEEP
+    delay(u32Millis);
+#else
+    esp_sleep_enable_timer_wakeup(u32Millis * 1000L);
+    esp_light_sleep_start();
+#endif
 }
 
 /**
