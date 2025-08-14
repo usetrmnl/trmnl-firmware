@@ -633,6 +633,13 @@ static https_request_err_e downloadAndShow()
         https.setTimeout(15000);
         https.setConnectTimeout(15000);
 
+        // Include ID and Access Token if the image is hosted on the same server as the API 
+        if (strncmp(filename, apiDisplayInputs.baseUrl.c_str(), apiDisplayInputs.baseUrl.length()) == 0)
+        {
+          https.addHeader("ID", apiDisplayInputs.macAddress);
+          https.addHeader("Access-Token", apiDisplayInputs.apiKey);
+        }
+        
         if (status && !update_firmware && !reset_firmware)
         {
           status = false;
