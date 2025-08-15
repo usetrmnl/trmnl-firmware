@@ -480,7 +480,7 @@ PNG *png = new PNG();
 void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
 
 {
-    bool isPNG = true;
+    bool isPNG = data_size >= 4 && MOTOLONG(image_buffer) == (int32_t)0x89504e47;;
     auto width = display_width();
     auto height = display_height();
 //    uint32_t *d32;
@@ -506,7 +506,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
         }
     }
 #endif
-    if (isPNG == true && data_size < DEFAULT_IMAGE_SIZE)
+    if (isPNG == true && data_size < MAX_IMAGE_SIZE)
     {
         Log_info("Drawing PNG");
         iRefreshMode = png_to_epd(image_buffer, data_size);
@@ -523,11 +523,15 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
 #endif
             int x = (width - pBBB->width)/2;
             int y = (height - pBBB->height)/2; // center it
-            bbep.fillScreen(BBEP_WHITE); // draw the image centered on a white background
+            if (x > 0 || y > 0) // only clear if the image is smaller than the display
+            {
+                bbep.fillScreen(BBEP_WHITE); 
+            }     
             bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
-        }
-        else
-        { // This work-around is due to a lack of RAM; the correct method would be to use loadBMP()
+        } 
+        else 
+        {
+         // This work-around is due to a lack of RAM; the correct method would be to use loadBMP()
             flip_image(image_buffer+62, bbep.width(), bbep.height(), false); // fix bottom-up bitmap images
 #ifdef BB_EPAPER
             bbep.setBuffer(image_buffer+62); // uncompressed 1-bpp bitmap
@@ -607,7 +611,6 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef BB_EPAPER
     bbep.allocBuffer(false);
-    bbep.fillScreen(BBEP_WHITE); // white background
 #endif
     if (*(uint16_t *)image_buffer == BB_BITMAP_MARKER)
     {
@@ -615,6 +618,10 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
         int x = (width - pBBB->width)/2;
         int y = (height - pBBB->height)/2; // center it
+        if (x > 0 || y > 0) // only clear if the image is smaller than the display
+        {
+            bbep.fillScreen(BBEP_WHITE); 
+        }
         bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
     }
     else
@@ -807,7 +814,6 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef BB_EPAPER
     bbep.allocBuffer(false);
-    bbep.fillScreen(BBEP_WHITE);
     Log_info("Free heap after bbep.allocBuffer() - %d", ESP.getMaxAllocHeap());
 #endif
 
@@ -842,6 +848,10 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
         int x = (width - pBBB->width)/2;
         int y = (height - pBBB->height)/2; // center it
+        if (x > 0 || y > 0) // only clear if the image is smaller than the display
+        { 
+            bbep.fillScreen(BBEP_WHITE);
+        }
         bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
     }
     else
