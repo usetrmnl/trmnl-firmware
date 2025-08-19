@@ -464,7 +464,7 @@ int png_draw_count(PNGDRAW *pDraw)
     int x, *pFlags = (int *)pDraw->pUser;
     uint8_t *s, set_bits;
 
-    if (pDraw->y > 430) return; // Workaround to ignore the icon in the lower left corner
+    if (pDraw->y > 430) return 0; // Workaround to ignore the icon in the lower left corner
 
     set_bits = pFlags[0]; // use a local var
     s = (uint8_t *)pDraw->pPixels;
