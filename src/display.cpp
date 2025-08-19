@@ -280,6 +280,86 @@ void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message,
     }
 }
 /** 
+ * @brief Reduce the bit depth of line of pixels using thresholding (aka simple color mapping)
+ * @param Destination bit count (1 or 2)
+ * @param Pointer to a PNG palette (3 bytes per entry)
+ * @param Pointer to the source pixels
+ * @param Pointer to the destination pixels
+ * @param Pixel count
+ * @param Original bit depth
+ * @return none
+ */
+void ReduceBpp(int iDestBpp, int iPixelType, uint8_t *pPalette, uint8_t *pSrc, uint8_t *pDest, int w, int iSrcBpp)
+{
+    int g = 0, x, iDelta;
+    uint8_t *s, *d, *pPal, u8, count;
+    
+    if (iPixelType == PNG_PIXEL_TRUECOLOR) iSrcBpp = 24;
+    else if (iPixelType == PNG_PIXEL_TRUECOLOR_ALPHA) iSrcBpp = 32;
+    iDelta = iSrcBpp/8; // bytes per pixel
+    count = 8; // bits in a byte
+    u8 = 0; // start with all black
+    d = pDest;
+    s = pSrc;
+    for (x=0; x<w; x++) {
+        u8 <<= iDestBpp;
+        switch (iSrcBpp) {
+            case 24:
+            case 32:
+                g = (s[0] + s[1]*2 + s[2])/4; // convert color to gray value
+                s += iDelta;
+                break;
+            case 8:
+                if (iPixelType == PNG_PIXEL_INDEXED) {
+                    pPal = &pPalette[s[0] * 3];
+                    g = (pPal[0] + pPal[1]*2 + pPal[2])/4;
+                } else { // must be grayscale
+                    g = s[0];
+                }
+                s++;
+                break;
+            case 4:
+                if (x & 1) {
+                    if (iPixelType == PNG_PIXEL_INDEXED) {
+                        pPal = &pPalette[(s[0] & 0xf) * 3];
+                        g = (pPal[0] + pPal[1]*2 + pPal[2])/4;
+                    } else {
+                        g = (s[0] & 0xf) | (s[0] << 4);
+                    }
+                    s++;
+                } else {
+                    if (iPixelType == PNG_PIXEL_INDEXED) {
+                        pPal = &pPalette[(s[0]>>4) * 3];
+                        g = (pPal[0] + pPal[1]*2 + pPal[2])/4;
+                    } else {
+                        g = (s[0] & 0xf0) | (s[0] >> 4);
+                    }
+                }
+                break;
+            case 2: // We need to handle this case for 2-bit images with (random) palettes
+                g = s[0] >> (6-((x & 3) * 2));
+                pPal = &pPalette[(g & 3)*3];
+                g = (pPal[0] + pPal[1]*2 + pPal[2])/4;
+                break;
+        } // switch on bpp
+        if (iDestBpp == 1) {
+            u8 |= (g >> 7); // B/W
+        } else { // generate 4 gray levels (2 bits)
+            u8 |= (3 ^ (g >> 6)); // 4 gray levels (inverted relative to 1-bit)
+        }
+        count -= iDestBpp;        
+        if (count == 0) { // byte is full, move on
+            *d++ = u8;
+            u8 = 0;
+            count = 8;
+        }
+    } // for x
+    if (count != 8) { // partial byte remaining
+        u8 <<= count;
+        *d++ = u8;
+    }
+} /* ReduceBpp() */
+/** 
  * @brief Callback function for each line of PNG decoded
  * @param PNGDRAW structure containing the current line and relevant info
  * @return none
@@ -287,19 +367,27 @@ void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message,
 void png_draw(PNGDRAW *pDraw)
 {
     int x;
-    uint8_t ucInvert = 0;
+    uint8_t ucBppChanged = 0, ucInvert = 0;
     uint8_t uc, ucMask, src, *s, *d, *pTemp = bbep.getCache(); // get some scratch memory (not from the stack)
 
-    if (pDraw->pPalette) {
-      if (pDraw->pPalette[0] == 0) {
-        ucInvert = 0xff;
-      }
+    if (pDraw->iPixelType == PNG_PIXEL_INDEXED || pDraw->iBpp > 2) {
+        if (pDraw->iBpp == 1) { // 1-bit output, just see which color is brighter
+            uint32_t u32Gray0, u32Gray1;
+            u32Gray0 = pDraw->pPalette[0] + (pDraw->pPalette[1]<<2) + pDraw->pPalette[2];
+            u32Gray1 = pDraw->pPalette[3] + (pDraw->pPalette[4]<<2) + pDraw->pPalette[5];
+          if (u32Gray0 < u32Gray1) {
+            ucInvert = 0xff;
+          }
+        } else {
+            // Reduce the source image to 1-bpp or 2-bpp
+            ReduceBpp((pDraw->pUser) ? 2:1, pDraw->iPixelType, pDraw->pPalette, pDraw->pPixels, pTemp, pDraw->iWidth, pDraw->iBpp);
+            ucBppChanged = 1;
+        }
     }
-    s = (uint8_t *)pDraw->pPixels;
+    s = (ucBppChanged) ? pTemp : (uint8_t *)pDraw->pPixels;
     d = pTemp;
     if (!pDraw->pUser) {
         // 1-bit output, decode the single plane and write it
-        ucInvert = ~ucInvert; // the b/w polarity is reversed compared to 2-bpp mode
         for (x=0; x<pDraw->iWidth; x+= 8) {
           d[0] = s[0] ^ ucInvert;
           d++; s++;
@@ -430,24 +518,23 @@ PNG *png = new PNG();
         if (png->getWidth() != bbep.width() || png->getHeight() != bbep.height()) {
             Log_error("PNG image size doesn't match display size");
             rc = -1;
-        } else if (png->getBpp() > 2) {
-            Log_error("Unsupported PNG bit depth (only 1 or 2-bpp supported)");
-            rc = -1;
         } else { // okay to decode
             Log_info("%s [%d]: Decoding %d-bpp png (current)\r\n", __FILE__, __LINE__, png->getBpp());
             // Prepare target memory window (entire display)
             bbep.setAddrWindow(0, 0, bbep.width(), bbep.height());
-            if (png->getBpp() == 1 || png_count_colors(png, pPNG, iDataSize) == 2) { // 1-bit image (single plane)
+            if (png->getBpp() == 1 || (png->getBpp() == 2 && png_count_colors(png, pPNG, iDataSize) == 2)) { // 1-bit image (single plane)
                 bbep.setPanelType(ONE_BIT_PANEL);
                 rc = REFRESH_PARTIAL; // the new image is 1bpp - try a partial update
                 bbep.startWrite(PLANE_0); // start writing image data to plane 0
                 png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
-                if (png->getBpp() == 1) {
+                if (png->getBpp() == 1 || png->getBpp() > 2) {
                     png->decode(NULL, 0);
                 } else { // convert the 2-bit image to 1-bit output
                     Log_info("%s [%d]: Current png only has 2 unique colors!\n", __FILE__, __LINE__);
                     iPlane = 2;
-                    png->decode(&iPlane, 0);
+                    if (png->decode(&iPlane, 0) != PNG_SUCCESS) {
+                        Log_info("%s [%d]: Error decoding image = %d\n", __FILE__, __LINE__, png->getLastError());
+                    }
                 }
                 png->close();
             } else { // 2-bpp
