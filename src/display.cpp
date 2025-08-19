@@ -383,6 +383,8 @@ int png_draw(PNGDRAW *pDraw)
             ReduceBpp((pDraw->pUser) ? 2:1, pDraw->iPixelType, pDraw->pPalette, pDraw->pPixels, pTemp, pDraw->iWidth, pDraw->iBpp);
             ucBppChanged = 1;
         }
+    } else if (pDraw->iBpp == 2) {
+        ucInvert = 0xff; // 2-bit non-palette images need to be inverted colors for 4-gray mode
     }
     s = (ucBppChanged) ? pTemp : (uint8_t *)pDraw->pPixels;
     d = pTemp;
