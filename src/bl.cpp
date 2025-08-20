@@ -15,7 +15,7 @@
 #include <AsyncTCP.h>
 #include <Preferences.h>
 #include <cstdint>
-#include <png_file.h>
+#include "png.h"
 #include <bmp.h>
 #include <Update.h>
 #include <math.h>
@@ -35,20 +35,20 @@
 #include <serialize_log.h>
 #include <preferences_persistence.h>
 #include "logo_small.h"
+#include "loading.h"
 #include <wifi-helpers.h>
 
 bool pref_clear = false;
 String new_filename = "";
-
+ApiDisplayResult apiDisplayResult;
 uint8_t *buffer = nullptr;
-uint8_t *decodedPng = nullptr;
 char filename[1024];      // image URL
 char binUrl[1024];        // update URL
 char message_buffer[128]; // message to show on the screen
 uint32_t time_since_sleep;
 image_err_e png_res = PNG_DECODE_ERR;
 bmp_err_e bmp_res = BMP_NOT_BMP;
-
+static float vBatt;
 bool status = false;          // need to download a new image
 bool update_firmware = false; // need to download a new firmware
 bool reset_firmware = false;  // need to reset credentials
@@ -81,7 +81,7 @@ static void showMessageWithLogo(MSG message_type);
 static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, const char *fw_version, String message);
 static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiResponse);
 static void wifiErrorDeepSleep();
-static uint8_t *storedLogoOrDefault(void);
+static uint8_t *storedLogoOrDefault(int iType);
 static bool saveCurrentFileName(String &name);
 static bool checkCurrentFileName(String &newName);
 static DeviceStatusStamp getDeviceStatusStamp();
@@ -111,6 +111,7 @@ void bl_init(void)
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
   Log_info("BL init success");
   pins_init();
+  vBatt = readBatteryVoltage(); // Read the battery voltage BEFORE WiFi is turned on
 
 #if defined(BOARD_SEEED_XIAO_ESP32C3)
   delay(2000);
@@ -240,10 +241,9 @@ void bl_init(void)
   {
     Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
 
-    buffer = (uint8_t *)malloc(DEFAULT_IMAGE_SIZE);
-    display_show_image(storedLogoOrDefault(), false, false);
-    free(buffer);
-    buffer = nullptr;
+  
+    display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false);
+
 
     need_to_refresh_display = 1;
     preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
@@ -357,6 +357,11 @@ void bl_init(void)
   // OTA checking, image checking and drawing
   https_request_err_e request_result = downloadAndShow();
   Log.info("%s [%d]: request result - %d\r\n", __FILE__, __LINE__, request_result);
+
+  if (request_result == HTTPS_IMAGE_FILE_TOO_BIG)
+  {
+    showMessageWithLogo(MSG_TOO_BIG);
+  }
 
   if (!preferences.isKey(PREFERENCES_CONNECT_API_RETRY_COUNT))
   {
@@ -555,7 +560,7 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
 
   inputs.macAddress = WiFi.macAddress();
 
-  inputs.batteryVoltage = readBatteryVoltage();
+  inputs.batteryVoltage = vBatt; //readBatteryVoltage();
 
   inputs.firmwareVersion = String(FW_VERSION_STRING);
 
@@ -602,7 +607,7 @@ static https_request_err_e downloadAndShow()
 
   auto apiDisplayInputs = loadApiDisplayInputs(preferences);
 
-  auto apiDisplayResult = fetchApiDisplay(apiDisplayInputs);
+  apiDisplayResult = fetchApiDisplay(apiDisplayInputs);
 
   if (apiDisplayResult.error != HTTPS_NO_ERR)
   {
@@ -659,6 +664,8 @@ static https_request_err_e downloadAndShow()
           // start connection and send HTTP header
           int httpCode = https.GET();
           int content_size = https.getSize();
+          uint8_t *buffer_old = nullptr; // Disable partial update for now
+          int file_size_old = 0;
 
           // httpCode will be negative on error
           if (httpCode < 0)
@@ -680,23 +687,18 @@ static https_request_err_e downloadAndShow()
           Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, https.getSize());
 
           uint32_t counter = 0;
-          if (content_size > DISPLAY_BMP_IMAGE_SIZE)
+          if (content_size > MAX_IMAGE_SIZE)
           {
-            Log_error_submit("Receiving failed. Bad file size");
-
+            //Log_error_submit("Receiving failed; file size too big");
+            Log.info("%s [%d]: Receiving failed; file size too big: %d\r\n", __FILE__, __LINE__, content_size);
+            result = HTTPS_IMAGE_FILE_TOO_BIG;
             return HTTPS_REQUEST_FAILED;
           }
           WiFiClient *stream = https.getStreamPtr();
           Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
           Log.info("%s [%d]: Stream timeout: %d\r\n", __FILE__, __LINE__, stream->getTimeout());
 
-          Log.info("%s [%d]: Stream available: %d\r\n", __FILE__, __LINE__, stream->available());
-
-          uint32_t timer = millis();
-          while (stream->available() < 4000 && millis() - timer < 1000)
-            ;
-
-          Log.info("%s [%d]: Stream available: %d\r\n", __FILE__, __LINE__, stream->available());
+          Log.info("%s [%d]: Stream available (may show as 0 and that's okay): %d\r\n", __FILE__, __LINE__, stream->available());
 
           bool isPNG = https.header("Content-Type") == "image/png";
 
@@ -721,9 +723,8 @@ static https_request_err_e downloadAndShow()
 
             return HTTPS_WRONG_IMAGE_SIZE;
           }
-
           WiFi.disconnect(true); // no need for WiFi, save power starting here
-          Log.info("%s [%d]: Received successfully; WiFi off\r\n", __FILE__, __LINE__);
+          Log.info("%s [%d]: Received successfully; WiFi off; WiFi off\r\n", __FILE__, __LINE__);
           bool bmp_rename = false;
 
           if (filesystem_file_exists("/current.bmp") || filesystem_file_exists("/current.png"))
@@ -732,17 +733,24 @@ static https_request_err_e downloadAndShow()
             filesystem_file_delete("/last.png");
             filesystem_file_rename("/current.png", "/last.png");
             filesystem_file_rename("/current.bmp", "/last.bmp");
+// Disable partial update (for now)
+//            if (filesystem_file_exists("/last.png")) {
+//                buffer_old = display_read_file("/last.png", &file_size_old);
+//                Log.info("%s [%d]: Reading last.png to use for partial update, size = %d\r\n", __FILE__, __LINE__, file_size_old);
+//            }
           }
 
           bool image_reverse = false;
           if (isPNG)
           {
             writeImageToFile("/current.png", buffer, content_size);
-            delay(100);
-            free(buffer);
-            buffer = nullptr;
             Log.info("%s [%d]: Decoding png\r\n", __FILE__, __LINE__);
-            png_res = decodePNG("/current.png", decodedPng);
+            display_show_image(buffer, content_size, true);
+//            delay(100);
+//            free(buffer);
+//            buffer = nullptr;
+//            png_res = decodePNG("/current.png", decodedPng);
+            png_res = PNG_NO_ERR; // DEBUG
           }
           else
           {
@@ -751,7 +759,8 @@ static https_request_err_e downloadAndShow()
           }
           Serial.println();
           String error = "";
-          uint8_t *imagePointer = (decodedPng == nullptr) ? buffer : decodedPng;
+          uint8_t *imagePointer = buffer;
+//          uint8_t *imagePointer = (decodedPng == nullptr) ? buffer : decodedPng;
           bool lastImageExists = filesystem_file_exists("/last.bmp") || filesystem_file_exists("/last.png");
 
           switch (png_res)
@@ -759,8 +768,8 @@ static https_request_err_e downloadAndShow()
           case PNG_NO_ERR:
           {
 
-            Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
-            display_show_image(imagePointer, image_reverse, isPNG);
+           // Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
+           // display_show_image(imagePointer, image_reverse, isPNG);
 
             // Using filename from API response
             new_filename = apiDisplayResult.response.filename;
@@ -811,7 +820,7 @@ static https_request_err_e downloadAndShow()
               writeImageToFile("/current.bmp", buffer, content_size);
             }
             Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
-            display_show_image(imagePointer, image_reverse, isPNG);
+            display_show_image(buffer, content_size, true);
 
             // Using filename from API response
             new_filename = apiDisplayResult.response.filename;
@@ -904,6 +913,7 @@ uint32_t downloadStream(WiFiClient *stream, int content_size, uint8_t *buffer)
 https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
 {
   https_request_err_e result = HTTPS_NO_ERR;
+  int file_size = 0;
 
   if (special_function == SF_NONE)
   {
@@ -1254,7 +1264,8 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           {
             isPNG = true;
             Log.info("Rewind PNG\n\r");
-            image_proccess_response = decodePNG(last_dot_file.c_str(), buffer);
+            buffer = display_read_file(last_dot_file.c_str(), &file_size);
+            image_proccess_response = PNG_NO_ERR; // DEBUG
           }
 
           if (file_check_bmp)
@@ -1264,7 +1275,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
             case PNG_NO_ERR:
             {
               Log.info("Showing image\n\r");
-              display_show_image(buffer, image_reverse, isPNG);
+              display_show_image(buffer, file_size, true);
               need_to_refresh_display = 1;
             }
             break;
@@ -1278,7 +1289,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
             case BMP_NO_ERR:
             {
               Log.info("Showing image\n\r");
-              display_show_image(buffer, image_reverse, isPNG);
+              display_show_image(buffer, DISPLAY_BMP_IMAGE_SIZE, true);
               need_to_refresh_display = 1;
             }
             break;
@@ -1347,9 +1358,13 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           else if (filesystem_file_exists("/current.png"))
           {
             Log.info("%s [%d]: send_to_me PNG\r\n", __FILE__, __LINE__);
-            isPNG = true;
-            image_err_e png_parse_result = decodePNG("/current.png", buffer);
-
+            image_err_e png_parse_result = PNG_NO_ERR; // DEBUG
+            buffer = display_read_file("/current.png", &file_size);
+// Disable partial update for now
+//            if (filesystem_file_exists("/last.png")) {
+//                buffer_old = display_read_file("/last.png", &file_size_old);
+//                Log.info("%s [%d]: loading last PNG for partial update\r\n", __FILE__, __LINE__);
+//            }
             if (png_parse_result != PNG_NO_ERR)
             {
               Log_error_submit("Error parsing PNG header, code: %d", png_parse_result);
@@ -1360,7 +1375,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           }
 
           Log.info("Showing image\n\r");
-          display_show_image(buffer, image_reverse, isPNG);
+          display_show_image(buffer, file_size, true);
           need_to_refresh_display = 1;
 
           free(buffer);
@@ -1652,9 +1667,7 @@ static void getDeviceCredentials()
 
                 // show the image
                 String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
-                display_show_msg(storedLogoOrDefault(), FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
-                free(buffer);
-                buffer = nullptr;
+                display_show_msg(storedLogoOrDefault(0), FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
                 need_to_refresh_display = 0;
               }
               else
@@ -1888,17 +1901,19 @@ static float readBatteryVoltage(void)
     digitalWrite(PIN_VBAT_SWITCH, VBAT_SWITCH_LEVEL);
   #endif
     Log.info("%s [%d]: Battery voltage reading...\r\n", __FILE__, __LINE__);
-    int32_t adc = 0;
-    for (uint8_t i = 0; i < 128; i++)
-    {
+    int32_t adc;
+    int32_t sensorValue;
+
+    adc = 0;
+    analogRead(3); // This is needed to properly initialize the ADC BEFORE calling analogReadMilliVolts()
+    for (uint8_t i = 0; i < 8; i++) {
       adc += analogReadMilliVolts(PIN_BATTERY);
     }
   #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001)
     digitalWrite(PIN_VBAT_SWITCH, (VBAT_SWITCH_LEVEL == HIGH ? LOW : HIGH));
   #endif
-
-    int32_t sensorValue = (adc / 128) * 2;
-
+    sensorValue = (adc / 8) * 2;
+    Log.info("%s [%d]: Battery sensorValue = %d\r\n", __FILE__, __LINE__, (int)sensorValue);
     float voltage = sensorValue / 1000.0;
     return voltage;
 #endif // FAKE_BATTERY_VOLTAGE
@@ -2039,24 +2054,15 @@ static void writeSpecialFunction(SPECIAL_FUNCTION function)
   }
 }
 
-static void showMessageWithLogo(MSG message_type)
-{
-  buffer = (uint8_t *)malloc(DEFAULT_IMAGE_SIZE);
-  display_show_msg(storedLogoOrDefault(), message_type);
-  free(buffer);
-  buffer = nullptr;
-
+static void showMessageWithLogo(MSG message_type) {
+  display_show_msg(storedLogoOrDefault(0), message_type);
   need_to_refresh_display = 1;
   preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
 }
 
 static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, const char *fw_version, String message)
 {
-  buffer = (uint8_t *)malloc(DEFAULT_IMAGE_SIZE);
-  display_show_msg(storedLogoOrDefault(), message_type, friendly_id, id, fw_version, message);
-  free(buffer);
-  buffer = nullptr;
-
+  display_show_msg(storedLogoOrDefault(0), message_type, friendly_id, id, fw_version, message);
   need_to_refresh_display = 1;
   preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
 }
@@ -2069,18 +2075,27 @@ static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, c
  */
 static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiResponse)
 {
-  buffer = (uint8_t *)malloc(DEFAULT_IMAGE_SIZE);
-  display_show_msg(storedLogoOrDefault(), message_type, "", false, "", apiResponse.message);
-  free(buffer);
-  buffer = nullptr;
-
+  display_show_msg(storedLogoOrDefault(0), message_type, "", false, "", apiResponse.message);
   need_to_refresh_display = 1;
   preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
 }
 
-static uint8_t *storedLogoOrDefault(void)
+// 0 = larger glyph, centered for message screens
+// 1 = small glyph, set in lower-right corner for loading screen
+static uint8_t *storedLogoOrDefault(int iType)
 {
-  return const_cast<uint8_t *>(logo_small);
+//  if (filesystem_read_from_file("/logo.bmp", buffer, DEFAULT_IMAGE_SIZE))
+//  {
+//    return buffer;
+//  }
+  if (iType == 0) {
+    return const_cast<uint8_t *>(logo_small);
+  } else {
+    // Force the loading screen to always use the slower update method because
+    // we don't know (yet) if the panel can handle the faster update modes
+    apiDisplayResult.response.maximum_compatibility = true;
+    return const_cast<uint8_t *>(loading);
+  }
 }
 
 static bool saveCurrentFileName(String &name)
@@ -2171,7 +2186,7 @@ DeviceStatusStamp getDeviceStatusStamp()
   deviceStatus.time_since_last_sleep = time_since_sleep;
   snprintf(deviceStatus.current_fw_version, sizeof(deviceStatus.current_fw_version), "%s", FW_VERSION_STRING);
   parseSpecialFunctionToStr(deviceStatus.special_function, sizeof(deviceStatus.special_function), special_function);
-  deviceStatus.battery_voltage = readBatteryVoltage();
+  deviceStatus.battery_voltage = vBatt; //readBatteryVoltage()
   parseWakeupReasonToStr(deviceStatus.wakeup_reason, sizeof(deviceStatus.wakeup_reason), esp_sleep_get_wakeup_cause());
   deviceStatus.free_heap_size = ESP.getFreeHeap();
   deviceStatus.max_alloc_size = ESP.getMaxAllocHeap();

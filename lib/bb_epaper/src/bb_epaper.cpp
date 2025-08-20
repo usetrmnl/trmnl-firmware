@@ -91,11 +91,11 @@ void BBEPAPER::initIO(int iDC, int iReset, int iBusy, int iCS, int iSPIChannel, 
 	bbepInitIO(&_bbep, u32Speed);
 } /* initIO() */
 #endif
-int BBEPAPER::writePlane(int iPlane)
+int BBEPAPER::writePlane(int iPlane, bool bInvert)
 {
     long l = millis();
     int rc;
-    rc = bbepWritePlane(&_bbep, iPlane);
+    rc = bbepWritePlane(&_bbep, iPlane, (int)bInvert);
     _bbep.iDataTime = (int)(millis() - l);
     return rc;
 } /* writePlane() */
@@ -149,6 +149,10 @@ int BBEPAPER::allocBuffer(bool bSecondPlane)
     return bbepAllocBuffer(&_bbep, (int)bSecondPlane);
 } /* allocBuffer() */
 
+uint8_t * BBEPAPER::getCache(void)
+{
+    return u8Cache;
+}
 void * BBEPAPER::getBuffer(void)
 {
     return (void *)_bbep.ucScreen;
@@ -211,10 +215,6 @@ bool BBEPAPER::hasPartialRefresh()
 
 void BBEPAPER::setTextColor(int iFG, int iBG)
 {
-    if ((_bbep.iFlags & (BBEP_3COLOR | BBEP_4COLOR | BBEP_7COLOR)) == 0) {
-        if (iFG == BBEP_RED || iFG == BBEP_YELLOW) iFG = BBEP_BLACK; // can't set red color
-        if (iBG == BBEP_RED || iFG == BBEP_YELLOW) iBG = BBEP_BLACK;
-    }
     _bbep.iFG = iFG;
     _bbep.iBG = (iBG == -1) ? iFG : iBG;
 } /* setTextColor() */

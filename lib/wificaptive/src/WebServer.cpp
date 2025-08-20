@@ -1,5 +1,8 @@
 #include "WebServer.h"
 #include <WiFi.h>
+#include <test.h>
+
+
 
 void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperationCallbacks callbacks)
 {
@@ -39,7 +42,8 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
               {
 		AsyncWebServerResponse *response = request->beginResponse(200, "text/html", INDEX_HTML, INDEX_HTML_LEN);
 		response->addHeader("Content-Encoding", "gzip");
-    	request->send(response); });
+    	request->send(response);  // redirect to the local IP URL
+        });
 
     // Servce logo.svg
     server.on("/logo.svg", HTTP_ANY, [&](AsyncWebServerRequest *request)
@@ -53,6 +57,19 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
               {
 		callbacks.resetSettings();
 		request->send(200); });
+
+    server.on("/advanced", HTTP_GET, [&](AsyncWebServerRequest *request)
+              {
+                AsyncWebServerResponse *response = request->beginResponse(200, "text/html", ADVANCED_HTML, ADVANCED_HTML_LEN);
+                response->addHeader("Content-Encoding", "gzip");
+                request->send(response); 
+            });
+    server.on("/run-test", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+                Serial.println("Running sensor test from web...");
+                String json = Main_Test();
+                request->send(200, "application/json", json);
+              });
 
     auto scanGET = server.on("/scan", HTTP_GET, [callbacks](AsyncWebServerRequest *request)
                              {

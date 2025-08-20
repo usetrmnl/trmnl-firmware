@@ -231,11 +231,11 @@ If you prefer to skip the build + upload steps below, flash directly from a web 
 
 ![Image Alt text](/pics/build_icon.JPG "Build")
 
-8. After the compilation process is complete, you should expect to see a message in the console.
+7. After the compilation process is complete, you should expect to see a message in the console.
 
 ![Image Alt text](/pics/console.JPG "Console")
 
-9. You can find the compiled file in the folder shown in the picture.
+8. You can find the compiled file in the folder shown in the picture.
 
 ![Image Alt text](/pics/bin_folder.JPG "Bin")
 

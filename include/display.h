@@ -18,6 +18,7 @@ enum MSG
   FW_UPDATE_FAILED,
   FW_UPDATE_SUCCESS,
   MSG_FORMAT_ERROR,
+  MSG_TOO_BIG,
   MAC_NOT_REGISTERED,
   TEST,
 };
@@ -28,6 +29,13 @@ enum MSG
  * @return none
  */
 void display_init(void);
+
+/**
+ * @brief Diagnostic function to continuously show the battery voltage
+ * @param none
+ * @return none
+ */
+void display_show_battery(float f);
 
 /**
  * @brief Function to reset the display
@@ -72,7 +80,16 @@ void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message,
  * @param reverse shows if the color scheme is reverse
  * @return none
  */
-void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG);
+
+void display_show_image(uint8_t *image_buffer, int data_size, bool bWait);
+
+/**
+ * @brief Function to read an image from the file system
+ * @param filename
+ * @param pointer to file size returned
+ * @return pointer to allocated buffer
+ */
+uint8_t * display_read_file(const char *filename, int *file_size);
 
 /**
  * @brief Function to show the image with message on the display
