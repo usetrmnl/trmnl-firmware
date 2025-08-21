@@ -1899,13 +1899,14 @@ static float readBatteryVoltage(void)
   #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001)
     pinMode(PIN_VBAT_SWITCH, OUTPUT);
     digitalWrite(PIN_VBAT_SWITCH, VBAT_SWITCH_LEVEL);
+    delay(10); // Wait for the switch to stabilize
   #endif
     Log.info("%s [%d]: Battery voltage reading...\r\n", __FILE__, __LINE__);
     int32_t adc;
     int32_t sensorValue;
 
     adc = 0;
-    analogRead(3); // This is needed to properly initialize the ADC BEFORE calling analogReadMilliVolts()
+    analogRead(PIN_BATTERY); // This is needed to properly initialize the ADC BEFORE calling analogReadMilliVolts()
     for (uint8_t i = 0; i < 8; i++) {
       adc += analogReadMilliVolts(PIN_BATTERY);
     }
