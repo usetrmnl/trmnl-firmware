@@ -284,7 +284,7 @@ void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message,
  * @param PNGDRAW structure containing the current line and relevant info
  * @return none
  */
-void png_draw(PNGDRAW *pDraw)
+int png_draw(PNGDRAW *pDraw)
 {
     int x;
     uint8_t ucInvert = 0;
@@ -344,6 +344,7 @@ void png_draw(PNGDRAW *pDraw)
         }
     }
     bbep.writeData(pTemp, (pDraw->iWidth+7)/8);
+    return 1;
 } /* png_draw() */
 
 //
@@ -370,12 +371,12 @@ const uint8_t ucTwoBitFlags[256] = {
 0x09,0x0b,0x0d,0x09,0x0b,0x0a,0x0e,0x0a,0x0d,0x0e,0x0c,0x0c,0x09,0x0a,0x0c,0x08
 };
 
-void png_draw_count(PNGDRAW *pDraw)
+int png_draw_count(PNGDRAW *pDraw)
 {
     int x, *pFlags = (int *)pDraw->pUser;
     uint8_t *s, set_bits;
 
-    if (pDraw->y > 430) return; // Workaround to ignore the icon in the lower left corner
+    if (pDraw->y > 430) return 0; // Workaround to ignore the icon in the lower left corner
 
     set_bits = pFlags[0]; // use a local var
     s = (uint8_t *)pDraw->pPixels;
@@ -383,6 +384,7 @@ void png_draw_count(PNGDRAW *pDraw)
         set_bits |= ucTwoBitFlags[*s++]; // do 4 pixels at a time
     } // for x
     pFlags[0] = set_bits; // put it back in the flags array
+    return 1;
 } /* png_draw_count() */
 /** 
  * @brief Function to decode a PNG and count the number of unique colors
