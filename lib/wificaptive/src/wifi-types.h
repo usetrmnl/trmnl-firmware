@@ -1,6 +1,9 @@
 #pragma once
 
 #include <Arduino.h>
+#include <WiFiGeneric.h>
+#include <WiFiType.h>
+#include <WiFi.h>
 
 struct WifiCredentials
 {

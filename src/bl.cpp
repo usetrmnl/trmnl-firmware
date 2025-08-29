@@ -1877,7 +1877,7 @@ static float readBatteryVoltage(void)
     int32_t sensorValue;
 
     adc = 0;
-    analogRead(3); // This is needed to properly initialize the ADC BEFORE calling analogReadMilliVolts()
+    analogRead(PIN_BATTERY); // This is needed to properly initialize the ADC BEFORE calling analogReadMilliVolts()
     for (uint8_t i = 0; i < 8; i++) {
       adc += analogReadMilliVolts(PIN_BATTERY);
     }
