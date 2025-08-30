@@ -5,20 +5,40 @@
 #include <Preferences.h>
 #include <preferences_persistence.h>
 #include "DEV_Config.h"
+#ifndef BOARD_TRMNL_X
 #define BB_EPAPER
-#ifdef BB_EPAPER
 #include "bb_epaper.h"
+#define MAX_BIT_DEPTH 2
 //#define ONE_BIT_PANEL EP426_800x480
 //#define TWO_BIT_PANEL EP426_800x480_4GRAY
 #define ONE_BIT_PANEL EP75_800x480
 #define TWO_BIT_PANEL EP75_800x480_4GRAY_OLD
 BBEPAPER bbep(ONE_BIT_PANEL);
 // Counts the number of partial updates to know when to do a full update
-RTC_DATA_ATTR int iUpdateCount = 0;
 #else
 #include "FastEPD.h"
 FASTEPD bbep;
+#define MAX_BIT_DEPTH 8
+const uint8_t u8_graytable[] = {
+/* 0 */  1, 1, 1, 1, 1, 1, 0, 0, 
+/* 1 */  0, 0, 0, 1, 1, 1, 0, 0, 
+/* 2 */  0, 0, 0, 0, 1, 1, 0, 0, 
+/* 3 */  2, 2, 2, 2, 1, 1, 0, 0, 
+/* 4 */  1, 1, 1, 1, 0, 1, 1, 2, 
+/* 5 */  0, 0, 0, 1, 1, 1, 1, 2, 
+/* 6 */  1, 1, 1, 1, 2, 1, 1, 2, 
+/* 7 */  0, 0, 1, 1, 2, 1, 1, 2, 
+/* 8 */  0, 0, 0, 1, 2, 1, 1, 2, 
+/* 9 */  0, 0, 1, 1, 1, 2, 1, 2, 
+/* 10 */  0, 0, 0, 1, 1, 2, 1, 2, 
+/* 11 */  0, 0, 1, 2, 1, 2, 1, 2, 
+/* 12 */  1, 1, 0, 1, 1, 2, 2, 0, 
+/* 13 */  1, 1, 1, 1, 2, 1, 2, 2, 
+/* 14 */  1, 1, 1, 2, 2, 1, 2, 2, 
+/* 15 */  0, 0, 0, 0, 0, 0, 0, 0
+};
 #endif
+RTC_DATA_ATTR int iUpdateCount = 0;
 #include "Group5.h"
 #include <config.h>
 #include "wifi_connect_qr.h"
@@ -44,30 +64,12 @@ void display_init(void)
 #ifdef BB_EPAPER
     bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
 #else
-    bbep.initPanel(BB_PANEL_EPDIY_V7);
-    bbep.setPanelSize(1448, 1072);
+    bbep.initPanel(BB_PANEL_EPDIY_V7_16); //, 26000000);
+    bbep.setPanelSize(1872, 1404, BB_PANEL_FLAG_MIRROR_X);
+    bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
 #endif
     Log_info("dev module end");
 }
-
-void display_show_battery(float vBatt)
-{
-char szTemp[32];
-
-    bbep.allocBuffer(false);
-    bbep.fillScreen(BBEP_WHITE); // draw the image centered on a white background
-    bbep.setFont(nicoclean_8); //Roboto_20);
-    bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
-    bbep.setCursor(0, 100);
-    sprintf(szTemp, "VBatt = %f", vBatt);
-    bbep.print(szTemp);
-    bbep.writePlane();
-    bbep.refresh(REFRESH_FULL, true);
-    bbep.sleep(DEEP_SLEEP);
-    while (1) {
-        vTaskDelay(1);
-    }
-} /* display_show_battery() */
 
 /**
  * @brief Function to sleep the ESP32 while saving power
@@ -364,6 +366,7 @@ void ReduceBpp(int iDestBpp, int iPixelType, uint8_t *pPalette, uint8_t *pSrc, u
  * @param PNGDRAW structure containing the current line and relevant info
  * @return none
  */
+#ifdef BB_EPAPER
 int png_draw(PNGDRAW *pDraw)
 {
     int x;
@@ -436,7 +439,47 @@ int png_draw(PNGDRAW *pDraw)
     bbep.writeData(pTemp, (pDraw->iWidth+7)/8);
     return 1;
 } /* png_draw() */
+#else // TRMNL_X version
+int png_draw(PNGDRAW *pDraw)
+{
+    int x;
+    uint8_t uc, ucMask, src, *s, *d;
+    int iPitch;
 
+    s = (uint8_t *)pDraw->pPixels;
+    d = bbep.currentBuffer();
+    if (pDraw->iBpp == 1) {
+        iPitch = (bbep.width() + 7)/8;
+        d += pDraw->y * iPitch; // point to the correct line
+        memcpy(d, s, (pDraw->iWidth+7)/8);
+    } else if (pDraw->iBpp == 2) { // we need to convert the 2-bit data into 4-bits
+        iPitch = bbep.width()/2;
+        d += pDraw->y * iPitch; // point to the correct line
+        for (x=0; x<pDraw->iWidth; x+=4) {
+            src = *s++;
+            uc = (src & 0xc0); // first pixel
+            uc |= ((src & 0x30) >> 2);
+            *d++ = uc;
+            uc = (src & 0xc) << 4;
+            uc |= ((src & 0x3) << 2);
+            *d++ = uc;
+        } // for x
+    } else if (pDraw->iBpp == 4) { // 4-bit is the native format
+        iPitch = bbep.width()/2;
+        d += pDraw->y * iPitch; // point to the correct line
+        memcpy(d, s, (pDraw->iWidth+1)/2);
+    } else { // must be 8-bit grayscale
+        iPitch = bbep.width()/2;
+        d += pDraw->y * iPitch; // point to the correct line
+        for (x=0; x<pDraw->iWidth; x+=2) {
+            uc = (s[0] & 0xf0) | (s[1] >> 4);
+            *d++ = uc;
+            s += 2;
+        } // for x
+    }
+    return 1;
+} /* png_draw() */
+#endif
 //
 // A table to accelerate the testing of 2-bit images for the number
 // of unique colors. Each entry sets bits 0-3 depending on the presence
@@ -519,12 +562,23 @@ PNG *png = new PNG();
     rc = png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
     png->close();
     if (rc == PNG_SUCCESS) {
-        if (png->getWidth() != bbep.width() || png->getHeight() != bbep.height()) {
-            Log_error("PNG image size doesn't match display size");
+        if (png->getWidth() == bbep.height() && png->getHeight() == bbep.width()) {
+            Log_error("Rotating canvas to portrait orientation");
+            bbep.setRotation(90);
+        }
+        if (png->getWidth() > bbep.width() || png->getHeight() > bbep.height()) {
+            Log_error("PNG image is too large for display size (%dx%d)", png->getWidth(), png->getHeight());
             rc = -1;
+<<<<<<< Updated upstream
+=======
+        } else if (png->getBpp() > MAX_BIT_DEPTH) {
+            Log_error("Unsupported PNG bit depth (only 1 to %d-bpp supported), this file has %d-bpp", MAX_BIT_DEPTH, png->getBpp());
+            rc = -1;
+>>>>>>> Stashed changes
         } else { // okay to decode
             Log_info("%s [%d]: Decoding %d-bpp png (current)\r\n", __FILE__, __LINE__, png->getBpp());
             // Prepare target memory window (entire display)
+#ifdef BB_EPAPER
             bbep.setAddrWindow(0, 0, bbep.width(), bbep.height());
             if (png->getBpp() == 1 || (png->getBpp() == 2 && png_count_colors(png, pPNG, iDataSize) == 2)) { // 1-bit image (single plane)
                 bbep.setPanelType(ONE_BIT_PANEL);
@@ -557,6 +611,11 @@ PNG *png = new PNG();
                 bbep.startWrite(PLANE_1); // start writing image data to plane 1
                 png->decode(&iPlane, 0); // decode it again to get plane 1 data
             }
+#else // FastEPD
+            bbep.setMode((png->getBpp() == 1) ? BB_MODE_1BPP : BB_MODE_4BPP);
+            png->decode(NULL, 0);
+            png->close();
+#endif
         }
     }
     free(png); // free the decoder instance
@@ -576,7 +635,11 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     auto height = display_height();
 //    uint32_t *d32;
     bool bAlloc = false;
+#ifdef BB_EPAPER
     int iRefreshMode = REFRESH_FULL; // assume full (slow) refresh
+#else
+    int iRefreshMode = 0;
+#endif
 
    // Log_info("Paint_NewImage %d", reverse);
     Log_info("show image for array");
@@ -628,8 +691,10 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
             bbep.setBuffer(image_buffer+62); // uncompressed 1-bpp bitmap
 #endif
         }
+#ifdef BB_EPAPER
         bbep.writePlane(PLANE_0); // send image data to the EPD
         iRefreshMode = REFRESH_PARTIAL;
+#endif
         iUpdateCount = 1; // use partial update
     }
     Log_info("Display refresh start");
