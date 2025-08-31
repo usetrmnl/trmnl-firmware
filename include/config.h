@@ -79,6 +79,7 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #define DEVICE_MODEL "xiao_epaper_display"
 #define PIN_INTERRUPT 5     //with silkscreen "KEY3"
 #define PIN_RESET 0
+#define FAKE_BATTERY_VOLTAGE
 #endif
 
 #if defined(BOARD_XIAO_EPAPER_DISPLAY)
