@@ -293,7 +293,8 @@ void ReduceBpp(int iDestBpp, int iPixelType, uint8_t *pPalette, uint8_t *pSrc, u
 {
     int g = 0, x, iDelta;
     uint8_t *s, *d, *pPal, u8, count;
-    
+    const uint8_t u8G2ToG8[4] = {0x00, 0x55, 0xaa, 0xff}; // 2-bit to 8-bit gray
+
     if (iPixelType == PNG_PIXEL_TRUECOLOR) iSrcBpp = 24;
     else if (iPixelType == PNG_PIXEL_TRUECOLOR_ALPHA) iSrcBpp = 32;
     iDelta = iSrcBpp/8; // bytes per pixel
@@ -338,8 +339,15 @@ void ReduceBpp(int iDestBpp, int iPixelType, uint8_t *pPalette, uint8_t *pSrc, u
                 break;
             case 2: // We need to handle this case for 2-bit images with (random) palettes
                 g = s[0] >> (6-((x & 3) * 2));
-                pPal = &pPalette[(g & 3)*3];
-                g = (pPal[0] + pPal[1]*2 + pPal[2])/4;
+                if (iPixelType == PNG_PIXEL_INDEXED) {
+                    pPal = &pPalette[(g & 3)*3];
+                    g = (pPal[0] + pPal[1]*2 + pPal[2])/4;
+                } else {
+                    g = u8G2ToG8[g & 3];
+                }
+                if ((x & 3) == 3) {
+                    s++;
+                }
                 break;
         } // switch on bpp
         if (iDestBpp == 1) {
