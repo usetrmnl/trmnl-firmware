@@ -704,6 +704,7 @@ static https_request_err_e downloadAndShow()
           Log.info("%s [%d]: Stream available (may show as 0 and that's okay): %d\r\n", __FILE__, __LINE__, stream->available());
 
           bool isPNG = https.header("Content-Type") == "image/png";
+          bool isJPEG = https.header("Content-Type") == "image/jpeg";
 
           Log.info("%s [%d]: Starting a download at: %d\r\n", __FILE__, __LINE__, getTime());
           heap_caps_check_integrity_all(true);
@@ -744,10 +745,10 @@ static https_request_err_e downloadAndShow()
           }
 
           bool image_reverse = false;
-          if (isPNG)
+          if (isPNG || isJPEG)
           {
             writeImageToFile("/current.png", buffer, content_size);
-            Log.info("%s [%d]: Decoding png\r\n", __FILE__, __LINE__);
+            Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
             display_show_image(buffer, content_size, true);
 //            delay(100);
 //            free(buffer);

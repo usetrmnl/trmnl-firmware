@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <display.h>
 #include <PNGdec.h>
+#include <JPEGDEC.h>
 #include <SPIFFS.h>
 #include <Preferences.h>
 #include <preferences_persistence.h>
@@ -52,6 +53,7 @@ RTC_DATA_ATTR int iUpdateCount = 0;
 extern char filename[];
 extern Preferences preferences;
 extern ApiDisplayResult apiDisplayResult;
+static uint8_t *pDither;
 
 /**
  * @brief Function to init the display
@@ -469,13 +471,34 @@ int png_draw(PNGDRAW *pDraw)
         d += pDraw->y * iPitch; // point to the correct line
         memcpy(d, s, (pDraw->iWidth+1)/2);
     } else { // must be 8-bit grayscale
-        iPitch = bbep.width()/2;
-        d += pDraw->y * iPitch; // point to the correct line
-        for (x=0; x<pDraw->iWidth; x+=2) {
-            uc = (s[0] & 0xf0) | (s[1] >> 4);
-            *d++ = uc;
-            s += 2;
-        } // for x
+        iPitch = bbep.width()/2; // rotated
+        if (bbep.width() == pDraw->iWidth) { // normal orientation
+            d += pDraw->y * iPitch; // point to the correct line
+            for (x=0; x<pDraw->iWidth; x+=2) {
+                uc = (s[0] & 0xf0) | (s[1] >> 4);
+                *d++ = uc;
+                s += 2;
+            } // for x
+        } else { // rotated
+            d = bbep.currentBuffer();
+            d += (bbep.height() - 1) * iPitch;
+            d += (pDraw->y / 2);
+            if (pDraw->y & 1) { // odd line (column)
+                for (x=0; x<pDraw->iWidth; x++) {
+                    uc = (d[0] & 0xf0) | (s[0] >> 4);
+                    *d = uc;
+                    s++;
+                    d -= iPitch;
+                } // for x
+            } else {
+                for (x=0; x<pDraw->iWidth; x++) {
+                    uc = (d[0] & 0xf) | (s[0] & 0xf0);
+                    *d = uc;
+                    s++;
+                    d -= iPitch;
+                } // for x
+            }
+        }
     }
     return 1;
 } /* png_draw() */
@@ -544,6 +567,102 @@ int i, iColors;
     Log_info("%s [%d]: png_count_colors: %d\r\n", __FILE__, __LINE__, iColors);
     return iColors;
 } /* png_count_colors() */
+
+/** 
+ * @brief JPEGDEC callback function passed blocks of MCUs (minimum coded units)
+ * @param pointer to the JPEGDRAW structure
+ * @return 1 to continue decoding or 0 to abort
+ */
+int jpeg_draw(JPEGDRAW *pDraw)
+{
+#ifdef BB_EPAPER
+int x, y;
+int iPlane = *(int *)pDraw->pUser;
+uint8_t src=0, uc=0, ucMask, *s, *d, *pTemp = bbep.getCache();
+
+    bbep.setAddrWindow(pDraw->x, pDraw->y, pDraw->iWidth, pDraw->iHeight);
+    if (iPlane == 0) { // 1-bit mode
+        bbep.startWrite(PLANE_0); // start writing image data to plane 0
+        for (y=0; y<pDraw->iHeight; y++) { // this is 8 or 16 depending on the color subsampling
+            s = (uint8_t *)pDraw->pPixels;
+            s += (y * (pDraw->iWidth >> 3));
+            // The pixel format of the display is the same as JPEGDEC, so just copy it
+            bbep.writeData(s, (pDraw->iWidth+7)/8);
+        } // for y
+    } else {
+        bbep.startWrite((iPlane == 1) ? PLANE_0 : PLANE_1); // start writing image data to plane 0
+        for (y=0; y<pDraw->iHeight; y++) { // this is 8 or 16 depending on the color subsampling
+            d = pTemp;
+            s = (uint8_t *)pDither;
+            s += (y * (pDraw->iWidth >> 2));
+            ucMask = (iPlane == 1) ? 0x40 : 0x80; // lower or upper source bit
+            for (x=0; x<pDraw->iWidth; x++) {
+                if ((x & 3) == 0) { // new input byte
+                    src = *s++;
+                }
+                uc <<= 1;
+                if (src & ucMask) {
+                    uc |= 1; // high bit of source pair
+                }
+                src <<= 2;
+                if ((x & 7) == 7) { // new output byte
+                    *d++ = uc;
+                }
+            } // for x
+            bbep.writeData(pTemp, (pDraw->iWidth+7)/8);
+        } // for y
+    }
+#else // FastEPD
+#endif
+    return 1; // continue decoding
+}
+/** 
+ * @brief Function to decode and display a JPEG image from memory
+ *        The decoded lines are written directly into the EPD framebuffer
+ *        due to insufficient RAM to hold the fully decoded image
+ * @param pointer to the buffer holding the JPEG file
+ * @param size of the JPEG file
+ * @return refresh mode based on image type and presence of old image
+ */
+int jpeg_to_epd(const uint8_t *pJPEG, int iDataSize)
+{
+JPEGDEC *jpg = new JPEGDEC();
+int rc = -1; // invalid mode
+int iPlane = 0;
+
+    if (!jpg) return JPEG_ERROR_MEMORY; // not enough memory for the decoder instance
+    rc = jpg->openRAM((uint8_t *)pJPEG, iDataSize, jpeg_draw);
+    if (rc) {
+        if (jpg->getWidth() != bbep.width() || jpg->getHeight() != bbep.height()) {
+            Log_error("JPEG image size doesn't match display size");
+            rc = -1;
+        } else { // okay to decode
+            //bbep.setPanelType(TWO_BIT_PANEL);
+            Log_info("%s [%d]: Decoding jpeg as 1-bpp\r\n", __FILE__, __LINE__);
+            jpg->setPixelType(ONE_BIT_DITHERED); // request 1-bit dithered output
+            pDither = (uint8_t *)malloc(jpg->getWidth() * 16);
+            iPlane = 0;//1; // Decode first plane
+            Log_info("%s [%d]: Decoding plane 0\r\n", __FILE__, __LINE__);
+            jpg->setUserPointer((void *)&iPlane);
+            jpg->decodeDither(pDither, 0);
+            jpg->close();
+            // Decode the second plane
+//            iPlane = 2;
+//            Log_info("%s [%d]: Decoding plane 1\r\n", __FILE__, __LINE__);
+//            jpg->openRAM((uint8_t *)pJPEG, iDataSize, jpeg_draw);
+//            jpg->setPixelType(TWO_BIT_DITHERED); // request 1-bit dithered output
+//            jpg->setUserPointer((void *)&iPlane);
+//            jpg->decodeDither(pDither, 0);
+            free(pDither);
+#ifdef BB_EPAPER
+            rc = REFRESH_FULL;
+#endif
+        }
+    }
+    jpg->close();
+    free(jpg);
+    return rc;
+} /* jpeg_to_epd() */
 /** 
  * @brief Function to decode and display a PNG image from memory
  *        The decoded lines are written directly into the EPD framebuffer
@@ -562,20 +681,17 @@ PNG *png = new PNG();
     rc = png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
     png->close();
     if (rc == PNG_SUCCESS) {
+        Log_error("Decoding %d x %d PNG", png->getWidth(), png->getHeight());
         if (png->getWidth() == bbep.height() && png->getHeight() == bbep.width()) {
             Log_error("Rotating canvas to portrait orientation");
-            bbep.setRotation(90);
-        }
-        if (png->getWidth() > bbep.width() || png->getHeight() > bbep.height()) {
+        } else if (png->getWidth() > bbep.width() || png->getHeight() > bbep.height()) {
             Log_error("PNG image is too large for display size (%dx%d)", png->getWidth(), png->getHeight());
             rc = -1;
-<<<<<<< Updated upstream
-=======
         } else if (png->getBpp() > MAX_BIT_DEPTH) {
             Log_error("Unsupported PNG bit depth (only 1 to %d-bpp supported), this file has %d-bpp", MAX_BIT_DEPTH, png->getBpp());
             rc = -1;
->>>>>>> Stashed changes
-        } else { // okay to decode
+        }
+        if (rc == PNG_SUCCESS) { // okay to decode
             Log_info("%s [%d]: Decoding %d-bpp png (current)\r\n", __FILE__, __LINE__, png->getBpp());
             // Prepare target memory window (entire display)
 #ifdef BB_EPAPER
@@ -630,7 +746,7 @@ PNG *png = new PNG();
 void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
 
 {
-    bool isPNG = data_size >= 4 && MOTOLONG(image_buffer) == (int32_t)0x89504e47;;
+    bool isPNG = data_size >= 4 && MOTOLONG(image_buffer) == (int32_t)0x89504e47;
     auto width = display_width();
     auto height = display_height();
 //    uint32_t *d32;
@@ -664,6 +780,10 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     {
         Log_info("Drawing PNG");
         iRefreshMode = png_to_epd(image_buffer, data_size);
+    }
+    else if (MOTOSHORT(image_buffer) == 0xffd8) {
+        Log_info("Drawing JPEG");
+        iRefreshMode = jpeg_to_epd(image_buffer, data_size);
     }
     else // uncompressed BMP or Group5 compressed image
     {
