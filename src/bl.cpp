@@ -116,8 +116,8 @@ void bl_init(void)
   pins_init();
   vBatt = readBatteryVoltage(); // Read the battery voltage BEFORE WiFi is turned on
 
-#if defined(BOARD_SEEED_XIAO_ESP32C3) || defined(BOARD_SEEED_XIAO_ESP32S3)
-  delay(3000);
+#if defined(BOARD_SEEED_XIAO_ESP32C3)
+  delay(2000);
 
   if (digitalRead(PIN_INTERRUPT) == LOW) {
     Log_info("Boot button pressed during startup, resetting WiFi credentials...");
@@ -237,6 +237,9 @@ void bl_init(void)
   Log.info("%s [%d]: Display init\r\n", __FILE__, __LINE__);
   display_init();
 
+  // Mount SPIFFS
+  filesystem_init();
+
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
   {
     Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
@@ -250,9 +253,6 @@ void bl_init(void)
     Log.info("%s [%d]: Display TRMNL logo end\r\n", __FILE__, __LINE__);
     preferences.putString(PREFERENCES_FILENAME_KEY, "");
   }
-
-  // Mount SPIFFS
-  filesystem_init();
 
   Log_info("Firmware version %s", FW_VERSION_STRING);
   Log_info("Arduino version %d.%d.%d", ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH);
@@ -1867,10 +1867,10 @@ static float readBatteryVoltage(void)
   Log.warning("%s [%d]: FAKE_BATTERY_VOLTAGE is defined. Returning 4.2V.\r\n", __FILE__, __LINE__);
   return 4.2f;
 #else
-  #ifdef BOARD_XIAO_EPAPER_DISPLAY
-    const int adcEnPin = 6;
-    pinMode(adcEnPin, OUTPUT);
-    digitalWrite(adcEnPin, HIGH);
+  #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001)
+    pinMode(PIN_VBAT_SWITCH, OUTPUT);
+    digitalWrite(PIN_VBAT_SWITCH, VBAT_SWITCH_LEVEL);
+    delay(10); // Wait for the switch to stabilize
   #endif
     Log.info("%s [%d]: Battery voltage reading...\r\n", __FILE__, __LINE__);
     int32_t adc;
@@ -1881,6 +1881,9 @@ static float readBatteryVoltage(void)
     for (uint8_t i = 0; i < 8; i++) {
       adc += analogReadMilliVolts(PIN_BATTERY);
     }
+  #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001)
+    digitalWrite(PIN_VBAT_SWITCH, (VBAT_SWITCH_LEVEL == HIGH ? LOW : HIGH));
+  #endif
     sensorValue = (adc / 8) * 2;
     Log.info("%s [%d]: Battery sensorValue = %d\r\n", __FILE__, __LINE__, (int)sensorValue);
     float voltage = sensorValue / 1000.0;
