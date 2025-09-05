@@ -22,19 +22,19 @@ FASTEPD bbep;
 #define MAX_BIT_DEPTH 8
 const uint8_t u8_graytable[] = {
 /* 0 */  1, 1, 1, 1, 1, 1, 0, 0, 
-/* 1 */  0, 0, 0, 1, 1, 1, 0, 0, 
-/* 2 */  0, 0, 0, 0, 1, 1, 0, 0, 
-/* 3 */  2, 2, 2, 2, 1, 1, 0, 0, 
-/* 4 */  1, 1, 1, 1, 0, 1, 1, 2, 
-/* 5 */  0, 0, 0, 1, 1, 1, 1, 2, 
-/* 6 */  1, 1, 1, 1, 2, 1, 1, 2, 
-/* 7 */  0, 0, 1, 1, 2, 1, 1, 2, 
-/* 8 */  0, 0, 0, 1, 2, 1, 1, 2, 
-/* 9 */  0, 0, 1, 1, 1, 2, 1, 2, 
-/* 10 */  0, 0, 0, 1, 1, 2, 1, 2, 
-/* 11 */  0, 0, 1, 2, 1, 2, 1, 2, 
-/* 12 */  1, 1, 0, 1, 1, 2, 2, 0, 
-/* 13 */  1, 1, 1, 1, 2, 1, 2, 2, 
+/* 1 */  2, 1, 1, 2, 1, 0, 0, 0, 
+/* 2 */  0, 0, 0, 1, 1, 1, 1, 2, 
+/* 3 */  1, 1, 0, 0, 1, 1, 2, 0, 
+/* 4 */  1, 0, 0, 0, 1, 1, 2, 0, 
+/* 5 */  0, 0, 1, 2, 2, 1, 0, 0, 
+/* 6 */  1, 1, 1, 0, 2, 1, 2, 0, 
+/* 7 */  0, 1, 1, 2, 0, 1, 2, 0, 
+/* 8 */  1, 1, 1, 1, 1, 1, 2, 2, 
+/* 9 */  0, 1, 1, 1, 1, 1, 2, 2, 
+/* 10 */  2, 2, 1, 1, 1, 1, 2, 2, 
+/* 11 */  2, 0, 0, 1, 1, 1, 2, 2, 
+/* 12 */  1, 1, 2, 0, 1, 1, 2, 2, 
+/* 13 */  0, 1, 2, 0, 1, 1, 2, 2, 
 /* 14 */  1, 1, 1, 2, 2, 1, 2, 2, 
 /* 15 */  0, 0, 0, 0, 0, 0, 0, 0
 };
@@ -68,7 +68,6 @@ void display_init(void)
 #else
     bbep.initPanel(BB_PANEL_EPDIY_V7_16); //, 26000000);
     bbep.setPanelSize(1872, 1404, BB_PANEL_FLAG_MIRROR_X);
-    bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
 #endif
     Log_info("dev module end");
 }
@@ -927,6 +926,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     }
     iUpdateCount++;
 #else
+    bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
     bbep.fullUpdate();
 #endif
     Log_info("display refresh end");
