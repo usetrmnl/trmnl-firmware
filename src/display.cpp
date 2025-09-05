@@ -450,28 +450,105 @@ int png_draw(PNGDRAW *pDraw)
 
     s = (uint8_t *)pDraw->pPixels;
     d = bbep.currentBuffer();
+    iPitch = bbep.width()/2;
     if (pDraw->iBpp == 1) {
-        iPitch = (bbep.width() + 7)/8;
-        d += pDraw->y * iPitch; // point to the correct line
-        memcpy(d, s, (pDraw->iWidth+7)/8);
+        if (bbep.width() == pDraw->iWidth) { // normal orientation
+            iPitch = (bbep.width() + 7)/8;
+            d += pDraw->y * iPitch; // point to the correct line
+            memcpy(d, s, (pDraw->iWidth+7)/8);
+        } else { // rotated
+            uint8_t ucPixel, ucMask, j;
+            d += (bbep.height() - 1) * iPitch;
+            d += (pDraw->y / 8);
+            ucMask = 0x80 >> (pDraw->y & 7); // destination mask
+            for (x=0; x<pDraw->iWidth; x++) {
+                if ((x & 7) == 0) uc = *s++;
+                ucPixel = d[0] & ~ucMask; // unset old pixel
+                if (uc & 0x80) ucPixel |= ucMask;
+                d[0] = ucPixel;
+                uc <<= 1;
+                d -= iPitch;
+            }
+        }
     } else if (pDraw->iBpp == 2) { // we need to convert the 2-bit data into 4-bits
         iPitch = bbep.width()/2;
-        d += pDraw->y * iPitch; // point to the correct line
-        for (x=0; x<pDraw->iWidth; x+=4) {
-            src = *s++;
-            uc = (src & 0xc0); // first pixel
-            uc |= ((src & 0x30) >> 2);
-            *d++ = uc;
-            uc = (src & 0xc) << 4;
-            uc |= ((src & 0x3) << 2);
-            *d++ = uc;
-        } // for x
+        if (bbep.width() == pDraw->iWidth) { // normal orientation
+            for (x=0; x<pDraw->iWidth; x+=4) {
+                src = *s++;
+                uc = (src & 0xc0); // first pixel
+                uc |= ((src & 0x30) >> 2);
+                *d++ = uc;
+                uc = (src & 0xc) << 4;
+                uc |= ((src & 0x3) << 2);
+                *d++ = uc;
+            } // for x
+        } else { // rotated
+            d += (bbep.height() - 1) * iPitch;
+            d += (pDraw->y / 2);
+            if (pDraw->y & 1) { // odd line (column)
+                for (x=0; x<pDraw->iWidth; x+=4) {
+                    uc = (d[0] & 0xf0) | ((s[0] >> 4) & 0x0c);
+                    *d = uc;
+                    d -= iPitch;
+                    uc = (d[0] & 0xf0) | ((s[0] >> 2) & 0x0c);
+                    *d = uc;
+                    d -= iPitch;
+                    uc = (d[0] & 0xf0) | (s[0] & 0xc);
+                    *d = uc;
+                    d -= iPitch;
+                    uc = (d[0] & 0xf0) | ((s[0] << 2) & 0x0c);
+                    *d = uc;
+                    d -= iPitch;
+                    s++;
+                } // for x
+            } else {
+                for (x=0; x<pDraw->iWidth; x+=4) {
+                    uc = (d[0] & 0xf) | (s[0] & 0xc0);
+                    *d = uc;
+                    d -= iPitch;
+                    uc = (d[0] & 0xf) | ((s[0] << 2) & 0xc0);
+                    *d = uc;
+                    d -= iPitch;
+                    uc = (d[0] & 0xf) | ((s[0] << 4) & 0xc0);
+                    *d = uc;
+                    d -= iPitch;
+                    uc = (d[0] & 0xf) | ((s[0] << 6) & 0xc0);
+                    *d = uc;
+                    d -= iPitch;
+                    s++;
+                } // for x
+            }
+        }
     } else if (pDraw->iBpp == 4) { // 4-bit is the native format
-        iPitch = bbep.width()/2;
-        d += pDraw->y * iPitch; // point to the correct line
-        memcpy(d, s, (pDraw->iWidth+1)/2);
+        if (bbep.width() == pDraw->iWidth) { // normal orientation
+            d += pDraw->y * iPitch; // point to the correct line
+            memcpy(d, s, (pDraw->iWidth+1)/2);
+        } else { // rotated
+            d += (bbep.height() - 1) * iPitch;
+            d += (pDraw->y / 2);
+            if (pDraw->y & 1) { // odd line (column)
+                for (x=0; x<pDraw->iWidth; x+=2) {
+                    uc = (d[0] & 0xf0) | (s[0] >> 4);
+                    *d = uc;
+                    d -= iPitch;
+                    uc = (d[0] & 0xf0) | (s[0] & 0xf);
+                    *d = uc;
+                    d -= iPitch;
+                    s++;
+                } // for x
+            } else {
+                for (x=0; x<pDraw->iWidth; x+=2) {
+                    uc = (d[0] & 0xf) | (s[0] & 0xf0);
+                    *d = uc;
+                    d -= iPitch;
+                    uc = (d[0] & 0xf) | (s[0] << 4);
+                    *d = uc;
+                    d -= iPitch;
+                    s++;
+                } // for x
+            }
+        }
     } else { // must be 8-bit grayscale
-        iPitch = bbep.width()/2; // rotated
         if (bbep.width() == pDraw->iWidth) { // normal orientation
             d += pDraw->y * iPitch; // point to the correct line
             for (x=0; x<pDraw->iWidth; x+=2) {
@@ -480,7 +557,6 @@ int png_draw(PNGDRAW *pDraw)
                 s += 2;
             } // for x
         } else { // rotated
-            d = bbep.currentBuffer();
             d += (bbep.height() - 1) * iPitch;
             d += (pDraw->y / 2);
             if (pDraw->y & 1) { // odd line (column)
@@ -613,9 +689,17 @@ uint8_t src=0, uc=0, ucMask, *s, *d, *pTemp = bbep.getCache();
         } // for y
     }
 #else // FastEPD
+  int x, y, iPitch = bbep.width()/2; // assume 4-bpp drawing mode
+  uint8_t *s, *d, *pBuffer = bbep.currentBuffer();
+  for (y=0; y<pDraw->iHeight; y++) {
+    d = &pBuffer[((pDraw->y + y)*iPitch) + (pDraw->x/2)];
+    s = (uint8_t *)pDraw->pPixels;
+    s += (y * (pDraw->iWidth/2));
+    memcpy(d, s, pDraw->iWidth/2); // source & dest format are the same
+  } // for y
 #endif
     return 1; // continue decoding
-}
+} /* jpeg_draw() */
 /** 
  * @brief Function to decode and display a JPEG image from memory
  *        The decoded lines are written directly into the EPD framebuffer
@@ -637,9 +721,15 @@ int iPlane = 0;
             Log_error("JPEG image size doesn't match display size");
             rc = -1;
         } else { // okay to decode
+#ifdef BB_EPAPER
             //bbep.setPanelType(TWO_BIT_PANEL);
-            Log_info("%s [%d]: Decoding jpeg as 1-bpp\r\n", __FILE__, __LINE__);
+            Log_info("%s [%d]: Decoding jpeg as 1-bpp dithered\r\n", __FILE__, __LINE__);
             jpg->setPixelType(ONE_BIT_DITHERED); // request 1-bit dithered output
+#else
+            bbep.setMode(BB_MODE_4BPP);
+            Log_info("%s [%d]: Decoding jpeg as 4-bpp dithered\r\n", __FILE__, __LINE__);
+            jpg->setPixelType(FOUR_BIT_DITHERED); // request 4-bit dithered output
+#endif
             pDither = (uint8_t *)malloc(jpg->getWidth() * 16);
             iPlane = 0;//1; // Decode first plane
             Log_info("%s [%d]: Decoding plane 0\r\n", __FILE__, __LINE__);
