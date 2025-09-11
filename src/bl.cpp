@@ -89,12 +89,12 @@ static bool checkCurrentFileName(String &newName);
 static DeviceStatusStamp getDeviceStatusStamp();
 void log_nvs_usage();
 
-static uint32_t startup_time = 0;
+static unsigned long startup_time = 0;
 
 void wait_for_serial() {
 #ifdef WAIT_FOR_SERIAL
   int idx = 0;
-  int start = millis();
+  unsigned long start = millis();
   while (millis() - start < 2000) {
       if (Serial)
         break;
