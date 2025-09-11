@@ -76,7 +76,6 @@ static void checkAndPerformFirmwareUpdate(void);     // OTA update
 static void goToSleep(void);                         // sleep preparing
 static bool setClock(void);                          // clock synchronization
 static float readBatteryVoltage(void);               // battery voltage reading
-static void submitOrSaveLogString(const char *log_buffer, size_t size); // log sending
 static void submitStoredLogs(void);
 static void writeSpecialFunction(SPECIAL_FUNCTION function);
 static void writeImageToFile(const char *name, uint8_t *in_buffer, size_t size);
@@ -90,15 +89,19 @@ static bool checkCurrentFileName(String &newName);
 static DeviceStatusStamp getDeviceStatusStamp();
 void log_nvs_usage();
 
+static uint32_t startup_time = 0;
 
-void wait_for_serial()
-{
+void wait_for_serial() {
 #ifdef WAIT_FOR_SERIAL
-  for (int i = 10; i > 0 && !Serial; i--)
-  {
-    Log_info("## Waiting for serial.. %d", i);
-    delay(1000);
-  }
+  int idx = 0;
+  int start = millis();
+  while (millis() - start < 2000) {
+      if (Serial)
+        break;
+      delay(100);
+      idx++;
+    }
+  Log_info("## Waited for serial.. %d ms", idx * 100);
 #endif
 }
 
@@ -109,7 +112,7 @@ void wait_for_serial()
  */
 void bl_init(void)
 {
-
+  startup_time = millis();
   Serial.begin(115200);
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
   Log_info("BL init success");
@@ -620,7 +623,7 @@ static https_request_err_e downloadAndShow()
 
   https_request_err_e result = handleApiDisplayResponse(apiDisplayResult.response);
 
-  auto withHttpResult = withHttp(
+  withHttp(
       filename,
       [&](HTTPClient *httpsp, HttpError error) -> https_request_err_e
       {
@@ -667,8 +670,8 @@ static https_request_err_e downloadAndShow()
           // start connection and send HTTP header
           int httpCode = https.GET();
           int content_size = https.getSize();
-          uint8_t *buffer_old = nullptr; // Disable partial update for now
-          int file_size_old = 0;
+//          uint8_t *buffer_old = nullptr; // Disable partial update for now
+//          int file_size_old = 0;
 
           // httpCode will be negative on error
           if (httpCode < 0)
@@ -728,7 +731,7 @@ static https_request_err_e downloadAndShow()
           }
           WiFi.disconnect(true); // no need for WiFi, save power starting here
           Log.info("%s [%d]: Received successfully; WiFi off; WiFi off\r\n", __FILE__, __LINE__);
-          bool bmp_rename = false;
+
 
           if (filesystem_file_exists("/current.bmp") || filesystem_file_exists("/current.png"))
           {
@@ -762,9 +765,9 @@ static https_request_err_e downloadAndShow()
           }
           Serial.println();
           String error = "";
-          uint8_t *imagePointer = buffer;
+         // uint8_t *imagePointer = buffer;
 //          uint8_t *imagePointer = (decodedPng == nullptr) ? buffer : decodedPng;
-          bool lastImageExists = filesystem_file_exists("/last.bmp") || filesystem_file_exists("/last.png");
+        //  bool lastImageExists = filesystem_file_exists("/last.bmp") || filesystem_file_exists("/last.png");
 
           switch (png_res)
           {
@@ -1244,7 +1247,6 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
         String action = apiResponse.action;
         if (action.equals("rewind"))
         {
-          bool isPNG = false;
           status = false;
           result = HTTPS_SUCCESS;
           Log.info("%s [%d]: rewind success\r\n", __FILE__, __LINE__);
@@ -1265,7 +1267,6 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           }
           else if (last_dot_file == "/last.png")
           {
-            isPNG = true;
             Log.info("Rewind PNG\n\r");
             buffer = display_read_file(last_dot_file.c_str(), &file_size);
             image_proccess_response = PNG_NO_ERR; // DEBUG
@@ -1321,7 +1322,6 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
 
         if (action.equals("send_to_me"))
         {
-          bool isPNG = false;
           status = false;
           result = HTTPS_SUCCESS;
           Log.info("%s [%d]: send_to_me success\r\n", __FILE__, __LINE__);
@@ -1807,6 +1807,7 @@ static void goToSleep(void)
   uint32_t time_to_sleep = SLEEP_TIME_TO_SLEEP;
   if (preferences.isKey(PREFERENCES_SLEEP_TIME_KEY))
     time_to_sleep = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
+  Log.info("%s [%d]: total awake time - %d ms\r\n", __FILE__, __LINE__, millis() - startup_time); 
   Log.info("%s [%d]: time to sleep - %d\r\n", __FILE__, __LINE__, time_to_sleep);
   preferences.putUInt(PREFERENCES_LAST_SLEEP_TIME, getTime());
   preferences.end();
