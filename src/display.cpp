@@ -579,7 +579,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     int iRefreshMode = REFRESH_FULL; // assume full (slow) refresh
 
    // Log_info("Paint_NewImage %d", reverse);
-    Log_info("show image for array");
+    Log_info("display_show_image start");
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef FUTURE
     if (reverse)
@@ -654,7 +654,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
 #else
     bbep.fullUpdate();
 #endif
-    Log_info("display refresh end");
+    Log_info("display_show_image end");
 }
 /**
  * @brief Function to read an image from the file system
@@ -697,8 +697,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
     BB_RECT rect;
 
-    Log_info("Paint_NewImage");
-    Log_info("show image for array");
+    Log_info("display_show_msg start");
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef BB_EPAPER
     bbep.allocBuffer(false);
@@ -886,7 +885,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
 #else
     bbep.fullUpdate();
 #endif
-    Log_info("display");
+    Log_info("display_show_msg end");
 }
 
 /**
@@ -911,6 +910,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     if (message_type == WIFI_CONNECT)
     {
         Log_info("Display set to white");
+        bbep.fillScreen(BBEP_WHITE);
 #ifdef BB_EPAPER
         bbep.writePlane(PLANE_0);
         if (!apiDisplayResult.response.maximum_compatibility) {
@@ -929,8 +929,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
     BB_RECT rect;
 
-    Log_info("Paint_NewImage");
-    Log_info("show image for array");
+    Log_info("display_show_msg2 start");
 
     // Load the image into the bb_epaper framebuffer
     if (*(uint16_t *)image_buffer == BB_BITMAP_MARKER)
@@ -1012,7 +1011,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 #else
     bbep.fullUpdate();
 #endif
-    Log_info("display");
+    Log_info("display_show_msg2 end");
 }
 
 /**
