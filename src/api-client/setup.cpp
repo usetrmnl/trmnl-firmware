@@ -17,6 +17,7 @@ void addSetupHeaders(HTTPClient &https, ApiSetupInputs &inputs)
   https.addHeader("ID", inputs.macAddress);
   https.addHeader("Content-Type", "application/json");
   https.addHeader("FW-Version", inputs.firmwareVersion);
+  https.addHeader("Model",inputs.model);
 }
 
 ApiSetupResult fetchApiSetup(ApiSetupInputs &apiSetupInputs)

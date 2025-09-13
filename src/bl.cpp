@@ -1397,6 +1397,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
         {
           Log.info("%s [%d]:Guest Mode success\r\n", __FILE__, __LINE__);
           String image_url = apiResponse.image_url;
+          uint64_t rate = apiResponse.refresh_rate;
           if (image_url.length() > 0)
           {
             Log.info("%s [%d]: image_url: %s\r\n", __FILE__, __LINE__, image_url.c_str());
@@ -1447,6 +1448,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
               status = true;
             }
           }
+          preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, rate);
         }
         else
         {
