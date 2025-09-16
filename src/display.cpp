@@ -8,11 +8,18 @@
 #define BB_EPAPER
 #ifdef BB_EPAPER
 #include "bb_epaper.h"
+
+const DISPLAY_PROFILE dpList[4] = { // 1-bit and 2-bit display types for each profile
+    {EP75_800x480, EP75_800x480_4GRAY}, // default
+    {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, // a
+    {EP75_800x480, EP75_800x480_4GRAY_V2}, // b
+    {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, // c
+};
 //#define ONE_BIT_PANEL EP426_800x480
 //#define TWO_BIT_PANEL EP426_800x480_4GRAY
-#define ONE_BIT_PANEL EP75_800x480
-#define TWO_BIT_PANEL EP75_800x480_4GRAY_OLD
-BBEPAPER bbep(ONE_BIT_PANEL);
+//#define ONE_BIT_PANEL EP75_800x480_GEN2
+//#define TWO_BIT_PANEL EP75_800x480_4GRAY_GEN2
+BBEPAPER bbep(EP75_800x480);
 // Counts the number of partial updates to know when to do a full update
 RTC_DATA_ATTR int iUpdateCount = 0;
 #else
@@ -32,6 +39,7 @@ FASTEPD bbep;
 extern char filename[];
 extern Preferences preferences;
 extern ApiDisplayResult apiDisplayResult;
+uint32_t iTempProfile;
 
 /**
  * @brief Function to init the display
@@ -41,8 +49,11 @@ extern ApiDisplayResult apiDisplayResult;
 void display_init(void)
 {
     Log_info("dev module start");
+    iTempProfile = preferences.getUInt(PREFERENCES_TEMP_PROFILE, TEMP_PROFILE_DEFAULT);
+    Log_info("Saved temperature profile: %d", iTempProfile);
 #ifdef BB_EPAPER
     bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
+    bbep.setPanelType(dpList[iTempProfile].OneBit);
 #else
     bbep.initPanel(BB_PANEL_EPDIY_V7);
     bbep.setPanelSize(1448, 1072);
@@ -527,7 +538,7 @@ PNG *png = new PNG();
             // Prepare target memory window (entire display)
             bbep.setAddrWindow(0, 0, bbep.width(), bbep.height());
             if (png->getBpp() == 1 || (png->getBpp() == 2 && png_count_colors(png, pPNG, iDataSize) == 2)) { // 1-bit image (single plane)
-                bbep.setPanelType(ONE_BIT_PANEL);
+                bbep.setPanelType(dpList[iTempProfile].OneBit);
                 rc = REFRESH_PARTIAL; // the new image is 1bpp - try a partial update
                 bbep.startWrite(PLANE_0); // start writing image data to plane 0
                 png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
@@ -542,7 +553,7 @@ PNG *png = new PNG();
                 }
                 png->close();
             } else { // 2-bpp
-                bbep.setPanelType(TWO_BIT_PANEL);
+                bbep.setPanelType(dpList[iTempProfile].TwoBit);
                 rc = REFRESH_FULL; // 4gray mode must be full refresh
                 iUpdateCount = 0; // grayscale mode resets the partial update counter
                 bbep.startWrite(PLANE_0); // start writing image data to plane 0
@@ -628,12 +639,17 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
             bbep.setBuffer(image_buffer+62); // uncompressed 1-bpp bitmap
 #endif
         }
-        bbep.writePlane(PLANE_0); // send image data to the EPD
+        bbep.writePlane(PLANE_FALSE_DIFF); // send image data to the EPD
         iRefreshMode = REFRESH_PARTIAL;
         iUpdateCount = 1; // use partial update
     }
     Log_info("Display refresh start");
 #ifdef BB_EPAPER
+    if (iTempProfile != apiDisplayResult.response.temp_profile) {
+        iTempProfile = apiDisplayResult.response.temp_profile;
+        Log_info("Saving new temperature profile (%d) to FLASH", iTempProfile);
+        preferences.putUInt(PREFERENCES_TEMP_PROFILE, iTempProfile);
+    }
     if ((iUpdateCount & 7) == 0 || apiDisplayResult.response.maximum_compatibility == true) {
         Log_info("%s [%d]: Forcing full refresh; desired refresh mode was: %d\r\n", __FILE__, __LINE__, iRefreshMode);
         iRefreshMode = REFRESH_FULL; // force full refresh every 8 partials
