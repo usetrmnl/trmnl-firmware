@@ -90,6 +90,7 @@ void display_init(void)
     bbep.setPanelType(dpList[iTempProfile].OneBit); // must be set BEFORE calling initIO()
 #endif // USE_TEMP_PROFILE
     bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
+    bbep.setPanelType(dpList[iTempProfile].OneBit);
 #else
     bbep.initPanel(BB_PANEL_EPDIY_V7_16); //, 26000000);
     bbep.setPanelSize(1872, 1404, BB_PANEL_FLAG_MIRROR_X);
