@@ -39,7 +39,7 @@
 #define DISPLAY_BMP_IMAGE_SIZE 48062 // in bytes - 62 bytes - header; 48000 bytes - bitmap (480*800 1bpp) / 8
 #define DEFAULT_IMAGE_SIZE 48000
 #ifdef BOARD_TRMNL_X
-#define MAX_IMAGE_SIZE 140000 // more RAM on the ESP32-S3
+#define MAX_IMAGE_SIZE 750000 // Use PSRAM on the ESP32-S3
 #else
 #define MAX_IMAGE_SIZE 90000 // largest compressed image we can receive
 #endif
@@ -68,7 +68,7 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #define PIN_INTERRUPT 2
 #define DEVICE_MODEL "og"
 #elif defined(BOARD_TRMNL_X)
-#define PIN_INTERRUPT 3
+#define PIN_INTERRUPT 0
 #define DEVICE_MODEL "x"
 #elif defined(BOARD_WAVESHARE_ESP32_DRIVER)
 #define PIN_INTERRUPT 33

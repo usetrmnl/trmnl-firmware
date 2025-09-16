@@ -36,6 +36,7 @@
 #include <serialize_log.h>
 #include <preferences_persistence.h>
 #include "logo_small.h"
+#include "logo_big.h"
 #include "loading.h"
 #include <wifi-helpers.h>
 
@@ -1819,8 +1820,7 @@ static void goToSleep(void)
 #elif CONFIG_IDF_TARGET_ESP32C3
   esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
 #elif CONFIG_IDF_TARGET_ESP32S3
-// DEBUG
-//  esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
 #endif
@@ -2059,6 +2059,9 @@ static uint8_t *storedLogoOrDefault(int iType)
 //  {
 //    return buffer;
 //  }
+#ifdef BOARD_TRMNL_X
+    return const_cast<uint8_t *>(logo_big);
+#else
   if (iType == 0) {
     return const_cast<uint8_t *>(logo_small);
   } else {
@@ -2067,6 +2070,7 @@ static uint8_t *storedLogoOrDefault(int iType)
     apiDisplayResult.response.maximum_compatibility = true;
     return const_cast<uint8_t *>(loading);
   }
+#endif
 }
 
 static bool saveCurrentFileName(String &name)
