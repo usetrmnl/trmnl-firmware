@@ -10,15 +10,11 @@
 #include "bb_epaper.h"
 
 const DISPLAY_PROFILE dpList[4] = { // 1-bit and 2-bit display types for each profile
-    {EP75_800x480, EP75_800x480_4GRAY}, // default
-    {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, // a
+    {EP75_800x480, EP75_800x480_4GRAY_GEN2/*EP75_800x480_4GRAY*/}, // default (for original EPD)
+    {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, // a = uses built-in fast + 4-gray 
     {EP75_800x480, EP75_800x480_4GRAY_V2}, // b
     {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, // c
 };
-//#define ONE_BIT_PANEL EP426_800x480
-//#define TWO_BIT_PANEL EP426_800x480_4GRAY
-//#define ONE_BIT_PANEL EP75_800x480_GEN2
-//#define TWO_BIT_PANEL EP75_800x480_4GRAY_GEN2
 BBEPAPER bbep(EP75_800x480);
 // Counts the number of partial updates to know when to do a full update
 RTC_DATA_ATTR int iUpdateCount = 0;

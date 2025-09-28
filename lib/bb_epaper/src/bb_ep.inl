@@ -2095,7 +2095,7 @@ const EPD_PANEL panelDefs[] PROGMEM = {
     {240, 416, 0, epd37_init_sequence_full, NULL, epd37_init_sequence_part, 0, BBEP_CHIP_UC81xx, u8Colors_2clr}, // EP37_240x416
     {104, 212, 0, epd213_inky_init_sequence_full, NULL, NULL, 0, BBEP_CHIP_UC81xx, u8Colors_2clr}, // EP213_104x212, older InkyPHAT black and white
     {800, 480, 0, epd75_init_sequence_full, epd75_init_sequence_fast, epd75_init_sequence_partial, 0, BBEP_CHIP_UC81xx, u8Colors_2clr}, // EP75_800x480
-    {800, 480, 0, epd75_init_sequence_full, epd75_init_fast_gen2, epd75_init_partial_gen2, 0, BBEP_CHIP_UC81xx, u8Colors_2clr}, // EP75_800x480_GEN2
+    {800, 480, 0, epd75_init_sequence_full, epd75_init_fast_gen2, epd75_init_sequence_partial, 0, BBEP_CHIP_UC81xx, u8Colors_2clr}, // EP75_800x480_GEN2
     {800, 480, 0, epd75_gray_init, NULL, NULL, BBEP_4GRAY, BBEP_CHIP_UC81xx, u8Colors_4gray}, // EP75_800x480_4GRAY_GEN2
     {800, 480, 0, epd75_old_gray_init, NULL, NULL, BBEP_4GRAY, BBEP_CHIP_UC81xx, u8Colors_4gray}, // EP75_800x480_4GRAY
     {800, 480, 0, epd75_old_gray_init2, NULL, NULL, BBEP_4GRAY, BBEP_CHIP_UC81xx, u8Colors_4gray}, // EP75_800x480_4GRAY_V2
