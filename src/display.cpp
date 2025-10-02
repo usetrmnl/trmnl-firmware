@@ -48,8 +48,8 @@ RTC_DATA_ATTR int iUpdateCount = 0;
 #include <api-client/display.h>
 #include <trmnl_log.h>
 #include "png_flip.h"
-#include "../lib/bb_epaper/Fonts/Roboto_Black_24.h"
 #include "../lib/bb_epaper/Fonts/nicoclean_8.h"
+#include "../lib/bb_epaper/Fonts/Inter_18.h"
 extern char filename[];
 extern Preferences preferences;
 extern ApiDisplayResult apiDisplayResult;
@@ -998,7 +998,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     }
 
 #ifdef BOARD_TRMNL_X
-    bbep.setFont(Roboto_Black_24);
+    bbep.setFont(Inter_18);
 #else
     bbep.setFont(nicoclean_8);
 #endif
@@ -1020,45 +1020,72 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     break;
     case WIFI_FAILED:
     {
+        String string0 = "TRMNL firmware ";
+        string0 += FW_VERSION_STRING;
+#ifdef __BB_EPAPER__
+        bbep.setCursor(40, 48); // place in upper left corner
+#else
+        bbep.setCursor(80, 104); // place in upper left corner
+#endif
+        bbep.println(string0);
         const char string1[] = "Can't establish WiFi connection.";
         bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - rect.w)/2, 386);
+        bbep.setCursor((bbep.width() - rect.w)/2, bbep.height() - (rect.h*2)-140);
         bbep.println(string1);
         const char string2[] = "Hold button on the back to reset WiFi, or scan QR Code for help.";
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.println(string2);
-
+#ifdef __BB_EPAPER__
         bbep.loadG5Image(wifi_failed_qr, bbep.width() - 66 - 40, 40, BBEP_WHITE, BBEP_BLACK);
+#else // bigger for X
+        bbep.loadG5Image(wifi_failed_qr, bbep.width() - (66*2) - 80, 80, BBEP_WHITE, BBEP_BLACK, 2.0f);
+#endif
     }
     break;
     case WIFI_INTERNAL_ERROR:
     {
         const char string1[] = "WiFi connected, but";
+#ifdef __BB_EPAPER__
+        int x = 132;
+#else
+        int x = 0;
+#endif
         bbep.getStringBox(string1, &rect);
+#ifdef __BB_EPAPER__
         bbep.setCursor((bbep.width() - 132 - rect.w) / 2, 340);
+#else
+        bbep.setCursor((bbep.width() - rect.w)/2, bbep.height() - (rect.h*2)-140);
+#endif
         bbep.println(string1);
         const char string2[] = "API connection cannot be";
         bbep.getStringBox(string2, &rect);
-        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
+        bbep.setCursor((bbep.width() - x - rect.w) / 2, -1);
         bbep.println(string2);
         const char string3[] = "established. Try to refresh,";
         bbep.getStringBox(string3, &rect);
-        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
+        bbep.setCursor((bbep.width() - x - rect.w) / 2, -1);
         bbep.println(string3);
         const char string4[] = "or scan QR Code for help.";
         bbep.getStringBox(string4, &rect);
-        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
+        bbep.setCursor((bbep.width() - x - rect.w) / 2, -1);
         bbep.print(string4);
-
+#ifdef __BB_EPAPER__
         bbep.loadG5Image(wifi_failed_qr, 639, 336, BBEP_WHITE, BBEP_BLACK);
+#else // bigger for X
+        bbep.loadG5Image(wifi_failed_qr, bbep.width() - (66*2) - 80, 80, BBEP_WHITE, BBEP_BLACK, 2.0f);
+#endif
     }
     break;
     case WIFI_WEAK:
     {
         const char string1[] = "WiFi connected but signal is weak";
         bbep.getStringBox(string1, &rect);
+#ifdef __BB_EPAPER__
         bbep.setCursor((bbep.width() - rect.w) / 2, 400);
+#else
+        bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - rect.h);
+#endif
         bbep.print(string1);
     }
     break;
@@ -1066,7 +1093,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     {
         const char string1[] = "WiFi connected, TRMNL not responding.";
         bbep.getStringBox(string1, &rect);
+#ifdef __BB_EPAPER__
         bbep.setCursor((bbep.width() - rect.w) / 2, 340);
+#else
+        bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - (rect.h*3));
+#endif
         bbep.println(string1);
         const char string2[] = "Short click the button on back,";
         bbep.getStringBox(string2, &rect);
@@ -1082,7 +1113,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     {
         const char string1[] = "WiFi connected, TRMNL content malformed.";
         bbep.getStringBox(string1, &rect);
+#ifdef __BB_EPAPER__
         bbep.setCursor((bbep.width() - rect.w) / 2, 400);
+#else
+        bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - (rect.h*2));
+#endif
         bbep.println(string1);
         const char string2[] = "Wait or reset by holding button on back.";
         bbep.getStringBox(string2, &rect);
@@ -1094,7 +1129,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     {
         const char string1[] = "Firmware update available! Starting now...";
         bbep.getStringBox(string1, &rect);
+#ifdef __BB_EPAPER__
         bbep.setCursor((bbep.width() - rect.w) / 2, 400);
+#else
+        bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - rect.h);
+#endif
         bbep.print(string1);
     }
     break;
@@ -1102,7 +1141,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     {
         const char string1[] = "Firmware update failed. Device will restart...";
         bbep.getStringBox(string1, &rect);
+#ifdef __BB_EPAPER__
         bbep.setCursor((bbep.width() - rect.w) / 2, 400);
+#else
+        bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - rect.h);
+#endif
         bbep.print(string1);
     }
     break;
@@ -1110,7 +1153,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     {
         const char string1[] = "Firmware update success. Device will restart...";
         bbep.getStringBox(string1, &rect);
+#ifdef __BB_EPAPER__
         bbep.setCursor((bbep.width() - rect.w) / 2, 400);
+#else
+        bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - rect.h);
+#endif
         bbep.print(string1);
     }
     break;
@@ -1118,7 +1165,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     {
         const char string1[] = "The image file from this URL is too large.";
         bbep.getStringBox(string1, &rect);
+#ifdef __BB_EPAPER__
         bbep.setCursor((bbep.width() - rect.w) / 2, 360);
+#else
+        bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - rect.h*4);
+#endif
         bbep.println(string1);
         if (strlen(filename) > 40) {
             filename[40] = 0; // truncate and add elipses
@@ -1132,7 +1183,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.println(string2);
+#ifdef __BB_EPAPER__
         String string3 = String(MAX_IMAGE_SIZE) + String(" bytes each and 1 or 2-bpp");
+#else
+        String string3 = String(MAX_IMAGE_SIZE) + String(" bytes each");
+#endif
         bbep.getStringBox(string3.c_str(), &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.print(string3);
@@ -1142,7 +1197,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     {
         const char string1[] = "The image format is incorrect";
         bbep.getStringBox(string1, &rect);
+#ifdef __BB_EPAPER__
         bbep.setCursor((bbep.width() - rect.w) / 2, 400);
+#else
+        bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - rect.h);
+#endif
         bbep.print(string1);
     }
     break;
@@ -1232,7 +1291,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     }
 
 #ifdef BOARD_TRMNL_X
-    bbep.setFont(Roboto_Black_24);
+    bbep.setFont(Inter_18);
 #else
     bbep.setFont(nicoclean_8);
 #endif
@@ -1244,7 +1303,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         Log_info("friendly id case");
         const char string1[] = "Please sign up at usetrmnl.com/signup";
         bbep.getStringBox(string1, &rect);
+#ifdef __BB_EPAPER__
         bbep.setCursor((bbep.width() - rect.w)/2, 400);
+#else
+        bbep.setCursor((bbep.width() - rect.w)/2, bbep.height() - 140 - rect.h*2);
+#endif
         bbep.println(string1);
 
         String string2 = "with Friendly ID ";
@@ -1268,13 +1331,21 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         bbep.println(string1);
         const char string2[] = "Connect your phone or computer to TRMNL WiFi network";
         bbep.getStringBox(string2, &rect);
+#ifdef __BB_EPAPER__
         bbep.setCursor((bbep.width() - rect.w) / 2, 386);
+#else
+        bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - rect.h*2);
+#endif
         bbep.println(string2);
         const char string3[] = "or scan the QR code for help";
         bbep.getStringBox(string3, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.print(string3);
+#ifdef __BB_EPAPER__
         bbep.loadG5Image(wifi_connect_qr, bbep.width() - 40 - 66, 40, BBEP_WHITE, BBEP_BLACK); // 66x66 QR code
+#else // bigger for X
+        bbep.loadG5Image(wifi_connect_qr, bbep.width() - (66*2) - 80, 80, BBEP_WHITE, BBEP_BLACK, 2.0f);
+#endif
     }
     break;
     case MAC_NOT_REGISTERED:
@@ -1283,7 +1354,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         UWORD font_width = 18; // DEBUG
         Paint_DrawMultilineText(0, y_start, message.c_str(), width, font_width, BBEP_BLACK, BBEP_WHITE,
 #ifdef BOARD_TRMNL_X
-        Roboto_Black_24, true);
+        Inter_18, true);
 #else
         nicoclean_8, true);
 #endif
