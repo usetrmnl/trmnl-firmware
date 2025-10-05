@@ -280,26 +280,124 @@ void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message,
     }
 }
 /** 
+ * @brief Reduce the bit depth of line of pixels using thresholding (aka simple color mapping)
+ * @param Destination bit count (1 or 2)
+ * @param Pointer to a PNG palette (3 bytes per entry)
+ * @param Pointer to the source pixels
+ * @param Pointer to the destination pixels
+ * @param Pixel count
+ * @param Original bit depth
+ * @return none
+ */
+void ReduceBpp(int iDestBpp, int iPixelType, uint8_t *pPalette, uint8_t *pSrc, uint8_t *pDest, int w, int iSrcBpp)
+{
+    int g = 0, x, iDelta;
+    uint8_t *s, *d, *pPal, u8, count;
+    const uint8_t u8G2ToG8[4] = {0x00, 0x55, 0xaa, 0xff}; // 2-bit to 8-bit gray
+
+    if (iPixelType == PNG_PIXEL_TRUECOLOR) iSrcBpp = 24;
+    else if (iPixelType == PNG_PIXEL_TRUECOLOR_ALPHA) iSrcBpp = 32;
+    iDelta = iSrcBpp/8; // bytes per pixel
+    count = 8; // bits in a byte
+    u8 = 0; // start with all black
+    d = pDest;
+    s = pSrc;
+    for (x=0; x<w; x++) {
+        u8 <<= iDestBpp;
+        switch (iSrcBpp) {
+            case 24:
+            case 32:
+                g = (s[0] + s[1]*2 + s[2])/4; // convert color to gray value
+                s += iDelta;
+                break;
+            case 8:
+                if (iPixelType == PNG_PIXEL_INDEXED) {
+                    pPal = &pPalette[s[0] * 3];
+                    g = (pPal[0] + pPal[1]*2 + pPal[2])/4;
+                } else { // must be grayscale
+                    g = s[0];
+                }
+                s++;
+                break;
+            case 4:
+                if (x & 1) {
+                    if (iPixelType == PNG_PIXEL_INDEXED) {
+                        pPal = &pPalette[(s[0] & 0xf) * 3];
+                        g = (pPal[0] + pPal[1]*2 + pPal[2])/4;
+                    } else {
+                        g = (s[0] & 0xf) | (s[0] << 4);
+                    }
+                    s++;
+                } else {
+                    if (iPixelType == PNG_PIXEL_INDEXED) {
+                        pPal = &pPalette[(s[0]>>4) * 3];
+                        g = (pPal[0] + pPal[1]*2 + pPal[2])/4;
+                    } else {
+                        g = (s[0] & 0xf0) | (s[0] >> 4);
+                    }
+                }
+                break;
+            case 2: // We need to handle this case for 2-bit images with (random) palettes
+                g = s[0] >> (6-((x & 3) * 2));
+                if (iPixelType == PNG_PIXEL_INDEXED) {
+                    pPal = &pPalette[(g & 3)*3];
+                    g = (pPal[0] + pPal[1]*2 + pPal[2])/4;
+                } else {
+                    g = u8G2ToG8[g & 3];
+                }
+                if ((x & 3) == 3) {
+                    s++;
+                }
+                break;
+        } // switch on bpp
+        if (iDestBpp == 1) {
+            u8 |= (g >> 7); // B/W
+        } else { // generate 4 gray levels (2 bits)
+            u8 |= (3 ^ (g >> 6)); // 4 gray levels (inverted relative to 1-bit)
+        }
+        count -= iDestBpp;        
+        if (count == 0) { // byte is full, move on
+            *d++ = u8;
+            u8 = 0;
+            count = 8;
+        }
+    } // for x
+    if (count != 8) { // partial byte remaining
+        u8 <<= count;
+        *d++ = u8;
+    }
+} /* ReduceBpp() */
+/** 
  * @brief Callback function for each line of PNG decoded
  * @param PNGDRAW structure containing the current line and relevant info
  * @return none
  */
-void png_draw(PNGDRAW *pDraw)
+int png_draw(PNGDRAW *pDraw)
 {
     int x;
-    uint8_t ucInvert = 0;
+    uint8_t ucBppChanged = 0, ucInvert = 0;
     uint8_t uc, ucMask, src, *s, *d, *pTemp = bbep.getCache(); // get some scratch memory (not from the stack)
 
-    if (pDraw->pPalette) {
-      if (pDraw->pPalette[0] == 0) {
-        ucInvert = 0xff;
-      }
+    if (pDraw->iPixelType == PNG_PIXEL_INDEXED || pDraw->iBpp > 2) {
+        if (pDraw->iBpp == 1) { // 1-bit output, just see which color is brighter
+            uint32_t u32Gray0, u32Gray1;
+            u32Gray0 = pDraw->pPalette[0] + (pDraw->pPalette[1]<<2) + pDraw->pPalette[2];
+            u32Gray1 = pDraw->pPalette[3] + (pDraw->pPalette[4]<<2) + pDraw->pPalette[5];
+          if (u32Gray0 < u32Gray1) {
+            ucInvert = 0xff;
+          }
+        } else {
+            // Reduce the source image to 1-bpp or 2-bpp
+            ReduceBpp((pDraw->pUser) ? 2:1, pDraw->iPixelType, pDraw->pPalette, pDraw->pPixels, pTemp, pDraw->iWidth, pDraw->iBpp);
+            ucBppChanged = 1;
+        }
+    } else if (pDraw->iBpp == 2) {
+        ucInvert = 0xff; // 2-bit non-palette images need to be inverted colors for 4-gray mode
     }
-    s = (uint8_t *)pDraw->pPixels;
+    s = (ucBppChanged) ? pTemp : (uint8_t *)pDraw->pPixels;
     d = pTemp;
     if (!pDraw->pUser) {
         // 1-bit output, decode the single plane and write it
-        ucInvert = ~ucInvert; // the b/w polarity is reversed compared to 2-bpp mode
         for (x=0; x<pDraw->iWidth; x+= 8) {
           d[0] = s[0] ^ ucInvert;
           d++; s++;
@@ -344,6 +442,7 @@ void png_draw(PNGDRAW *pDraw)
         }
     }
     bbep.writeData(pTemp, (pDraw->iWidth+7)/8);
+    return 1;
 } /* png_draw() */
 
 //
@@ -370,12 +469,12 @@ const uint8_t ucTwoBitFlags[256] = {
 0x09,0x0b,0x0d,0x09,0x0b,0x0a,0x0e,0x0a,0x0d,0x0e,0x0c,0x0c,0x09,0x0a,0x0c,0x08
 };
 
-void png_draw_count(PNGDRAW *pDraw)
+int png_draw_count(PNGDRAW *pDraw)
 {
     int x, *pFlags = (int *)pDraw->pUser;
     uint8_t *s, set_bits;
 
-    if (pDraw->y > 430) return; // Workaround to ignore the icon in the lower left corner
+    if (pDraw->y > 430) return 0; // Workaround to ignore the icon in the lower left corner
 
     set_bits = pFlags[0]; // use a local var
     s = (uint8_t *)pDraw->pPixels;
@@ -383,6 +482,7 @@ void png_draw_count(PNGDRAW *pDraw)
         set_bits |= ucTwoBitFlags[*s++]; // do 4 pixels at a time
     } // for x
     pFlags[0] = set_bits; // put it back in the flags array
+    return 1;
 } /* png_draw_count() */
 /** 
  * @brief Function to decode a PNG and count the number of unique colors
@@ -430,24 +530,23 @@ PNG *png = new PNG();
         if (png->getWidth() != bbep.width() || png->getHeight() != bbep.height()) {
             Log_error("PNG image size doesn't match display size");
             rc = -1;
-        } else if (png->getBpp() > 2) {
-            Log_error("Unsupported PNG bit depth (only 1 or 2-bpp supported)");
-            rc = -1;
         } else { // okay to decode
             Log_info("%s [%d]: Decoding %d-bpp png (current)\r\n", __FILE__, __LINE__, png->getBpp());
             // Prepare target memory window (entire display)
             bbep.setAddrWindow(0, 0, bbep.width(), bbep.height());
-            if (png->getBpp() == 1 || png_count_colors(png, pPNG, iDataSize) == 2) { // 1-bit image (single plane)
+            if (png->getBpp() == 1 || (png->getBpp() == 2 && png_count_colors(png, pPNG, iDataSize) == 2)) { // 1-bit image (single plane)
                 bbep.setPanelType(ONE_BIT_PANEL);
                 rc = REFRESH_PARTIAL; // the new image is 1bpp - try a partial update
                 bbep.startWrite(PLANE_0); // start writing image data to plane 0
                 png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
-                if (png->getBpp() == 1) {
+                if (png->getBpp() == 1 || png->getBpp() > 2) {
                     png->decode(NULL, 0);
                 } else { // convert the 2-bit image to 1-bit output
                     Log_info("%s [%d]: Current png only has 2 unique colors!\n", __FILE__, __LINE__);
                     iPlane = 2;
-                    png->decode(&iPlane, 0);
+                    if (png->decode(&iPlane, 0) != PNG_SUCCESS) {
+                        Log_info("%s [%d]: Error decoding image = %d\n", __FILE__, __LINE__, png->getLastError());
+                    }
                 }
                 png->close();
             } else { // 2-bpp
@@ -480,7 +579,7 @@ PNG *png = new PNG();
 void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
 
 {
-    bool isPNG = true;
+    bool isPNG = data_size >= 4 && MOTOLONG(image_buffer) == (int32_t)0x89504e47;;
     auto width = display_width();
     auto height = display_height();
 //    uint32_t *d32;
@@ -488,7 +587,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     int iRefreshMode = REFRESH_FULL; // assume full (slow) refresh
 
    // Log_info("Paint_NewImage %d", reverse);
-    Log_info("show image for array");
+    Log_info("display_show_image start");
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef FUTURE
     if (reverse)
@@ -506,7 +605,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
         }
     }
 #endif
-    if (isPNG == true && data_size < DEFAULT_IMAGE_SIZE)
+    if (isPNG == true && data_size < MAX_IMAGE_SIZE)
     {
         Log_info("Drawing PNG");
         iRefreshMode = png_to_epd(image_buffer, data_size);
@@ -523,11 +622,15 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
 #endif
             int x = (width - pBBB->width)/2;
             int y = (height - pBBB->height)/2; // center it
-            bbep.fillScreen(BBEP_WHITE); // draw the image centered on a white background
+            if (x > 0 || y > 0) // only clear if the image is smaller than the display
+            {
+                bbep.fillScreen(BBEP_WHITE); 
+            }     
             bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
-        }
-        else
-        { // This work-around is due to a lack of RAM; the correct method would be to use loadBMP()
+        } 
+        else 
+        {
+         // This work-around is due to a lack of RAM; the correct method would be to use loadBMP()
             flip_image(image_buffer+62, bbep.width(), bbep.height(), false); // fix bottom-up bitmap images
 #ifdef BB_EPAPER
             bbep.setBuffer(image_buffer+62); // uncompressed 1-bpp bitmap
@@ -559,7 +662,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
 #else
     bbep.fullUpdate();
 #endif
-    Log_info("display refresh end");
+    Log_info("display_show_image end");
 }
 /**
  * @brief Function to read an image from the file system
@@ -602,12 +705,10 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
     BB_RECT rect;
 
-    Log_info("Paint_NewImage");
-    Log_info("show image for array");
+    Log_info("display_show_msg start");
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef BB_EPAPER
     bbep.allocBuffer(false);
-    bbep.fillScreen(BBEP_WHITE); // white background
 #endif
     if (*(uint16_t *)image_buffer == BB_BITMAP_MARKER)
     {
@@ -615,6 +716,10 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
         int x = (width - pBBB->width)/2;
         int y = (height - pBBB->height)/2; // center it
+        if (x > 0 || y > 0) // only clear if the image is smaller than the display
+        {
+            bbep.fillScreen(BBEP_WHITE); 
+        }
         bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
     }
     else
@@ -788,7 +893,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
 #else
     bbep.fullUpdate();
 #endif
-    Log_info("display");
+    Log_info("display_show_msg end");
 }
 
 /**
@@ -807,13 +912,13 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef BB_EPAPER
     bbep.allocBuffer(false);
-    bbep.fillScreen(BBEP_WHITE);
     Log_info("Free heap after bbep.allocBuffer() - %d", ESP.getMaxAllocHeap());
 #endif
 
     if (message_type == WIFI_CONNECT)
     {
         Log_info("Display set to white");
+        bbep.fillScreen(BBEP_WHITE);
 #ifdef BB_EPAPER
         bbep.writePlane(PLANE_0);
         if (!apiDisplayResult.response.maximum_compatibility) {
@@ -832,8 +937,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
     BB_RECT rect;
 
-    Log_info("Paint_NewImage");
-    Log_info("show image for array");
+    Log_info("display_show_msg2 start");
 
     // Load the image into the bb_epaper framebuffer
     if (*(uint16_t *)image_buffer == BB_BITMAP_MARKER)
@@ -842,6 +946,10 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
         int x = (width - pBBB->width)/2;
         int y = (height - pBBB->height)/2; // center it
+        if (x > 0 || y > 0) // only clear if the image is smaller than the display
+        { 
+            bbep.fillScreen(BBEP_WHITE);
+        }
         bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
     }
     else
@@ -911,7 +1019,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 #else
     bbep.fullUpdate();
 #endif
-    Log_info("display");
+    Log_info("display_show_msg2 end");
 }
 
 /**
