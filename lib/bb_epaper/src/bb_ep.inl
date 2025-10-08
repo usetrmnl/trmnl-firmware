@@ -49,6 +49,12 @@ BBEP_GRAY3, BBEP_GRAY2, BBEP_GRAY1, BBEP_GRAY0, BBEP_GRAY3, BBEP_GRAY2, BBEP_GRA
 BBEP_GRAY3, BBEP_GRAY2, BBEP_GRAY1, BBEP_GRAY0, BBEP_GRAY3, BBEP_GRAY2, BBEP_GRAY1, BBEP_GRAY0
 };
 
+// 2-bit grayscale mode (some swapped)
+const uint8_t u8Colors_4gray_v2[16] = {
+BBEP_GRAY3, BBEP_GRAY1, BBEP_GRAY2, BBEP_GRAY0, BBEP_GRAY3, BBEP_GRAY1, BBEP_GRAY2, BBEP_GRAY0,
+BBEP_GRAY3, BBEP_GRAY2, BBEP_GRAY1, BBEP_GRAY0, BBEP_GRAY3, BBEP_GRAY1, BBEP_GRAY2, BBEP_GRAY0
+}; 
+
 // the 4-color mode
 const uint8_t u8Colors_4clr[16] = {  // black white red yellow
     BBEP_BLACK, BBEP_WHITE, BBEP_RED, BBEP_YELLOW, BBEP_BLACK, BBEP_WHITE, BBEP_RED, BBEP_YELLOW,
@@ -646,7 +652,7 @@ const uint8_t epd75_init_sequence_partial[] PROGMEM = {
 };
 const uint8_t epd75_init_fast_gen2[] PROGMEM = {
     0x02, 0x00, 0x1f, // panel setting
-    0x03, 0x50, 0x10, 0x07,
+    0x03, 0x50, 0x21, 0x07,
     0x01, 0x04, // power on
     BUSY_WAIT,
     0x05, 0x06, 0x27, 0x27, 0x18, 0x17,
@@ -656,14 +662,17 @@ const uint8_t epd75_init_fast_gen2[] PROGMEM = {
 };
 
 const uint8_t epd75_init_partial_gen2[] PROGMEM = {
+    0x01, 0x04, // power on
+    BUSY_WAIT,
+    0x02, 0xe0, 0x02,
+    0x02, 0xe5, 0x5a,    
     0x02, 0x00, 0x1f, // panel setting
-//    0x03, 0x50, 0x10, 0x07,
+    0x03, 0x50, 0x21, 0x07,
     0x01, 0x04, // power on
     BUSY_WAIT,
     0x05, 0x06, 0x27, 0x27, 0x18, 0x17,
     0x02, 0xe0, 0x02,
     0x02, 0xe5, 0x6e,
-    0x03, 0x50, 0xa9, 0x07,
     0
 };
 
@@ -2095,8 +2104,8 @@ const EPD_PANEL panelDefs[] PROGMEM = {
     {240, 416, 0, epd37_init_sequence_full, NULL, epd37_init_sequence_part, 0, BBEP_CHIP_UC81xx, u8Colors_2clr}, // EP37_240x416
     {104, 212, 0, epd213_inky_init_sequence_full, NULL, NULL, 0, BBEP_CHIP_UC81xx, u8Colors_2clr}, // EP213_104x212, older InkyPHAT black and white
     {800, 480, 0, epd75_init_sequence_full, epd75_init_sequence_fast, epd75_init_sequence_partial, 0, BBEP_CHIP_UC81xx, u8Colors_2clr}, // EP75_800x480
-    {800, 480, 0, epd75_init_sequence_full, epd75_init_fast_gen2, epd75_init_sequence_partial, 0, BBEP_CHIP_UC81xx, u8Colors_2clr}, // EP75_800x480_GEN2
-    {800, 480, 0, epd75_gray_init, NULL, NULL, BBEP_4GRAY, BBEP_CHIP_UC81xx, u8Colors_4gray}, // EP75_800x480_4GRAY_GEN2
+    {800, 480, 0, epd75_init_sequence_full, epd75_init_fast_gen2, epd75_init_partial_gen2, 0, BBEP_CHIP_UC81xx, u8Colors_2clr}, // EP75_800x480_GEN2
+    {800, 480, 0, epd75_gray_init, NULL, NULL, BBEP_4GRAY, BBEP_CHIP_UC81xx, u8Colors_4gray_v2}, // EP75_800x480_4GRAY_GEN2
     {800, 480, 0, epd75_old_gray_init, NULL, NULL, BBEP_4GRAY, BBEP_CHIP_UC81xx, u8Colors_4gray}, // EP75_800x480_4GRAY
     {800, 480, 0, epd75_old_gray_init2, NULL, NULL, BBEP_4GRAY, BBEP_CHIP_UC81xx, u8Colors_4gray}, // EP75_800x480_4GRAY_V2
     {128, 296, 0, epd29_init_sequence_full, epd29_init_sequence_fast, epd29_init_sequence_part, 0, BBEP_CHIP_UC81xx, u8Colors_2clr}, // Badger 2040

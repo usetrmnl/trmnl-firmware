@@ -10,10 +10,9 @@
 #include "bb_epaper.h"
 
 const DISPLAY_PROFILE dpList[4] = { // 1-bit and 2-bit display types for each profile
-    {EP75_800x480, EP75_800x480_4GRAY_GEN2/*EP75_800x480_4GRAY*/}, // default (for original EPD)
+    {EP75_800x480, EP75_800x480_4GRAY}, // default (for original EPD)
     {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, // a = uses built-in fast + 4-gray 
-    {EP75_800x480, EP75_800x480_4GRAY_V2}, // b
-    {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, // c
+    {EP75_800x480, EP75_800x480_4GRAY_V2}, // b = darker grays
 };
 BBEPAPER bbep(EP75_800x480);
 // Counts the number of partial updates to know when to do a full update
@@ -366,6 +365,15 @@ void ReduceBpp(int iDestBpp, int iPixelType, uint8_t *pPalette, uint8_t *pSrc, u
         *d++ = u8;
     }
 } /* ReduceBpp() */
+enum {
+    PNG_1_BIT = 0,
+    PNG_1_BIT_INVERTED,
+    PNG_2_BIT_0,
+    PNG_2_BIT_1,
+    PNG_2_BIT_BOTH,
+    PNG_2_BIT_INVERTED,
+};
+
 /** 
  * @brief Callback function for each line of PNG decoded
  * @param PNGDRAW structure containing the current line and relevant info
@@ -376,6 +384,7 @@ int png_draw(PNGDRAW *pDraw)
     int x;
     uint8_t ucBppChanged = 0, ucInvert = 0;
     uint8_t uc, ucMask, src, *s, *d, *pTemp = bbep.getCache(); // get some scratch memory (not from the stack)
+    int iPlane = *(int *)pDraw->pUser;
 
     if (pDraw->iPixelType == PNG_PIXEL_INDEXED || pDraw->iBpp > 2) {
         if (pDraw->iBpp == 1) { // 1-bit output, just see which color is brighter
@@ -395,8 +404,9 @@ int png_draw(PNGDRAW *pDraw)
     }
     s = (ucBppChanged) ? pTemp : (uint8_t *)pDraw->pPixels;
     d = pTemp;
-    if (!pDraw->pUser) {
+    if (iPlane == PNG_1_BIT || iPlane == PNG_1_BIT_INVERTED) {
         // 1-bit output, decode the single plane and write it
+        if (iPlane == PNG_1_BIT_INVERTED) ucInvert = ~ucInvert; // to do PLANE_FALSE_DIFF
         for (x=0; x<pDraw->iWidth; x+= 8) {
           d[0] = s[0] ^ ucInvert;
           d++; s++;
@@ -405,8 +415,10 @@ int png_draw(PNGDRAW *pDraw)
         src = *s++;
         src ^= ucInvert;
         uc = 0; // suppress warning/error
-        if (*(int *)pDraw->pUser > 1) { // draw 2bpp data as 1-bit to use for partial update
-            ucInvert = ~ucInvert; // the invert rule is backwards for grayscale data
+        if (iPlane == PNG_2_BIT_BOTH || iPlane == PNG_2_BIT_INVERTED) { // draw 2bpp data as 1-bit to use for partial update
+            if (iPlane == PNG_2_BIT_BOTH) {
+                ucInvert = ~ucInvert; // the invert rule is backwards for grayscale data
+            }
             src = ~src;
             for (x=0; x<pDraw->iWidth; x++) {
                 uc <<= 1;
@@ -423,7 +435,7 @@ int png_draw(PNGDRAW *pDraw)
                 }
             } // for x
         } else { // normal 0/1 split plane
-            ucMask = (*(int *)pDraw->pUser == 0) ? 0x40 : 0x80; // lower or upper source bit
+            ucMask = (iPlane == PNG_2_BIT_0) ? 0x40 : 0x80; // lower or upper source bit
             for (x=0; x<pDraw->iWidth; x++) {
                 uc <<= 1;
                 if (src & ucMask) {
@@ -516,10 +528,9 @@ int i, iColors;
  * @param size of the PNG file
  * @return refresh mode based on image type and presence of old image
  */
-
 int png_to_epd(const uint8_t *pPNG, int iDataSize)
 {
-int iPlane, rc = -1;
+int iPlane = PNG_1_BIT, rc = -1;
 PNG *png = new PNG();
 
     if (!png) return PNG_MEM_ERROR; // not enough memory for the decoder instance
@@ -539,26 +550,37 @@ PNG *png = new PNG();
                 bbep.startWrite(PLANE_0); // start writing image data to plane 0
                 png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
                 if (png->getBpp() == 1 || png->getBpp() > 2) {
-                    png->decode(NULL, 0);
+                    iPlane = PNG_1_BIT;
+                    png->decode(&iPlane, 0);
                 } else { // convert the 2-bit image to 1-bit output
                     Log_info("%s [%d]: Current png only has 2 unique colors!\n", __FILE__, __LINE__);
-                    iPlane = 2;
+                    iPlane = PNG_2_BIT_BOTH;
                     if (png->decode(&iPlane, 0) != PNG_SUCCESS) {
                         Log_info("%s [%d]: Error decoding image = %d\n", __FILE__, __LINE__, png->getLastError());
                     }
                 }
                 png->close();
+                if (iTempProfile != 0) { // need to write the inverted plane to do PLANE_FALSE_DIFF
+                    bbep.startWrite(PLANE_1); // start writing image data to plane 1
+                    png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
+                    if (iPlane == PNG_1_BIT) {
+                        iPlane = PNG_1_BIT_INVERTED; // inverted 1-bit to second memory plane
+                    } else { // convert the 2-bit image to 1-bit output
+                        iPlane = PNG_2_BIT_INVERTED; // inverted 2-bit -> 1-bit to second plane
+                    }
+                    png->decode(&iPlane, 0);
+                } // temp profile needs the second plane written
             } else { // 2-bpp
                 bbep.setPanelType(dpList[iTempProfile].TwoBit);
                 rc = REFRESH_FULL; // 4gray mode must be full refresh
                 iUpdateCount = 0; // grayscale mode resets the partial update counter
                 bbep.startWrite(PLANE_0); // start writing image data to plane 0
-                iPlane = 0;
+                iPlane = PNG_2_BIT_0;
                 Log_info("%s [%d]: decoding 4-gray plane 0\r\n", __FILE__, __LINE__);
                 png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
                 png->decode(&iPlane, 0); // tell PNGDraw to use bits for plane 0
                 png->close(); // start over for plane 1
-                iPlane = 1;
+                iPlane = PNG_2_BIT_1;
                 Log_info("%s [%d]: decoding 4-gray plane 1\r\n", __FILE__, __LINE__);
                 png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
                 bbep.startWrite(PLANE_1); // start writing image data to plane 1
