@@ -1885,7 +1885,7 @@ const uint8_t epd75_old_gray_init2[] PROGMEM = {
 // 2-bit (4 grayscale mode)
 const uint8_t epd75_gray_init[] PROGMEM = {
     2, 0x00, 0x1f, // panel setting
-    3, 0x50, 0x10, 0x07, // VCOM
+    3, 0x50, 0x90, 0x07, // VCOM (bit 7 set disables the border color - stays white in our case)
     1, UC8151_PON, // power on
     BUSY_WAIT,
     5, 0x06, 0x27, 0x27, 0x18, 0x17, // booster soft start
