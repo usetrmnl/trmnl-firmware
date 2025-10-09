@@ -25,7 +25,7 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload)
   uint32_t u32TP = 0; // default
      if (tp == "a") u32TP = 1;
      else if (tp == "b") u32TP = 2;
-     else if (tp == "c") u32TP = 3;
+//     else if (tp == "c") u32TP = 3;
 
   return ApiDisplayResponse{
       .outcome = ApiDisplayOutcome::Ok,
