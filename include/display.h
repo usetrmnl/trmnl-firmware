@@ -23,6 +23,11 @@ enum MSG
   TEST,
 };
 
+typedef struct dp_tag
+{
+  uint32_t OneBit, TwoBit; // profiles for 1 and 2-bit modes
+} DISPLAY_PROFILE;
+
 /**
  * @brief Function to init the display
  * @param none
