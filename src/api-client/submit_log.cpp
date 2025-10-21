@@ -27,7 +27,7 @@ bool submitLogToApi(LogApiInput &input, const char *api_url)
                     HTTPClient &https = *httpsPointer;
 
                     https.addHeader("ID", WiFi.macAddress());
-                    https.addHeader("Accept", "application/json");
+                    https.addHeader("Accept", "application/json, */*");
                     https.addHeader("Access-Token", input.api_key);
                     https.addHeader("Content-Type", "application/json");
 
@@ -45,7 +45,11 @@ bool submitLogToApi(LogApiInput &input, const char *api_url)
                       Log_error("[HTTPS] POST... failed, error: %d %s", httpCode, https.errorToString(httpCode).c_str());
                       return false;
                     }
-                    else if (httpCode != HTTP_CODE_OK && httpCode != HTTP_CODE_MOVED_PERMANENTLY && httpCode != HTTP_CODE_NO_CONTENT)
+                    else if (httpCode != HTTP_CODE_OK && 
+                             httpCode != HTTP_CODE_MOVED_PERMANENTLY && 
+                             httpCode != HTTP_CODE_NO_CONTENT && 
+                             httpCode != HTTP_CODE_TEMPORARY_REDIRECT && 
+                             httpCode != HTTP_CODE_PERMANENT_REDIRECT)
                     {
                       Log_error("[HTTPS] POST... failed, returned HTTP code unknown: %d %s", httpCode, https.errorToString(httpCode).c_str());
                       return false;
