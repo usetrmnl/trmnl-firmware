@@ -2133,6 +2133,7 @@ void bbepWaitBusy(BBEPDISP *pBBEP)
     while (iTimeout < 5000) {
         if (digitalRead(pBBEP->iBUSYPin) == busy_idle) break;
         // delay(1);
+        iTimeout += 200;
         bbepLightSleep(200); // save battery power by checking every 200ms
     }
 } /* bbepWaitBusy() */
