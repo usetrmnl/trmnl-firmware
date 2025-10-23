@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include "bl.h"
-#include "esp_ota_ops.h" 
+#include "esp_ota_ops.h"
 
 void setup()
 {

@@ -790,9 +790,41 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         bbep.print(string1);
     }
     break;
-    case API_ERROR:
+    case API_REQUEST_FAILED:
     {
-        const char string1[] = "WiFi connected, TRMNL not responding.";
+        const char string1[] = "WiFi connected, request to API failed.";
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, 340);
+        bbep.println(string1);
+        const char string2[] = "Short click the button on back,";
+        bbep.getStringBox(string2, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+        bbep.println(string2);
+        const char string3[] = "otherwise check your internet.";
+        bbep.getStringBox(string3, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+        bbep.print(string3);
+    }
+    break;
+    case API_UNABLE_TO_CONNECT:
+    {
+        const char string1[] = "WiFi connected, unable connect to API.";
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, 340);
+        bbep.println(string1);
+        const char string2[] = "Short click the button on back,";
+        bbep.getStringBox(string2, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+        bbep.println(string2);
+        const char string3[] = "otherwise check your internet.";
+        bbep.getStringBox(string3, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+        bbep.print(string3);
+    }
+    break;
+    case API_SETUP_FAILED:
+    {
+        const char string1[] = "WiFi connected, /api/setup returned error.";
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, 340);
         bbep.println(string1);
@@ -809,6 +841,30 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     case API_SIZE_ERROR:
     {
         const char string1[] = "WiFi connected, TRMNL content malformed.";
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, 400);
+        bbep.println(string1);
+        const char string2[] = "Wait or reset by holding button on back.";
+        bbep.getStringBox(string2, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+        bbep.print(string2);
+    }
+    break;
+    case API_FIRMWARE_UPDATE_ERROR:
+    {
+        const char string1[] = "WiFi connected, could not get firmware update from api.";
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, 400);
+        bbep.println(string1);
+        const char string2[] = "Wait or reset by holding button on back.";
+        bbep.getStringBox(string2, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+        bbep.print(string2);
+    }
+    break;
+    case API_IMAGE_DOWNLOAD_ERROR:
+    {
+        const char string1[] = "WiFi connected, API could not deliver image to device.";
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, 400);
         bbep.println(string1);

@@ -448,7 +448,7 @@ void bl_init(void)
   {
     if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
     {
-      showMessageWithLogo(API_ERROR);
+      showMessageWithLogo(API_REQUEST_FAILED);
     }
     else
     {
@@ -465,7 +465,7 @@ void bl_init(void)
   {
     if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
     {
-      showMessageWithLogo(API_ERROR);
+      showMessageWithLogo(API_UNABLE_TO_CONNECT);
     }
     else
     {
@@ -1526,7 +1526,7 @@ static bool performApiSetup()
   {
     if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
     {
-      showMessageWithLogo(API_ERROR);
+      showMessageWithLogo(API_SETUP_FAILED);
     }
     else
     {
@@ -1603,7 +1603,7 @@ static void downloadSetupImage()
     {
       if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
       {
-        showMessageWithLogo(API_ERROR);
+        showMessageWithLogo(API_IMAGE_DOWNLOAD_ERROR);
       }
       else
       {
@@ -1626,7 +1626,7 @@ static void downloadSetupImage()
     {
       if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
       {
-        showMessageWithLogo(API_ERROR);
+        showMessageWithLogo(API_IMAGE_DOWNLOAD_ERROR);
       }
       else
       {
@@ -1644,7 +1644,7 @@ static void downloadSetupImage()
     {
       if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
       {
-        showMessageWithLogo(API_ERROR);
+        showMessageWithLogo(API_IMAGE_DOWNLOAD_ERROR);
       }
       else
       {
@@ -1745,7 +1745,7 @@ static void checkAndPerformFirmwareUpdate(void)
                Log.fatal("%s [%d]: Unable to connect for firmware update\r\n", __FILE__, __LINE__);
                if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
                {
-                 showMessageWithLogo(API_ERROR);
+                 showMessageWithLogo(API_FIRMWARE_UPDATE_ERROR);
                }
                else
                {
@@ -2223,3 +2223,17 @@ void log_nvs_usage()
     Log_error("Failed to get NVS stats: %s", esp_err_to_name(ret));
   }
 }
+
+void Test_new_screens(void){
+    showMessageWithLogo(API_ERROR);
+    delay(000);
+    showMessageWithLogo(API_REQUEST_FAILED);
+    delay(2000);
+    showMessageWithLogo(API_IMAGE_DOWNLOAD_ERROR);
+    delay(2000);
+    showMessageWithLogo(API_FIRMWARE_UPDATE_ERROR);
+    delay(2000);
+    showMessageWithLogo(API_SETUP_FAILED);
+    delay(2000);
+    showMessageWithLogo(API_UNABLE_TO_CONNECT);
+};

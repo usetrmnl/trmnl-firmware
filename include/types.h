@@ -25,6 +25,7 @@ enum https_request_err_e
     HTTPS_WRONG_IMAGE_FORMAT,
     HTTPS_IMAGE_FILE_TOO_BIG,
     HTTPS_PLUGIN_NOT_ATTACHED,
+    HTTPS_BAD_CLIENT
 };
 
 #endif
