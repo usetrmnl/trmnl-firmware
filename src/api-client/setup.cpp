@@ -23,7 +23,7 @@ void addSetupHeaders(HTTPClient &https, ApiSetupInputs &inputs)
 ApiSetupResult fetchApiSetup(ApiSetupInputs &apiSetupInputs)
 {
   return withHttp(
-      apiSetupInputs.baseUrl + "/api/setup/",
+      apiSetupInputs.baseUrl + "/api/setup",
       [&apiSetupInputs](HTTPClient *https, HttpError error) -> ApiSetupResult
       {
         if (error == HttpError::HTTPCLIENT_WIFICLIENT_ERROR)

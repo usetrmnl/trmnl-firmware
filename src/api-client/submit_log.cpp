@@ -3,6 +3,7 @@
 #include "trmnl_log.h"
 #include <memory>
 #include "http_client.h"
+#include <config.h>
 #include <api_request_serialization.h>
 
 bool submitLogToApi(LogApiInput &input, const char *api_url)
@@ -38,6 +39,18 @@ bool submitLogToApi(LogApiInput &input, const char *api_url)
 
                     // start connection and send HTTP header
                     int httpCode = https.POST(payload);
+                    if(httpCode == HTTP_CODE_PERMANENT_REDIRECT || httpCode == HTTP_CODE_TEMPORARY_REDIRECT){
+                      https.end();
+                      https.begin(API_BASE_URL + https.getLocation());
+                      https.addHeader("ID", WiFi.macAddress());
+                      https.addHeader("Accept", "application/json, */*");
+                      https.addHeader("Access-Token", input.api_key);
+                      https.addHeader("Content-Type", "application/json");
+
+                      https.setTimeout(15000);
+                      https.setConnectTimeout(15000);
+                      httpCode = https.POST(payload);
+                    }   
 
                     // httpCode will be negative on error
                     if (httpCode < 0)
@@ -47,9 +60,7 @@ bool submitLogToApi(LogApiInput &input, const char *api_url)
                     }
                     else if (httpCode != HTTP_CODE_OK && 
                              httpCode != HTTP_CODE_MOVED_PERMANENTLY && 
-                             httpCode != HTTP_CODE_NO_CONTENT && 
-                             httpCode != HTTP_CODE_TEMPORARY_REDIRECT && 
-                             httpCode != HTTP_CODE_PERMANENT_REDIRECT)
+                             httpCode != HTTP_CODE_NO_CONTENT)
                     {
                       Log_error("[HTTPS] POST... failed, returned HTTP code unknown: %d %s", httpCode, https.errorToString(httpCode).c_str());
                       return false;

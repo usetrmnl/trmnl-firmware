@@ -670,6 +670,16 @@ static https_request_err_e downloadAndShow()
           // start connection and send HTTP header
           int httpCode = https.GET();
           int content_size = https.getSize();
+          if(httpCode == HTTP_CODE_PERMANENT_REDIRECT ||
+            httpCode == HTTP_CODE_TEMPORARY_REDIRECT){
+              https.end();
+              https.begin(API_BASE_URL +https.getLocation());
+              Log_info("Redirected to: %s", https.getLocation().c_str());
+              https.setTimeout(15000);
+              https.setConnectTimeout(15000);
+              httpCode = https.GET();
+              content_size = https.getSize();
+            }
 //          uint8_t *buffer_old = nullptr; // Disable partial update for now
 //          int file_size_old = 0;
 
@@ -690,8 +700,9 @@ static https_request_err_e downloadAndShow()
             Log_error_submit("[HTTPS] GET... failed, code: %d (%s)", httpCode, https.errorToString(httpCode).c_str());
             return HTTPS_REQUEST_FAILED;
           }
+          
           Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, https.getSize());
-
+          
           uint32_t counter = 0;
           if (content_size > MAX_IMAGE_SIZE)
           {
@@ -1499,7 +1510,7 @@ static bool performApiSetup()
   inputs.macAddress = WiFi.macAddress();
   inputs.firmwareVersion = FW_VERSION_STRING;
 
-  Log.info("%s [%d]: [HTTPS] begin /api/setup/ ...\r\n", __FILE__, __LINE__);
+  Log.info("%s [%d]: [HTTPS] begin /api/setup ...\r\n", __FILE__, __LINE__);
   Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
   Log.info("%s [%d]: Device MAC address: %s\r\n", __FILE__, __LINE__, WiFi.macAddress().c_str());
 
@@ -1620,6 +1631,15 @@ static void downloadSetupImage()
     Log.info("%s [%d]: [HTTPS] GET..\r\n", __FILE__, __LINE__);
 
     int httpCode = https->GET();
+
+    if(httpCode == HTTP_CODE_PERMANENT_REDIRECT ||httpCode == HTTP_CODE_TEMPORARY_REDIRECT){
+              https->end();
+              https->begin(https->getLocation());
+              Log_info("Redirected to: %s", https->getLocation().c_str());
+              https->setTimeout(15000);
+              https->setConnectTimeout(15000);
+              httpCode = https->GET();
+            }
 
     // httpCode will be negative on error
     if (httpCode <= 0)
