@@ -82,7 +82,8 @@ enum {
     PLANE_1,
     PLANE_BOTH,
     PLANE_DUPLICATE, // duplicate 0 to both 0 and 1
-    PLANE_0_TO_1 // send plane 0 to plane 1 memory
+    PLANE_0_TO_1, // send plane 0 to plane 1 memory
+    PLANE_FALSE_DIFF // use 'partial' mode to force all pixels to update
 };
 #ifndef __ONEBITDISPLAY__
 // 5 possible font sizes: 8x8, 16x32, 6x8, 12x16 (stretched from 6x8 with smoothing), 16x16 (stretched from 8x8)
@@ -131,9 +132,11 @@ enum {
     EP42R2_400x300, // GDEQ042Z21
     EP37_240x416, // GDEY037T03
     EP213_104x212, // InkyPHAT 2.13 black and white
-    EP75_800x480, // GDEY075T7
-    EP75_800x480_4GRAY, // GDEW075T7 in 4 grayscale mode
-    EP75_800x480_4GRAY_OLD, // GDEY075T7 in 4 grayscale mode
+    EP75_800x480, // GDEY075T7 (original TRMNL panel)
+    EP75_800x480_GEN2, // GEDY075-D2 (TRMNL gen2 panel)
+    EP75_800x480_4GRAY_GEN2, // GDEW075T7 in 4 grayscale mode
+    EP75_800x480_4GRAY, // GDEY075T7 in 4 grayscale mode
+    EP75_800x480_4GRAY_V2, // GDEY075T7 in 4 grayscale mode, panel which produces too light output
     EP29_128x296, // Pimoroni Badger2040
     EP213R_122x250, // Inky phat 2.13 B/W/R
     EP154_200x200, // waveshare
