@@ -3,7 +3,6 @@
 #include "trmnl_log.h"
 #include <memory>
 #include "http_client.h"
-#include <config.h>
 #include <api_request_serialization.h>
 
 bool submitLogToApi(LogApiInput &input, const char *api_url)
@@ -41,7 +40,7 @@ bool submitLogToApi(LogApiInput &input, const char *api_url)
                     int httpCode = https.POST(payload);
                     if(httpCode == HTTP_CODE_PERMANENT_REDIRECT || httpCode == HTTP_CODE_TEMPORARY_REDIRECT){
                       https.end();
-                      https.begin(API_BASE_URL + https.getLocation());
+                      https.begin(String(api_url) + https.getLocation());
                       https.addHeader("ID", WiFi.macAddress());
                       https.addHeader("Accept", "application/json, */*");
                       https.addHeader("Access-Token", input.api_key);
