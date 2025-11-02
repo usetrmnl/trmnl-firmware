@@ -88,10 +88,18 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #define PIN_INTERRUPT 3         //the green button
 #define PIN_VBAT_SWITCH 21      //load switch enable pin for battery voltage measurement
 #define VBAT_SWITCH_LEVEL HIGH  //load switch enable pin active level
+#elif defined(BOARD_DFR_FireBeetle_ESP32E)
+#define DEVICE_MODEL "dfrobot_firebeetle_esp32e"
+// TODO
+#define PIN_INTERRUPT 4         // have to add the button
+#else
 #endif
 
 #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001)
 #define PIN_BATTERY 1
+#elif defined(BOARD_DFR_FireBeetle_ESP32E)
+// TODO confirm pin
+#define PIN_BATTERY 34
 #else
 #define PIN_BATTERY 3
 #endif
@@ -103,7 +111,8 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #define BUTTON_SOFT_RESET_TIME 15000
 
 #define SERVER_MAX_RETRIES 3
-
-#define API_BASE_URL "https://trmnl.app"
+// TODO change it back
+// #define API_BASE_URL "https://trmnl.app"
+#define API_BASE_URL "http://192.168.50.154:3000"
 
 #endif
