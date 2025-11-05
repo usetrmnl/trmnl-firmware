@@ -126,6 +126,8 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
  */
 void display_show_msg_api(uint8_t *image_buffer, String message);
 
+void display_show_msg_qa(uint8_t *image_buffer, const float *voltage, const float *temperature, bool qa_result);
+
 /**
  * @brief Function to got the display to the sleep
  * @param none
