@@ -67,7 +67,7 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
     server.on("/run-test", HTTP_GET, [](AsyncWebServerRequest *request)
               {
                 Serial.println("Running sensor test from web...");
-                String json = Main_Test();
+                String json = testTemperature();
                 request->send(200, "application/json", json);
               });
 

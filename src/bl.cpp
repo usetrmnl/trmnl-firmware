@@ -2059,17 +2059,16 @@ static void writeSpecialFunction(SPECIAL_FUNCTION function)
   }
 }
 
-static void showMessageWithLogo(MSG message_type) {
-  display_show_msg(storedLogoOrDefault(0), message_type);
-  need_to_refresh_display = 1;
-  preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
-}
-
 static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, const char *fw_version, String message)
 {
   display_show_msg(storedLogoOrDefault(0), message_type, friendly_id, id, fw_version, message);
   need_to_refresh_display = 1;
   preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
+}
+
+static void showMessageWithLogo(MSG message_type)
+{
+  display_show_msg(storedLogoOrDefault(0), message_type);
 }
 
 /**
