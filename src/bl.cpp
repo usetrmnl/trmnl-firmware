@@ -638,7 +638,10 @@ static https_request_err_e downloadAndShow()
         https.setTimeout(15000);
         https.setConnectTimeout(15000);
 
-        // Include ID and Access Token if the image is hosted on the same server as the API 
+        // Disable gzip compression - ESP32 doesn't auto-decompress and we need raw image data
+        https.addHeader("Accept-Encoding", "identity");
+
+        // Include ID and Access Token if the image is hosted on the same server as the API
         if (strncmp(filename, apiDisplayInputs.baseUrl.c_str(), apiDisplayInputs.baseUrl.length()) == 0)
         {
           https.addHeader("ID", apiDisplayInputs.macAddress);
@@ -956,10 +959,14 @@ uint32_t downloadStream(WiFiClient *stream, int content_size, uint8_t *buffer)
   {
     if (stream->available())
     {
-      Log.info("%s [%d]: Downloading... Available bytes: %d\r\n", __FILE__, __LINE__, stream->available());
-      counter += stream->readBytes(buffer + counter, counter2 -= counter);
+      int available = stream->available();
+      Log.info("%s [%d]: Downloading... Available bytes: %d\r\n", __FILE__, __LINE__, available);
+      int bytes_to_read = min(available, counter2 - counter);
+      int bytes_read = stream->readBytes(buffer + counter, bytes_to_read);
+      counter += bytes_read;
       iteration_counter++;
       last_data_time = millis();
+      Log.info("%s [%d]: Read %d bytes, total: %d/%d\r\n", __FILE__, __LINE__, bytes_read, counter, content_size);
     }
     else if (!stream->connected())
     {
@@ -967,10 +974,10 @@ uint32_t downloadStream(WiFiClient *stream, int content_size, uint8_t *buffer)
       Log.info("%s [%d]: Stream disconnected, stopping download\r\n", __FILE__, __LINE__);
       break;
     }
-    else if (millis() - last_data_time > 2000)
+    else if (millis() - last_data_time > 5000)
     {
-      // No data received for 2 seconds, assume download is complete
-      Log.info("%s [%d]: No data for 2s, stopping download\r\n", __FILE__, __LINE__);
+      // No data received for 5 seconds, assume download is complete
+      Log.info("%s [%d]: No data for 5s, stopping download\r\n", __FILE__, __LINE__);
       break;
     }
     delay(10);

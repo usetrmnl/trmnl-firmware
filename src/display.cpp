@@ -593,6 +593,10 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
 
    // Log_info("Paint_NewImage %d", reverse);
     Log_info("display_show_image start");
+    Log_info("data_size = %d, isPNG = %d", data_size, isPNG);
+    if (data_size >= 4) {
+        Log_info("First 4 bytes: %02X %02X %02X %02X", image_buffer[0], image_buffer[1], image_buffer[2], image_buffer[3]);
+    }
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef FUTURE
     if (reverse)
