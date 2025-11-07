@@ -709,8 +709,18 @@ static https_request_err_e downloadAndShow()
           }
           
           Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, https.getSize());
-          
+
           uint32_t counter = 0;
+          bool content_size_known = true;
+
+          // Handle missing Content-Length header
+          if (content_size <= 0)
+          {
+            Log.warning("%s [%d]: Content-Length not provided (size: %d), using MAX_IMAGE_SIZE as fallback\r\n", __FILE__, __LINE__, content_size);
+            content_size = MAX_IMAGE_SIZE;
+            content_size_known = false;
+          }
+
           if (content_size > MAX_IMAGE_SIZE)
           {
             //Log_error_submit("Receiving failed; file size too big");
@@ -730,6 +740,13 @@ static https_request_err_e downloadAndShow()
           heap_caps_check_integrity_all(true);
           buffer = (uint8_t *)malloc(content_size);
 
+          // Check if malloc succeeded
+          if (buffer == NULL)
+          {
+            Log_error_submit("Failed to allocate %d bytes for image buffer", content_size);
+            return HTTPS_OUT_OF_MEMORY;
+          }
+
           counter = downloadStream(stream, content_size, buffer);
 
           if (counter >= 2 && buffer[0] == 'B' && buffer[1] == 'M')
@@ -738,14 +755,24 @@ static https_request_err_e downloadAndShow()
             Log.info("BMP file detected");
           }
 
-          if (counter != content_size)
+          // Only validate size if we know the expected content size
+          if (content_size_known && counter != content_size)
           {
-
-            Log_error_submit("Receiving failed. Read: %d", counter);
-
-            // display_show_msg(const_cast<uint8_t *>(default_icon), API_SIZE_ERROR);
-
+            Log_error_submit("Receiving failed. Expected: %d, Read: %d", content_size, counter);
             return HTTPS_WRONG_IMAGE_SIZE;
+          }
+
+          // When content size is unknown, validate we got some data
+          if (!content_size_known)
+          {
+            if (counter == 0)
+            {
+              Log_error_submit("Receiving failed. No data received");
+              return HTTPS_WRONG_IMAGE_SIZE;
+            }
+            Log.info("%s [%d]: Downloaded %d bytes (Content-Length was not provided)\r\n", __FILE__, __LINE__, counter);
+            // Update content_size to actual downloaded size for further processing
+            content_size = counter;
           }
 
           submitStoredLogs();
@@ -921,14 +948,30 @@ uint32_t downloadStream(WiFiClient *stream, int content_size, uint8_t *buffer)
   int iteration_counter = 0;
   int counter2 = content_size;
   unsigned long download_start = millis();
+  unsigned long last_data_time = millis();
   int counter = 0;
-  while (counter != content_size && millis() - download_start < 10000)
+
+  // Download until we reach content_size, stream disconnects, or timeout
+  while (counter < content_size && millis() - download_start < 30000)
   {
     if (stream->available())
     {
       Log.info("%s [%d]: Downloading... Available bytes: %d\r\n", __FILE__, __LINE__, stream->available());
       counter += stream->readBytes(buffer + counter, counter2 -= counter);
       iteration_counter++;
+      last_data_time = millis();
+    }
+    else if (!stream->connected())
+    {
+      // Stream disconnected, stop downloading
+      Log.info("%s [%d]: Stream disconnected, stopping download\r\n", __FILE__, __LINE__);
+      break;
+    }
+    else if (millis() - last_data_time > 2000)
+    {
+      // No data received for 2 seconds, assume download is complete
+      Log.info("%s [%d]: No data for 2s, stopping download\r\n", __FILE__, __LINE__);
+      break;
     }
     delay(10);
   }
