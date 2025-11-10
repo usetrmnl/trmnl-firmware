@@ -32,7 +32,7 @@ FASTEPD bbep;
 #include "png_flip.h"
 #include "../include/Fonts/Roboto_20.h"
 #include "../include/Fonts/nicoclean_8.h"
-#include "../lib/bb_epaper/Fonts/Roboto_Black_24.h"
+#include "../include/Fonts/Roboto_Black_24.h"
 extern char filename[];
 extern Preferences preferences;
 extern ApiDisplayResult apiDisplayResult;
