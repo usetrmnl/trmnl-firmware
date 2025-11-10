@@ -29,6 +29,22 @@ ButtonPressResult read_button_presses()
   return bpr;
 }
 
+ButtonPressResult read_long_press(){
+    auto time_start = millis();
+    ButtonPressResult bpr = NoAction;
+    
+    while (digitalRead(PIN_INTERRUPT) == LOW && millis() - time_start < BUTTON_SOFT_RESET_TIME)
+    {
+        delay(10); 
+    }
+    auto elapsed = millis() - time_start;
+    if (elapsed > BUTTON_MEDIUM_HOLD_TIME) {
+        Log_info("Button time=%d detected extra-long press", elapsed);
+        bpr = LongPress;
+    }
+    return bpr;
+}
+
 const char *ButtonPressResultNames[] = {
     "LongPress",
     "DoubleClick",
