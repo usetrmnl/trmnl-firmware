@@ -8,10 +8,13 @@
 #define BB_EPAPER
 #ifdef BB_EPAPER
 #include "bb_epaper.h"
-//#define ONE_BIT_PANEL EP426_800x480
-//#define TWO_BIT_PANEL EP426_800x480_4GRAY
+#if defined(BOARD_DFR_FireBeetle_ESP32E)
+#define ONE_BIT_PANEL EP426_800x480
+#define TWO_BIT_PANEL EP426_800x480_4GRAY
+#else 
 #define ONE_BIT_PANEL EP75_800x480
 #define TWO_BIT_PANEL EP75_800x480_4GRAY_OLD
+#endif
 BBEPAPER bbep(ONE_BIT_PANEL);
 // Counts the number of partial updates to know when to do a full update
 RTC_DATA_ATTR int iUpdateCount = 0;
@@ -27,9 +30,9 @@ FASTEPD bbep;
 #include <api-client/display.h>
 #include <trmnl_log.h>
 #include "png_flip.h"
-#include "../lib/bb_epaper/Fonts/Roboto_20.h"
-#include "../lib/bb_epaper/Fonts/nicoclean_8.h"
-#include "../lib/bb_epaper/Fonts/Roboto_Black_24.h"
+#include "../include/Fonts/Roboto_20.h"
+#include "../include/Fonts/nicoclean_8.h"
+#include "../include/Fonts/Roboto_Black_24.h"
 extern char filename[];
 extern Preferences preferences;
 extern ApiDisplayResult apiDisplayResult;
@@ -659,7 +662,12 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     }
     if (!bWait) iRefreshMode = REFRESH_PARTIAL; // fast update when showing loading screen
     Log_info("%s [%d]: EPD refresh mode: %d\r\n", __FILE__, __LINE__, iRefreshMode);
+
+    #if defined(BOARD_DFR_FireBeetle_ESP32E)
+        bbep.refresh(REFRESH_FULL, bWait); // fast updates does not seem to work on this display
+    #else
     bbep.refresh(iRefreshMode, bWait);
+    #endif
     if (bAlloc) {
         bbep.freeBuffer();
     }

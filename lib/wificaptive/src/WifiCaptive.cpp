@@ -191,7 +191,11 @@ bool WifiCaptive::isSaved()
 void WifiCaptive::readWifiCredentials()
 {
     Preferences preferences;
-    preferences.begin("wificaptive", true);
+    // TODO
+    // open RW so the namespace is created on first boot
+    if (!preferences.begin("wificaptive", false)) {
+    return;
+}
 
     for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
     {
