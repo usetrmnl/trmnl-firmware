@@ -138,6 +138,7 @@ enum {
     EP75_800x480_4GRAY, // GDEY075T7 in 4 grayscale mode
     EP75_800x480_4GRAY_V2, // GDEY075T7 in 4 grayscale mode, panel which produces too light output
     EP29_128x296, // Pimoroni Badger2040
+    EP29_128x296_4GRAY, // Pimoroni 4-gray
     EP213R_122x250, // Inky phat 2.13 B/W/R
     EP154_200x200, // waveshare
     EP154B_200x200, // DEPG01540BN
@@ -426,9 +427,11 @@ class BBEPAPER
 {
   public:
     BBEPAPER(int iPanel);
+    BBEPAPER(void) {};
     int createVirtual(int iWidth, int iHeight, int iFlags);
     void setAddrWindow(int x, int y, int w, int h);
     int setPanelType(int iPanel);
+    int getPanelType(void) { return _bbep.type;};
     void setCS2(uint8_t cs);
     bool hasFastRefresh();
     bool hasPartialRefresh();

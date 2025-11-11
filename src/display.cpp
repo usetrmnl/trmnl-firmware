@@ -10,11 +10,17 @@
 #include "bb_epaper.h"
 
 const DISPLAY_PROFILE dpList[4] = { // 1-bit and 2-bit display types for each profile
+#ifdef MINI_EPD
+    {EP426_800x480, EP426_800x480_4GRAY}, // default
+    {EP426_800x480, EP426_800x480_4GRAY}, // A/B = same
+    {EP426_800x480, EP426_800x480_4GRAY},
+#else // 7.5 OG
     {EP75_800x480, EP75_800x480_4GRAY}, // default (for original EPD)
     {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, // a = uses built-in fast + 4-gray 
     {EP75_800x480, EP75_800x480_4GRAY_V2}, // b = darker grays
+#endif
 };
-BBEPAPER bbep(EP75_800x480);
+BBEPAPER bbep;
 // Counts the number of partial updates to know when to do a full update
 RTC_DATA_ATTR int iUpdateCount = 0;
 #else
@@ -35,7 +41,7 @@ extern char filename[];
 extern Preferences preferences;
 extern ApiDisplayResult apiDisplayResult;
 uint32_t iTempProfile;
-
+static int i426Workaround = 0;
 /**
  * @brief Function to init the display
  * @param none
@@ -47,8 +53,8 @@ void display_init(void)
     iTempProfile = preferences.getUInt(PREFERENCES_TEMP_PROFILE, TEMP_PROFILE_DEFAULT);
     Log_info("Saved temperature profile: %d", iTempProfile);
 #ifdef BB_EPAPER
+    bbep.setPanelType(dpList[iTempProfile].OneBit); // must be set BEFORE calling initIO()
     bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
-    bbep.setPanelType(dpList[iTempProfile].OneBit);
 #else
     bbep.initPanel(BB_PANEL_EPDIY_V7);
     bbep.setPanelSize(1448, 1072);
@@ -560,7 +566,7 @@ PNG *png = new PNG();
                     }
                 }
                 png->close();
-                if (iTempProfile != 0) { // need to write the inverted plane to do PLANE_FALSE_DIFF
+                if (bbep.getPanelType() != EP75_800x480) { // need to write the inverted plane to do PLANE_FALSE_DIFF
                     bbep.startWrite(PLANE_1); // start writing image data to plane 1
                     png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
                     if (iPlane == PNG_1_BIT) {
@@ -626,6 +632,12 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
         }
     }
 #endif
+    if (i426Workaround) {
+        // After a partial update, the 4.26" 800x480 needs to be 'reset' to accept writes
+        // This is only needed if the user pressed the WAKE button and there will be 2 updates
+        // while the power is on
+        bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
+    }
     if (isPNG == true && data_size < MAX_IMAGE_SIZE)
     {
         Log_info("Drawing PNG");
@@ -681,6 +693,9 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     if (!bWait) iRefreshMode = REFRESH_PARTIAL; // fast update when showing loading screen
     Log_info("%s [%d]: EPD refresh mode: %d\r\n", __FILE__, __LINE__, iRefreshMode);
     bbep.refresh(iRefreshMode, bWait);
+    if (bbep.getPanelType() == EP426_800x480 && iRefreshMode == REFRESH_PARTIAL) {
+        i426Workaround = 1; // need to re-initialize the controller for another update before sleeping
+    }
     if (bAlloc) {
         bbep.freeBuffer();
     }
