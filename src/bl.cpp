@@ -638,7 +638,9 @@ static https_request_err_e downloadAndShow()
         https.setTimeout(15000);
         https.setConnectTimeout(15000);
 
-        // Include ID and Access Token if the image is hosted on the same server as the API 
+        https.addHeader("Accept-Encoding", "identity"); // Disable compression for raw image data
+
+        // Include ID and Access Token if the image is hosted on the same server as the API
         if (strncmp(filename, apiDisplayInputs.baseUrl.c_str(), apiDisplayInputs.baseUrl.length()) == 0)
         {
           https.addHeader("ID", apiDisplayInputs.macAddress);
@@ -709,43 +711,50 @@ static https_request_err_e downloadAndShow()
           }
           
           Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, https.getSize());
-          
-          uint32_t counter = 0;
-          if (content_size > MAX_IMAGE_SIZE)
-          {
-            //Log_error_submit("Receiving failed; file size too big");
-            Log.info("%s [%d]: Receiving failed; file size too big: %d\r\n", __FILE__, __LINE__, content_size);
-            result = HTTPS_IMAGE_FILE_TOO_BIG;
-            return HTTPS_REQUEST_FAILED;
-          }
-          WiFiClient *stream = https.getStreamPtr();
-          Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
-          Log.info("%s [%d]: Stream timeout: %d\r\n", __FILE__, __LINE__, stream->getTimeout());
 
-          Log.info("%s [%d]: Stream available (may show as 0 and that's okay): %d\r\n", __FILE__, __LINE__, stream->available());
+          uint32_t counter = 0;
+
+          if (content_size <= 0)
+          {
+            Log.warning("%s [%d]: Content-Length not provided (size: %d)\r\n", __FILE__, __LINE__, content_size);
+          }
 
           bool isPNG = https.header("Content-Type") == "image/png";
 
           Log.info("%s [%d]: Starting a download at: %d\r\n", __FILE__, __LINE__, getTime());
           heap_caps_check_integrity_all(true);
-          buffer = (uint8_t *)malloc(content_size);
 
-          counter = downloadStream(stream, content_size, buffer);
+          // getString() handles chunked transfer encoding automatically
+          String payload = https.getString();
+          counter = payload.length();
+
+          if (counter == 0)
+          {
+            Log_error_submit("Receiving failed. No data received");
+            return HTTPS_WRONG_IMAGE_SIZE;
+          }
+
+          if (counter > MAX_IMAGE_SIZE)
+          {
+            Log_error_submit("Receiving failed; file size too big: %d", counter);
+            return HTTPS_IMAGE_FILE_TOO_BIG;
+          }
+
+          buffer = (uint8_t *)malloc(counter);
+
+          if (buffer == NULL)
+          {
+            Log_error_submit("Failed to allocate %d bytes for image buffer", counter);
+            return HTTPS_OUT_OF_MEMORY;
+          }
+
+          memcpy(buffer, payload.c_str(), counter);
+          content_size = counter;
 
           if (counter >= 2 && buffer[0] == 'B' && buffer[1] == 'M')
           {
             isPNG = false;
             Log.info("BMP file detected");
-          }
-
-          if (counter != content_size)
-          {
-
-            Log_error_submit("Receiving failed. Read: %d", counter);
-
-            // display_show_msg(const_cast<uint8_t *>(default_icon), API_SIZE_ERROR);
-
-            return HTTPS_WRONG_IMAGE_SIZE;
           }
 
           submitStoredLogs();
@@ -921,14 +930,22 @@ uint32_t downloadStream(WiFiClient *stream, int content_size, uint8_t *buffer)
   int iteration_counter = 0;
   int counter2 = content_size;
   unsigned long download_start = millis();
+  unsigned long last_data_time = millis();
   int counter = 0;
-  while (counter != content_size && millis() - download_start < 10000)
+
+  while (counter < content_size && millis() - download_start < 30000)
   {
     if (stream->available())
     {
       Log.info("%s [%d]: Downloading... Available bytes: %d\r\n", __FILE__, __LINE__, stream->available());
-      counter += stream->readBytes(buffer + counter, counter2 -= counter);
+      int bytes_to_read = min(stream->available(), counter2 - counter);
+      counter += stream->readBytes(buffer + counter, bytes_to_read);
       iteration_counter++;
+      last_data_time = millis();
+    }
+    else if (!stream->connected() || millis() - last_data_time > 5000)
+    {
+      break;
     }
     delay(10);
   }
