@@ -255,10 +255,8 @@ Tools required:
 
 1. Windows OS
 2. Flash Tool 3.9.5
-3. [Firmware binary file](https://github.com/usetrmnl/firmware/tree/main/builds)
-4. [Bootloader binary file](https://github.com/usetrmnl/firmware/tree/main/builds/bin/bootloader.bin)
-5. [Partition binary file](https://github.com/usetrmnl/firmware/tree/main/builds/bin/partitions.bin)
-6. [Boot app binary file](https://github.com/usetrmnl/firmware/tree/main/builds/bin/boot_app0.bin)
+3. Binaries to merge - `bootloader.bin`, `firmware.bin`, `partitions.bin` (see Compilation Guide above)
+4. Bootloader binary file (`boot_app0.bin`, found in ~/.platformio/packages/framework-arduinoespressif32/tools/partitions/)
 
 ### Step 1 - Configure flash tool
 open the Flash Tool (executable file), select these parameters, then clickOK:
