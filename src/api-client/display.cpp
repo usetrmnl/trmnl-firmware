@@ -16,7 +16,8 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
            "Battery-Voltage: %s\n\r"
            "FW-Version: %s\r\n"
            "Model: %s\r\n"
-           "RSSI: %s\r\n",
+           "RSSI: %s\r\n"
+           "temperature-profile:true\r\n",
            inputs.macAddress.c_str(),
            inputs.specialFunction,
            inputs.apiKey.c_str(),
@@ -34,6 +35,7 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
   https.addHeader("FW-Version", inputs.firmwareVersion);
   https.addHeader("Model", String(inputs.model));
   https.addHeader("RSSI", String(inputs.rssi));
+  https.addHeader("temperature-profile", "true");
   https.addHeader("Width", String(inputs.displayWidth));
   https.addHeader("Height", String(inputs.displayHeight));
 
