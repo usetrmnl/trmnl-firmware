@@ -11,7 +11,7 @@ graph TB
     Init("Init peripherals")
     Start --> Init
 
-    IsLongRst{"Reset button 
+    IsLongRst{"Reset button
       pressed > 5000 ms?"}
     Init --> IsLongRst
 
@@ -73,7 +73,7 @@ graph TB
     IsSetupSuccess --> SetupError
     Sleep2(["Sleep"])
     SetupError --> Sleep2
-    
+
     %% Check update
     PingServer{"Ping server,
       success?"}
@@ -83,7 +83,7 @@ graph TB
     PingServer -->|"No"| PingError
     Sleep3(["Sleep"])
     PingError --> Sleep3
-    
+
     %% Act on update
     IsNeedReset{"Need to reset
      the device?"}
@@ -105,7 +105,7 @@ following Wifi connection via the captive portal, device swaps its Mac Address f
 GET /api/setup
 
 headers = {
-  'ID' => 'XX:XX:XX:XX:XX' # mac adddress
+  'ID' => 'XX:XX:XX:XX:XX' # mac address
 }
 
 response example (success):
@@ -171,7 +171,7 @@ if 'FW-Version' header != web server `Setting.firmware_download_url`, server wil
 if device detects an issue with response data from the `api/display` endpoint, logs are sent to server.
 
 ```curl
-POST /api/logs
+POST /api/log
 
 # example request tbd
 ```
@@ -268,20 +268,20 @@ open the Flash Tool (executable file), select these parameters, then clickOK:
 ![Image Alt text](/pics/select_screen.jpg "select screen")
 
 ### Step 2 - Add binaries
-1. Beside the top blank space, click “...” dots and select the bootloader binary file then input 
-> “0x00000000” 
+1. Beside the top blank space, click “...” dots and select the bootloader binary file then input
+> “0x00000000”
 in the far right space and check the box.
 
-2. Click “...” dots and select the partitions binary file then input 
-> “0x00008000” 
+2. Click “...” dots and select the partitions binary file then input
+> “0x00008000”
 in the far right space and check the box.
 
-3. Click “...” dots and select the boot_app0 binary file then input 
-> “0x0000e000” 
+3. Click “...” dots and select the boot_app0 binary file then input
+> “0x0000e000”
 in the far right space and check the box.
 
-4. Click “...” dots and select the firmware binary file then input 
-> “0x00010000” 
+4. Click “...” dots and select the firmware binary file then input
+> “0x00010000”
 in the far right space and check the box.
 
 ![Image Alt text](/pics/binaries.jpg "binaries")
@@ -298,7 +298,7 @@ finally, set the following parameters at the bottom of the Flash Tool interface:
 2. Next, connect the PCB to the Windows machine with a USB-C cable. make sure the USB port is on the right, and that the PCB’s on/off switch is toggled DOWN for “off.”
 
 3. While holding the BOOT button (below the on/off toggle), toggle the device ON by flipping the above switch UP. you may hear a sound from your Windows machine Inspect the Device Manager connections at the bottom of the interface, and a new device should appear. it may be “USB Component {{ Num }},” or something like below:
- 
+
 ![Image Alt text](/pics/select_device.jpg "select_device")
 
 4. Take note of this device’s name, that is our TRMNL PCB. then back inside the Flash Tool, click to open the “COM” dropdown in the bottom right and choose the TRMNL PCB. finally, click the “START” button.
