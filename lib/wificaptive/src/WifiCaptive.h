@@ -77,7 +77,12 @@ public:
     /// @brief Connects to the saved SSID with the best signal strength
     /// @return True if successfully connected to saved SSID, false otherwise.
     bool autoConnect();
+
+    /// @brief Checks if there are saved WiFi credentials
+    /// @return True if there are saved credentials, false otherwise.
 };
+
+bool checkForSavedCredentials();
 
 extern WifiCaptive WifiCaptivePortal;
 

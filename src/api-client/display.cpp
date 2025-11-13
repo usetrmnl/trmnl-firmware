@@ -77,10 +77,22 @@ ApiDisplayResult fetchApiDisplay(ApiDisplayInputs &apiDisplayInputs)
 
         delay(5);
 
+        Log_info("Start location: %s", https->getLocation().c_str());
         int httpCode = https->GET();
+        if(httpCode == HTTP_CODE_PERMANENT_REDIRECT ||httpCode == HTTP_CODE_TEMPORARY_REDIRECT){
+              https->end();
+              https->begin(API_BASE_URL + https->getLocation());
+              Log_info("Redirected to: %s", https->getLocation().c_str());
+              https->setTimeout(15000);
+              https->setConnectTimeout(15000);
+              addHeaders(*https, apiDisplayInputs);
+              httpCode = https->GET();
+            }
 
         if (httpCode < 0 ||
-            !(httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY || httpCode == HTTP_CODE_TOO_MANY_REQUESTS))
+            !(httpCode == HTTP_CODE_OK ||
+              httpCode == HTTP_CODE_MOVED_PERMANENTLY ||
+              httpCode == HTTP_CODE_TOO_MANY_REQUESTS))
         {
           Log_error("[HTTPS] GET... failed, error: %s", https->errorToString(httpCode).c_str());
 

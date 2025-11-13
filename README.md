@@ -217,17 +217,21 @@ See [releases](https://github.com/usetrmnl/firmware/releases). For older version
 
 ## **Compilation guide**
 
-A more user-friendly (and non developer) guide is available here:
-https://help.usetrmnl.com/en/articles/10271569-manually-flash-firmware
+There are technical and non-technical options to flashing firmware.
 
-If you prefer to skip the build + upload steps below, flash directly from a web browser here: https://usetrmnl.com/flash.
+**No code required**
+
+* Flash directly from a web browser: https://usetrmnl.com/flash
+* Enable OTA updates from your TRMNL dashboard > Device settings (native hardware only)
+
+**For developers**
 
 1. Install VS Code: https://code.visualstudio.com
 2. Install PlatformIO: https://platformio.org/install/ide?install=vscode
 3. Install Git: https://git-scm.com/book/en/v2/Appendix-A%3A-Git-in-Other-Environments-Git-in-Visual-Studio-Code
-4. Clone repository: https://github.com/usetrmnl/firmware
-5. After cloning, open project in VS Code workspace
-6. After configuring the project, click on the PlatformIO -> Build button located at the bottom of the screen
+4. Clone this repository: https://github.com/usetrmnl/trmnl-firmware
+5. Open project in VS Code workspace
+6. After configuring the project, click the PlatformIO -> Build button located at the bottom of the screen
 
 ![Image Alt text](/pics/build_icon.JPG "Build")
 
@@ -237,7 +241,7 @@ If you prefer to skip the build + upload steps below, flash directly from a web 
 
 8. You can find the compiled file in the folder shown in the picture.
 
-![Image Alt text](/pics/bin_folder.JPG "Bin")
+![Image Alt text](/pics/bin_folder.png "Bin")
 
 ## **Uploading guide (PlatformIO)**
 
@@ -255,10 +259,8 @@ Tools required:
 
 1. Windows OS
 2. Flash Tool 3.9.5
-3. [Firmware binary file](https://github.com/usetrmnl/firmware/tree/main/builds)
-4. [Bootloader binary file](https://github.com/usetrmnl/firmware/tree/main/builds/bin/bootloader.bin)
-5. [Partition binary file](https://github.com/usetrmnl/firmware/tree/main/builds/bin/partitions.bin)
-6. [Boot app binary file](https://github.com/usetrmnl/firmware/tree/main/builds/bin/boot_app0.bin)
+3. Binaries to merge - `bootloader.bin`, `firmware.bin`, `partitions.bin` (see Compilation Guide above)
+4. Bootloader binary file (`boot_app0.bin`, found in ~/.platformio/packages/framework-arduinoespressif32/tools/partitions/)
 
 ### Step 1 - Configure flash tool
 open the Flash Tool (executable file), select these parameters, then clickOK:

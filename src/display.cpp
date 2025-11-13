@@ -50,6 +50,7 @@ RTC_DATA_ATTR int iUpdateCount = 0;
 #include "png_flip.h"
 #include "../lib/bb_epaper/Fonts/nicoclean_8.h"
 #include "../lib/bb_epaper/Fonts/Inter_18.h"
+#include "../lib/bb_epaper/Fonts/Roboto_Black_24.h"
 extern char filename[];
 extern Preferences preferences;
 extern ApiDisplayResult apiDisplayResult;
@@ -79,8 +80,12 @@ void display_init(void)
  */
 void display_sleep(uint32_t u32Millis)
 {
-  esp_sleep_enable_timer_wakeup(u32Millis * 1000L);
-  esp_light_sleep_start();
+#ifdef DO_NOT_LIGHT_SLEEP
+    delay(u32Millis);
+#else
+    esp_sleep_enable_timer_wakeup(u32Millis * 1000L);
+    esp_light_sleep_start();
+#endif
 }
 
 /**
@@ -296,7 +301,8 @@ void ReduceBpp(int iDestBpp, int iPixelType, uint8_t *pPalette, uint8_t *pSrc, u
 {
     int g = 0, x, iDelta;
     uint8_t *s, *d, *pPal, u8, count;
-    
+    const uint8_t u8G2ToG8[4] = {0x00, 0x55, 0xaa, 0xff}; // 2-bit to 8-bit gray
+
     if (iPixelType == PNG_PIXEL_TRUECOLOR) iSrcBpp = 24;
     else if (iPixelType == PNG_PIXEL_TRUECOLOR_ALPHA) iSrcBpp = 32;
     iDelta = iSrcBpp/8; // bytes per pixel
@@ -341,8 +347,15 @@ void ReduceBpp(int iDestBpp, int iPixelType, uint8_t *pPalette, uint8_t *pSrc, u
                 break;
             case 2: // We need to handle this case for 2-bit images with (random) palettes
                 g = s[0] >> (6-((x & 3) * 2));
-                pPal = &pPalette[(g & 3)*3];
-                g = (pPal[0] + pPal[1]*2 + pPal[2])/4;
+                if (iPixelType == PNG_PIXEL_INDEXED) {
+                    pPal = &pPalette[(g & 3)*3];
+                    g = (pPal[0] + pPal[1]*2 + pPal[2])/4;
+                } else {
+                    g = u8G2ToG8[g & 3];
+                }
+                if ((x & 3) == 3) {
+                    s++;
+                }
                 break;
         } // switch on bpp
         if (iDestBpp == 1) {
@@ -847,7 +860,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
 #endif
 
    // Log_info("Paint_NewImage %d", reverse);
-    Log_info("show image for array");
+    Log_info("display_show_image start");
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef FUTURE
     if (reverse)
@@ -929,7 +942,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
     bbep.fullUpdate();
 #endif
-    Log_info("display refresh end");
+    Log_info("display_show_image end");
 }
 /**
  * @brief Function to read an image from the file system
@@ -972,13 +985,12 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
     BB_RECT rect;
 
-    Log_info("Paint_NewImage");
-    Log_info("show image for array");
+    Log_info("display_show_msg start");
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef BB_EPAPER
     bbep.allocBuffer(false);
 #endif
-    if (*(uint16_t *)image_buffer == BB_BITMAP_MARKER)
+    if (image_buffer && *(uint16_t *)image_buffer == BB_BITMAP_MARKER)
     {
         // G5 compressed image
         BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
@@ -993,7 +1005,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     else
     {
 #ifdef BB_EPAPER
-        memcpy(bbep.getBuffer(), image_buffer+62, Imagesize); // uncompressed 1-bpp bitmap
+        if (image_buffer) memcpy(bbep.getBuffer(), image_buffer+62, Imagesize); // uncompressed 1-bpp bitmap
 #endif
     }
 
@@ -1089,9 +1101,41 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         bbep.print(string1);
     }
     break;
-    case API_ERROR:
+    case API_REQUEST_FAILED:
     {
-        const char string1[] = "WiFi connected, TRMNL not responding.";
+        const char string1[] = "WiFi connected, request to API failed.";
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, 340);
+        bbep.println(string1);
+        const char string2[] = "Short click the button on back,";
+        bbep.getStringBox(string2, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+        bbep.println(string2);
+        const char string3[] = "otherwise check your internet.";
+        bbep.getStringBox(string3, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+        bbep.print(string3);
+    }
+    break;
+    case API_UNABLE_TO_CONNECT:
+    {
+        const char string1[] = "WiFi connected, unable connect to API.";
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, 340);
+        bbep.println(string1);
+        const char string2[] = "Short click the button on back,";
+        bbep.getStringBox(string2, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+        bbep.println(string2);
+        const char string3[] = "otherwise check your internet.";
+        bbep.getStringBox(string3, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+        bbep.print(string3);
+    }
+    break;
+    case API_SETUP_FAILED:
+    {
+        const char string1[] = "WiFi connected, /api/setup returned error.";
         bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
         bbep.setCursor((bbep.width() - rect.w) / 2, 340);
@@ -1118,6 +1162,30 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
 #else
         bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - (rect.h*2));
 #endif
+        bbep.println(string1);
+        const char string2[] = "Wait or reset by holding button on back.";
+        bbep.getStringBox(string2, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+        bbep.print(string2);
+    }
+    break;
+    case API_FIRMWARE_UPDATE_ERROR:
+    {
+        const char string1[] = "WiFi connected, could not get firmware update from api.";
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, 400);
+        bbep.println(string1);
+        const char string2[] = "Wait or reset by holding button on back.";
+        bbep.getStringBox(string2, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+        bbep.print(string2);
+    }
+    break;
+    case API_IMAGE_DOWNLOAD_ERROR:
+    {
+        const char string1[] = "WiFi connected, API could not deliver image to device.";
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, 400);
         bbep.println(string1);
         const char string2[] = "Wait or reset by holding button on back.";
         bbep.getStringBox(string2, &rect);
@@ -1158,6 +1226,14 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
 #else
         bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - rect.h);
 #endif
+        bbep.print(string1);
+    }
+    break;
+    case QA_START:
+    {
+        const char string1[] = "Starting QA test, press back button to cancel.";
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, 400);
         bbep.print(string1);
     }
     break;
@@ -1214,6 +1290,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         bbep.println("a b c d e f g h i y a b c d e f g h i y a b c d e");
     }
     break;
+    case FILL_WHITE:
+    {   
+        Log_info("Display set to white");
+        bbep.fillScreen(BBEP_WHITE);
+    }
     default:
         break;
     }
@@ -1224,7 +1305,105 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
 #else
     bbep.fullUpdate();
 #endif
-    Log_info("display");
+    Log_info("display_show_msg end");
+}
+
+
+void display_show_msg_qa(uint8_t *image_buffer, const float *voltage, const float *temperature, bool qa_result)
+{
+    auto width = display_width();
+    auto height = display_height();
+    UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
+    BB_RECT rect;
+
+    Log_info("display_show_msg start");
+    Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
+#ifdef BB_EPAPER
+    bbep.allocBuffer(false);
+#endif
+    if (*(uint16_t *)image_buffer == BB_BITMAP_MARKER)
+    {
+        // G5 compressed image
+        BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
+        int x = (width - pBBB->width)/2;
+        int y = (height - pBBB->height)/2; // center it
+        if (x > 0 || y > 0) // only clear if the image is smaller than the display
+        {
+            bbep.fillScreen(BBEP_WHITE); 
+        }
+        bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
+    }
+    else
+    {
+#ifdef BB_EPAPER
+        memcpy(bbep.getBuffer(), image_buffer+62, Imagesize); // uncompressed 1-bpp bitmap
+#endif
+    }
+
+    bbep.setFont(nicoclean_8); //Roboto_20);
+    bbep.setTextColor(BBEP_BLACK, BBEP_WHITE); 
+
+    String voltageString = String("Initial voltage: ") 
+    + String(voltage[0], 4) 
+    + String(" V, ") 
+    + String("  Final voltage: ")
+    + String(voltage[1], 4)
+    + String(" V, ")
+    + String("  Diff: ")
+    + String(voltage[2], 4)
+    + String(" V");
+
+    String temperatureString = String("Initial temperature: ") 
+    + String(temperature[0], 4) 
+    + String(" C, ")
+    + String("  Final temperature: ")
+    + String(temperature[1], 4)
+    + String(" C")
+    + String("  Diff: ")
+    + String(temperature[2], 4)
+    + String(" C");
+
+    
+    bbep.getStringBox(voltageString.c_str(), &rect);
+    bbep.setCursor((bbep.width() - rect.w) / 2, 340);
+    bbep.print(voltageString);
+    
+    bbep.getStringBox(temperatureString.c_str(), &rect);
+    bbep.setCursor((bbep.width() - rect.w) / 2, 370);
+    bbep.print(temperatureString);
+
+    String qaResultInstruction = (qa_result) 
+    ? "QA passed, press button to clear screen" 
+    : "QA failed, please use another board and put in failure pile for investigation";
+
+    bbep.getStringBox(qaResultInstruction.c_str(), &rect);
+    bbep.setCursor((bbep.width() - rect.w) / 2, 400);
+    bbep.println(qaResultInstruction);
+
+    String qaResultString = (qa_result) ? "PASS" : "FAIL";
+    bbep.setFont(Roboto_Black_24);
+    bbep.getStringBox(qaResultString.c_str(), &rect);
+    bbep.setCursor((bbep.width() - rect.w) / 2, 250);
+    bbep.print(qaResultString);
+
+    #ifdef BB_EPAPER
+        bbep.writePlane(PLANE_0);
+        bbep.refresh(REFRESH_FULL, true);
+        bbep.freeBuffer();
+    #else
+        bbep.fullUpdate();
+    #endif
+        Log_info("display_show_msg end");
+    /*
+     const char string2[] = "PNG images can be a maximum of";
+        bbep.getStringBox(string2, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+        bbep.println(string2);
+        String string3 = String(MAX_IMAGE_SIZE) + String(" bytes each and 1 or 2-bpp");
+        bbep.getStringBox(string3.c_str(), &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+        bbep.print(string3);
+    */ 
 }
 
 /**
@@ -1249,6 +1428,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     if (message_type == WIFI_CONNECT)
     {
         Log_info("Display set to white");
+        bbep.fillScreen(BBEP_WHITE);
 #ifdef BB_EPAPER
         bbep.writePlane(PLANE_0);
         if (!apiDisplayResult.response.maximum_compatibility) {
@@ -1267,11 +1447,10 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
     BB_RECT rect;
 
-    Log_info("Paint_NewImage");
-    Log_info("show image for array");
+    Log_info("display_show_msg2 start");
 
     // Load the image into the bb_epaper framebuffer
-    if (*(uint16_t *)image_buffer == BB_BITMAP_MARKER)
+    if (image_buffer && *(uint16_t *)image_buffer == BB_BITMAP_MARKER)
     {
         // G5 compressed image
         BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
@@ -1286,7 +1465,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     else
     {
 #ifdef BB_EPAPER
-        memcpy(bbep.getBuffer(), image_buffer+62, Imagesize); // uncompressed 1-bpp bitmap
+        if (image_buffer) memcpy(bbep.getBuffer(), image_buffer+62, Imagesize); // uncompressed 1-bpp bitmap
 #endif
     }
 
@@ -1371,7 +1550,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 #else
     bbep.fullUpdate();
 #endif
-    Log_info("display");
+    Log_info("display_show_msg2 end");
 }
 
 /**

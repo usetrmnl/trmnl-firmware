@@ -2109,7 +2109,9 @@ int bbepCreateVirtual(BBEPDISP *pBBEP, int iWidth, int iHeight, int iFlags)
 // Put the ESP32 into light sleep for N milliseconds
 void bbepLightSleep(uint32_t u32Millis)
 {
-#ifdef ARDUINO_ARCH_ESP32
+#ifdef DO_NOT_LIGHT_SLEEP
+    delay(u32Millis);
+#elif ARDUINO_ARCH_ESP32
   esp_sleep_enable_timer_wakeup(u32Millis * 1000L);
   esp_light_sleep_start();
 #else
@@ -2130,10 +2132,12 @@ void bbepWaitBusy(BBEPDISP *pBBEP)
     delay(10); // give time for the busy status to be valid
     uint8_t busy_idle =  (pBBEP->chip_type == BBEP_CHIP_UC81xx) ? HIGH : LOW;
     delay(1); // some panels need a short delay before testing the BUSY line
-    while (iTimeout < 5000) {
+    while (iTimeout < 5000) { // B/W updates should never take more than 3 seconds
         if (digitalRead(pBBEP->iBUSYPin) == busy_idle) break;
         // delay(1);
+        iTimeout += 200;
         bbepLightSleep(200); // save battery power by checking every 200ms
+        iTimeout += 200;
     }
 } /* bbepWaitBusy() */
 //

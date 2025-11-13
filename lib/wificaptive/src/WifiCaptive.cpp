@@ -520,4 +520,13 @@ bool WifiCaptive::tryConnectWithRetries(const WifiCredentials creds, int last_us
     return false;
 }
 
+bool checkForSavedCredentials()
+{
+    Preferences preferences;
+    preferences.begin("wificaptive", true);
+    PreferenceType type = preferences.getType(WIFI_SSID_KEY(0));
+    preferences.end();
+    return type == PT_STR;
+}
+
 WifiCaptive WifiCaptivePortal;
