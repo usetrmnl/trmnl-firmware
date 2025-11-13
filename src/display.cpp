@@ -457,7 +457,8 @@ int png_draw(PNGDRAW *pDraw)
 int png_draw(PNGDRAW *pDraw)
 {
     int x;
-    uint8_t uc, ucMask, src, *s, *d;
+    uint8_t uc = 0;
+    uint8_t ucMask, src, *s, *d;
     int iPitch;
 
     s = (uint8_t *)pDraw->pPixels;
