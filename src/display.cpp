@@ -1,24 +1,45 @@
 #include <Arduino.h>
 #include <display.h>
 #include <PNGdec.h>
+#include <JPEGDEC.h>
 #include <SPIFFS.h>
 #include <Preferences.h>
 #include <preferences_persistence.h>
 #include "DEV_Config.h"
+#ifndef BOARD_TRMNL_X
 #define BB_EPAPER
-#ifdef BB_EPAPER
 #include "bb_epaper.h"
+#define MAX_BIT_DEPTH 2
 //#define ONE_BIT_PANEL EP426_800x480
 //#define TWO_BIT_PANEL EP426_800x480_4GRAY
 #define ONE_BIT_PANEL EP75_800x480
 #define TWO_BIT_PANEL EP75_800x480_4GRAY_OLD
 BBEPAPER bbep(ONE_BIT_PANEL);
 // Counts the number of partial updates to know when to do a full update
-RTC_DATA_ATTR int iUpdateCount = 0;
 #else
 #include "FastEPD.h"
 FASTEPD bbep;
+#define MAX_BIT_DEPTH 8
+const uint8_t u8_graytable[] = {
+/* 0 */  2, 2, 1, 1, 1, 1, 1, 1, 
+/* 1 */  2, 2, 2, 2, 1, 1, 2, 1,
+/* 2 */  2, 2, 2, 1, 1, 1, 1, 2, 
+/* 3 */  2, 2, 2, 1, 1, 1, 1, 2,
+/* 4 */  2, 2, 2, 2, 1, 1, 1, 2,
+/* 5 */  2, 2, 2, 2, 1, 2, 2, 1,
+/* 6 */  2, 2, 1, 1, 1, 2, 1, 2,
+/* 7 */  2, 2, 2, 1, 1, 2, 1, 2, 
+/* 8 */  1, 1, 1, 1, 1, 1, 2, 2, 
+/* 9 */  2, 1, 1, 1, 1, 1, 2, 2, 
+/* 10 */  2, 2, 1, 1, 1, 1, 2, 2, 
+/* 11 */  2, 2, 2, 1, 1, 1, 2, 2, 
+/* 12 */  2, 1, 1, 2, 1, 1, 2, 2, 
+/* 13 */  2, 2, 2, 2, 1, 1, 2, 2, 
+/* 14 */  2, 2, 2, 2, 2, 1, 2, 2, 
+/* 15 */  2, 2, 2, 2, 2, 2, 2, 2
+};
 #endif
+RTC_DATA_ATTR int iUpdateCount = 0;
 #include "Group5.h"
 #include <config.h>
 #include "wifi_connect_qr.h"
@@ -27,12 +48,13 @@ FASTEPD bbep;
 #include <api-client/display.h>
 #include <trmnl_log.h>
 #include "png_flip.h"
-#include "../lib/bb_epaper/Fonts/Roboto_20.h"
 #include "../lib/bb_epaper/Fonts/nicoclean_8.h"
+#include "../lib/bb_epaper/Fonts/Inter_18.h"
 #include "../lib/bb_epaper/Fonts/Roboto_Black_24.h"
 extern char filename[];
 extern Preferences preferences;
 extern ApiDisplayResult apiDisplayResult;
+static uint8_t *pDither;
 
 /**
  * @brief Function to init the display
@@ -45,30 +67,11 @@ void display_init(void)
 #ifdef BB_EPAPER
     bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
 #else
-    bbep.initPanel(BB_PANEL_EPDIY_V7);
-    bbep.setPanelSize(1448, 1072);
+    bbep.initPanel(BB_PANEL_EPDIY_V7_16); //, 26000000);
+    bbep.setPanelSize(1872, 1404, BB_PANEL_FLAG_MIRROR_X);
 #endif
     Log_info("dev module end");
 }
-
-void display_show_battery(float vBatt)
-{
-char szTemp[32];
-
-    bbep.allocBuffer(false);
-    bbep.fillScreen(BBEP_WHITE); // draw the image centered on a white background
-    bbep.setFont(nicoclean_8); //Roboto_20);
-    bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
-    bbep.setCursor(0, 100);
-    sprintf(szTemp, "VBatt = %f", vBatt);
-    bbep.print(szTemp);
-    bbep.writePlane();
-    bbep.refresh(REFRESH_FULL, true);
-    bbep.sleep(DEEP_SLEEP);
-    while (1) {
-        vTaskDelay(1);
-    }
-} /* display_show_battery() */
 
 /**
  * @brief Function to sleep the ESP32 while saving power
@@ -377,6 +380,7 @@ void ReduceBpp(int iDestBpp, int iPixelType, uint8_t *pPalette, uint8_t *pSrc, u
  * @param PNGDRAW structure containing the current line and relevant info
  * @return none
  */
+#ifdef BB_EPAPER
 int png_draw(PNGDRAW *pDraw)
 {
     int x;
@@ -449,7 +453,145 @@ int png_draw(PNGDRAW *pDraw)
     bbep.writeData(pTemp, (pDraw->iWidth+7)/8);
     return 1;
 } /* png_draw() */
+#else // TRMNL_X version
+int png_draw(PNGDRAW *pDraw)
+{
+    int x;
+    uint8_t uc = 0;
+    uint8_t ucMask, src, *s, *d;
+    int iPitch;
 
+    s = (uint8_t *)pDraw->pPixels;
+    d = bbep.currentBuffer();
+    iPitch = bbep.width()/2;
+    if (pDraw->iBpp == 1) {
+        if (bbep.width() == pDraw->iWidth) { // normal orientation
+            iPitch = (bbep.width() + 7)/8;
+            d += pDraw->y * iPitch; // point to the correct line
+            memcpy(d, s, (pDraw->iWidth+7)/8);
+        } else { // rotated
+            uint8_t ucPixel, ucMask, j;
+            d += (bbep.height() - 1) * iPitch;
+            d += (pDraw->y / 8);
+            ucMask = 0x80 >> (pDraw->y & 7); // destination mask
+            for (x=0; x<pDraw->iWidth; x++) {
+                if ((x & 7) == 0) uc = *s++;
+                ucPixel = d[0] & ~ucMask; // unset old pixel
+                if (uc & 0x80) ucPixel |= ucMask;
+                d[0] = ucPixel;
+                uc <<= 1;
+                d -= iPitch;
+            }
+        }
+    } else if (pDraw->iBpp == 2) { // we need to convert the 2-bit data into 4-bits
+        iPitch = bbep.width()/2;
+        if (bbep.width() == pDraw->iWidth) { // normal orientation
+            for (x=0; x<pDraw->iWidth; x+=4) {
+                src = *s++;
+                uc = (src & 0xc0); // first pixel
+                uc |= ((src & 0x30) >> 2);
+                *d++ = uc;
+                uc = (src & 0xc) << 4;
+                uc |= ((src & 0x3) << 2);
+                *d++ = uc;
+            } // for x
+        } else { // rotated
+            d += (bbep.height() - 1) * iPitch;
+            d += (pDraw->y / 2);
+            if (pDraw->y & 1) { // odd line (column)
+                for (x=0; x<pDraw->iWidth; x+=4) {
+                    uc = (d[0] & 0xf0) | ((s[0] >> 4) & 0x0c);
+                    *d = uc;
+                    d -= iPitch;
+                    uc = (d[0] & 0xf0) | ((s[0] >> 2) & 0x0c);
+                    *d = uc;
+                    d -= iPitch;
+                    uc = (d[0] & 0xf0) | (s[0] & 0xc);
+                    *d = uc;
+                    d -= iPitch;
+                    uc = (d[0] & 0xf0) | ((s[0] << 2) & 0x0c);
+                    *d = uc;
+                    d -= iPitch;
+                    s++;
+                } // for x
+            } else {
+                for (x=0; x<pDraw->iWidth; x+=4) {
+                    uc = (d[0] & 0xf) | (s[0] & 0xc0);
+                    *d = uc;
+                    d -= iPitch;
+                    uc = (d[0] & 0xf) | ((s[0] << 2) & 0xc0);
+                    *d = uc;
+                    d -= iPitch;
+                    uc = (d[0] & 0xf) | ((s[0] << 4) & 0xc0);
+                    *d = uc;
+                    d -= iPitch;
+                    uc = (d[0] & 0xf) | ((s[0] << 6) & 0xc0);
+                    *d = uc;
+                    d -= iPitch;
+                    s++;
+                } // for x
+            }
+        }
+    } else if (pDraw->iBpp == 4) { // 4-bit is the native format
+        if (bbep.width() == pDraw->iWidth) { // normal orientation
+            d += pDraw->y * iPitch; // point to the correct line
+            memcpy(d, s, (pDraw->iWidth+1)/2);
+        } else { // rotated
+            d += (bbep.height() - 1) * iPitch;
+            d += (pDraw->y / 2);
+            if (pDraw->y & 1) { // odd line (column)
+                for (x=0; x<pDraw->iWidth; x+=2) {
+                    uc = (d[0] & 0xf0) | (s[0] >> 4);
+                    *d = uc;
+                    d -= iPitch;
+                    uc = (d[0] & 0xf0) | (s[0] & 0xf);
+                    *d = uc;
+                    d -= iPitch;
+                    s++;
+                } // for x
+            } else {
+                for (x=0; x<pDraw->iWidth; x+=2) {
+                    uc = (d[0] & 0xf) | (s[0] & 0xf0);
+                    *d = uc;
+                    d -= iPitch;
+                    uc = (d[0] & 0xf) | (s[0] << 4);
+                    *d = uc;
+                    d -= iPitch;
+                    s++;
+                } // for x
+            }
+        }
+    } else { // must be 8-bit grayscale
+        if (bbep.width() == pDraw->iWidth) { // normal orientation
+            d += pDraw->y * iPitch; // point to the correct line
+            for (x=0; x<pDraw->iWidth; x+=2) {
+                uc = (s[0] & 0xf0) | (s[1] >> 4);
+                *d++ = uc;
+                s += 2;
+            } // for x
+        } else { // rotated
+            d += (bbep.height() - 1) * iPitch;
+            d += (pDraw->y / 2);
+            if (pDraw->y & 1) { // odd line (column)
+                for (x=0; x<pDraw->iWidth; x++) {
+                    uc = (d[0] & 0xf0) | (s[0] >> 4);
+                    *d = uc;
+                    s++;
+                    d -= iPitch;
+                } // for x
+            } else {
+                for (x=0; x<pDraw->iWidth; x++) {
+                    uc = (d[0] & 0xf) | (s[0] & 0xf0);
+                    *d = uc;
+                    s++;
+                    d -= iPitch;
+                } // for x
+            }
+        }
+    }
+    return 1;
+} /* png_draw() */
+#endif
 //
 // A table to accelerate the testing of 2-bit images for the number
 // of unique colors. Each entry sets bits 0-3 depending on the presence
@@ -514,6 +656,116 @@ int i, iColors;
     Log_info("%s [%d]: png_count_colors: %d\r\n", __FILE__, __LINE__, iColors);
     return iColors;
 } /* png_count_colors() */
+
+/** 
+ * @brief JPEGDEC callback function passed blocks of MCUs (minimum coded units)
+ * @param pointer to the JPEGDRAW structure
+ * @return 1 to continue decoding or 0 to abort
+ */
+int jpeg_draw(JPEGDRAW *pDraw)
+{
+#ifdef BB_EPAPER
+int x, y;
+int iPlane = *(int *)pDraw->pUser;
+uint8_t src=0, uc=0, ucMask, *s, *d, *pTemp = bbep.getCache();
+
+    bbep.setAddrWindow(pDraw->x, pDraw->y, pDraw->iWidth, pDraw->iHeight);
+    if (iPlane == 0) { // 1-bit mode
+        bbep.startWrite(PLANE_0); // start writing image data to plane 0
+        for (y=0; y<pDraw->iHeight; y++) { // this is 8 or 16 depending on the color subsampling
+            s = (uint8_t *)pDraw->pPixels;
+            s += (y * (pDraw->iWidth >> 3));
+            // The pixel format of the display is the same as JPEGDEC, so just copy it
+            bbep.writeData(s, (pDraw->iWidth+7)/8);
+        } // for y
+    } else {
+        bbep.startWrite((iPlane == 1) ? PLANE_0 : PLANE_1); // start writing image data to plane 0
+        for (y=0; y<pDraw->iHeight; y++) { // this is 8 or 16 depending on the color subsampling
+            d = pTemp;
+            s = (uint8_t *)pDither;
+            s += (y * (pDraw->iWidth >> 2));
+            ucMask = (iPlane == 1) ? 0x40 : 0x80; // lower or upper source bit
+            for (x=0; x<pDraw->iWidth; x++) {
+                if ((x & 3) == 0) { // new input byte
+                    src = *s++;
+                }
+                uc <<= 1;
+                if (src & ucMask) {
+                    uc |= 1; // high bit of source pair
+                }
+                src <<= 2;
+                if ((x & 7) == 7) { // new output byte
+                    *d++ = uc;
+                }
+            } // for x
+            bbep.writeData(pTemp, (pDraw->iWidth+7)/8);
+        } // for y
+    }
+#else // FastEPD
+  int x, y, iPitch = bbep.width()/2; // assume 4-bpp drawing mode
+  uint8_t *s, *d, *pBuffer = bbep.currentBuffer();
+  for (y=0; y<pDraw->iHeight; y++) {
+    d = &pBuffer[((pDraw->y + y)*iPitch) + (pDraw->x/2)];
+    s = (uint8_t *)pDraw->pPixels;
+    s += (y * (pDraw->iWidth/2));
+    memcpy(d, s, pDraw->iWidth/2); // source & dest format are the same
+  } // for y
+#endif
+    return 1; // continue decoding
+} /* jpeg_draw() */
+/** 
+ * @brief Function to decode and display a JPEG image from memory
+ *        The decoded lines are written directly into the EPD framebuffer
+ *        due to insufficient RAM to hold the fully decoded image
+ * @param pointer to the buffer holding the JPEG file
+ * @param size of the JPEG file
+ * @return refresh mode based on image type and presence of old image
+ */
+int jpeg_to_epd(const uint8_t *pJPEG, int iDataSize)
+{
+JPEGDEC *jpg = new JPEGDEC();
+int rc = -1; // invalid mode
+int iPlane = 0;
+
+    if (!jpg) return JPEG_ERROR_MEMORY; // not enough memory for the decoder instance
+    rc = jpg->openRAM((uint8_t *)pJPEG, iDataSize, jpeg_draw);
+    if (rc) {
+        if (jpg->getWidth() != bbep.width() || jpg->getHeight() != bbep.height()) {
+            Log_error("JPEG image size doesn't match display size");
+            rc = -1;
+        } else { // okay to decode
+#ifdef BB_EPAPER
+            //bbep.setPanelType(TWO_BIT_PANEL);
+            Log_info("%s [%d]: Decoding jpeg as 1-bpp dithered\r\n", __FILE__, __LINE__);
+            jpg->setPixelType(ONE_BIT_DITHERED); // request 1-bit dithered output
+#else
+            bbep.setMode(BB_MODE_4BPP);
+            Log_info("%s [%d]: Decoding jpeg as 4-bpp dithered\r\n", __FILE__, __LINE__);
+            jpg->setPixelType(FOUR_BIT_DITHERED); // request 4-bit dithered output
+#endif
+            pDither = (uint8_t *)malloc(jpg->getWidth() * 16);
+            iPlane = 0;//1; // Decode first plane
+            Log_info("%s [%d]: Decoding plane 0\r\n", __FILE__, __LINE__);
+            jpg->setUserPointer((void *)&iPlane);
+            jpg->decodeDither(pDither, 0);
+            jpg->close();
+            // Decode the second plane
+//            iPlane = 2;
+//            Log_info("%s [%d]: Decoding plane 1\r\n", __FILE__, __LINE__);
+//            jpg->openRAM((uint8_t *)pJPEG, iDataSize, jpeg_draw);
+//            jpg->setPixelType(TWO_BIT_DITHERED); // request 1-bit dithered output
+//            jpg->setUserPointer((void *)&iPlane);
+//            jpg->decodeDither(pDither, 0);
+            free(pDither);
+#ifdef BB_EPAPER
+            rc = REFRESH_FULL;
+#endif
+        }
+    }
+    jpg->close();
+    free(jpg);
+    return rc;
+} /* jpeg_to_epd() */
 /** 
  * @brief Function to decode and display a PNG image from memory
  *        The decoded lines are written directly into the EPD framebuffer
@@ -532,12 +784,20 @@ PNG *png = new PNG();
     rc = png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
     png->close();
     if (rc == PNG_SUCCESS) {
-        if (png->getWidth() != bbep.width() || png->getHeight() != bbep.height()) {
-            Log_error("PNG image size doesn't match display size");
+        Log_error("Decoding %d x %d PNG", png->getWidth(), png->getHeight());
+        if (png->getWidth() == bbep.height() && png->getHeight() == bbep.width()) {
+            Log_error("Rotating canvas to portrait orientation");
+        } else if (png->getWidth() > bbep.width() || png->getHeight() > bbep.height()) {
+            Log_error("PNG image is too large for display size (%dx%d)", png->getWidth(), png->getHeight());
             rc = -1;
-        } else { // okay to decode
+        } else if (png->getBpp() > MAX_BIT_DEPTH) {
+            Log_error("Unsupported PNG bit depth (only 1 to %d-bpp supported), this file has %d-bpp", MAX_BIT_DEPTH, png->getBpp());
+            rc = -1;
+        }
+        if (rc == PNG_SUCCESS) { // okay to decode
             Log_info("%s [%d]: Decoding %d-bpp png (current)\r\n", __FILE__, __LINE__, png->getBpp());
             // Prepare target memory window (entire display)
+#ifdef BB_EPAPER
             bbep.setAddrWindow(0, 0, bbep.width(), bbep.height());
             if (png->getBpp() == 1 || (png->getBpp() == 2 && png_count_colors(png, pPNG, iDataSize) == 2)) { // 1-bit image (single plane)
                 bbep.setPanelType(ONE_BIT_PANEL);
@@ -570,6 +830,11 @@ PNG *png = new PNG();
                 bbep.startWrite(PLANE_1); // start writing image data to plane 1
                 png->decode(&iPlane, 0); // decode it again to get plane 1 data
             }
+#else // FastEPD
+            bbep.setMode((png->getBpp() == 1) ? BB_MODE_1BPP : BB_MODE_4BPP);
+            png->decode(NULL, 0);
+            png->close();
+#endif
         }
     }
     free(png); // free the decoder instance
@@ -584,12 +849,16 @@ PNG *png = new PNG();
 void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
 
 {
-    bool isPNG = data_size >= 4 && MOTOLONG(image_buffer) == (int32_t)0x89504e47;;
+    bool isPNG = data_size >= 4 && MOTOLONG(image_buffer) == (int32_t)0x89504e47;
     auto width = display_width();
     auto height = display_height();
 //    uint32_t *d32;
     bool bAlloc = false;
+#ifdef BB_EPAPER
     int iRefreshMode = REFRESH_FULL; // assume full (slow) refresh
+#else
+    int iRefreshMode = 0;
+#endif
 
    // Log_info("Paint_NewImage %d", reverse);
     Log_info("display_show_image start");
@@ -614,6 +883,10 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     {
         Log_info("Drawing PNG");
         iRefreshMode = png_to_epd(image_buffer, data_size);
+    }
+    else if (MOTOSHORT(image_buffer) == 0xffd8) {
+        Log_info("Drawing JPEG");
+        iRefreshMode = jpeg_to_epd(image_buffer, data_size);
     }
     else // uncompressed BMP or Group5 compressed image
     {
@@ -641,8 +914,10 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
             bbep.setBuffer(image_buffer+62); // uncompressed 1-bpp bitmap
 #endif
         }
+#ifdef BB_EPAPER
         bbep.writePlane(PLANE_0); // send image data to the EPD
         iRefreshMode = REFRESH_PARTIAL;
+#endif
         iUpdateCount = 1; // use partial update
     }
     Log_info("Display refresh start");
@@ -665,6 +940,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     }
     iUpdateCount++;
 #else
+    bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
     bbep.fullUpdate();
 #endif
     Log_info("display_show_image end");
@@ -734,7 +1010,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
 #endif
     }
 
-    bbep.setFont(nicoclean_8); //Roboto_20);
+#ifdef BOARD_TRMNL_X
+    bbep.setFont(Inter_18);
+#else
+    bbep.setFont(nicoclean_8);
+#endif
     bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
 
     switch (message_type)
@@ -753,45 +1033,72 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     break;
     case WIFI_FAILED:
     {
+        String string0 = "TRMNL firmware ";
+        string0 += FW_VERSION_STRING;
+#ifdef __BB_EPAPER__
+        bbep.setCursor(40, 48); // place in upper left corner
+#else
+        bbep.setCursor(80, 104); // place in upper left corner
+#endif
+        bbep.println(string0);
         const char string1[] = "Can't establish WiFi connection.";
         bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - rect.w)/2, 386);
+        bbep.setCursor((bbep.width() - rect.w)/2, bbep.height() - (rect.h*2)-140);
         bbep.println(string1);
         const char string2[] = "Hold button on the back to reset WiFi, or scan QR Code for help.";
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.println(string2);
-
+#ifdef __BB_EPAPER__
         bbep.loadG5Image(wifi_failed_qr, bbep.width() - 66 - 40, 40, BBEP_WHITE, BBEP_BLACK);
+#else // bigger for X
+        bbep.loadG5Image(wifi_failed_qr, bbep.width() - (66*2) - 80, 80, BBEP_WHITE, BBEP_BLACK, 2.0f);
+#endif
     }
     break;
     case WIFI_INTERNAL_ERROR:
     {
         const char string1[] = "WiFi connected, but";
+#ifdef __BB_EPAPER__
+        int x = 132;
+#else
+        int x = 0;
+#endif
         bbep.getStringBox(string1, &rect);
+#ifdef __BB_EPAPER__
         bbep.setCursor((bbep.width() - 132 - rect.w) / 2, 340);
+#else
+        bbep.setCursor((bbep.width() - rect.w)/2, bbep.height() - (rect.h*2)-140);
+#endif
         bbep.println(string1);
         const char string2[] = "API connection cannot be";
         bbep.getStringBox(string2, &rect);
-        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
+        bbep.setCursor((bbep.width() - x - rect.w) / 2, -1);
         bbep.println(string2);
         const char string3[] = "established. Try to refresh,";
         bbep.getStringBox(string3, &rect);
-        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
+        bbep.setCursor((bbep.width() - x - rect.w) / 2, -1);
         bbep.println(string3);
         const char string4[] = "or scan QR Code for help.";
         bbep.getStringBox(string4, &rect);
-        bbep.setCursor((bbep.width() - 132 - rect.w) / 2, -1);
+        bbep.setCursor((bbep.width() - x - rect.w) / 2, -1);
         bbep.print(string4);
-
+#ifdef __BB_EPAPER__
         bbep.loadG5Image(wifi_failed_qr, 639, 336, BBEP_WHITE, BBEP_BLACK);
+#else // bigger for X
+        bbep.loadG5Image(wifi_failed_qr, bbep.width() - (66*2) - 80, 80, BBEP_WHITE, BBEP_BLACK, 2.0f);
+#endif
     }
     break;
     case WIFI_WEAK:
     {
         const char string1[] = "WiFi connected but signal is weak";
         bbep.getStringBox(string1, &rect);
+#ifdef __BB_EPAPER__
         bbep.setCursor((bbep.width() - rect.w) / 2, 400);
+#else
+        bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - rect.h);
+#endif
         bbep.print(string1);
     }
     break;
@@ -831,7 +1138,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     {
         const char string1[] = "WiFi connected, /api/setup returned error.";
         bbep.getStringBox(string1, &rect);
+#ifdef __BB_EPAPER__
         bbep.setCursor((bbep.width() - rect.w) / 2, 340);
+#else
+        bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - (rect.h*3));
+#endif
         bbep.println(string1);
         const char string2[] = "Short click the button on back,";
         bbep.getStringBox(string2, &rect);
@@ -847,7 +1158,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     {
         const char string1[] = "WiFi connected, TRMNL content malformed.";
         bbep.getStringBox(string1, &rect);
+#ifdef __BB_EPAPER__
         bbep.setCursor((bbep.width() - rect.w) / 2, 400);
+#else
+        bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - (rect.h*2));
+#endif
         bbep.println(string1);
         const char string2[] = "Wait or reset by holding button on back.";
         bbep.getStringBox(string2, &rect);
@@ -883,7 +1198,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     {
         const char string1[] = "Firmware update available! Starting now...";
         bbep.getStringBox(string1, &rect);
+#ifdef __BB_EPAPER__
         bbep.setCursor((bbep.width() - rect.w) / 2, 400);
+#else
+        bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - rect.h);
+#endif
         bbep.print(string1);
     }
     break;
@@ -891,7 +1210,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     {
         const char string1[] = "Firmware update failed. Device will restart...";
         bbep.getStringBox(string1, &rect);
+#ifdef __BB_EPAPER__
         bbep.setCursor((bbep.width() - rect.w) / 2, 400);
+#else
+        bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - rect.h);
+#endif
         bbep.print(string1);
     }
     break;
@@ -899,7 +1222,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     {
         const char string1[] = "Firmware update success. Device will restart...";
         bbep.getStringBox(string1, &rect);
+#ifdef __BB_EPAPER__
         bbep.setCursor((bbep.width() - rect.w) / 2, 400);
+#else
+        bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - rect.h);
+#endif
         bbep.print(string1);
     }
     break;
@@ -915,7 +1242,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     {
         const char string1[] = "The image file from this URL is too large.";
         bbep.getStringBox(string1, &rect);
+#ifdef __BB_EPAPER__
         bbep.setCursor((bbep.width() - rect.w) / 2, 360);
+#else
+        bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - rect.h*4);
+#endif
         bbep.println(string1);
         if (strlen(filename) > 40) {
             filename[40] = 0; // truncate and add elipses
@@ -929,7 +1260,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.println(string2);
+#ifdef __BB_EPAPER__
         String string3 = String(MAX_IMAGE_SIZE) + String(" bytes each and 1 or 2-bpp");
+#else
+        String string3 = String(MAX_IMAGE_SIZE) + String(" bytes each");
+#endif
         bbep.getStringBox(string3.c_str(), &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.print(string3);
@@ -939,7 +1274,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     {
         const char string1[] = "The image format is incorrect";
         bbep.getStringBox(string1, &rect);
+#ifdef __BB_EPAPER__
         bbep.setCursor((bbep.width() - rect.w) / 2, 400);
+#else
+        bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - rect.h);
+#endif
         bbep.print(string1);
     }
     break;
@@ -1131,7 +1470,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 #endif
     }
 
-    bbep.setFont(nicoclean_8); //Roboto_20);
+#ifdef BOARD_TRMNL_X
+    bbep.setFont(Inter_18);
+#else
+    bbep.setFont(nicoclean_8);
+#endif
     bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
     switch (message_type)
     {
@@ -1140,7 +1483,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         Log_info("friendly id case");
         const char string1[] = "Please sign up at usetrmnl.com/signup";
         bbep.getStringBox(string1, &rect);
+#ifdef __BB_EPAPER__
         bbep.setCursor((bbep.width() - rect.w)/2, 400);
+#else
+        bbep.setCursor((bbep.width() - rect.w)/2, bbep.height() - 140 - rect.h*2);
+#endif
         bbep.println(string1);
 
         String string2 = "with Friendly ID ";
@@ -1164,20 +1511,33 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         bbep.println(string1);
         const char string2[] = "Connect your phone or computer to TRMNL WiFi network";
         bbep.getStringBox(string2, &rect);
+#ifdef __BB_EPAPER__
         bbep.setCursor((bbep.width() - rect.w) / 2, 386);
+#else
+        bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - rect.h*2);
+#endif
         bbep.println(string2);
         const char string3[] = "or scan the QR code for help";
         bbep.getStringBox(string3, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.print(string3);
+#ifdef __BB_EPAPER__
         bbep.loadG5Image(wifi_connect_qr, bbep.width() - 40 - 66, 40, BBEP_WHITE, BBEP_BLACK); // 66x66 QR code
+#else // bigger for X
+        bbep.loadG5Image(wifi_connect_qr, bbep.width() - (66*2) - 80, 80, BBEP_WHITE, BBEP_BLACK, 2.0f);
+#endif
     }
     break;
     case MAC_NOT_REGISTERED:
     {
         UWORD y_start = 340;
         UWORD font_width = 18; // DEBUG
-        Paint_DrawMultilineText(0, y_start, message.c_str(), width, font_width, BBEP_BLACK, BBEP_WHITE, nicoclean_8/*Roboto_20*/, true);
+        Paint_DrawMultilineText(0, y_start, message.c_str(), width, font_width, BBEP_BLACK, BBEP_WHITE,
+#ifdef BOARD_TRMNL_X
+        Inter_18, true);
+#else
+        nicoclean_8, true);
+#endif
     }
     break;
     default:

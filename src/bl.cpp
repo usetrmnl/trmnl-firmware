@@ -36,6 +36,7 @@
 #include <serialize_log.h>
 #include <preferences_persistence.h>
 #include "logo_small.h"
+#include "logo_medium.h"
 #include "loading.h"
 #include <wifi-helpers.h>
 
@@ -262,6 +263,11 @@ void bl_init(void)
   Log_info("ESP-IDF version %d.%d.%d", ESP_IDF_VERSION_MAJOR, ESP_IDF_VERSION_MINOR, ESP_IDF_VERSION_PATCH);
   list_files();
   log_nvs_usage();
+
+  // DEBUG - test message display
+  // showMessageWithLogo(MSG_FORMAT_ERROR);
+  // display_show_msg(storedLogoOrDefault(1), WIFI_CONNECT, "ABCDEF", true, FW_VERSION_STRING, "Hello World!");
+  // wifiErrorDeepSleep();
 
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
 
@@ -720,6 +726,7 @@ static https_request_err_e downloadAndShow()
           }
 
           bool isPNG = https.header("Content-Type") == "image/png";
+          bool isJPEG = https.header("Content-Type") == "image/jpeg";
 
           Log.info("%s [%d]: Starting a download at: %d\r\n", __FILE__, __LINE__, getTime());
           heap_caps_check_integrity_all(true);
@@ -777,10 +784,10 @@ static https_request_err_e downloadAndShow()
           }
 
           bool image_reverse = false;
-          if (isPNG)
+          if (isPNG || isJPEG)
           {
             writeImageToFile("/current.png", buffer, content_size);
-            Log.info("%s [%d]: Decoding png\r\n", __FILE__, __LINE__);
+            Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
             display_show_image(buffer, content_size, true);
 //            delay(100);
 //            free(buffer);
@@ -2109,6 +2116,9 @@ static uint8_t *storedLogoOrDefault(int iType)
 //  {
 //    return buffer;
 //  }
+#ifdef BOARD_TRMNL_X
+    return const_cast<uint8_t *>(logo_medium);
+#else
   if (iType == 0) {
     return const_cast<uint8_t *>(logo_small);
   } else {
@@ -2117,6 +2127,7 @@ static uint8_t *storedLogoOrDefault(int iType)
     apiDisplayResult.response.maximum_compatibility = true;
     return const_cast<uint8_t *>(loading);
   }
+#endif
 }
 
 static bool saveCurrentFileName(String &name)

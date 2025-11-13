@@ -9,6 +9,8 @@ ButtonPressResult read_button_presses()
   Log_info("Button time=%d: start", time_start);
   ButtonPressResult bpr = NoAction;
 
+  return bpr; // DEBUG
+  
   while (digitalRead(PIN_INTERRUPT) == LOW && millis() - time_start < BUTTON_SOFT_RESET_TIME) // while button held
   {
     delay(10); // can save power if configured correctly
