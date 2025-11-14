@@ -118,13 +118,22 @@
       margin-bottom: 5px;
     }
 
-    input {
+    input, select, textarea {
       border-width: 1px;
       border-radius: .75rem;
       font-size: 16px;
       padding: 5px;
       width: 100%;
       box-sizing: border-box;
+    }
+    
+    textarea {
+      font-family: monospace;
+      resize: vertical;
+    }
+    
+    select {
+      height: 35px;
     }
 
     input:focus {
@@ -334,14 +343,43 @@
       location.reload();
     }
 
+    function toggleEnterpriseFields(isEnterprise) {
+      var enterpriseFields = document.getElementById('enterprise_fields');
+      var enterpriseUsernameGroup = document.getElementById('enterprise_username_group');
+      var enterpriseIndicator = document.getElementById('enterprise_indicator');
+
+      // store the enterprise status in a hidden field
+      document.getElementById('isEnterpriseHidden').value = isEnterprise ? 'true' : 'false';
+
+      if (isEnterprise) {
+        enterpriseFields.style.display = 'flex';
+        enterpriseUsernameGroup.style.display = 'flex';
+        enterpriseIndicator.style.display = 'block';
+      } else {
+        enterpriseFields.style.display = 'none';
+        enterpriseUsernameGroup.style.display = 'none';
+        enterpriseIndicator.style.display = 'none';
+      }
+    }
+
     function connect() {
       hideAlert();
       var ssid = document.getElementById('ssid').value;
       var pswd = document.getElementById('password').value;
       var server = document.getElementById('server').value;
+      var isEnterprise = document.getElementById('isEnterpriseHidden').value === 'true';
+
       if (!ssid) {
         displayAlert('Please enter your Wi-Fi name', "warning");
         return;
+      }
+
+      if (isEnterprise) {
+        var identity = document.getElementById('identity').value;
+        if (!identity) {
+          displayAlert('Please enter your identity for WPA2 Enterprise', "warning");
+          return;
+        }
       }
 
       // if custom server form-group is visible, validate the url
@@ -349,7 +387,7 @@
       if (customServerVisible && server) {
         try {
           new URL(server);
-          // does it start with http:// or https://?
+
           if (!server.startsWith('http://') && !server.startsWith('https://')) {
             throw new Error();
           }
@@ -364,7 +402,17 @@
 
       saveServerToStorage();
 
-      var body = { ssid: ssid, pswd: pswd, server: server };
+      var body = {
+        ssid: ssid,
+        pswd: pswd,
+        server: server,
+        isEnterprise: isEnterprise
+      };
+
+      if (isEnterprise) {
+        body.identity = document.getElementById('identity').value;
+        body.username = document.getElementById('username').value;
+      }
 
       showLoader();
       fetch('/connect', {
@@ -446,18 +494,19 @@
           document.getElementById('other-networks-caption').style.display = 'block';
         }
         knownNetworks.forEach((item, row) => {
-          appendWifiToTable("table-saved", item.name, item.open, item.rssi, false);
+          appendWifiToTable("table-saved", item.name, item.open, item.rssi, item.enterprise, false);
         });
         otherNetworks.forEach((item, row) => {
-          appendWifiToTable("table-others", item.name, item.open, item.rssi, true);
+          appendWifiToTable("table-others", item.name, item.open, item.rssi, item.enterprise, true);
         });
       } else if (response && response.status == 202) {
         setTimeout(getInfo, 2000); // repeat in 2s
       }
     }
 
-    function appendWifiToTable(table, name, open, rssi, onClick) {
+    function appendWifiToTable(table, name, open, rssi, enterprise, onClick) {
       var newRow = document.createElement('tr');
+      newRow.setAttribute('data-enterprise', enterprise ? 'true' : 'false');
       if (onClick) {
         newRow.onclick = function () {
           onClickItemTable(this);
@@ -497,11 +546,20 @@
         }
       });
       var value = x.querySelector('th').textContent;
+      var isEnterprise = x.getAttribute('data-enterprise') === 'true';
+
       if (value) {
         document.getElementById('ssid').value = value;
         var passwordTag = document.getElementById('password');
         passwordTag.value = '';
-        passwordTag.focus();
+
+        toggleEnterpriseFields(isEnterprise);
+
+        if (isEnterprise) {
+          document.getElementById('identity').focus();
+        } else {
+          passwordTag.focus();
+        }
       }
     }
 
@@ -597,20 +655,34 @@
     <p id="scanning-info">Scanning networks, please wait...</p>
     <div id="scanning-loader" class="loader"></div>
   </div>
-  <div class="div-container">
-    <div class="form-group">
-      <label for="ssid">SSID</label>
-      <input type="text" id="ssid" name="ssid" placeholder="Enter your Wi-Fi name">
-    </div>
-    <div class="form-group">
-      <label for="password">Password</label>
-      <input type="password" id="password" name="password" pattern=".{8,}" placeholder="Enter your Wi-Fi password">
-      <i id="toggler" class="bi bi-eye" onclick="togglePassword()"></i>
-    </div>
-    <div class="form-group" id="custom_server_form_group" style="display: none;">
-      <label for="server">API Server</label>
-      <input type="url" id="server" name="server" placeholder="Enter your custom server without a trailing / (e.g. https://trmnl.app)">
-    </div>
+    <div class="div-container">
+      <div class="form-group">
+        <label for="ssid">SSID</label>
+        <input type="text" id="ssid" name="ssid" placeholder="Enter your Wi-Fi name">
+      </div>
+      <input type="hidden" id="isEnterpriseHidden" value="false">
+      <div class="form-group" id="enterprise_indicator" style="display: none;">
+        <div class="alert alert-primary" style="margin-bottom: 0;">
+          This network uses WPA2 Enterprise authentication. If you only have a username and password, use the identity field for your username.
+        </div>
+      </div>
+      <div class="form-group" id="enterprise_fields" style="display: none;">
+        <label for="identity">Identity (required)</label>
+        <input type="text" id="identity" name="identity" placeholder="Enter your identity (e.g. username@domain.com)">
+      </div>
+      <div class="form-group" id="enterprise_username_group" style="display: none;">
+        <label for="username">Username (optional)</label>
+        <input type="text" id="username" name="username" placeholder="Enter username (if different from identity)">
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" placeholder="Enter your Wi-Fi password">
+        <i id="toggler" class="bi bi-eye" onclick="togglePassword()"></i>
+      </div>
+      <div class="form-group" id="custom_server_form_group" style="display: none;">
+        <label for="server">API Server</label>
+        <input type="url" id="server" name="server" placeholder="Enter your custom server without a trailing / (e.g. https://trmnl.app)">
+      </div>
     <div class="form-group">
       <div class="alert alert-primary" id="message" role="alert" style="display: none;"></div>
     </div>

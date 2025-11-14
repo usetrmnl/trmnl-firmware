@@ -9,6 +9,10 @@ struct WifiCredentials
 {
     String ssid;
     String pswd;
+    // WPA2 Enterprise fields
+    bool isEnterprise = false;
+    String username;
+    String identity;
 };
 
 struct Network
@@ -17,6 +21,7 @@ struct Network
     int32_t rssi;
     bool open;
     bool saved;
+    bool enterprise;
 };
 
 struct WifiEventData
