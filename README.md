@@ -178,38 +178,46 @@ POST /api/log
 
 ## **Power consumption**
 
-Ths image displays the amount of power consumed during a work cycle that involves downloading and displaying images.
+A bit of background first. The ESP32-C3 inside the TRMNL OG is one of Espressif's newer, more efficient microcontrollers. For battery powered applications, it's designed to be put to sleep to conserve power when your project doesn't need it to be active. There are two sleep modes - light and deep. Deep sleep conserves the most power, but at the cost of losing the contents of the main memory. The lowest possible power consumption is about 4uA @ 3V with a timed wakeup, but TRMNL needs to be able to wake up with a button press. Keeping the GPIO active during deep sleep (to detect the button press) uses about 100uA on average (see power profile below). This means that a 2500mAh battery could theoretically keep the TRMNL powered in this state for approximately 25,000 hours.
 
-![Image Alt text](/pics/Simple_cycle.jpg "Simple cycle")
+![TRMNL deep sleep power consumption](/pics/deep-sleep-power-consumption.png)
 
-This image displays the amount of power consumed while in sleep mode.
+Of course its not very useful to have a device that's permanently sleeping, so shown below is the power profile of TRMNL doing a normal display update (timed wake up, send device status, fetch new image, show it on the e-paper display):
 
-![Image Alt text](/pics/Sleep_cycle.jpg "Sleep cycle")
+![TRMNL device full cycle power consumption](/pics/full-cycle.png)
 
-This image displays the amount of power consumed during a work cycle that involves link pinging, new firmware downloading and OTA.
+The peaks and valleys you see above represent the variation in electrical current (power) drawn by the ESP32-C3 at different points during the ~10.5 second update cycle. The majority of energy is used while WiFi is active (between the 3 and 9 second marks). The last portion of the graph with higher frequency peaks is from the e-paper display cycling through its update (average power is quite low). The total electrical charge needed for the update is shown in the lower right corner (0.67c). This value is in Coulombs and represents the number of electrons that have moved through the circuit.
 
-![Image Alt text](/pics/OTA.jpg "OTA")
+0.67 C = 0.186111 mAh
 
-Full Power Cycle
+If we ignore the ESP32 sleep periods, the energy used in each display update would allow 2500/0.186111 = 13433 updates. If we configure our TRMNL account to update the information every 15 minutes, we'll be requesting 96 updates per day and the battery charge could last for 140 days (13433 / 96). This isn't too far off from real world results. The battery voltage will drop below a safe threshold before it has released its full energy and in the equation above, we haven't counted the energy used during the sleep periods nor the energy lost in the TRMNL's power supply (between the battery and the ESP32). The real world result will be closer to 120 days on a full charge.
 
-- Sleep 0.1mA
-- Image refresh cycle 32.8mA during 24s
+We can extend the battery life further by disabling updates during our sleeping hours. In the TRMNL web portal there is a setting for “Sleep Mode” (see screenshot below):
 
-If refreshed continuously, device will refresh 8,231 times (54 hours) on a full charge.
-If device is set to sleep continuously, it can sleep for 18,000 hours (750 days).
+![TRMNL sleep mode](/pics/sleep-mode.png)
 
-15 min refresh = 78 days
-5 min refresh = 29 days
+For example - by reducing the total active time each day by 8 hours, the number of updates per day (set to a 15-minute interval like above) changes from 96 to 64. With sleep mode set to 8 hours, our battery life is extended:
+
+13433 / 64 = 210 days (theoretical maximum)
+
+**Designed for Efficiency**
+
+Lithium batteries deliver between 3.7 and 4.2 volts depending on their charge state. The ESP32 operates between 2.8V and 3.3V. In order to power the ESP32 from the battery, the voltage needs to be reduced.
+
+There are two main types of power regulators - buck converters, and linear regulators. Many ESP32 products use linear regulators since they are less expensive. This savings comes at a cost - they throw away up to 20% of the battery's energy as waste heat. Your TRMNL was designed with a buck converter to safely and efficiently power the ESP32. This ensures the best use of the battery's energy. At TRMNL we are always looking for additional software optimizations that improve battery life.
 
 ## **Low Battery Level**
 
-This image shows that the battery disconnects when the voltage reaches 2.75 V:
+Lithium ion batteries are ubiquitous in our lives; they're in nearly everyone's pocket/purse and many other devices you use daily. They bring a host of benefits, some risks and require care to keep them working at their best. Your TRMNL protects the battery against overcharging, but your help is needed to prevent problems when the battery is low. There are two main problems that arise with dead Li-Ion batteries:
 
-![Image Alt text](/pics/battery_3v3.jpg "Voltage battery&3.3V")
+1. If they pass below a certain voltage, they need to be recharged with a special trickle charger; the charging circuit of the TRMNL won't be able to charge them.
+2. Batteries that are left uncharged for an extended period of time can “outgas”. This means that the electrolyte goes through a chemical reaction and releases hydrogen gas. You may have seen batteries in this state - the metal envelope puffs up like a balloon.
 
-The pulse on the graph shows the voltage on the divider in sleep mode, further on the graph it can be seen that at the moment of disconnection of the battery on the divider under load the voltage is equal to 1V, i.e. a voltage of 1.2V under load on the divider can be considered extremely critical, which corresponds to a voltage of 1.5V in the state sleep on the divider and 3V on the battery:
+The conditions above are to be avoided, but `#2` can be dangerous as well. If your battery is puffy, dispose of it safely at a local recycling spot and contact TRMNL support to get a new one.
 
-![Image Alt text](/pics/battery_divider.jpg "Voltage battery&divider")
+Even when your TRMNL is disconnected (power switch in the off position), its battery will slowly self-discharge. To keep your TRMNL's battery running at peak performance:
+1. Charge your device immediately when the low battery image is shown.
+2. If you've switched off your TRMNL for storage/moving, ensure the battery is not already low.
 
 ## **Version Log**
 
