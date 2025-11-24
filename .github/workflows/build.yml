@@ -47,8 +47,11 @@ jobs:
           g++ --version
           gcc --version
 
-      - name: build
+      - name: build (trmnl)
         run: pio run
+
+      - name: build (TRMNL_X)
+        run: pio run -e TRMNL_X
 
       - name: test
         if: matrix.os != 'windows-latest'
