@@ -1,8 +1,6 @@
 #pragma once
 
 #include <Arduino.h>
-#include <WiFiGeneric.h>
-#include <WiFiType.h>
 #include <WiFi.h>
 
 struct WifiCredentials
@@ -11,7 +9,7 @@ struct WifiCredentials
     String pswd;
 };
 
-struct Network
+struct WifiNetwork
 {
     String ssid;
     int32_t rssi;

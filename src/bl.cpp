@@ -132,7 +132,7 @@ void bl_init(void)
 
   wakeup_reason = esp_sleep_get_wakeup_cause();
 
-  if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO || wakeup_reason == ESP_SLEEP_WAKEUP_EXT0 || wakeup_reason == ESP_SLEEP_WAKEUP_EXT1)
+  if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO)
   {
     Log_info("GPIO wakeup detected (%d)", wakeup_reason);
     auto button = read_button_presses();
@@ -198,7 +198,6 @@ void bl_init(void)
       case SF_SLEEP:
       {
         Log.info("%s [%d]: Sleep special function...\r\n", __FILE__, __LINE__);
-        // still in progress
       }
       break;
       case SF_ADD_WIFI:
@@ -236,12 +235,9 @@ void bl_init(void)
       Log_error("SF not saved");
     }
   }
-  // EPD init
-  // EPD clear
   Log.info("%s [%d]: Display init\r\n", __FILE__, __LINE__);
   display_init();
 
-  // Mount SPIFFS
   filesystem_init();
 
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
@@ -276,7 +272,9 @@ void bl_init(void)
 #ifdef HARDCODED_WIFI
   WifiCredentials hardcodedCreds = {.ssid = "ssid-goes-here", .pswd = "password-goes-here"};
   Log_info("Hardcoded WiFi: connecting to SSID '%s'", hardcodedCreds.ssid.c_str());
+  esp_wifi_set_max_tx_power(34);
   auto connectResult = WifiCaptivePortal.connect(hardcodedCreds);
+  WiFi.waitForConnectResult(60000);
   Log_info("Hardcoded WiFi: connect result '%s'", wifiStatusStr(connectResult));
 // goToSleep();
 #else
@@ -800,7 +798,7 @@ static https_request_err_e downloadAndShow()
             bmp_res = parseBMPHeader(buffer, image_reverse);
             Log.info("%s [%d]: BMP Parsing result: %d\r\n", __FILE__, __LINE__, bmp_res);
           }
-          Serial.println();
+          Serial.println("PNG res: " + String(png_res));
           String error = "";
          // uint8_t *imagePointer = buffer;
 //          uint8_t *imagePointer = (decodedPng == nullptr) ? buffer : decodedPng;
@@ -1876,6 +1874,9 @@ static void goToSleep(void)
   esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
 #elif CONFIG_IDF_TARGET_ESP32S3
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
+#elif CONFIG_IDF_TARGET_ESP32C5
+  esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
+
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
 #endif
@@ -1994,7 +1995,7 @@ uint32_t getTime(void)
   struct tm timeinfo;
   if (!getLocalTime(&timeinfo, 200))
   {
-    Log.info("%s [%d]: Failed to obtain time. \r\n", __FILE__, __LINE__);
+    Log_info("Failed to obtain time");
     return (0);
   }
   time(&now);

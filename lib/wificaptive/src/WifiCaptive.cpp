@@ -65,8 +65,8 @@ bool WifiCaptive::startPortal()
         .getAnnotatedNetworks = [this](bool runScan)
         {
             // Warning: DO NOT USE true on this function in an async context!
-            std::vector<Network> uniqueNetworks = getScannedUniqueNetworks(false);
-            std::vector<Network> combinedNetworks = combineNetworks(uniqueNetworks, _savedWifis);
+            std::vector<WifiNetwork> uniqueNetworks = getScannedUniqueNetworks(false);
+            std::vector<WifiNetwork> combinedNetworks = combineNetworks(uniqueNetworks, _savedWifis);
             return combinedNetworks; }};
 
     setUpWebserver(*_server, localIP, callbacks);
@@ -292,9 +292,9 @@ void WifiCaptive::saveApiServer(String url)
     preferences.end();
 }
 
-std::vector<Network> WifiCaptive::getScannedUniqueNetworks(bool runScan)
+std::vector<WifiNetwork> WifiCaptive::getScannedUniqueNetworks(bool runScan)
 {
-    std::vector<Network> uniqueNetworks;
+    std::vector<WifiNetwork> uniqueWifiNetworks;
     int n = WiFi.scanComplete();
     if (runScan == true)
     {
@@ -342,7 +342,7 @@ std::vector<Network> WifiCaptive::getScannedUniqueNetworks(bool runScan)
             int32_t rssi = WiFi.RSSI(i);
             bool open = WiFi.encryptionType(i);
             bool found = false;
-            for (auto &network : uniqueNetworks)
+            for (auto &network : uniqueWifiNetworks)
             {
                 if (network.ssid == ssid)
                 {
@@ -350,33 +350,33 @@ std::vector<Network> WifiCaptive::getScannedUniqueNetworks(bool runScan)
                     found = true;
                     if (network.rssi < rssi)
                     {
-                        network.rssi = rssi; // Update to higher RSSI
+                        network.rssi = rssi; 
                     }
                     break;
                 }
             }
             if (!found)
             {
-                uniqueNetworks.push_back({ssid, rssi, open, false});
+                uniqueWifiNetworks.push_back({ssid, rssi, open, false});
             }
         }
     }
 
-    Log_info("Unique networks found: %d", uniqueNetworks.size());
-    for (auto &network : uniqueNetworks)
+    Log_info("Unique networks found: %d", uniqueWifiNetworks.size());
+    for (auto &network : uniqueWifiNetworks)
     {
         Log_info("SSID: %s, RSSI: %d, Open: %d", network.ssid.c_str(), network.rssi, network.open);
     }
 
-    return uniqueNetworks;
+    return uniqueWifiNetworks;
 }
 
 std::vector<WifiCredentials> WifiCaptive::matchNetworks(
-    std::vector<Network> &scanResults,
+    std::vector<WifiNetwork> &scanResults,
     WifiCredentials savedWifis[])
 {
     // sort scan results by RSSI
-    std::sort(scanResults.begin(), scanResults.end(), [](const Network &a, const Network &b)
+    std::sort(scanResults.begin(), scanResults.end(), [](const WifiNetwork &a, const WifiNetwork &b)
               { return a.rssi > b.rssi; });
 
     std::vector<WifiCredentials> sortedWifis;
@@ -394,11 +394,11 @@ std::vector<WifiCredentials> WifiCaptive::matchNetworks(
     return sortedWifis;
 }
 
-std::vector<Network> WifiCaptive::combineNetworks(
-    std::vector<Network> &scanResults,
+std::vector<WifiNetwork> WifiCaptive::combineNetworks(
+    std::vector<WifiNetwork> &scanResults,
     WifiCredentials savedWifis[])
 {
-    std::vector<Network> combinedNetworks;
+    std::vector<WifiNetwork> combinedWifiNetworks;
     for (auto &network : scanResults)
     {
         bool found = false;
@@ -406,21 +406,21 @@ std::vector<Network> WifiCaptive::combineNetworks(
         {
             if (network.ssid == savedWifis[i].ssid)
             {
-                combinedNetworks.push_back({network.ssid, network.rssi, network.open, true});
+                combinedWifiNetworks.push_back({network.ssid, network.rssi, network.open, true});
                 found = true;
                 break;
             }
         }
         if (!found)
         {
-            combinedNetworks.push_back({network.ssid, network.rssi, network.open, false});
+            combinedWifiNetworks.push_back({network.ssid, network.rssi, network.open, false});
         }
     }
-    // add saved wifis that are not combinedNetworks
+    // add saved wifis that are not combinedWifiNetworks
     for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
     {
         bool found = false;
-        for (auto &network : combinedNetworks)
+        for (auto &network : combinedWifiNetworks)
         {
             if (network.ssid == savedWifis[i].ssid)
             {
@@ -430,11 +430,11 @@ std::vector<Network> WifiCaptive::combineNetworks(
         }
         if (!found && savedWifis[i].ssid != "")
         {
-            combinedNetworks.push_back({savedWifis[i].ssid, -200, false, true});
+            combinedWifiNetworks.push_back({savedWifis[i].ssid, -200, false, true});
         }
     }
 
-    return combinedNetworks;
+    return combinedWifiNetworks;
 }
 
 bool WifiCaptive::autoConnect()
@@ -458,7 +458,7 @@ bool WifiCaptive::autoConnect()
     }
 
     Log_info("Last used network unavailable, scanning for known networks...");
-    std::vector<Network> scanResults = getScannedUniqueNetworks(true);
+    std::vector<WifiNetwork> scanResults = getScannedUniqueNetworks(true);
     std::vector<WifiCredentials> sortedNetworks = matchNetworks(scanResults, _savedWifis);
     if (sortedNetworks.size() == 0)
     {

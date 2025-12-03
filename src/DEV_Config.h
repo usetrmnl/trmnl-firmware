@@ -105,6 +105,15 @@
 #elif defined(BOARD_TRMNL_X)
    #define FAKE_BATTERY_VOLTAGE
 
+#elif defined(BOARD_ESP32_C5_DEVKITC_1)
+   #define EPD_SCK_PIN  6
+   #define EPD_MOSI_PIN 1
+   #define EPD_CS_PIN   7
+   #define EPD_RST_PIN  9
+   #define EPD_DC_PIN   8
+   #define EPD_BUSY_PIN 10
+   #define FAKE_BATTERY_VOLTAGE
+
 #elif defined(BOARD_SEEED_RETERMINAL_E1001)
    // Pin definition for reTerminal E1001
    #define EPD_SCK_PIN  7

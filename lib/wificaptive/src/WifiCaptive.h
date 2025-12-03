@@ -52,9 +52,9 @@ private:
     int readLastUsedWifiIndex();
     void saveApiServer(String url);
     bool tryConnectWithRetries(const WifiCredentials creds, int last_used_index);
-    std::vector<WifiCredentials> matchNetworks(std::vector<Network> &scanResults, WifiCredentials wifiCredentials[]);
-    std::vector<Network> getScannedUniqueNetworks(bool runScan);
-    std::vector<Network> combineNetworks(std::vector<Network> &scanResults, WifiCredentials wifiCredentials[]);
+    std::vector<WifiCredentials> matchNetworks(std::vector<WifiNetwork> &scanResults, WifiCredentials wifiCredentials[]);
+    std::vector<WifiNetwork> getScannedUniqueNetworks(bool runScan);
+    std::vector<WifiNetwork> combineNetworks(std::vector<WifiNetwork> &scanResults, WifiCredentials wifiCredentials[]);
 
 public:
     wl_status_t connect(const WifiCredentials credentials);

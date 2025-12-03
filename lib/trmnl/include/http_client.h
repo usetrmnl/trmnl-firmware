@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <WiFiClientSecure.h>
+#include <WiFiClient.h>
 #include <HTTPClient.h>
 
 // Error codes for the HTTP utilities - using distinct values to avoid overlap

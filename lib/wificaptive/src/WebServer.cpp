@@ -83,7 +83,7 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
 		} else {
 			// Data structure to store the highest RSSI for each SSID
             // Warning: DO NOT USE true on this function in an async context!
-            std::vector<Network> combinedNetworks = callbacks.getAnnotatedNetworks(false);
+            std::vector<WifiNetwork> combinedNetworks = callbacks.getAnnotatedNetworks(false);
 
             // Generate JSON response
             size_t size = 0;
