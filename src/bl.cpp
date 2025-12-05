@@ -106,6 +106,100 @@ void wait_for_serial() {
 #endif
 }
 
+#ifdef BOARD_TRMNL_X
+#include "IQS323.h"
+// ############################ SLIDER #############################
+IQS323 iqs323;
+#define IQS323_I2C_ADDRESS 0x44
+// Sensor states
+uint16_t slider_position = 65535;
+iqs323_gesture_events slider_event = IQS323_GESTURE_NONE;
+
+#define SENSOR_SDA_PIN 39
+#define SENSOR_SCL_PIN 40
+#define SENSOR_READY_PIN GPIO_NUM_3
+// ############################ SLIDER #############################
+
+void read_slider_coordinates(void)
+{
+  /* read slider coordinates from memory */
+  uint16_t buffer = iqs323.sliderCoordinate();
+
+  if(buffer != slider_position)
+  {
+    slider_position = buffer;
+  }
+}
+
+/* Function to process Slider gesture events */
+void read_gesture_event(void)
+{
+  /* Read slider bit to check if a slider event occurred */
+  bool gesture_event = iqs323.getSliderEvent();
+  printf("Gesture event: %d\n", gesture_event);
+  if (gesture_event)
+  {
+    /* returns slider event that occurred (tap, swipe or flick) by reading event bits from MM */
+    iqs323_gesture_events gesture_buffer = iqs323.getGestureType();
+    printf("Gesture type: %d\n", gesture_buffer);
+    if(slider_event != gesture_buffer)
+    {
+      slider_event = gesture_buffer;
+      int file_size = 0;
+      switch (slider_event)
+      {
+        case IQS323_GESTURE_UNKNOWN:
+          Serial.println("SLIDER: UNKNOWN (something went wrong?)");
+          break;
+        case IQS323_GESTURE_TAP:
+          Serial.println("SLIDER: Tap");
+          break;
+        case IQS323_GESTURE_SWIPE_NEGATIVE:
+          Serial.println("SLIDER: Swipe ->");
+          buffer = display_read_file("/current.png", &file_size);
+          if (!buffer || file_size == 0) {
+            Serial.println("No previous image found");
+            break;
+          }
+          Serial.printf("Drawing current plugin... File size: %d\n", file_size);
+          display_show_image(buffer, file_size, false);
+          goToSleep();
+          break;
+        case IQS323_GESTURE_SWIPE_POSITIVE:
+          Serial.println("SLIDER: Swipe <-");
+          buffer = display_read_file("/last.png", &file_size);
+          if (!buffer || file_size == 0) {
+            Serial.println("No previous image found");
+            break;
+          }
+          Serial.printf("Drawing previous plugin... File size: %d\n", file_size);
+          display_show_image(buffer, file_size, false);
+          goToSleep();
+          break;
+        case IQS323_GESTURE_FLICK_NEGATIVE:
+          Serial.println("SLIDER: Flick ->");
+          break;
+        case IQS323_GESTURE_FLICK_POSITIVE:
+          Serial.println("SLIDER: Flick <-");
+          break;
+        case IQS323_GESTURE_HOLD:
+          Serial.println("SLIDER: Hold");
+          break;
+        case IQS323_GESTURE_NONE:
+          Serial.println("SLIDER: None");
+          break;
+      }
+
+      /* Clear event if a finger is removed from slider after the event was processed */
+      if (slider_position == 65535)
+      {
+        slider_event = IQS323_GESTURE_NONE;
+      }
+    }
+  }
+}
+#endif
+
 /**
  * @brief Function to init business logic module
  * @param none
@@ -132,10 +226,17 @@ void bl_init(void)
 
   wakeup_reason = esp_sleep_get_wakeup_cause();
 
-  if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO)
+  if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO || wakeup_reason == ESP_SLEEP_WAKEUP_EXT0 || wakeup_reason == ESP_SLEEP_WAKEUP_EXT1)
   {
     Log_info("GPIO wakeup detected (%d)", wakeup_reason);
+    #ifdef BOARD_TRMNL_X
+    iqs323.begin(IQS323_I2C_ADDRESS, SENSOR_SDA_PIN, SENSOR_SCL_PIN, PIN_INTERRUPT, false);
+    iqs323.read_gesture();
+    iqs323.run();
+    auto button = 2;
+    #else
     auto button = read_button_presses();
+    #endif
     wait_for_serial();
     Log_info("GPIO wakeup (%d) -> button was read (%s)", wakeup_reason, ButtonPressResultNames[button]);
     switch (button)
@@ -158,6 +259,25 @@ void bl_init(void)
   {
     wait_for_serial();
     Log_info("Non-GPIO wakeup (%d) -> didn't read buttons", wakeup_reason);
+
+    #ifdef BOARD_TRMNL_X
+
+    // If we woke up not from GPIO, need to initialize the IQS323
+
+    iqs323.begin(IQS323_I2C_ADDRESS, SENSOR_SDA_PIN, SENSOR_SCL_PIN, PIN_INTERRUPT, true);
+    printf("IQS323 resetting device...\n");
+    iqs323.SW_Reset(STOP);
+    Serial.println("IQS323 Ready to configure!");
+
+    while (true)
+    {
+      iqs323.run();
+      if (iqs323.iqs323_state.init_state == IQS323_INIT_DONE) {
+        iqs323.iqs323_state.state = IQS323_STATE_RUN;
+        break;
+      }
+    }
+    #endif
   }
 
   Log_info("preferences start");
@@ -240,6 +360,13 @@ void bl_init(void)
 
   filesystem_init();
 
+  #ifdef BOARD_TRMNL_X
+  if (iqs323.new_data_available) {
+    read_slider_coordinates();
+    read_gesture_event();  // Process gesture NOW
+    iqs323.new_data_available = false;
+  }
+  #endif
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
   {
     Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
@@ -1852,6 +1979,9 @@ static void checkAndPerformFirmwareUpdate(void)
  */
 static void goToSleep(void)
 {
+#ifdef BOARD_TRMNL_X
+  iqs323.run(); // to clear any pending operations before sleep
+#endif
   submitStoredLogs();
   if (WiFi.status() == WL_CONNECTED) {
     WiFi.disconnect();

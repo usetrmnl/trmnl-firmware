@@ -24,13 +24,13 @@ void log_impl(LogLevel level, LogMode mode, const char* file, int line, const ch
  * Standard variants (serial + store locally for later submission)
  */
 /** Log to serial and store locally for later submission */
-#define Log_verbose(format, ...) _LOG_IMPL(LOG_VERBOSE, LOG_STORE_ONLY, format, ##__VA_ARGS__)
+#define Log_verbose(format, ...) _LOG_IMPL(LOG_VERBOSE, LOG_SERIAL_ONLY, format, ##__VA_ARGS__)
 /** Log to serial and store locally for later submission */
-#define Log_info(format, ...) _LOG_IMPL(LOG_INFO, LOG_STORE_ONLY, format, ##__VA_ARGS__)
+#define Log_info(format, ...) _LOG_IMPL(LOG_INFO, LOG_SERIAL_ONLY, format, ##__VA_ARGS__)
 /** Log to serial and store locally for later submission */
-#define Log_error(format, ...) _LOG_IMPL(LOG_ERROR, LOG_STORE_ONLY, format, ##__VA_ARGS__)
+#define Log_error(format, ...) _LOG_IMPL(LOG_ERROR, LOG_SERIAL_ONLY, format, ##__VA_ARGS__)
 /** Log to serial and store locally for later submission */
-#define Log_fatal(format, ...) _LOG_IMPL(LOG_FATAL, LOG_STORE_ONLY, format, ##__VA_ARGS__)
+#define Log_fatal(format, ...) _LOG_IMPL(LOG_FATAL, LOG_SERIAL_ONLY, format, ##__VA_ARGS__)
 
 /*
     Submit variants (serial + immediate submission / storage - use with caution due to HTTPClient stack overflow risk)

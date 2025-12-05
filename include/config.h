@@ -68,7 +68,7 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #define PIN_INTERRUPT 2
 #define DEVICE_MODEL "og"
 #elif defined(BOARD_TRMNL_X)
-#define PIN_INTERRUPT 0
+#define PIN_INTERRUPT 3
 #define DEVICE_MODEL "x"
 #elif defined(BOARD_ESP32_C5_DEVKITC_1)
 #define PIN_INTERRUPT 28

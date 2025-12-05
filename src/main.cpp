@@ -7,12 +7,12 @@
 void setup()
 {
   
-  bool testPassed = checkIfAlreadyPassed();
+  // bool testPassed = checkIfAlreadyPassed();
   
-  if (!testPassed) {
-    startQA();
-  }
-  esp_ota_mark_app_valid_cancel_rollback();
+  // if (!testPassed) {
+  //   startQA();
+  // }
+  // esp_ota_mark_app_valid_cancel_rollback();
   bl_init();
 }
 

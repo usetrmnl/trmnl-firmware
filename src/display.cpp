@@ -65,10 +65,13 @@ void display_init(void)
 {
     Log_info("dev module start");
 #ifdef BB_EPAPER
+    Log_info("BB e-Paper init");
     bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
 #else
-    bbep.initPanel(BB_PANEL_EPDIY_V7_16); //, 26000000);
-    bbep.setPanelSize(1872, 1404, BB_PANEL_FLAG_MIRROR_X);
+    bbep.initPanel(BB_PANEL_TRMNL_X); //, 26000000);
+    if (bbep.setPanelSize(1872, 1404, BB_PANEL_FLAG_MIRROR_X) == BBEP_ERROR_NO_MEMORY) {
+        Log_error("Failed to allocate memory for e-Paper display");
+    }
 #endif
     Log_info("dev module end");
 }
@@ -962,7 +965,11 @@ uint8_t *buffer;
     return nullptr;
   }
   *file_size = f.size();
+  #ifdef CONFIG_SPIRAM
+  buffer = (uint8_t *)ps_malloc(*file_size);
+  #else
   buffer = (uint8_t *)malloc(*file_size);
+  #endif
   if (!buffer) {
     Serial.println("Memory allocation filed!");
     *file_size = 0;
