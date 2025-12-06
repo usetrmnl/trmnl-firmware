@@ -3,7 +3,6 @@
 #include "esp_ota_ops.h" 
 #include "qa.h"
 
-/* Test code to check the caching*/
 
 void setup()
 {

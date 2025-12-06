@@ -2,8 +2,6 @@
 #include "api_response_parsing.h"
 #include <trmnl_log.h>
 
-/* Test code to check the caching*/
-
 ApiSetupResponse parseResponse_apiSetup(String &payload)
 {
   JsonDocument doc;
