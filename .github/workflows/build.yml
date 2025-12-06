@@ -27,9 +27,15 @@ jobs:
           path: |
             ~/.cache/pip
             ~/.platformio
+            ~/.buildcache
           key: ${{ runner.os }}-pio-${{ hashFiles('platformio.ini') }}
           restore-keys: |
             ${{ runner.os }}-pio-
+
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: ${{ runner.os }}-ccache-${{ hashFiles('platformio.ini') }}
 
       - uses: actions/setup-python@v6
         with:
@@ -43,6 +49,16 @@ jobs:
       - name: Install PlatformIO Core
         run: pip install --upgrade platformio
 
+      - name: Configure ccache for PlatformIO (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          echo "PLATFORMIO_BUILD_CACHE_DIR=$HOME/.buildcache" >> $GITHUB_ENV
+          
+      - name: Configure ccache for PlatformIO (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          echo "PLATFORMIO_BUILD_CACHE_DIR=$env:USERPROFILE\.buildcache" >> $env:GITHUB_ENV
+
       - name: Display PlatformIO Information
         run: |
           pio system info
@@ -50,10 +66,10 @@ jobs:
           gcc --version
 
       - name: build (trmnl)
-        run: pio run
+        run: pio run -j 4
 
       - name: build (TRMNL_X)
-        run: pio run -e TRMNL_X
+        run: pio run -e TRMNL_X -j 4
 
       - name: test
         if: matrix.os != 'windows-latest'
