@@ -3,6 +3,8 @@
 #include <config.h>
 #include "button.h"
 
+/* Test code to check the caching*/
+
 ButtonPressResult read_button_presses()
 {
   auto time_start = millis();

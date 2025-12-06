@@ -8,6 +8,8 @@
 #include "WifiCaptive.h"
 #include "logo_small.h"
 
+/* Test code to check the caching*/
+
 extern "C" {
   #include "esp_timer.h"   // esp_timer_get_time()
 }
