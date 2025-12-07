@@ -36,6 +36,7 @@ jobs:
         uses: hendrikmuhs/ccache-action@v1
         with:
           key: ${{ runner.os }}-ccache-${{ hashFiles('platformio.ini') }}
+          job-summary: "" # disabled
 
       - uses: actions/setup-python@v6
         with:
