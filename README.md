@@ -271,7 +271,7 @@ Tools required:
 4. Bootloader binary file (`boot_app0.bin`, found in ~/.platformio/packages/framework-arduinoespressif32/tools/partitions/)
 
 ### Step 1 - Configure flash tool
-open the Flash Tool (executable file), select these parameters, then clickOK:
+open the Flash Tool (executable file), select these parameters, then click OK:
 
 ![Image Alt text](/pics/select_screen.jpg "select screen")
 

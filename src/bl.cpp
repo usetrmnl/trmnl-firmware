@@ -20,7 +20,6 @@
 #include <Update.h>
 #include <math.h>
 #include <filesystem.h>
-#include "trmnl_log.h"
 #include <stored_logs.h>
 #include <button.h>
 #include "api-client/submit_log.h"
