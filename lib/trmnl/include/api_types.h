@@ -39,7 +39,9 @@ struct ApiDisplayResponse
   bool maximum_compatibility;
   String firmware_url;
   uint64_t refresh_rate;
+  #ifdef USE_TEMP_PROFILE
   uint32_t temp_profile;
+  #endif // USE_TEMP_PROFILE
   bool reset_firmware;
   SPECIAL_FUNCTION special_function;
   String action;
