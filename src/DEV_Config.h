@@ -102,6 +102,7 @@
    #define EPD_RST_PIN  38
    #define EPD_DC_PIN   10
    #define EPD_BUSY_PIN 4
+//   #define FAKE_BATTERY_VOLTAGE
 #elif defined(BOARD_TRMNL_X)
    #define FAKE_BATTERY_VOLTAGE
 

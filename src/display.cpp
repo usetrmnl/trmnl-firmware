@@ -10,11 +10,18 @@
 #define BB_EPAPER
 #include "bb_epaper.h"
 #define MAX_BIT_DEPTH 2
-//#define ONE_BIT_PANEL EP426_800x480
-//#define TWO_BIT_PANEL EP426_800x480_4GRAY
-#define ONE_BIT_PANEL EP75_800x480
-#define TWO_BIT_PANEL EP75_800x480_4GRAY_OLD
-BBEPAPER bbep(ONE_BIT_PANEL);
+const DISPLAY_PROFILE dpList[4] = { // 1-bit and 2-bit display types for each profile
+#ifdef MINI_EPD
+    {EP426_800x480, EP426_800x480_4GRAY}, // default
+    {EP426_800x480, EP426_800x480_4GRAY}, // A/B = same
+    {EP426_800x480, EP426_800x480_4GRAY},
+#else // 7.5 OG
+    {EP75_800x480, EP75_800x480_4GRAY}, // default (for original EPD)
+    {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, // a = uses built-in fast + 4-gray 
+    {EP75_800x480, EP75_800x480_4GRAY_V2}, // b = darker grays
+#endif
+};
+BBEPAPER bbep;
 // Counts the number of partial updates to know when to do a full update
 #else
 #include "FastEPD.h"
@@ -55,7 +62,8 @@ extern char filename[];
 extern Preferences preferences;
 extern ApiDisplayResult apiDisplayResult;
 static uint8_t *pDither;
-
+uint32_t iTempProfile;
+static int i426Workaround = 0;
 /**
  * @brief Function to init the display
  * @param none
@@ -64,7 +72,10 @@ static uint8_t *pDither;
 void display_init(void)
 {
     Log_info("dev module start");
+    iTempProfile = preferences.getUInt(PREFERENCES_TEMP_PROFILE, TEMP_PROFILE_DEFAULT);
+    Log_info("Saved temperature profile: %d", iTempProfile);
 #ifdef BB_EPAPER
+    bbep.setPanelType(dpList[iTempProfile].OneBit); // must be set BEFORE calling initIO()
     bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
 #else
     bbep.initPanel(BB_PANEL_EPDIY_V7_16); //, 26000000);
@@ -375,6 +386,15 @@ void ReduceBpp(int iDestBpp, int iPixelType, uint8_t *pPalette, uint8_t *pSrc, u
         *d++ = u8;
     }
 } /* ReduceBpp() */
+enum {
+    PNG_1_BIT = 0,
+    PNG_1_BIT_INVERTED,
+    PNG_2_BIT_0,
+    PNG_2_BIT_1,
+    PNG_2_BIT_BOTH,
+    PNG_2_BIT_INVERTED,
+};
+
 /** 
  * @brief Callback function for each line of PNG decoded
  * @param PNGDRAW structure containing the current line and relevant info
@@ -386,6 +406,7 @@ int png_draw(PNGDRAW *pDraw)
     int x;
     uint8_t ucBppChanged = 0, ucInvert = 0;
     uint8_t uc, ucMask, src, *s, *d, *pTemp = bbep.getCache(); // get some scratch memory (not from the stack)
+    int iPlane = *(int *)pDraw->pUser;
 
     if (pDraw->iPixelType == PNG_PIXEL_INDEXED || pDraw->iBpp > 2) {
         if (pDraw->iBpp == 1) { // 1-bit output, just see which color is brighter
@@ -405,8 +426,9 @@ int png_draw(PNGDRAW *pDraw)
     }
     s = (ucBppChanged) ? pTemp : (uint8_t *)pDraw->pPixels;
     d = pTemp;
-    if (!pDraw->pUser) {
+    if (iPlane == PNG_1_BIT || iPlane == PNG_1_BIT_INVERTED) {
         // 1-bit output, decode the single plane and write it
+        if (iPlane == PNG_1_BIT_INVERTED) ucInvert = ~ucInvert; // to do PLANE_FALSE_DIFF
         for (x=0; x<pDraw->iWidth; x+= 8) {
           d[0] = s[0] ^ ucInvert;
           d++; s++;
@@ -415,8 +437,10 @@ int png_draw(PNGDRAW *pDraw)
         src = *s++;
         src ^= ucInvert;
         uc = 0; // suppress warning/error
-        if (*(int *)pDraw->pUser > 1) { // draw 2bpp data as 1-bit to use for partial update
-            ucInvert = ~ucInvert; // the invert rule is backwards for grayscale data
+        if (iPlane == PNG_2_BIT_BOTH || iPlane == PNG_2_BIT_INVERTED) { // draw 2bpp data as 1-bit to use for partial update
+            if (iPlane == PNG_2_BIT_BOTH) {
+                ucInvert = ~ucInvert; // the invert rule is backwards for grayscale data
+            }
             src = ~src;
             for (x=0; x<pDraw->iWidth; x++) {
                 uc <<= 1;
@@ -433,7 +457,7 @@ int png_draw(PNGDRAW *pDraw)
                 }
             } // for x
         } else { // normal 0/1 split plane
-            ucMask = (*(int *)pDraw->pUser == 0) ? 0x40 : 0x80; // lower or upper source bit
+            ucMask = (iPlane == PNG_2_BIT_0) ? 0x40 : 0x80; // lower or upper source bit
             for (x=0; x<pDraw->iWidth; x++) {
                 uc <<= 1;
                 if (src & ucMask) {
@@ -774,10 +798,9 @@ int iPlane = 0;
  * @param size of the PNG file
  * @return refresh mode based on image type and presence of old image
  */
-
 int png_to_epd(const uint8_t *pPNG, int iDataSize)
 {
-int iPlane, rc = -1;
+int iPlane = PNG_1_BIT, rc = -1;
 PNG *png = new PNG();
 
     if (!png) return PNG_MEM_ERROR; // not enough memory for the decoder instance
@@ -800,31 +823,42 @@ PNG *png = new PNG();
 #ifdef BB_EPAPER
             bbep.setAddrWindow(0, 0, bbep.width(), bbep.height());
             if (png->getBpp() == 1 || (png->getBpp() == 2 && png_count_colors(png, pPNG, iDataSize) == 2)) { // 1-bit image (single plane)
-                bbep.setPanelType(ONE_BIT_PANEL);
+                bbep.setPanelType(dpList[iTempProfile].OneBit);
                 rc = REFRESH_PARTIAL; // the new image is 1bpp - try a partial update
                 bbep.startWrite(PLANE_0); // start writing image data to plane 0
                 png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
                 if (png->getBpp() == 1 || png->getBpp() > 2) {
-                    png->decode(NULL, 0);
+                    iPlane = PNG_1_BIT;
+                    png->decode(&iPlane, 0);
                 } else { // convert the 2-bit image to 1-bit output
                     Log_info("%s [%d]: Current png only has 2 unique colors!\n", __FILE__, __LINE__);
-                    iPlane = 2;
+                    iPlane = PNG_2_BIT_BOTH;
                     if (png->decode(&iPlane, 0) != PNG_SUCCESS) {
                         Log_info("%s [%d]: Error decoding image = %d\n", __FILE__, __LINE__, png->getLastError());
                     }
                 }
                 png->close();
+                if (bbep.getPanelType() != EP75_800x480) { // need to write the inverted plane to do PLANE_FALSE_DIFF
+                    bbep.startWrite(PLANE_1); // start writing image data to plane 1
+                    png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
+                    if (iPlane == PNG_1_BIT) {
+                        iPlane = PNG_1_BIT_INVERTED; // inverted 1-bit to second memory plane
+                    } else { // convert the 2-bit image to 1-bit output
+                        iPlane = PNG_2_BIT_INVERTED; // inverted 2-bit -> 1-bit to second plane
+                    }
+                    png->decode(&iPlane, 0);
+                } // temp profile needs the second plane written
             } else { // 2-bpp
-                bbep.setPanelType(TWO_BIT_PANEL);
+                bbep.setPanelType(dpList[iTempProfile].TwoBit);
                 rc = REFRESH_FULL; // 4gray mode must be full refresh
                 iUpdateCount = 0; // grayscale mode resets the partial update counter
                 bbep.startWrite(PLANE_0); // start writing image data to plane 0
-                iPlane = 0;
+                iPlane = PNG_2_BIT_0;
                 Log_info("%s [%d]: decoding 4-gray plane 0\r\n", __FILE__, __LINE__);
                 png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
                 png->decode(&iPlane, 0); // tell PNGDraw to use bits for plane 0
                 png->close(); // start over for plane 1
-                iPlane = 1;
+                iPlane = PNG_2_BIT_1;
                 Log_info("%s [%d]: decoding 4-gray plane 1\r\n", __FILE__, __LINE__);
                 png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
                 bbep.startWrite(PLANE_1); // start writing image data to plane 1
@@ -879,6 +913,14 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
         }
     }
 #endif
+#ifdef BB_EPAPER
+    if (i426Workaround) {
+        // After a partial update, the 4.26" 800x480 needs to be 'reset' to accept writes
+        // This is only needed if the user pressed the WAKE button and there will be 2 updates
+        // while the power is on
+        bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
+    }
+#endif // BB_EPAPER
     if (isPNG == true && data_size < MAX_IMAGE_SIZE)
     {
         Log_info("Drawing PNG");
@@ -916,12 +958,22 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
         }
 #ifdef BB_EPAPER
         bbep.writePlane(PLANE_0); // send image data to the EPD
+#ifdef MINI_EPD
+        bbep.writePlane(PLANE_FALSE_DIFF); // send image data to the EPD
+#else
+        bbep.writePlane(PLANE_0); // send image data to the EPD
+#endif // MINI_EPD
         iRefreshMode = REFRESH_PARTIAL;
 #endif
         iUpdateCount = 1; // use partial update
     }
     Log_info("Display refresh start");
 #ifdef BB_EPAPER
+    if (iTempProfile != apiDisplayResult.response.temp_profile) {
+        iTempProfile = apiDisplayResult.response.temp_profile;
+        Log_info("Saving new temperature profile (%d) to FLASH", iTempProfile);
+        preferences.putUInt(PREFERENCES_TEMP_PROFILE, iTempProfile);
+    }
     if ((iUpdateCount & 7) == 0 || apiDisplayResult.response.maximum_compatibility == true) {
         Log_info("%s [%d]: Forcing full refresh; desired refresh mode was: %d\r\n", __FILE__, __LINE__, iRefreshMode);
         iRefreshMode = REFRESH_FULL; // force full refresh every 8 partials
@@ -935,6 +987,9 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     if (!bWait) iRefreshMode = REFRESH_PARTIAL; // fast update when showing loading screen
     Log_info("%s [%d]: EPD refresh mode: %d\r\n", __FILE__, __LINE__, iRefreshMode);
     bbep.refresh(iRefreshMode, bWait);
+    if (bbep.getPanelType() == EP426_800x480 && iRefreshMode == REFRESH_PARTIAL) {
+        i426Workaround = 1; // need to re-initialize the controller for another update before sleeping
+    }
     if (bAlloc) {
         bbep.freeBuffer();
     }
