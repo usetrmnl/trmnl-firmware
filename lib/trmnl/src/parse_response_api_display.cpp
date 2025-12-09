@@ -9,6 +9,8 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload)
   JsonDocument doc;
   DeserializationError error = deserializeJson(doc, payload);
 
+  Serial.print(payload);
+
   if (error)
   {
     Log_error("JSON deserialization error.");
