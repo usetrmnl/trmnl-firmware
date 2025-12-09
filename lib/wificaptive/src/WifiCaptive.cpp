@@ -61,7 +61,8 @@ bool WifiCaptive::startPortal()
         {
             _ssid = credentials.ssid;
             _password = credentials.pswd;
-            _api_server = api_server; },
+            _api_server = api_server;
+            _enterprise_credentials = credentials; },
         .getAnnotatedNetworks = [this](bool runScan)
         {
             // Warning: DO NOT USE true on this function in an async context!
@@ -91,7 +92,18 @@ bool WifiCaptive::startPortal()
         }
         else
         {
-            WifiCredentials credentials = {_ssid, _password};
+            // use enterprise credentials if available, otherwise use basic credentials
+            WifiCredentials credentials;
+            if (_enterprise_credentials.isEnterprise)
+            {
+                credentials = _enterprise_credentials;
+            }
+            else
+            {
+                credentials.ssid = _ssid;
+                credentials.pswd = _password;
+                credentials.isEnterprise = false;
+            }
             bool res = connect(credentials) == WL_CONNECTED;
             if (res)
             {
@@ -104,6 +116,7 @@ bool WifiCaptive::startPortal()
             {
                 _ssid = "";
                 _password = "";
+                _enterprise_credentials = WifiCredentials{};
 
                 WiFi.disconnect();
                 WiFi.enableSTA(false);
@@ -123,11 +136,22 @@ bool WifiCaptive::startPortal()
         Log_info("Not connected after AP disconnect");
         WiFi.mode(WIFI_STA);
 
-        auto result = initiateConnectionAndWaitForOutcome({_ssid, _password});
+        WifiCredentials credentials;
+        if (_enterprise_credentials.isEnterprise)
+        {
+            credentials = _enterprise_credentials;
+        }
+        else
+        {
+            credentials.ssid = _ssid;
+            credentials.pswd = _password;
+            credentials.isEnterprise = false;
+        }
+        auto result = initiateConnectionAndWaitForOutcome(credentials);
         status = result.status;
     }
 
-    // stop dsn
+    // stop dns
     _dnsServer->stop();
     delete _dnsServer;
     _dnsServer = nullptr;
@@ -142,6 +166,8 @@ bool WifiCaptive::startPortal()
 
 void WifiCaptive::resetSettings()
 {
+    Log_info("Resetting WiFi settings");
+
     Preferences preferences;
     preferences.begin("wificaptive", false);
     preferences.remove("api_url");
@@ -150,13 +176,19 @@ void WifiCaptive::resetSettings()
     {
         preferences.remove(WIFI_SSID_KEY(i));
         preferences.remove(WIFI_PSWD_KEY(i));
+        preferences.remove(WIFI_ENT_KEY(i));
+        preferences.remove(WIFI_USERNAME_KEY(i));
+        preferences.remove(WIFI_IDENTITY_KEY(i));
     }
     preferences.end();
 
     for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
     {
-        _savedWifis[i] = {"", ""};
+        _savedWifis[i] = WifiCredentials{};
     }
+
+    // Clean up any WPA2 Enterprise state
+    disableWpa2Enterprise();
 
     WiFi.disconnect(true, true);
     WiFi.eraseAP();
@@ -197,6 +229,9 @@ void WifiCaptive::readWifiCredentials()
     {
         _savedWifis[i].ssid = preferences.getString(WIFI_SSID_KEY(i), "");
         _savedWifis[i].pswd = preferences.getString(WIFI_PSWD_KEY(i), "");
+        _savedWifis[i].isEnterprise = preferences.getBool(WIFI_ENT_KEY(i), false);
+        _savedWifis[i].username = preferences.getString(WIFI_USERNAME_KEY(i), "");
+        _savedWifis[i].identity = preferences.getString(WIFI_IDENTITY_KEY(i), "");
     }
 
     preferences.end();
@@ -204,14 +239,31 @@ void WifiCaptive::readWifiCredentials()
 
 void WifiCaptive::saveWifiCredentials(const WifiCredentials credentials)
 {
-    Log_info("Saving wifi credentials: %s", credentials.ssid.c_str());
+    Log_info("Saving wifi credentials: %s (Enterprise: %s)", credentials.ssid.c_str(), credentials.isEnterprise ? "yes" : "no");
 
     // Check if the credentials already exist
     for (u16_t i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
     {
-        if (_savedWifis[i].ssid == credentials.ssid && _savedWifis[i].pswd == credentials.pswd)
+        // For regular networks, check SSID and password
+        if (!credentials.isEnterprise && !_savedWifis[i].isEnterprise)
         {
-            return; // Avoid saving duplicate networks
+            if (_savedWifis[i].ssid == credentials.ssid && _savedWifis[i].pswd == credentials.pswd)
+            {
+                Log_info("Duplicate regular network found, not saving");
+                return; // Avoid saving duplicate networks
+            }
+        }
+        // For enterprise networks, check SSID, username, identity, and password
+        else if (credentials.isEnterprise && _savedWifis[i].isEnterprise)
+        {
+            if (_savedWifis[i].ssid == credentials.ssid &&
+                _savedWifis[i].username == credentials.username &&
+                _savedWifis[i].identity == credentials.identity &&
+                _savedWifis[i].pswd == credentials.pswd)
+            {
+                Log_info("Duplicate enterprise network found, not saving");
+                return; // Avoid saving duplicate networks
+            }
         }
     }
 
@@ -228,6 +280,9 @@ void WifiCaptive::saveWifiCredentials(const WifiCredentials credentials)
     {
         preferences.putString(WIFI_SSID_KEY(i), _savedWifis[i].ssid);
         preferences.putString(WIFI_PSWD_KEY(i), _savedWifis[i].pswd);
+        preferences.putBool(WIFI_ENT_KEY(i), _savedWifis[i].isEnterprise);
+        preferences.putString(WIFI_USERNAME_KEY(i), _savedWifis[i].username);
+        preferences.putString(WIFI_IDENTITY_KEY(i), _savedWifis[i].identity);
     }
     preferences.putInt(WIFI_LAST_INDEX, 0);
     preferences.end();
@@ -340,7 +395,10 @@ std::vector<Network> WifiCaptive::getScannedUniqueNetworks(bool runScan)
         {
             String ssid = WiFi.SSID(i);
             int32_t rssi = WiFi.RSSI(i);
-            bool open = WiFi.encryptionType(i);
+            wifi_auth_mode_t encType = WiFi.encryptionType(i);
+            bool open = (encType == WIFI_AUTH_OPEN);
+            bool enterprise = (encType == WIFI_AUTH_WPA2_ENTERPRISE);
+
             bool found = false;
             for (auto &network : uniqueNetworks)
             {
@@ -357,7 +415,7 @@ std::vector<Network> WifiCaptive::getScannedUniqueNetworks(bool runScan)
             }
             if (!found)
             {
-                uniqueNetworks.push_back({ssid, rssi, open, false});
+                uniqueNetworks.push_back({ssid, rssi, open, false, enterprise});
             }
         }
     }
@@ -406,14 +464,14 @@ std::vector<Network> WifiCaptive::combineNetworks(
         {
             if (network.ssid == savedWifis[i].ssid)
             {
-                combinedNetworks.push_back({network.ssid, network.rssi, network.open, true});
+                combinedNetworks.push_back({network.ssid, network.rssi, network.open, true, network.enterprise});
                 found = true;
                 break;
             }
         }
         if (!found)
         {
-            combinedNetworks.push_back({network.ssid, network.rssi, network.open, false});
+            combinedNetworks.push_back({network.ssid, network.rssi, network.open, false, network.enterprise});
         }
     }
     // add saved wifis that are not combinedNetworks
@@ -430,7 +488,8 @@ std::vector<Network> WifiCaptive::combineNetworks(
         }
         if (!found && savedWifis[i].ssid != "")
         {
-            combinedNetworks.push_back({savedWifis[i].ssid, -200, false, true});
+            // Use the saved enterprise flag from credentials
+            combinedNetworks.push_back({savedWifis[i].ssid, -200, false, true, savedWifis[i].isEnterprise});
         }
     }
 
@@ -498,7 +557,7 @@ bool WifiCaptive::tryConnectWithRetries(const WifiCredentials creds, int last_us
 {
     for (int attempt = 0; attempt < WIFI_CONNECTION_ATTEMPTS; attempt++)
     {
-        Log_info("Attempt %d to connect to %s", attempt + 1, creds.ssid.c_str());
+        Log_info("Attempt %d to connect to %s (Enterprise: %s)", attempt + 1, creds.ssid.c_str(), creds.isEnterprise ? "yes" : "no");
         connect(creds);
         if (WiFi.status() == WL_CONNECTED)
         {
@@ -509,7 +568,17 @@ bool WifiCaptive::tryConnectWithRetries(const WifiCredentials creds, int last_us
             }
             return true;
         }
+
+        // Clean up before next attempt
         WiFi.disconnect();
+
+        // If this was an enterprise connection, clean up WPA2 Enterprise state
+        if (creds.isEnterprise)
+        {
+            Log_info("Cleaning up WPA2 Enterprise state after failed attempt");
+            disableWpa2Enterprise();
+        }
+
         if (attempt < WIFI_CONNECTION_ATTEMPTS - 1)
         {
             uint32_t backoff_delay = 2000 * (1 << attempt);
