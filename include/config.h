@@ -24,6 +24,7 @@
 #define PREFERENCES_FRIENDLY_ID "friendly_id"
 #define PREFERENCES_FRIENDLY_ID_DEFAULT ""
 #define PREFERENCES_SLEEP_TIME_KEY "refresh_rate"
+#define PREFERENCES_TEMP_PROFILE "temp_profile"
 #define PREFERENCES_LOG_KEY "log_"
 #define PREFERENCES_LOG_BUFFER_HEAD_KEY "log_head"
 #define PREFERENCES_LOG_ID_KEY "log_id"
@@ -47,6 +48,12 @@
 #define SLEEP_TIME_TO_SLEEP 900                /* Time ESP32 will go to sleep (in seconds) */
 #define SLEEP_TIME_WHILE_NOT_CONNECTED 5       /* Time ESP32 will go to sleep (in seconds) */
 #define SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED 5 /* Time ESP32 will go to sleep (in seconds) */
+
+// Different display profiles
+#define TEMP_PROFILE_DEFAULT 0
+#define TEMP_PROFILE_A 1
+#define TEMP_PROFILE_B 2
+#define TEMP_PROFILE_C 3
 
 #define MS_TO_S_FACTOR 1000                    /* Conversion factor for milliseconds to seconds */
 
@@ -110,7 +117,7 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #define BUTTON_SOFT_RESET_TIME 15000
 
 #define SERVER_MAX_RETRIES 3
-
-#define API_BASE_URL "https://trmnl.app"
+#define API_BASE_URL "https://usetrmnl.com"
+//#define API_BASE_URL "https://trmnl.app"
 
 #endif
