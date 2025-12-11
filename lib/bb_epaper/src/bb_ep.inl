@@ -2207,14 +2207,24 @@ int bbepCreateVirtual(BBEPDISP *pBBEP, int iWidth, int iHeight, int iFlags)
         return BBEP_ERROR_BAD_PARAMETER;
     }
 }
+// Enable or disable light sleep for bb_epaper library at runtime
+void bbepSetLightSleep(bool enabled)
+{
+    g_bbep_light_sleep_enabled = enabled;
+}
+
 // Put the ESP32 into light sleep for N milliseconds
 void bbepLightSleep(uint32_t u32Millis)
 {
 #ifdef DO_NOT_LIGHT_SLEEP
     delay(u32Millis);
 #elif ARDUINO_ARCH_ESP32
-  esp_sleep_enable_timer_wakeup(u32Millis * 1000L);
-  esp_light_sleep_start();
+  if (!g_bbep_light_sleep_enabled) {
+    delay(u32Millis);
+  } else {
+    esp_sleep_enable_timer_wakeup(u32Millis * 1000L);
+    esp_light_sleep_start();
+  }
 #else
   delay(u32Millis);
 #endif

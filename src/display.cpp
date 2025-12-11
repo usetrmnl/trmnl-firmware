@@ -99,6 +99,16 @@ void display_init(void)
 }
 
 /**
+ * @brief Enable or disable light sleep at runtime
+ * @param enabled true to enable light sleep, false to disable
+ * @return none
+ */
+void display_set_light_sleep(bool enabled)
+{
+    g_light_sleep_enabled = enabled;
+}
+
+/**
  * @brief Function to sleep the ESP32 while saving power
  * @param u32Millis represents the sleep time in milliseconds
  * @return none
@@ -108,8 +118,12 @@ void display_sleep(uint32_t u32Millis)
 #ifdef DO_NOT_LIGHT_SLEEP
     delay(u32Millis);
 #else
-    esp_sleep_enable_timer_wakeup(u32Millis * 1000L);
-    esp_light_sleep_start();
+    if (!g_light_sleep_enabled) {
+        delay(u32Millis);
+    } else {
+        esp_sleep_enable_timer_wakeup(u32Millis * 1000L);
+        esp_light_sleep_start();
+    }
 #endif
 }
 

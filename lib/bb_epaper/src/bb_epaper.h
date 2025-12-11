@@ -543,5 +543,6 @@ typedef enum
 void bbepWriteCmd(BBEPDISP *pBBEP, uint8_t cmd);
 void bbepWriteData(BBEPDISP *pBBEP, uint8_t *pData, int iLen);
 void bbepCMD2(BBEPDISP *pBBEP, uint8_t cmd1, uint8_t cmd2);
+void bbepSetLightSleep(bool enabled);
 #endif // __BB_EPAPER__
 
