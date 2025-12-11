@@ -7,6 +7,7 @@
 #include <Preferences.h>
 #include "WifiCaptive.h"
 #include "logo_small.h"
+#include "bb_epaper.h"
 
 extern "C" {
   #include "esp_timer.h"   // esp_timer_get_time()
@@ -137,9 +138,13 @@ bool startQA(){
   uint8_t *buffer = (uint8_t *)malloc(48000);
   memset(buffer, 255, 48000);
   display_init();
-  
+
+  // Disable light sleep before display operation to prevent workflow interruption
+  display_set_light_sleep(true);
+  bbepSetLightSleep(true);
+
   display_show_msg(const_cast<uint8_t *>(logo_small),QA_START);
-  
+
   Log.info("QA Test started\n");
 
   float initial_temp = measureTemperatureAverage();/*
@@ -180,6 +185,10 @@ bool startQA(){
 
   }
 
+  // Re-enable light sleep after QA test completes
+  display_set_light_sleep(true);
+  bbepSetLightSleep(true);
+
   if(!stopRequested){
     savePassedTest();
     while (1){
@@ -196,6 +205,7 @@ bool startQA(){
 
     }
   }
+
   return result;
 }
 

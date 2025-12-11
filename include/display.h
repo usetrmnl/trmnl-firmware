@@ -129,6 +129,13 @@ void display_show_msg_api(uint8_t *image_buffer, String message);
 void display_show_msg_qa(uint8_t *image_buffer, const float *voltage, const float *temperature, bool qa_result);
 
 /**
+ * @brief Enable or disable light sleep at runtime
+ * @param enabled true to enable light sleep, false to disable
+ * @return none
+ */
+void display_set_light_sleep(bool enabled);
+
+/**
  * @brief Function to got the display to the sleep
  * @param none
  * @return none
