@@ -9,7 +9,7 @@
 #ifndef BOARD_TRMNL_X
 #define BB_EPAPER
 #include "bb_epaper.h"
-
+#define MAX_BIT_DEPTH 2
 const DISPLAY_PROFILE dpList[4] = { // 1-bit and 2-bit display types for each profile
     {EP75_800x480, EP75_800x480_4GRAY}, // default (for original EPD)
     {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, // a = uses built-in fast + 4-gray 
