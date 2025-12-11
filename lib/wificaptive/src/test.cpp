@@ -11,7 +11,7 @@ const int intervalMs = 7000; // 7s
 const int sample_interval = 1; //1 ms
 const int temperature_threshold = 55; // 35 by Celsium
 
-float initialTemp = 0;
+float start_temp = 0;
 
 
 void setupTestEndpoint() {
@@ -20,7 +20,7 @@ void setupTestEndpoint() {
   });
 }
 
-float measureTemperatureAverage() {
+float measureTemperatureAverageWeb() {
   float sum = 0;
   for (int i = 0; i < samples; i++) {
     sum += temperatureRead();
@@ -29,16 +29,16 @@ float measureTemperatureAverage() {
   return sum / samples;
 }
 
-String Main_Test() {
-  float initial_temp = measureTemperatureAverage();
+String testTemperature() {
+  float start_temp = measureTemperatureAverageWeb();
   float last_temp;
 
   bool passed = false;
 
-  if (initial_temp <= temperature_threshold) {
+  if (start_temp <= temperature_threshold) {
     delay(intervalMs);
-    last_temp = measureTemperatureAverage();
-    float diff = last_temp - initial_temp;
+    last_temp = measureTemperatureAverageWeb();
+    float diff = last_temp - start_temp;
     passed = diff < 2;
   } else {
     String json = "{";
@@ -47,11 +47,11 @@ String Main_Test() {
     return json;
   }
 
-  float diff = last_temp - initial_temp;
+  float diff = last_temp - start_temp;
 
   String json = "{";
   json += "\"testPassed\":" + String(passed ? "true" : "false") + ",";
-  json += "\"initialTemp\":" + String(initial_temp, 2) + ",";
+  json += "\"initialTemp\":" + String(start_temp, 2) + ",";
   json += "\"finalTemp\":" + String(last_temp, 2) + ",";
   json += "\"tempDifference\":" + String(diff, 2) + ",";
   json += "\"Threshold\":" + String("false");

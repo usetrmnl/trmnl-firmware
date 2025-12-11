@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: actions/cache@v4
         with:
@@ -27,7 +27,7 @@ jobs:
             ~/.platformio/.cache
           key: ${{ runner.os }}-pio
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.x"
 
@@ -59,7 +59,7 @@ jobs:
         run: cp .pio/build/trmnl/firmware.bin ${{ env.APP_FIRMWARE_FILE }}
 
       - name: Upload firmware artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: firmware images
           path: "*.bin"

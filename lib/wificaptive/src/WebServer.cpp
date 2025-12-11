@@ -2,8 +2,6 @@
 #include <WiFi.h>
 #include <test.h>
 
-
-
 void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperationCallbacks callbacks)
 {
     //======================== Webserver ========================
@@ -40,10 +38,10 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
     // Serve index.html
     server.on("/", HTTP_ANY, [&](AsyncWebServerRequest *request)
               {
-		AsyncWebServerResponse *response = request->beginResponse(200, "text/html", INDEX_HTML, INDEX_HTML_LEN);
-		response->addHeader("Content-Encoding", "gzip");
-    	request->send(response);  // redirect to the local IP URL
-        });
+                  AsyncWebServerResponse *response = request->beginResponse(200, "text/html", INDEX_HTML, INDEX_HTML_LEN);
+                  response->addHeader("Content-Encoding", "gzip");
+                  request->send(response); // redirect to the local IP URL
+              });
 
     // Servce logo.svg
     server.on("/logo.svg", HTTP_ANY, [&](AsyncWebServerRequest *request)
@@ -62,14 +60,12 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
               {
                 AsyncWebServerResponse *response = request->beginResponse(200, "text/html", ADVANCED_HTML, ADVANCED_HTML_LEN);
                 response->addHeader("Content-Encoding", "gzip");
-                request->send(response); 
-            });
+                request->send(response); });
     server.on("/run-test", HTTP_GET, [](AsyncWebServerRequest *request)
               {
                 Serial.println("Running sensor test from web...");
-                String json = Main_Test();
-                request->send(200, "application/json", json);
-              });
+                String json = testTemperature();
+                request->send(200, "application/json", json); });
 
     auto scanGET = server.on("/scan", HTTP_GET, [callbacks](AsyncWebServerRequest *request)
                              {
@@ -99,7 +95,8 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
 				json+= "\"name\":\""+ssid+"\",";
 				json+= "\"rssi\":\""+rssi+"\",";
 				json+= "\"open\":"+String(network.open == WIFI_AUTH_OPEN ? "true,": "false,");
-                json+= "\"saved\":"+String(network.saved ? "true": "false");
+                json+= "\"saved\":"+String(network.saved ? "true,": "false,");
+                json+= "\"enterprise\":"+String(network.enterprise ? "true": "false");
 				json+= "}";
 
 				size += 1;
@@ -133,7 +130,19 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
 		String ssid = data["ssid"];
 		String pswd = data["pswd"];
         String api_server = data["server"];
-        callbacks.setConnectionCredentials({ssid, pswd}, api_server);
+
+        bool isEnterprise = data["isEnterprise"].is<bool>() && data["isEnterprise"].as<bool>();
+        String username = data["username"].is<String>() ? data["username"].as<String>() : "";
+        String identity = data["identity"].is<String>() ? data["identity"].as<String>() : "";
+
+        WifiCredentials credentials;
+        credentials.ssid = ssid;
+        credentials.pswd = pswd;
+        credentials.isEnterprise = isEnterprise;
+        credentials.username = username;
+        credentials.identity = identity;
+
+        callbacks.setConnectionCredentials(credentials, api_server);
         String mac = WiFi.macAddress();
         String message = "{\"ssid\":\"" + ssid + "\",\"mac\":\"" + mac + "\"}";
         request->send(200, "application/json", message); });

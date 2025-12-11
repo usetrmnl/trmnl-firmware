@@ -9,6 +9,7 @@ struct ApiSetupInputs
   String baseUrl;
   String macAddress;
   String firmwareVersion;
+  String model;
 };
 
 struct ApiSetupResult

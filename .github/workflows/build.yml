@@ -20,18 +20,27 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: actions/cache@v4
         with:
           path: |
             ~/.cache/pip
-            ~/.platformio/.cache
-          key: ${{ runner.os }}-pio
+            ~/.platformio
+            ~/.buildcache
+          key: ${{ runner.os }}-pio-${{ hashFiles('platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-
 
-      - uses: actions/setup-python@v5
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1
         with:
-          python-version: "3.x"
+          key: ${{ runner.os }}-ccache-${{ hashFiles('platformio.ini') }}
+          job-summary: "" # disabled
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
 
       - uses: maxim-lobanov/setup-xcode@v1
         if: matrix.os == 'macos-15'
@@ -41,14 +50,27 @@ jobs:
       - name: Install PlatformIO Core
         run: pip install --upgrade platformio
 
+      - name: Configure ccache for PlatformIO (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          echo "PLATFORMIO_BUILD_CACHE_DIR=$HOME/.buildcache" >> $GITHUB_ENV
+          
+      - name: Configure ccache for PlatformIO (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          echo "PLATFORMIO_BUILD_CACHE_DIR=$env:USERPROFILE\.buildcache" >> $env:GITHUB_ENV
+
       - name: Display PlatformIO Information
         run: |
           pio system info
           g++ --version
           gcc --version
 
-      - name: build
-        run: pio run
+      - name: build (trmnl)
+        run: pio run -j 4
+
+      - name: build (TRMNL_X)
+        run: pio run -e TRMNL_X -j 4
 
       - name: test
         if: matrix.os != 'windows-latest'

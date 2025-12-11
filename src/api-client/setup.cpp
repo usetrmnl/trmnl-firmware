@@ -17,12 +17,13 @@ void addSetupHeaders(HTTPClient &https, ApiSetupInputs &inputs)
   https.addHeader("ID", inputs.macAddress);
   https.addHeader("Content-Type", "application/json");
   https.addHeader("FW-Version", inputs.firmwareVersion);
+  https.addHeader("Model",inputs.model);
 }
 
 ApiSetupResult fetchApiSetup(ApiSetupInputs &apiSetupInputs)
 {
   return withHttp(
-      apiSetupInputs.baseUrl + "/api/setup/",
+      apiSetupInputs.baseUrl + "/api/setup",
       [&apiSetupInputs](HTTPClient *https, HttpError error) -> ApiSetupResult
       {
         if (error == HttpError::HTTPCLIENT_WIFICLIENT_ERROR)
