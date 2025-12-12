@@ -118,13 +118,14 @@ static void loadCPUAndRadio(uint32_t ms) {
 
 bool startQA(){
   
-  bool wifiSaved = checkForSavedCredentials();
+  /*bool wifiSaved = checkForSavedCredentials();
 
   if(wifiSaved){
 
     Serial.print("WiFi credentials found, skipping QA\n");
     return true;
   }
+    */
 
   while(!stopRequested){
   
@@ -193,9 +194,9 @@ bool startQA(){
     savePassedTest();
     while (1){
       Serial.println("QA Test Passed. Long press the button to continue...");
-      auto button = read_long_press();
+      auto button = read_button_presses();
 
-      if(button == LongPress){
+      if(button == ShortPress){
         Serial.println("Long press detected, painting screen white");
         display_show_msg(NULL, FILL_WHITE);
         delay(10000);
