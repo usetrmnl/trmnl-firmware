@@ -82,7 +82,7 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #define DEVICE_MODEL "waveshare"
 #elif defined(BOARD_SEEED_XIAO_ESP32C3)
 #define DEVICE_MODEL "seeed_esp32c3"
-#define PIN_INTERRUPT 9         //the boot button on the XIAO ESP32-C3, this button can't be used as wakeup source though
+#define PIN_INTERRUPT 9         //the boot button on the XIAO ESP32-C3, this button can't be used as wakeup  source though
                                 //because it's not in the RTC GPIO group. Instead, you can always use the reset button to
                                 //wake up the device. Resetting WiFi configuration needs special routine - press reset button
                                 //then press the boot button in less than 2 seconds, and hold it for 5 seconds.
