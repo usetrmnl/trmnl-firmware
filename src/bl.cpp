@@ -146,6 +146,7 @@ void bl_init(void)
     case DoubleClick:
       double_click = true;
       break;
+    case ShortPress:
     case NoAction:
       break;
     case SoftReset:
