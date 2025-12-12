@@ -68,10 +68,7 @@ void display_init(void)
     Log_info("BB e-Paper init");
     bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
 #else
-    bbep.initPanel(BB_PANEL_TRMNL_X); //, 26000000);
-    if (bbep.setPanelSize(1872, 1404, BB_PANEL_FLAG_MIRROR_X) == BBEP_ERROR_NO_MEMORY) {
-        Log_error("Failed to allocate memory for e-Paper display");
-    }
+    bbep.initPanel(BB_PANEL_TRMNL_X);
 #endif
     Log_info("dev module end");
 }
@@ -944,7 +941,8 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     iUpdateCount++;
 #else
     bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
-    bbep.fullUpdate();
+    iRefreshMode = (bWait) ? CLEAR_SLOW : CLEAR_WHITE;
+    bbep.fullUpdate(iRefreshMode);
 #endif
     Log_info("display_show_image end");
 }
