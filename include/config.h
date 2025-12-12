@@ -3,7 +3,7 @@
 
 #define FW_MAJOR_VERSION 1
 #define FW_MINOR_VERSION 7
-#define FW_PATCH_VERSION 0
+#define FW_PATCH_VERSION 1
 
 // Helper macros for stringification
 #define STRINGIFY(x) #x
@@ -118,7 +118,6 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #define BUTTON_DOUBLE_CLICK_WINDOW 800
 
 #define SERVER_MAX_RETRIES 3
-#define API_BASE_URL "https://usetrmnl.com"
-//#define API_BASE_URL "https://trmnl.app"
+#define API_BASE_URL "https://trmnl.app"
 
 #endif
