@@ -271,7 +271,7 @@ void bl_init(void)
 
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
 
-// uncomment this to hardcode WiFi credentials (useful for testing wifi errors, etc.)
+// uncdcomment this to hardcode WiFi credentials (useful for testing wifi errors, etc.)
 // #define HARDCODED_WIFI
 #ifdef HARDCODED_WIFI
   WifiCredentials hardcodedCreds = {.ssid = "ssid-goes-here", .pswd = "password-goes-here"};

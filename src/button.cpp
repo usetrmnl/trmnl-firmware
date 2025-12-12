@@ -3,10 +3,15 @@
 #include <config.h>
 #include "button.h"
 
-// Helper function to wait for button release and return press duration
-static unsigned long wait_for_button_release(unsigned long start_time) {
-  while (digitalRead(PIN_INTERRUPT) == LOW && millis() - start_time < BUTTON_SOFT_RESET_TIME) {
-    delay(10);
+ButtonPressResult read_button_presses()
+{
+  auto time_start = millis();
+  Log_info("Button time=%d: start", time_start);
+  ButtonPressResult bpr = NoAction;
+  
+  while (digitalRead(PIN_INTERRUPT) == LOW && millis() - time_start < BUTTON_SOFT_RESET_TIME) // while button held
+  {
+    delay(10); // can save power if configured correctly
   }
   return millis() - start_time;
 }
