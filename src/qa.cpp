@@ -162,9 +162,6 @@ bool startQA(){
   loadCPUAndRadio(intervalMs);
   stopRadioRX();
   Log.info("Stress test ended\n");
-  if(stopRequested){
-    break;
-  }
   
   float last_temp = measureTemperatureAverage();
   float last_voltage = measureVoltageAverage();
@@ -187,10 +184,7 @@ bool startQA(){
   }
 
   // Re-enable light sleep after QA test completes
-  display_set_light_sleep(true);
-  bbepSetLightSleep(true);
 
-  if(!stopRequested){
     savePassedTest();
     while (1){
       Serial.println("QA Test Passed. Long press the button to continue...");
@@ -205,7 +199,7 @@ bool startQA(){
       }
 
     }
-  }
+  
 
   return result;
 }
