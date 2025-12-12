@@ -7,6 +7,7 @@
 #include <Preferences.h>
 #include "WifiCaptive.h"
 #include "logo_small.h"
+#include "bb_epaper.h"
 
 extern "C" {
   #include "esp_timer.h"   // esp_timer_get_time()
@@ -124,6 +125,7 @@ bool startQA(){
     Serial.print("WiFi credentials found, skipping QA\n");
     return true;
   }
+    
 
   while(!stopRequested){
   
@@ -137,9 +139,13 @@ bool startQA(){
   uint8_t *buffer = (uint8_t *)malloc(48000);
   memset(buffer, 255, 48000);
   display_init();
-  
+
+  // Disable light sleep before display operation to prevent workflow interruption
+  display_set_light_sleep(true);
+  bbepSetLightSleep(true);
+
   display_show_msg(const_cast<uint8_t *>(logo_small),QA_START);
-  
+
   Log.info("QA Test started\n");
 
   float initial_temp = measureTemperatureAverage();/*
@@ -156,9 +162,6 @@ bool startQA(){
   loadCPUAndRadio(intervalMs);
   stopRadioRX();
   Log.info("Stress test ended\n");
-  if(stopRequested){
-    break;
-  }
   
   float last_temp = measureTemperatureAverage();
   float last_voltage = measureVoltageAverage();
@@ -180,13 +183,14 @@ bool startQA(){
 
   }
 
-  if(!stopRequested){
+  // Re-enable light sleep after QA test completes
+
     savePassedTest();
     while (1){
       Serial.println("QA Test Passed. Long press the button to continue...");
-      auto button = read_long_press();
+      auto button = read_button_presses();
 
-      if(button == LongPress){
+      if(button == ShortPress){
         Serial.println("Long press detected, painting screen white");
         display_show_msg(NULL, FILL_WHITE);
         delay(10000);
@@ -195,7 +199,8 @@ bool startQA(){
       }
 
     }
-  }
+  
+
   return result;
 }
 

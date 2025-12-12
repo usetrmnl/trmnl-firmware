@@ -58,6 +58,9 @@ extern ApiDisplayResult apiDisplayResult;
 uint32_t iTempProfile;
 static uint8_t *pDither;
 
+// Runtime control for light sleep (true = enabled, false = disabled)
+static bool g_light_sleep_enabled = true;
+
 /**
  * @brief Function to init the display
  * @param none
@@ -79,6 +82,16 @@ void display_init(void)
 }
 
 /**
+ * @brief Enable or disable light sleep at runtime
+ * @param enabled true to enable light sleep, false to disable
+ * @return none
+ */
+void display_set_light_sleep(bool enabled)
+{
+    g_light_sleep_enabled = enabled;
+}
+
+/**
  * @brief Function to sleep the ESP32 while saving power
  * @param u32Millis represents the sleep time in milliseconds
  * @return none
@@ -88,8 +101,12 @@ void display_sleep(uint32_t u32Millis)
 #ifdef DO_NOT_LIGHT_SLEEP
     delay(u32Millis);
 #else
-    esp_sleep_enable_timer_wakeup(u32Millis * 1000L);
-    esp_light_sleep_start();
+    if (!g_light_sleep_enabled) {
+        delay(u32Millis);
+    } else {
+        esp_sleep_enable_timer_wakeup(u32Millis * 1000L);
+        esp_light_sleep_start();
+    }
 #endif
 }
 
@@ -1265,7 +1282,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     break;
     case QA_START:
     {
-        const char string1[] = "Starting QA test, press back button to cancel.";
+        const char string1[] = "Starting QA test";
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, 400);
         bbep.print(string1);
