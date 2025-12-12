@@ -118,14 +118,14 @@ static void loadCPUAndRadio(uint32_t ms) {
 
 bool startQA(){
   
-  /*bool wifiSaved = checkForSavedCredentials();
+  bool wifiSaved = checkForSavedCredentials();
 
   if(wifiSaved){
 
     Serial.print("WiFi credentials found, skipping QA\n");
     return true;
   }
-    */
+    
 
   while(!stopRequested){
   
