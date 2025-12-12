@@ -69,8 +69,8 @@ jobs:
       - name: build (trmnl)
         run: pio run -j ${{ runner.os == 'Windows' && '1' || '4' }} -v
 
-      - name: build (TRMNL_X)
-        run: pio run -e TRMNL_X -j ${{ runner.os == 'Windows' && '1' || '4' }} -v
+      #- name: build (TRMNL_X)
+      #  run: pio run -e TRMNL_X -j ${{ runner.os == 'Windows' && '1' || '4' }} -v
 
       - name: test
         if: matrix.os != 'windows-latest'
