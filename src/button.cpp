@@ -11,7 +11,6 @@ static unsigned long wait_for_button_release(unsigned long start_time) {
   return millis() - start_time;
 }
 
-// Helper function to check press duration and return appropriate result
 static ButtonPressResult classify_press_duration(unsigned long duration) {
   if (duration >= BUTTON_SOFT_RESET_TIME) {
     Log_info("Button time=%lu detected extra-long press", duration);
@@ -20,33 +19,28 @@ static ButtonPressResult classify_press_duration(unsigned long duration) {
     Log_info("Button time=%lu detected long press", duration);
     return LongPress;
   }
-  return NoAction; // Not a long press
+  return NoAction; 
 }
 
-// Helper function to wait for second press within double-click window
 static ButtonPressResult wait_for_second_press(unsigned long start_time) {
   auto release_time = millis();
 
   while (millis() - release_time < BUTTON_DOUBLE_CLICK_WINDOW) {
     if (digitalRead(PIN_INTERRUPT) == LOW) {
-      // Second press detected
       auto second_press_start = millis();
       auto second_duration = wait_for_button_release(second_press_start);
 
-      // Check if second press was a long press
       ButtonPressResult long_press_result = classify_press_duration(second_duration);
       if (long_press_result != NoAction) {
         return long_press_result;
       }
 
-      // Normal double-click
       Log_info("Button time=%lu detected double-click", millis() - start_time);
       return DoubleClick;
     }
     delay(10);
   }
 
-  // No second press within window
   return ShortPress;
 }
 
