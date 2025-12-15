@@ -17,6 +17,9 @@ static ButtonPressResult classify_press_duration(unsigned long duration) {
   } else if (duration > BUTTON_HOLD_TIME) {
     Log_info("Button time=%lu detected long press", duration);
     return LongPress;
+  } else if(duration > BUTTON_MEDIUM_HOLD_TIME){
+    Log_info("Button time=%lu detected long press", duration);
+    return DoubleClick;
   }
   return NoAction; 
 }
