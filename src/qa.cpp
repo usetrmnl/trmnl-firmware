@@ -166,23 +166,26 @@ bool startQA(){
 
   if (stopRequested) {
     Log.info("QA test stopped by user\n");
-    break;
+    savePassedTest();
+    return true;
   }
 
   float last_temp = measureTemperatureAverage();
   if (stopRequested) {
     Log.info("QA test stopped by user\n");
-    break;
+    savePassedTest();
+    return true;
   }
 
   float last_voltage = measureVoltageAverage();
   if (stopRequested) {
     Log.info("QA test stopped by user\n");
-    break;
+    savePassedTest();
+    return true;
   }
 
   Log.info("QA test ended\n");
-  
+
   tempDiff = last_temp - initial_temp;
   voltageDiff = last_voltage - initial_voltage;
 
@@ -214,7 +217,7 @@ bool startQA(){
       }
 
     }
-  
+
 
   return result;
 }
