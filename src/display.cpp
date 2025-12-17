@@ -727,11 +727,14 @@ JPEGDEC *jpg = new JPEGDEC();
 int rc = -1; // invalid mode
 int iPlane = 0;
 
-    if (!jpg) return JPEG_ERROR_MEMORY; // not enough memory for the decoder instance
+    if (!jpg) {
+        Log_error("%s [%d]: Not enough memory for the JPEG decoder instance", __FILE__, __LINE__);
+        return JPEG_ERROR_MEMORY; // not enough memory for the decoder instance
+    }
     rc = jpg->openRAM((uint8_t *)pJPEG, iDataSize, jpeg_draw);
     if (rc) {
         if (jpg->getWidth() != bbep.width() || jpg->getHeight() != bbep.height()) {
-            Log_error("JPEG image size doesn't match display size");
+            Log_error("%s [%d]: JPEG image size doesn't match display size", __FILE__, __LINE__);
             rc = -1;
         } else { // okay to decode
 #ifdef BB_EPAPER
@@ -780,13 +783,16 @@ int png_to_epd(const uint8_t *pPNG, int iDataSize)
 int iPlane, rc = -1;
 PNG *png = new PNG();
 
-    if (!png) return PNG_MEM_ERROR; // not enough memory for the decoder instance
+    if (!png) {
+        Log_error("%s [%d]: Not enough memory for the PNG decoder instance", __FILE__, __LINE__);
+        return PNG_MEM_ERROR; // not enough memory for the decoder instance
+    }
     rc = png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
     png->close();
     if (rc == PNG_SUCCESS) {
-        Log_error("Decoding %d x %d PNG", png->getWidth(), png->getHeight());
+        Log_info("Decoding %d x %d PNG", png->getWidth(), png->getHeight());
         if (png->getWidth() == bbep.height() && png->getHeight() == bbep.width()) {
-            Log_error("Rotating canvas to portrait orientation");
+            Log_info("Rotating canvas to portrait orientation");
         } else if (png->getWidth() > bbep.width() || png->getHeight() > bbep.height()) {
             Log_error("PNG image is too large for display size (%dx%d)", png->getWidth(), png->getHeight());
             rc = -1;
@@ -958,7 +964,7 @@ File f = SPIFFS.open(filename, "r");
 uint8_t *buffer;
 
   if (!f) {
-    Serial.println("Failed to open file!");
+    Log_error("%s [%d]: Failed to open file!\r\n", __FILE__, __LINE__);
     *file_size = 0;
     return nullptr;
   }
@@ -969,7 +975,7 @@ uint8_t *buffer;
   buffer = (uint8_t *)malloc(*file_size);
   #endif
   if (!buffer) {
-    Serial.println("Memory allocation filed!");
+    Log_error("%s [%d]: Memory allocation failed!\r\n", __FILE__, __LINE__);
     *file_size = 0;
     return nullptr;
   }
