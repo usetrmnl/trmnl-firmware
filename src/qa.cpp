@@ -49,7 +49,7 @@ void savePassedTest(){
 
 float measureTemperatureAverage() {
   float sum = 0;
-  for (int i = 0; i < samples; i++) {
+  for (int i = 0; i < samples && !stopRequested; i++) {
     sum += temperatureRead();
     delay(sample_interval);
   }
@@ -58,11 +58,11 @@ float measureTemperatureAverage() {
 
 float measureVoltageAverage() {
   long sum = 0;
-  for (int i = 0; i < samples; i++) {
+  for (int i = 0; i < samples && !stopRequested; i++) {
     sum += analogRead(adcPin);
     delay(sample_interval);
   }
-  return (sum / samples) * (3.3 / 4095.0) * 2; 
+  return (sum / samples) * (3.3 / 4095.0) * 2;
 }
 
 
@@ -117,24 +117,25 @@ static void loadCPUAndRadio(uint32_t ms) {
 }
 
 bool startQA(){
-  
-  bool wifiSaved = checkForSavedCredentials();
+
+  /*bool wifiSaved = checkForSavedCredentials();
 
   if(wifiSaved){
 
     Serial.print("WiFi credentials found, skipping QA\n");
     return true;
-  }
-    
+  }*/
 
-  while(!stopRequested){
-  
+  stopRequested = false;
+
   Serial.begin(115200);
-  
+
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
   pins_init();
   Log.info("QA Test started\n");
   attachInterrupt(digitalPinToInterrupt(PIN_INTERRUPT), onBtnPress, FALLING);
+
+  while(!stopRequested){
   
   uint8_t *buffer = (uint8_t *)malloc(48000);
   memset(buffer, 255, 48000);
@@ -162,9 +163,23 @@ bool startQA(){
   loadCPUAndRadio(intervalMs);
   stopRadioRX();
   Log.info("Stress test ended\n");
-  
+
+  if (stopRequested) {
+    Log.info("QA test stopped by user\n");
+    break;
+  }
+
   float last_temp = measureTemperatureAverage();
+  if (stopRequested) {
+    Log.info("QA test stopped by user\n");
+    break;
+  }
+
   float last_voltage = measureVoltageAverage();
+  if (stopRequested) {
+    Log.info("QA test stopped by user\n");
+    break;
+  }
 
   Log.info("QA test ended\n");
   
