@@ -29,6 +29,7 @@
 #include "Arduino.h"
 #include "Wire.h"
 #include "./inc/iqs323_addresses.h"
+#include "rtc_wake_stub_trmnl_x.h"
 
 /* Select the EV-Kit below by changing the value of the define (default = 0):
  * 0: Inductive Options EV-Kit (AZP1212A4).
@@ -201,7 +202,6 @@ public:
         void acknowledgeReset(bool stopOrRestart);
         void ReATI(bool stopOrRestart);
         void SW_Reset(bool stopOrRestart);
-        void device_reset();
         void writeMM(bool stopOrRestart);
         void clearRDY(void);
         bool getRDYStatus(void);
@@ -209,6 +209,7 @@ public:
         void setEventMode(bool stopOrRestart);
 
         void updateInfoFlags(bool stopOrRestart);
+        void setIQSMemoryMap(iqs323_system_status_t iqs_status);
         iqs323_power_modes get_PowerMode(void);
         bool checkReset(void);
 

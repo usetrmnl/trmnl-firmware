@@ -30,9 +30,12 @@
 #include "IQS323.h"
 
 #include "IQS323_config.h"
+#include "rtc_wake_stub_trmnl_x.h"
 
 /* Private Global Variables */
 bool iqs323_deviceRDY = false;
+time_t last_rdy_time = 0;
+time_t prev_rdy_time = 0;
 uint8_t iqs323_ready_pin;
 
 /* Private Functions */
@@ -79,10 +82,11 @@ void IQS323::begin(uint8_t deviceAddressIn, int sdaPinIn, int sclPinIn, uint8_t 
   _deviceAddress = deviceAddressIn;
   iqs323_ready_pin = readyPinIn;
 
+  attachInterrupt(iqs323_ready_pin, iqs323_ready_interrupt, CHANGE);
+
   /* Initialize "running" and "init" state machine variables. */
   if (to_init) {
     printf("IQS323 to be initialized!\n");
-    attachInterrupt(iqs323_ready_pin, iqs323_ready_interrupt, CHANGE);
     iqs323_state.state = IQS323_STATE_START;
     iqs323_state.init_state = IQS323_INIT_VERIFY_PRODUCT;
   }
@@ -287,7 +291,7 @@ bool IQS323::init(void)
   */
 void IQS323::run(void)
 {
-  printf("IQS323 State: %d\n", iqs323_state.state);
+  // printf("IQS323 State: %d\n", iqs323_state.state);
   switch (iqs323_state.state)
   {
     /* After a hardware reset, this is the starting position of the main
@@ -341,9 +345,10 @@ void IQS323::run(void)
 
     /* If a RDY Window is open, read the latest values from the IQS323 */
     case IQS323_STATE_RUN:
-      if(!gpio_get_level((gpio_num_t)iqs323_ready_pin))
+      if (iqs323_deviceRDY)
       {
-        iqs323_deviceRDY = true;
+        Serial.println("RDY time: " + String(last_rdy_time) + " us, " + "time delta: " + String(micros() - last_rdy_time) + " us, " + "time between RDYs: " + String(last_rdy_time - prev_rdy_time) + " us");
+        prev_rdy_time = last_rdy_time;
         queueValueUpdates();
         iqs323_deviceRDY = false;
         new_data_available = false;
@@ -371,6 +376,7 @@ void iqs323_ready_interrupt(void)
   else
   {
     iqs323_deviceRDY = true;
+    last_rdy_time = micros();
   }
 }
 
@@ -408,6 +414,7 @@ bool IQS323::getRDYStatus(void)
   */
 void IQS323::queueValueUpdates(void)
 {
+  printf("Queue value updates...\n");
   uint8_t transferBytes[18];	// The array which will hold the bytes to be transferred.
 
 	/* Read the info flags. */
@@ -601,12 +608,10 @@ void IQS323::ReATI(bool stopOrRestart)
 {
   uint8_t transferByte[2]; // Array to store the bytes transferred.
 
-  force_I2C_communication();
   readRandomBytes(IQS323_MM_SYSTEM_CONTROL, 2, transferByte, RESTART);
   /* Set the the RE_ATI_BIT in the SYSTEM_CONTROL register */
   transferByte[0] = setBit(transferByte[0], IQS323_RE_ATI_BIT);
   /* Write the new byte to the required device. */
-  force_I2C_communication();
   writeRandomBytes(IQS323_MM_SYSTEM_CONTROL, 2, transferByte, stopOrRestart);
 }
 
@@ -679,6 +684,44 @@ void IQS323::updateInfoFlags(bool stopOrRestart)
 	/* Assign the info flags to the local SYSTEM_STATUS register */
   IQSMemoryMap.SYSTEM_STATUS[0] =  transferBytes[0];
   IQSMemoryMap.SYSTEM_STATUS[1] =  transferBytes[1];
+}
+
+void IQS323::setIQSMemoryMap(iqs323_system_status_t iqs_status)
+{
+  IQSMemoryMap.SYSTEM_STATUS[0] =  iqs_status.status[0];
+  IQSMemoryMap.SYSTEM_STATUS[1] =  iqs_status.status[1];
+
+  /* Assign the Gestures */
+  IQSMemoryMap.GESTURES[0]  = iqs_status.gestures[0];
+  IQSMemoryMap.GESTURES[1]  = iqs_status.gestures[1];
+
+  /* Assign the Slider Coordinates */
+  IQSMemoryMap.SLIDER_COORDINATES[0]  = iqs_status.slider_cords[0];
+  IQSMemoryMap.SLIDER_COORDINATES[1] = iqs_status.slider_cords[1];
+
+  /* Assign Channel 0 Counts */
+  IQSMemoryMap.CH0_COUNTS_LTA[0]  = iqs_status.ch0_cnts[0];
+  IQSMemoryMap.CH0_COUNTS_LTA[1]  = iqs_status.ch0_cnts[1];
+
+  /* Assign Channel 0 LTA */
+  IQSMemoryMap.CH0_COUNTS_LTA[2]  = iqs_status.ch0_cnts[2];
+  IQSMemoryMap.CH0_COUNTS_LTA[3]  = iqs_status.ch0_cnts[3];
+
+  /* Assign Channel 1 Counts */
+  IQSMemoryMap.CH1_COUNTS_LTA[0]  = iqs_status.ch1_cnts[0];
+  IQSMemoryMap.CH1_COUNTS_LTA[1]  = iqs_status.ch1_cnts[1];
+
+  /* Assign Channel 1 LTA */
+  IQSMemoryMap.CH1_COUNTS_LTA[2]  = iqs_status.ch1_cnts[2];
+  IQSMemoryMap.CH1_COUNTS_LTA[3]  = iqs_status.ch1_cnts[3];
+
+  /* Assign Channel 2 Counts */
+  IQSMemoryMap.CH2_COUNTS_LTA[0]  = iqs_status.ch2_cnts[0];
+  IQSMemoryMap.CH2_COUNTS_LTA[1]  = iqs_status.ch2_cnts[1];
+
+  /* Assign Channel 2 LTA */
+  IQSMemoryMap.CH2_COUNTS_LTA[2]  = iqs_status.ch2_cnts[2];
+  IQSMemoryMap.CH2_COUNTS_LTA[3]  = iqs_status.ch2_cnts[3];
 }
 
 /**
@@ -988,11 +1031,6 @@ void IQS323::writeMM(bool stopOrRestart)
   transferBytes[18] = S0_COMPENSATION_0;
   transferBytes[19] = S0_COMPENSATION_1;
 
-  while (!iqs323_deviceRDY)
-  {
-    delayMicroseconds(10);
-  }
-
   writeRandomBytes(IQS323_MM_S0_SETUP_0, 20, transferBytes, STOP);
   Serial.println("\t\t1. Write Sensor 0 Settings");
 
@@ -1018,11 +1056,6 @@ void IQS323::writeMM(bool stopOrRestart)
   transferBytes[17] = S1_ATI_FINE;
   transferBytes[18] = S1_COMPENSATION_0;
   transferBytes[19] = S1_COMPENSATION_1;
-
-  while (!iqs323_deviceRDY)
-  {
-    delayMicroseconds(10);
-  }
 
   writeRandomBytes(IQS323_MM_S1_SETUP_0, 20, transferBytes, STOP);
   Serial.println("\t\t2. Write Sensor 1 Settings");
@@ -1050,11 +1083,6 @@ void IQS323::writeMM(bool stopOrRestart)
   transferBytes[18] = S2_COMPENSATION_0;
   transferBytes[19] = S2_COMPENSATION_1;
 
-  while (!iqs323_deviceRDY)
-  {
-    delayMicroseconds(10);
-  }
-
   writeRandomBytes(IQS323_MM_S2_SETUP_0, 20, transferBytes, STOP);
   Serial.println("\t\t3. Write Sensor 2 Settings");
 
@@ -1069,10 +1097,7 @@ void IQS323::writeMM(bool stopOrRestart)
   transferBytes[6] = CH0_FOLLOWER_WEIGHT_0;
   transferBytes[7] = CH0_FOLLOWER_WEIGHT_1;
 
-  while (!iqs323_deviceRDY)
-  {
-    delayMicroseconds(10);
-  }
+  
 
   writeRandomBytes(IQS323_MM_CH0_SETUP_0, 8, transferBytes, STOP);
   Serial.println("\t\t4. Write Channel 0 Settings");
@@ -1088,10 +1113,7 @@ void IQS323::writeMM(bool stopOrRestart)
   transferBytes[6] = CH1_FOLLOWER_WEIGHT_0;
   transferBytes[7] = CH1_FOLLOWER_WEIGHT_1;
 
-  while (!iqs323_deviceRDY)
-  {
-    delayMicroseconds(10);
-  }
+  
 
   writeRandomBytes(IQS323_MM_CH1_SETUP_0, 8, transferBytes, STOP);
   Serial.println("\t\t5. Write Channel 1 Settings");
@@ -1107,10 +1129,7 @@ void IQS323::writeMM(bool stopOrRestart)
   transferBytes[6] = CH2_FOLLOWER_WEIGHT_0;
   transferBytes[7] = CH2_FOLLOWER_WEIGHT_1;
 
-  while (!iqs323_deviceRDY)
-  {
-    delayMicroseconds(10);
-  }
+  
 
   writeRandomBytes(IQS323_MM_CH2_SETUP_0, 8, transferBytes, STOP);
   Serial.println("\t\t6. Write Channel 2 Settings");
@@ -1136,10 +1155,7 @@ void IQS323::writeMM(bool stopOrRestart)
   transferBytes[16] = DELTA_LINK2_0;
   transferBytes[17] = DELTA_LINK2_1;
 
-  while (!iqs323_deviceRDY)
-  {
-    delayMicroseconds(10);
-  }
+  
 
   writeRandomBytes(IQS323_MM_SLIDER_SETUP_CALIBRATION, 18, transferBytes, STOP);
   Serial.println("\t\t7. Write Slider Configuration");
@@ -1161,10 +1177,7 @@ void IQS323::writeMM(bool stopOrRestart)
   transferBytes[12] = MINIMUM_SWIPE_DISTANCE_0;
   transferBytes[13] = MINIMUM_SWIPE_DISTANCE_1;
 
-  while (!iqs323_deviceRDY)
-  {
-    delayMicroseconds(10);
-  }
+  
 
   writeRandomBytes(IQS323_MM_GESTURE_ENABLE, 14, transferBytes, STOP);
   Serial.println("\t\t8. Write Slider Gestures Setup");
@@ -1182,10 +1195,7 @@ void IQS323::writeMM(bool stopOrRestart)
   transferBytes[8] = FAST_FILTER_BAND_0;
   transferBytes[9] = FAST_FILTER_BAND_1;
 
-  while (!iqs323_deviceRDY)
-  {
-    delayMicroseconds(10);
-  }
+  
 
   writeRandomBytes(IQS323_MM_COUNTS_FILTER_BETA, 10, transferBytes, STOP);
   Serial.println("\t\t9. Write Filter Betas");
@@ -1203,10 +1213,7 @@ void IQS323::writeMM(bool stopOrRestart)
   transferBytes[8] = RELEASE_DELTA_PERCENTAGE;
   transferBytes[9] = DELTA_SNAP_SAMPLE_DELAY;
 
-  while (!iqs323_deviceRDY)
-  {
-    delayMicroseconds(10);
-  }
+  
 
   writeRandomBytes(IQS323_MM_OUTA_MASK, 10, transferBytes, STOP);
   Serial.println("\t\t10. Write General Settings");
@@ -1226,10 +1233,7 @@ void IQS323::writeMM(bool stopOrRestart)
   transferBytes[10] = POWER_MODE_TIMEOUT_0;
   transferBytes[11] = POWER_MODE_TIMEOUT_1;
 
-  while (!iqs323_deviceRDY)
-  {
-    delayMicroseconds(10);
-  }
+  
 
   writeRandomBytes(IQS323_MM_SYSTEM_CONTROL, 12, transferBytes, STOP);
   Serial.println("\t\t11. Write Power mode & System Settings");
@@ -1239,10 +1243,7 @@ void IQS323::writeMM(bool stopOrRestart)
   /* Memory Map Position 0xE0 - 0xDF */
   transferBytes[0] = I2C_SETUP;
 
-  while (!iqs323_deviceRDY)
-  {
-    delayMicroseconds(10);
-  }
+  
 
   writeRandomBytes(IQS323_MM_I2C_SETUP, 1, transferBytes, STOP);
   Serial.println("\t\t12. Write I2C Settings");
@@ -1279,6 +1280,7 @@ void IQS323::readRandomBytes(uint8_t memoryAddress, uint8_t numBytes, uint8_t by
   // A simple counter to assist with loading bytes into the user-supplied array.
   uint8_t i = 0;
 
+  force_I2C_communication();
   while (!iqs323_deviceRDY)
   {
     delayMicroseconds(10);
@@ -1343,6 +1345,7 @@ void IQS323::writeRandomBytes(uint8_t memoryAddress, uint8_t numBytes, uint8_t b
   /* Select the device with the address "_deviceAddress" and start
   communication. */
 
+  force_I2C_communication();
   while (!iqs323_deviceRDY)
   {
     delayMicroseconds(10);

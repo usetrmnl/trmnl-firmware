@@ -68,12 +68,39 @@ void display_init(void)
     Log_info("BB e-Paper init");
     bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
 #else
-    bbep.initPanel(BB_PANEL_TRMNL_X); //, 26000000);
-    if (bbep.setPanelSize(1872, 1404, BB_PANEL_FLAG_MIRROR_X) == BBEP_ERROR_NO_MEMORY) {
-        Log_error("Failed to allocate memory for e-Paper display");
-    }
+    bbep.initPanel(BB_PANEL_TRMNL_X);
 #endif
     Log_info("dev module end");
+}
+
+void config_bma530_interrupt()
+{
+    bbep.ioPinMode(3, INPUT);
+    // bbep.ioRead(3);
+    bbep.ioRead(10);
+}
+
+uint8_t pca9535_interrupt_clear()
+{
+    return bbep.ioRead(3);
+}
+
+bool turn_otg()
+{
+    Serial.printf("IO Pin 1 read before: %d\n", bbep.ioRead(1));
+    if (bbep.ioRead(1) == 1)
+    {
+        bbep.ioPinMode(1, OUTPUT);
+        bbep.ioWrite(1, 0);
+        Log_info("OTG turned off");
+        Serial.printf("IO Pin 1 read after: %d\n", bbep.ioRead(1));
+        return false;
+    }
+    bbep.ioPinMode(1, OUTPUT);
+    bbep.ioWrite(1, 1);
+    Log_info("OTG turned on");
+    Serial.printf("IO Pin 1 read after: %d\n", bbep.ioRead(1));
+    return true;
 }
 
 /**
@@ -944,7 +971,8 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     iUpdateCount++;
 #else
     bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
-    bbep.fullUpdate();
+    iRefreshMode = (bWait) ? CLEAR_SLOW : CLEAR_WHITE;
+    bbep.fullUpdate(iRefreshMode);
 #endif
     Log_info("display_show_image end");
 }
@@ -1026,6 +1054,22 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
 
     switch (message_type)
     {
+    case OTG_TURNED_ON:
+    {
+        const char string1[] = "OTG turned on!";
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - rect.w)/2, 430);
+        bbep.println(string1);
+    break;
+    }
+    case OTG_TURNED_OFF:
+    {
+        const char string1[] = "OTG turned off!";
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - rect.w)/2, 430);
+        bbep.println(string1);
+    break;
+    }
     case WIFI_CONNECT:
     {
         const char string1[] = "Connect to TRMNL WiFi";

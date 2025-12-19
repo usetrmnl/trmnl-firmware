@@ -26,10 +26,10 @@
 #define S0_ATI_SETUP_1                           0x03
 #define S0_ATI_BASE_0                            0x96
 #define S0_ATI_BASE_1                            0x00
-#define S0_ATI_COARSE                            0x44
-#define S0_ATI_FINE                              0x5E
-#define S0_COMPENSATION_0                        0xD7
-#define S0_COMPENSATION_1                        0xA3
+#define S0_ATI_COARSE                            0x42
+#define S0_ATI_FINE                              0x54
+#define S0_COMPENSATION_0                        0xD8
+#define S0_COMPENSATION_1                        0x9B
 
 /* Sensor 1 Settings */
 /* Memory Map Position 0x40 - 0x49 */
@@ -49,9 +49,9 @@
 #define S1_ATI_SETUP_1                           0x03
 #define S1_ATI_BASE_0                            0x96
 #define S1_ATI_BASE_1                            0x00
-#define S1_ATI_COARSE                            0x47
-#define S1_ATI_FINE                              0x5C
-#define S1_COMPENSATION_0                        0xDB
+#define S1_ATI_COARSE                            0x82
+#define S1_ATI_FINE                              0x68
+#define S1_COMPENSATION_0                        0xE0
 #define S1_COMPENSATION_1                        0xA3
 
 /* Sensor 2 Settings */
@@ -72,8 +72,8 @@
 #define S2_ATI_SETUP_1                           0x03
 #define S2_ATI_BASE_0                            0x96
 #define S2_ATI_BASE_1                            0x00
-#define S2_ATI_COARSE                            0x44
-#define S2_ATI_FINE                              0x60
+#define S2_ATI_COARSE                            0x82
+#define S2_ATI_FINE                              0x68
 #define S2_COMPENSATION_0                        0xEB
 #define S2_COMPENSATION_1                        0xA3
 
@@ -143,10 +143,10 @@
 #define MAXIMUM_SWIPE_TIME_1                     0x01
 #define MINIMUM_HOLD_TIME_0                      0xF4
 #define MINIMUM_HOLD_TIME_1                      0x01
-#define MAXIMUM_TAP_DISTANCE_0                   0xC8
-#define MAXIMUM_TAP_DISTANCE_1                   0x00
-#define MINIMUM_SWIPE_DISTANCE_0                 0xC8
-#define MINIMUM_SWIPE_DISTANCE_1                 0x00
+#define MAXIMUM_TAP_DISTANCE_0                   0x5E
+#define MAXIMUM_TAP_DISTANCE_1                   0x01
+#define MINIMUM_SWIPE_DISTANCE_0                 0xF4
+#define MINIMUM_SWIPE_DISTANCE_1                 0x01
 
 /* Filter Betas */
 /* Memory Map Position 0xB0 - 0xB4 */

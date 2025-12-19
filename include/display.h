@@ -8,6 +8,8 @@ enum MSG
 {
   NONE,
   FRIENDLY_ID,
+  OTG_TURNED_ON,
+  OTG_TURNED_OFF,
   WIFI_CONNECT,
   WIFI_FAILED,
   WIFI_WEAK,
@@ -36,6 +38,10 @@ enum MSG
  * @return none
  */
 void display_init(void);
+
+uint8_t pca9535_interrupt_clear();
+void config_bma530_interrupt();
+bool turn_otg();
 
 /**
  * @brief Diagnostic function to continuously show the battery voltage
