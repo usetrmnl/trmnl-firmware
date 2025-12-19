@@ -88,6 +88,12 @@ public:
 
 bool checkForSavedCredentials();
 
+/// @brief Searches for a specific WiFi network by SSID
+/// @param ssid The SSID to search for
+/// @param rssi_out Optional pointer to receive signal strength (RSSI in dBm, -100 to 0)
+/// @return True if network is found, false otherwise
+bool findNetwork(const char* ssid, int32_t* rssi_out = nullptr);
+
 extern WifiCaptive WifiCaptivePortal;
 
 #endif

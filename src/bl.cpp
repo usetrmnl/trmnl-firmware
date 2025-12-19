@@ -789,10 +789,8 @@ static https_request_err_e downloadAndShow()
             writeImageToFile("/current.png", buffer, content_size);
             Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
             display_show_image(buffer, content_size, true);
-//            delay(100);
-//            free(buffer);
-//            buffer = nullptr;
-//            png_res = decodePNG("/current.png", decodedPng);
+            free(buffer);
+            buffer = nullptr;
             png_res = PNG_NO_ERR; // DEBUG
           }
           else
@@ -864,6 +862,8 @@ static https_request_err_e downloadAndShow()
             }
             Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
             display_show_image(buffer, content_size, true);
+            free(buffer);
+            buffer = nullptr;
 
             // Using filename from API response
             new_filename = apiDisplayResult.response.filename;

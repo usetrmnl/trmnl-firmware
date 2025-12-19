@@ -8,7 +8,6 @@ void setup()
 {
   
   bool testPassed = checkIfAlreadyPassed();
-  startQA();
   if (!testPassed) {
     startQA();
   }

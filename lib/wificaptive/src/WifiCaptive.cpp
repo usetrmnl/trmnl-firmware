@@ -598,4 +598,39 @@ bool checkForSavedCredentials()
     return type == PT_STR;
 }
 
+bool findNetwork(const char* ssid, int32_t* rssi_out)
+{
+    Log_info("Scanning for network: %s", ssid);
+
+    WiFi.mode(WIFI_STA);
+    int n = WiFi.scanNetworks(false);  
+
+    if (n == 0) {
+        Log_info("No networks found");
+        return false;
+    }
+
+    Log_info("Found %d networks, searching for %s", n, ssid);
+
+    for (int i = 0; i < n; ++i) {
+        String scannedSSID = WiFi.SSID(i);
+
+        if (scannedSSID == ssid) {
+            int32_t rssi = WiFi.RSSI(i);
+            Log_info("Found %s! RSSI: %d dBm", ssid, rssi);
+
+            if (rssi_out) {
+                *rssi_out = rssi;
+            }
+
+            WiFi.scanDelete();
+            return true;
+        }
+    }
+
+    Log_info("Network '%s' not found", ssid);
+    WiFi.scanDelete();
+    return false;
+}
+
 WifiCaptive WifiCaptivePortal;
