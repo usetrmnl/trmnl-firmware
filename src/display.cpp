@@ -835,7 +835,7 @@ PNG *png = new PNG();
     rc = png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
     png->close();
     if (rc == PNG_SUCCESS) {
-        Log_error("Decoding %d x %d PNG", png->getWidth(), png->getHeight());
+        Log_info("Decoding %d x %d PNG", png->getWidth(), png->getHeight());
         if (png->getWidth() == bbep.height() && png->getHeight() == bbep.width()) {
             Log_error("Rotating canvas to portrait orientation");
         } else if (png->getWidth() > bbep.width() || png->getHeight() > bbep.height()) {

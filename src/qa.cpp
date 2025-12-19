@@ -118,13 +118,13 @@ static void loadCPUAndRadio(uint32_t ms) {
 
 bool startQA(){
 
-  /*bool wifiSaved = checkForSavedCredentials();
-
-  if(wifiSaved){
-
-    Serial.print("WiFi credentials found, skipping QA\n");
+  int32_t rssi = 0;
+  if (findNetwork("TRMNL_QA", &rssi)) {
+    Log.info("TRMNL_QA network found with RSSI: %d dBm\n", rssi);
+  } else {
+    savePassedTest();
     return true;
-  }*/
+  }
 
   stopRequested = false;
 
@@ -142,8 +142,8 @@ bool startQA(){
   display_init();
 
   // Disable light sleep before display operation to prevent workflow interruption
-  display_set_light_sleep(true);
-  bbepSetLightSleep(true);
+  display_set_light_sleep(false);
+  bbepSetLightSleep(false);
 
   display_show_msg(const_cast<uint8_t *>(logo_small),QA_START);
 
@@ -166,6 +166,7 @@ bool startQA(){
 
   if (stopRequested) {
     Log.info("QA test stopped by user\n");
+    free(buffer);
     savePassedTest();
     return true;
   }
@@ -173,6 +174,7 @@ bool startQA(){
   float last_temp = measureTemperatureAverage();
   if (stopRequested) {
     Log.info("QA test stopped by user\n");
+    free(buffer);
     savePassedTest();
     return true;
   }
@@ -180,6 +182,7 @@ bool startQA(){
   float last_voltage = measureVoltageAverage();
   if (stopRequested) {
     Log.info("QA test stopped by user\n");
+    free(buffer);
     savePassedTest();
     return true;
   }
@@ -197,13 +200,16 @@ bool startQA(){
   Log.info("Displaying results\n");
   display_init();
   display_show_msg_qa(buffer,voltage,temperature,result);
+  free(buffer);
   break;
 
   }
 
   // Re-enable light sleep after QA test completes
+  display_set_light_sleep(true);
+  bbepSetLightSleep(true);
 
-    savePassedTest();
+  savePassedTest();
     while (1){
       Serial.println("QA Test Passed. Long press the button to continue...");
       auto button = read_button_presses();
@@ -227,6 +233,7 @@ void testLoadScreen(){
   uint8_t *buffer = (uint8_t *)malloc(48000);
   memset(buffer, 255, 48000);
   display_show_msg(const_cast<uint8_t *>(logo_small),QA_START);
+  free(buffer);
 }
 
 void testResultScreen(bool result){
@@ -236,6 +243,7 @@ void testResultScreen(bool result){
   float temperature[3] = {0,0,0};
   float voltage[3] = {0,0,0};
   display_show_msg_qa(buffer,voltage,temperature,result);
+  free(buffer);
 }
 
 
