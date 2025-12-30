@@ -38,7 +38,14 @@ void log_impl(LogLevel level, LogMode mode, const char* file, int line, const ch
     int serial_len = snprintf(nullptr, 0, "%s [%d]: %s", file, line, user_message) + 1;
     char* serial_buffer = (char*)alloca(serial_len);
     snprintf(serial_buffer, serial_len, "%s [%d]: %s", file, line, user_message);
-    
+
+// This mode is not handled correctly by underlying implementation,
+// so shortcut it here    
+    if (mode == LOG_SERIAL_ONLY) {
+        Serial.println(serial_buffer);
+        return;
+    }
+
     switch (level) {
     case LOG_VERBOSE:
         Log.verboseln(serial_buffer);
