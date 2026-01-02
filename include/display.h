@@ -138,7 +138,7 @@ void display_show_msg_qa(uint8_t *image_buffer, const float *voltage, const floa
  * @param enabled true to enable light sleep, false to disable
  * @return none
  */
-void display_set_light_sleep(bool enabled);
+void display_set_light_sleep(uint8_t enabled);
 
 /**
  * @brief Function to got the display to the sleep
