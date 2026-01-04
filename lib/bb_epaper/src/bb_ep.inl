@@ -2105,7 +2105,7 @@ const EPD_PANEL panelDefs[] PROGMEM = {
     {400, 300, 0, epd42r2_init_sequence_full, epd42r2_init_sequence_fast, NULL, BBEP_RED_SWAPPED | BBEP_3COLOR, BBEP_CHIP_UC81xx, u8Colors_3clr}, // EP42R2_400x300
     {240, 416, 0, epd37_init_sequence_full, NULL, epd37_init_sequence_part, 0, BBEP_CHIP_UC81xx, u8Colors_2clr}, // EP37_240x416
     {104, 212, 0, epd213_inky_init_sequence_full, NULL, NULL, 0, BBEP_CHIP_UC81xx, u8Colors_2clr}, // EP213_104x212, older InkyPHAT black and white
-    {800, 480, 0, epd75_init_sequence_full, epd75_init_sequence_fast, epd75_init_sequence_partial, 0, BBEP_CHIP_UC81xx, u8Colors_2clr}, // EP75_800x480
+    {800, 480, 0, epd75_init_sequence_fast, epd75_init_sequence_fast, epd75_init_sequence_partial, 0, BBEP_CHIP_UC81xx, u8Colors_2clr}, // EP75_800x480
     {800, 480, 0, epd75_init_sequence_full, epd75_init_fast_gen2, epd75_init_partial_gen2, 0, BBEP_CHIP_UC81xx, u8Colors_2clr}, // EP75_800x480_GEN2
     {800, 480, 0, epd75_gray_init, NULL, NULL, BBEP_4GRAY, BBEP_CHIP_UC81xx, u8Colors_4gray_v2}, // EP75_800x480_4GRAY_GEN2
     {800, 480, 0, epd75_old_gray_init, NULL, NULL, BBEP_4GRAY, BBEP_CHIP_UC81xx, u8Colors_4gray}, // EP75_800x480_4GRAY
@@ -2247,7 +2247,7 @@ void bbepWaitBusy(BBEPDISP *pBBEP)
     delay(1); // some panels need a short delay before testing the BUSY line
     while (iTimeout < 5000) { // B/W updates should never take more than 3 seconds
         if (digitalRead(pBBEP->iBUSYPin) == busy_idle) break;
-        // delay(1);
+        //delay(1);
         iTimeout += 200;
         bbepLightSleep(200); // save battery power by checking every 200ms
         iTimeout += 200;

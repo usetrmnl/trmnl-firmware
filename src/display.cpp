@@ -15,7 +15,7 @@ const DISPLAY_PROFILE dpList[4] = { // 1-bit and 2-bit display types for each pr
     {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, // a = uses built-in fast + 4-gray 
     {EP75_800x480, EP75_800x480_4GRAY_V2}, // b = darker grays
 };
-BBEPAPER bbep(EP75_800x480);
+BBEPAPER bbep(EP75_800x480_GEN2);
 // Counts the number of partial updates to know when to do a full update
 #else
 #include "FastEPD.h"
@@ -71,7 +71,9 @@ void display_init(void)
     Log_info("dev module start");
     iTempProfile = preferences.getUInt(PREFERENCES_TEMP_PROFILE, TEMP_PROFILE_DEFAULT);
     Log_info("Saved temperature profile: %d", iTempProfile);
-#ifdef BB_EPAPER
+
+
+    #ifdef BB_EPAPER
     bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
     bbep.setPanelType(dpList[iTempProfile].OneBit);
 #else
@@ -932,6 +934,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
 #endif
     if (isPNG == true && data_size < MAX_IMAGE_SIZE)
     {
+        bbep.fillScreen(BBEP_WHITE);
         Log_info("Drawing PNG");
         iRefreshMode = png_to_epd(image_buffer, data_size);
     }
@@ -962,6 +965,8 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
          // This work-around is due to a lack of RAM; the correct method would be to use loadBMP()
             flip_image(image_buffer+62, bbep.width(), bbep.height(), false); // fix bottom-up bitmap images
 #ifdef BB_EPAPER
+            Log_info("set buffer %d,%d", bbep.width(), bbep.height());
+
             bbep.setBuffer(image_buffer+62); // uncompressed 1-bpp bitmap
 #endif
         }
@@ -989,8 +994,12 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
         iRefreshMode = REFRESH_FAST;
     }
     if (!bWait) iRefreshMode = REFRESH_PARTIAL; // fast update when showing loading screen
+    
+    
+    iRefreshMode =REFRESH_FULL;
     Log_info("%s [%d]: EPD refresh mode: %d\r\n", __FILE__, __LINE__, iRefreshMode);
-    bbep.refresh(iRefreshMode, bWait);
+    bbep.refresh(iRefreshMode, true);
+    delay(20000); // wait for the display to finish
     if (bAlloc) {
         bbep.freeBuffer();
     }
