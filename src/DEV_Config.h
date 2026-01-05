@@ -96,12 +96,12 @@
    
 #elif defined(BOARD_XIAO_EPAPER_DISPLAY)
    // Pin definition for TRMNL 7inch5 OG DIY Kit
-   #define EPD_SCK_PIN  7
-   #define EPD_MOSI_PIN 9
-   #define EPD_CS_PIN   44
-   #define EPD_RST_PIN  38
-   #define EPD_DC_PIN   10
-   #define EPD_BUSY_PIN 4
+   #define EPD_SCK_PIN  48
+   #define EPD_MOSI_PIN 38
+   #define EPD_CS_PIN   21
+   #define EPD_RST_PIN  17
+   #define EPD_DC_PIN   18
+   #define EPD_BUSY_PIN 10
 #elif defined(BOARD_TRMNL_X)
    #define FAKE_BATTERY_VOLTAGE
 
