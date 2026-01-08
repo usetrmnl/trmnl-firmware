@@ -6,6 +6,7 @@
 #include <Preferences.h>
 #include <preferences_persistence.h>
 #include "DEV_Config.h"
+#define MAX_BIT_DEPTH 8
 #ifndef BOARD_TRMNL_X
 #define BB_EPAPER
 #include "bb_epaper.h"
@@ -37,7 +38,6 @@ BBEPAPER bbep(ONE_BIT_PANEL);
 #else
 #include "FastEPD.h"
 FASTEPD bbep;
-#define MAX_BIT_DEPTH 8
 const uint8_t u8_graytable[] = {
 /* 0 */  2, 2, 1, 1, 1, 1, 1, 1, 
 /* 1 */  2, 2, 2, 2, 1, 1, 2, 1,
