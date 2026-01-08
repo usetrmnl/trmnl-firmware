@@ -6,10 +6,10 @@
 #include <Preferences.h>
 #include <preferences_persistence.h>
 #include "DEV_Config.h"
+#define MAX_BIT_DEPTH 8
 #ifndef BOARD_TRMNL_X
 #define BB_EPAPER
 #include "bb_epaper.h"
-#define MAX_BIT_DEPTH 2
 const DISPLAY_PROFILE dpList[4] = { // 1-bit and 2-bit display types for each profile
     {EP75_800x480, EP75_800x480_4GRAY}, // default (for original EPD)
     {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, // a = uses built-in fast + 4-gray 
@@ -20,7 +20,6 @@ BBEPAPER bbep(EP75_800x480);
 #else
 #include "FastEPD.h"
 FASTEPD bbep;
-#define MAX_BIT_DEPTH 8
 const uint8_t u8_graytable[] = {
 /* 0 */  2, 2, 1, 1, 1, 1, 1, 1, 
 /* 1 */  2, 2, 2, 2, 1, 1, 2, 1,
