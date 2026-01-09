@@ -116,14 +116,13 @@
 
 #elif defined(BOARD_ARDUINO_NANO_ESP32)
    // Pin definition for Arduino Nano ESP32
-   // Using default SPI pins: SCK=D13(GPIO13), MOSI=D11(GPIO11)
-   // Control pins can be adjusted based on your wiring
-   #define EPD_SCK_PIN  13  // D13 - default SPI SCK
-   #define EPD_MOSI_PIN 11  // D11 - default SPI MOSI
-   #define EPD_CS_PIN   10  // D10 - default SPI CS
-   #define EPD_RST_PIN  7   // D7 - EPD reset pin (adjust as needed)
-   #define EPD_DC_PIN   8   // D8 - EPD data/command pin (adjust as needed)
-   #define EPD_BUSY_PIN 6   // D6 - EPD busy pin (adjust as needed)
+   // Using GPIO numbers to match actual hardware wiring
+   #define EPD_SCK_PIN  48
+   #define EPD_MOSI_PIN 38
+   #define EPD_CS_PIN   21
+   #define EPD_RST_PIN  17
+   #define EPD_DC_PIN   18
+   #define EPD_BUSY_PIN 10
 #else
    #error "Board type not defined. Please define BOARD_WAVESHARE_ESP32_DRIVER or BOARD_TRMNL or BOARD_SEEED_XIAO_ESP32C3 or BOARD_SEEED_XIAO_ESP32S3 or BOARD_ARDUINO_NANO_ESP32 in platformio.ini build_flags."
 #endif
