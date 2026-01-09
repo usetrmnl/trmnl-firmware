@@ -102,6 +102,10 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #define PIN_INTERRUPT 3         //the green button
 #define PIN_VBAT_SWITCH 21      //load switch enable pin for battery voltage measurement
 #define VBAT_SWITCH_LEVEL HIGH  //load switch enable pin active level
+#elif defined(BOARD_ARDUINO_NANO_ESP32)
+#define DEVICE_MODEL "arduino_nano_esp32"
+#define PIN_INTERRUPT 9         //GPIO9 - boot button on Arduino Nano ESP32
+#define FAKE_BATTERY_VOLTAGE    //No battery voltage measurement by default
 #endif
 
 #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001)
