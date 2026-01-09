@@ -15,7 +15,7 @@ const DISPLAY_PROFILE dpList[4] = { // 1-bit and 2-bit display types for each pr
     {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, // a = uses built-in fast + 4-gray 
     {EP75_800x480, EP75_800x480_4GRAY_V2}, // b = darker grays
 };
-BBEPAPER bbep(EP75_800x480_GEN2);
+BBEPAPER bbep(WAVESHARE_3COLOR_800x480);
 // Counts the number of partial updates to know when to do a full update
 #else
 #include "FastEPD.h"
@@ -900,8 +900,8 @@ PNG *png = new PNG();
  * @return none
  */
 void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
-
 {
+
     bool isPNG = data_size >= 4 && MOTOLONG(image_buffer) == (int32_t)0x89504e47;
     auto width = display_width();
     auto height = display_height();
@@ -972,10 +972,15 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
         }
 #ifdef BB_EPAPER
         bbep.writePlane(PLANE_0); // send image data to the EPD
+        Log_info("Image written to EPD buffer PLANE_0");
+        memset(bbep.getBuffer(), 0xFF, 48000);
+        bbep.writePlane(PLANE_1);
+        Log_info("Image written to EPD buffer PLANE_1");
         iRefreshMode = REFRESH_PARTIAL;
 #endif
         iUpdateCount = 1; // use partial update
     }
+    Log_info("Image size = %d vs excepted ", data_size,48000);
     Log_info("Display refresh start");
 #ifdef BB_EPAPER
     if (iTempProfile != apiDisplayResult.response.temp_profile) {
