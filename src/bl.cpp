@@ -68,14 +68,14 @@ StoredLogs storedLogs(LOG_MAX_NOTES_NUMBER / 2, LOG_MAX_NOTES_NUMBER / 2, PREFER
 static https_request_err_e downloadAndShow(); // download and show the image
 static uint32_t downloadStream(WiFiClient *stream, int content_size, uint8_t *buffer);
 static https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse);
-static void getDeviceCredentials();                  // receiveing API key and Friendly ID
-static bool performApiSetup();     // perform API setup call and return success
-static void downloadSetupImage();                    // download and display setup image
-static void resetDeviceCredentials(void);            // reset device credentials API key, Friendly ID, Wi-Fi SSID and password
-static void checkAndPerformFirmwareUpdate(void);     // OTA update
-static void goToSleep(void);                         // sleep preparing
-static bool setClock(void);                          // clock synchronization
-static float readBatteryVoltage(void);               // battery voltage reading
+static void getDeviceCredentials();              // receiveing API key and Friendly ID
+static bool performApiSetup();                   // perform API setup call and return success
+static void downloadSetupImage();                // download and display setup image
+static void resetDeviceCredentials(void);        // reset device credentials API key, Friendly ID, Wi-Fi SSID and password
+static void checkAndPerformFirmwareUpdate(void); // OTA update
+static void goToSleep(void);                     // sleep preparing
+static bool setClock(void);                      // clock synchronization
+static float readBatteryVoltage(void);           // battery voltage reading
 static void submitStoredLogs(void);
 static void writeSpecialFunction(SPECIAL_FUNCTION function);
 static void writeImageToFile(const char *name, uint8_t *in_buffer, size_t size);
@@ -91,16 +91,18 @@ void log_nvs_usage();
 
 static unsigned long startup_time = 0;
 
-void wait_for_serial() {
+void wait_for_serial()
+{
 #ifdef WAIT_FOR_SERIAL
   int idx = 0;
   unsigned long start = millis();
-  while (millis() - start < 2000) {
-      if (Serial)
-        break;
-      delay(100);
-      idx++;
-    }
+  while (millis() - start < 2000)
+  {
+    if (Serial)
+      break;
+    delay(100);
+    idx++;
+  }
   Log_info("## Waited for serial.. %d ms", idx * 100);
 #endif
 }
@@ -122,7 +124,8 @@ void bl_init(void)
 #if defined(BOARD_SEEED_XIAO_ESP32C3)
   delay(2000);
 
-  if (digitalRead(PIN_INTERRUPT) == LOW) {
+  if (digitalRead(PIN_INTERRUPT) == LOW)
+  {
     Log_info("Boot button pressed during startup, resetting WiFi credentials...");
     WifiCaptivePortal.resetSettings();
     Log_info("WiFi credentials reset completed");
@@ -131,7 +134,19 @@ void bl_init(void)
 
   wakeup_reason = esp_sleep_get_wakeup_cause();
 
-  if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO || wakeup_reason == ESP_SLEEP_WAKEUP_EXT0 || wakeup_reason == ESP_SLEEP_WAKEUP_EXT1)
+  bool gpio_wakeup = false;
+  switch (wakeup_reason)
+  {
+  case ESP_SLEEP_WAKEUP_EXT0:
+  case ESP_SLEEP_WAKEUP_EXT1:
+  case ESP_SLEEP_WAKEUP_GPIO:
+    gpio_wakeup = true;
+    break;
+  default:
+    break;
+  }
+
+  if (gpio_wakeup)
   {
     Log_info("GPIO wakeup detected (%d)", wakeup_reason);
     auto button = read_button_presses();
@@ -248,9 +263,7 @@ void bl_init(void)
   {
     Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
 
-  
     display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false);
-
 
     need_to_refresh_display = 1;
     preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
@@ -572,7 +585,7 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
 
   inputs.macAddress = WiFi.macAddress();
 
-  inputs.batteryVoltage = vBatt; //readBatteryVoltage();
+  inputs.batteryVoltage = vBatt; // readBatteryVoltage();
 
   inputs.firmwareVersion = String(FW_VERSION_STRING);
 
@@ -599,7 +612,8 @@ static https_request_err_e downloadAndShow()
   apiHostname.replace("/", "");
 
   int colon = apiHostname.indexOf(':');
-  if (colon != -1) {
+  if (colon != -1)
+  {
     apiHostname = apiHostname.substring(0, colon);
   }
 
@@ -652,7 +666,7 @@ static https_request_err_e downloadAndShow()
           https.addHeader("ID", apiDisplayInputs.macAddress);
           https.addHeader("Access-Token", apiDisplayInputs.apiKey);
         }
-        
+
         if (status && !update_firmware && !reset_firmware)
         {
           status = false;
@@ -685,18 +699,19 @@ static https_request_err_e downloadAndShow()
           // start connection and send HTTP header
           int httpCode = https.GET();
           int content_size = https.getSize();
-          if(httpCode == HTTP_CODE_PERMANENT_REDIRECT ||
-            httpCode == HTTP_CODE_TEMPORARY_REDIRECT){
-              https.end();
-              https.begin(API_BASE_URL +https.getLocation());
-              Log_info("Redirected to: %s", https.getLocation().c_str());
-              https.setTimeout(15000);
-              https.setConnectTimeout(15000);
-              httpCode = https.GET();
-              content_size = https.getSize();
-            }
-//          uint8_t *buffer_old = nullptr; // Disable partial update for now
-//          int file_size_old = 0;
+          if (httpCode == HTTP_CODE_PERMANENT_REDIRECT ||
+              httpCode == HTTP_CODE_TEMPORARY_REDIRECT)
+          {
+            https.end();
+            https.begin(API_BASE_URL + https.getLocation());
+            Log_info("Redirected to: %s", https.getLocation().c_str());
+            https.setTimeout(15000);
+            https.setConnectTimeout(15000);
+            httpCode = https.GET();
+            content_size = https.getSize();
+          }
+          //          uint8_t *buffer_old = nullptr; // Disable partial update for now
+          //          int file_size_old = 0;
 
           // httpCode will be negative on error
           if (httpCode < 0)
@@ -715,7 +730,7 @@ static https_request_err_e downloadAndShow()
             Log_error_submit("[HTTPS] GET... failed, code: %d (%s)", httpCode, https.errorToString(httpCode).c_str());
             return HTTPS_REQUEST_FAILED;
           }
-          
+
           Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, https.getSize());
 
           uint32_t counter = 0;
@@ -769,18 +784,17 @@ static https_request_err_e downloadAndShow()
           WiFi.disconnect(true); // no need for WiFi, save power starting here
           Log.info("%s [%d]: Received successfully; WiFi off; WiFi off\r\n", __FILE__, __LINE__);
 
-
           if (filesystem_file_exists("/current.bmp") || filesystem_file_exists("/current.png"))
           {
             filesystem_file_delete("/last.bmp");
             filesystem_file_delete("/last.png");
             filesystem_file_rename("/current.png", "/last.png");
             filesystem_file_rename("/current.bmp", "/last.bmp");
-// Disable partial update (for now)
-//            if (filesystem_file_exists("/last.png")) {
-//                buffer_old = display_read_file("/last.png", &file_size_old);
-//                Log.info("%s [%d]: Reading last.png to use for partial update, size = %d\r\n", __FILE__, __LINE__, file_size_old);
-//            }
+            // Disable partial update (for now)
+            //            if (filesystem_file_exists("/last.png")) {
+            //                buffer_old = display_read_file("/last.png", &file_size_old);
+            //                Log.info("%s [%d]: Reading last.png to use for partial update, size = %d\r\n", __FILE__, __LINE__, file_size_old);
+            //            }
           }
 
           bool image_reverse = false;
@@ -800,17 +814,17 @@ static https_request_err_e downloadAndShow()
           }
           Serial.println();
           String error = "";
-         // uint8_t *imagePointer = buffer;
-//          uint8_t *imagePointer = (decodedPng == nullptr) ? buffer : decodedPng;
-        //  bool lastImageExists = filesystem_file_exists("/last.bmp") || filesystem_file_exists("/last.png");
+          // uint8_t *imagePointer = buffer;
+          //          uint8_t *imagePointer = (decodedPng == nullptr) ? buffer : decodedPng;
+          //  bool lastImageExists = filesystem_file_exists("/last.bmp") || filesystem_file_exists("/last.png");
 
           switch (png_res)
           {
           case PNG_NO_ERR:
           {
 
-           // Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
-           // display_show_image(imagePointer, image_reverse, isPNG);
+            // Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
+            // display_show_image(imagePointer, image_reverse, isPNG);
 
             // Using filename from API response
             new_filename = apiDisplayResult.response.filename;
@@ -1408,11 +1422,11 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
             Log.info("%s [%d]: send_to_me PNG\r\n", __FILE__, __LINE__);
             image_err_e png_parse_result = PNG_NO_ERR; // DEBUG
             buffer = display_read_file("/current.png", &file_size);
-// Disable partial update for now
-//            if (filesystem_file_exists("/last.png")) {
-//                buffer_old = display_read_file("/last.png", &file_size_old);
-//                Log.info("%s [%d]: loading last PNG for partial update\r\n", __FILE__, __LINE__);
-//            }
+            // Disable partial update for now
+            //            if (filesystem_file_exists("/last.png")) {
+            //                buffer_old = display_read_file("/last.png", &file_size_old);
+            //                Log.info("%s [%d]: loading last PNG for partial update\r\n", __FILE__, __LINE__);
+            //            }
             if (png_parse_result != PNG_NO_ERR)
             {
               Log_error_submit("Error parsing PNG header, code: %d", png_parse_result);
@@ -1854,30 +1868,39 @@ static void checkAndPerformFirmwareUpdate(void)
  */
 static void goToSleep(void)
 {
+#ifdef DISABLE_DEEP_SLEEP
+  Log_info("Deep sleep disabled for debugging");
+  return;
+#endif
   submitStoredLogs();
-  if (WiFi.status() == WL_CONNECTED) {
+  if (WiFi.status() == WL_CONNECTED)
+  {
     WiFi.disconnect();
   }
-  WiFi.mode(WIFI_OFF); 
+  WiFi.mode(WIFI_OFF);
   filesystem_deinit();
   uint32_t time_to_sleep = SLEEP_TIME_TO_SLEEP;
   if (preferences.isKey(PREFERENCES_SLEEP_TIME_KEY))
     time_to_sleep = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
-  Log.info("%s [%d]: total awake time - %d ms\r\n", __FILE__, __LINE__, millis() - startup_time); 
+  Log.info("%s [%d]: total awake time - %d ms\r\n", __FILE__, __LINE__, millis() - startup_time);
   Log.info("%s [%d]: time to sleep - %d\r\n", __FILE__, __LINE__, time_to_sleep);
   preferences.putUInt(PREFERENCES_LAST_SLEEP_TIME, getTime());
   preferences.end();
   esp_sleep_enable_timer_wakeup((uint64_t)time_to_sleep * SLEEP_uS_TO_S_FACTOR);
+#ifndef DISABLE_GPIO_WAKEUP
   // Configure GPIO pin for wakeup
 #if CONFIG_IDF_TARGET_ESP32
-  #define BUTTON_PIN_BITMASK(GPIO) (1ULL << GPIO)  // 2 ^ GPIO_NUMBER in hex
-  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK(PIN_INTERRUPT), ESP_EXT1_WAKEUP_ALL_LOW);
+#define BUTTON_PIN_BITMASK(GPIO) (1ULL << GPIO) // 2 ^ GPIO_NUMBER in hex
+  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK(PIN_INTERRUPT), ESP_EXT1_WAKEUP_ANY_HIGH);
 #elif CONFIG_IDF_TARGET_ESP32C3
   esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
 #elif CONFIG_IDF_TARGET_ESP32S3
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
+#endif
+#else
+  Log_info("GPIO wake source disabled");
 #endif
   esp_deep_sleep_start();
 }
@@ -1894,7 +1917,8 @@ static bool setClock()
   bool sync_status = false;
   struct tm timeinfo;
 
-  configTime(0, 0, "time.google.com", "time.cloudflare.com");
+  configTime(0, 0, "216.239.35.12", "162.159.200.123");
+  //  configTime(0, 0, "time.google.com", "time.cloudflare.com");
   Log.info("%s [%d]: Time synchronization...\r\n", __FILE__, __LINE__);
 
   // Wait for time to be set
@@ -1924,27 +1948,28 @@ static float readBatteryVoltage(void)
   Log.warning("%s [%d]: FAKE_BATTERY_VOLTAGE is defined. Returning 4.2V.\r\n", __FILE__, __LINE__);
   return 4.2f;
 #else
-  #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001)
-    pinMode(PIN_VBAT_SWITCH, OUTPUT);
-    digitalWrite(PIN_VBAT_SWITCH, VBAT_SWITCH_LEVEL);
-    delay(10); // Wait for the switch to stabilize
-  #endif
-    Log.info("%s [%d]: Battery voltage reading...\r\n", __FILE__, __LINE__);
-    int32_t adc;
-    int32_t sensorValue;
+#if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001)
+  pinMode(PIN_VBAT_SWITCH, OUTPUT);
+  digitalWrite(PIN_VBAT_SWITCH, VBAT_SWITCH_LEVEL);
+  delay(10); // Wait for the switch to stabilize
+#endif
+  Log.info("%s [%d]: Battery voltage reading...\r\n", __FILE__, __LINE__);
+  int32_t adc;
+  int32_t sensorValue;
 
-    adc = 0;
-    analogRead(PIN_BATTERY); // This is needed to properly initialize the ADC BEFORE calling analogReadMilliVolts()
-    for (uint8_t i = 0; i < 8; i++) {
-      adc += analogReadMilliVolts(PIN_BATTERY);
-    }
-  #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001)
-    digitalWrite(PIN_VBAT_SWITCH, (VBAT_SWITCH_LEVEL == HIGH ? LOW : HIGH));
-  #endif
-    sensorValue = (adc / 8) * 2;
-    Log.info("%s [%d]: Battery sensorValue = %d\r\n", __FILE__, __LINE__, (int)sensorValue);
-    float voltage = sensorValue / 1000.0;
-    return voltage;
+  adc = 0;
+  analogRead(PIN_BATTERY); // This is needed to properly initialize the ADC BEFORE calling analogReadMilliVolts()
+  for (uint8_t i = 0; i < 8; i++)
+  {
+    adc += analogReadMilliVolts(PIN_BATTERY);
+  }
+#if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001)
+  digitalWrite(PIN_VBAT_SWITCH, (VBAT_SWITCH_LEVEL == HIGH ? LOW : HIGH));
+#endif
+  sensorValue = (adc / 8) * 2;
+  Log.info("%s [%d]: Battery sensorValue = %d\r\n", __FILE__, __LINE__, (int)sensorValue);
+  float voltage = sensorValue / 1000.0;
+  return voltage;
 #endif // FAKE_BATTERY_VOLTAGE
 }
 
@@ -1986,7 +2011,6 @@ bool storeLogString(const char *log_buffer)
   }
   return true;
 }
-
 
 uint32_t getTime(void)
 {
@@ -2117,11 +2141,14 @@ static uint8_t *storedLogoOrDefault(int iType)
 //    return buffer;
 //  }
 #ifdef BOARD_TRMNL_X
-    return const_cast<uint8_t *>(logo_medium);
+  return const_cast<uint8_t *>(logo_medium);
 #else
-  if (iType == 0) {
+  if (iType == 0)
+  {
     return const_cast<uint8_t *>(logo_small);
-  } else {
+  }
+  else
+  {
     // Force the loading screen to always use the slower update method because
     // we don't know (yet) if the panel can handle the faster update modes
     apiDisplayResult.response.maximum_compatibility = true;
@@ -2218,7 +2245,7 @@ DeviceStatusStamp getDeviceStatusStamp()
   deviceStatus.time_since_last_sleep = time_since_sleep;
   snprintf(deviceStatus.current_fw_version, sizeof(deviceStatus.current_fw_version), "%s", FW_VERSION_STRING);
   parseSpecialFunctionToStr(deviceStatus.special_function, sizeof(deviceStatus.special_function), special_function);
-  deviceStatus.battery_voltage = vBatt; //readBatteryVoltage()
+  deviceStatus.battery_voltage = vBatt; // readBatteryVoltage()
   parseWakeupReasonToStr(deviceStatus.wakeup_reason, sizeof(deviceStatus.wakeup_reason), esp_sleep_get_wakeup_cause());
   deviceStatus.free_heap_size = ESP.getFreeHeap();
   deviceStatus.max_alloc_size = ESP.getMaxAllocHeap();
@@ -2246,19 +2273,19 @@ void logWithAction(LogAction action, const char *message, time_t time, int line,
 
   switch (action)
   {
-    case LOG_ACTION_STORE:
+  case LOG_ACTION_STORE:
+    storeLogString(json_string.c_str());
+    break;
+  case LOG_ACTION_SUBMIT:
+    submitLogString(json_string.c_str());
+    break;
+  case LOG_ACTION_SUBMIT_OR_STORE:
+    if (!submitLogString(json_string.c_str()))
+    {
+      Log_info("Was unable to send log to API; saving locally for later.");
       storeLogString(json_string.c_str());
-      break;
-    case LOG_ACTION_SUBMIT:
-      submitLogString(json_string.c_str());
-      break;
-    case LOG_ACTION_SUBMIT_OR_STORE:
-      if (!submitLogString(json_string.c_str()))
-      {
-        Log_info("Was unable to send log to API; saving locally for later.");
-        storeLogString(json_string.c_str());
-      }
-      break;
+    }
+    break;
   }
 
   preferences.putUInt(PREFERENCES_LOG_ID_KEY, ++log_id);
@@ -2281,16 +2308,17 @@ void log_nvs_usage()
   }
 }
 
-void Test_new_screens(void){
-    showMessageWithLogo(API_ERROR);
-    delay(000);
-    showMessageWithLogo(API_REQUEST_FAILED);
-    delay(2000);
-    showMessageWithLogo(API_IMAGE_DOWNLOAD_ERROR);
-    delay(2000);
-    showMessageWithLogo(API_FIRMWARE_UPDATE_ERROR);
-    delay(2000);
-    showMessageWithLogo(API_SETUP_FAILED);
-    delay(2000);
-    showMessageWithLogo(API_UNABLE_TO_CONNECT);
+void Test_new_screens(void)
+{
+  showMessageWithLogo(API_ERROR);
+  delay(000);
+  showMessageWithLogo(API_REQUEST_FAILED);
+  delay(2000);
+  showMessageWithLogo(API_IMAGE_DOWNLOAD_ERROR);
+  delay(2000);
+  showMessageWithLogo(API_FIRMWARE_UPDATE_ERROR);
+  delay(2000);
+  showMessageWithLogo(API_SETUP_FAILED);
+  delay(2000);
+  showMessageWithLogo(API_UNABLE_TO_CONNECT);
 };

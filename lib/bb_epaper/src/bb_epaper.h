@@ -158,7 +158,10 @@ enum {
     EP41_640x400, // EInk ED040TC1 SPI UC81xx
     EP81_SPECTRA_1024x576, // Spectra 8.1" 1024x576 6-colors
     EP7_960x640, // ED070EC1
-    EP_PANEL_COUNT
+    EP_PANEL_COUNT,
+    WAVESHARE_3COLOR_800x480 =46,
+    
+
 };
 #ifdef FUTURE
     EPD42_4GRAY_400x300, // WFT0420CZ15
@@ -426,6 +429,7 @@ class BBEPAPER
 {
   public:
     BBEPAPER(int iPanel);
+    void bbepPrepareImageSSD1675B(BBEPDISP *pBBEP);
     int createVirtual(int iWidth, int iHeight, int iFlags);
     void setAddrWindow(int x, int y, int w, int h);
     int setPanelType(int iPanel);
