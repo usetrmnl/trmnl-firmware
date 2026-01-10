@@ -884,8 +884,7 @@ PNG *png = new PNG();
                     }
                     png->decode(&iPlane, 0);
                 } // temp profile needs the second plane written
-            } else { // 2-bpp
-#ifdef USE_TEMP_PROFILE
+            } else { // 2-bpp (or greater, but reduced to 2-bpp)
                 bbep.setPanelType(dpList[iTempProfile].TwoBit);
 #else
                 bbep.setPanelType(TWO_BIT_PANEL);
