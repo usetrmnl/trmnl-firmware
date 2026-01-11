@@ -980,7 +980,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
 #endif
         iUpdateCount = 1; // use partial update
     }
-    Log_info("Image size = %d vs excepted ", data_size,48000);
+    Log_info("Image size = %d vs expected ", data_size,48000);
     Log_info("Display refresh start");
 #ifdef BB_EPAPER
     if (iTempProfile != apiDisplayResult.response.temp_profile) {
