@@ -2076,6 +2076,109 @@ const uint8_t epd81c_init_full[] PROGMEM = {
     0x00
 };
 
+
+// Minimaler SSD1675B (B/W/R) Init-Template für 800x480
+const uint8_t epd75r_ssd1675b_init_sequence_full[] PROGMEM = {
+    0x01, 0x12,            // SWRESET
+    BUSY_WAIT,
+    // Power Setting (Werte laut PDF/Modul)
+    0x06, 0x01, 0x07, 0x07, 0x3f, 0x3f, 0x03,
+    0x01, 0x04,            // Power on
+    BUSY_WAIT,
+    0x02, 0x11, 0x03,      // Data entry mode (Inkrement, Bitrichtung)
+    // RAM window
+    0x03, 0x44, 0x00, 0x0F,      // X start/end (Bytes für 800px → 0..0x0F)
+    0x05, 0x45, 0x00, 0x00, 0xDF, 0x01, // Y start/end (0..479 → 0x01DF)
+    0x02, 0x4E, 0x00,      // RAM X counter
+    0x03, 0x4F, 0x00, 0x00,// RAM Y counter
+    // Panel/Resolution/VCOM/Data Interval
+    0x05, 0x61, 0x03, 0x20, 0x01, 0xE0, // 800x480
+    0x03, 0x50, 0x11, 0x07, // VCOM & data interval (anpassen)
+    0x02, 0x3C, 0x80,       // Border (optional)
+    0x00
+};
+// // Schnelle Initialisierung (Fast) – vor dem Refresh ausgeführt
+// // Hinweis: Tri-Color-EPDs unterstützen „Fast“ nur sehr eingeschränkt. Diese Sequenz
+// // setzt die wesentlichen Register für einen schnelleren Update, ohne eigene LUTs.
+// const uint8_t epd75r_ssd1675b_init_sequence_fast[] PROGMEM = {
+//     0x01, 0x12,                          // SWRESET
+//     BUSY_WAIT,
+
+//     0x02, 0x11, 0x03,                    // Data Entry Mode
+
+//     // RAM-Fenster
+//     0x03, 0x44, 0x00, 0x63,              // RAM X start/end (0..99)
+//     0x05, 0x45, 0x00, 0x00, 0xDF, 0x01,  // RAM Y start/end (0..479)
+
+//     // RAM Counter
+//     0x02, 0x4E, 0x00,                    // RAM X counter
+//     0x03, 0x4F, 0x00, 0x00,              // RAM Y counter
+
+//     // Auflösung & Anzeigeparameter (ggf. für schnellere Intervalle anpassen)
+//     0x05, 0x61, 0x03, 0x20, 0x01, 0xE0,  // 800x480
+//     0x03, 0x50, 0x11, 0x07,              // VCOM & Data Interval (schnellere Intervalle je nach Spez.)
+//     0x02, 0x3C, 0x80,                    // Border
+
+//     0x00
+// };
+
+const uint8_t epd75r_ssd1675b_init_sequence_fast[] PROGMEM = {
+    0x01, 0x12,                          // SWRESET
+    BUSY_WAIT,
+
+    0x02, 0x11, 0x03,                    // Data Entry Mode
+
+    // RAM-Fenster
+    0x03, 0x44, 0x00, 0x63,              // RAM X start/end (0..99)
+    0x05, 0x45, 0x00, 0x00, 0xDF, 0x01,  // RAM Y start/end (0..479)
+
+    // RAM Counter
+    0x02, 0x4E, 0x00,                    // RAM X counter
+    0x03, 0x4F, 0x00, 0x00,              // RAM Y counter
+
+    // Auflösung & Anzeigeparameter
+    0x05, 0x61, 0x03, 0x20, 0x01, 0xE0,  // 800x480
+    0x03, 0x50, 0x11, 0x07,              // VCOM & Data Interval
+    0x02, 0x3C, 0x80,                    // Border
+
+    // LUT laden (0x32): 48 Datenbytes → length=49
+    49, 0x32,
+    0x40, 0x14, 0x01, 0x00, 0x00, 0x01,
+    0x10, 0xA8, 0x01, 0x00, 0x00, 0x01,
+    0x08, 0x64, 0x01, 0x00, 0x00, 0x01,
+    0x2C, 0x8A, 0x01, 0x00, 0x00, 0x01,
+    0x08, 0x64, 0x01, 0x00, 0x00, 0x01,
+    0x20, 0x08, 0x01, 0x00, 0x00, 0x01,
+    0x2C, 0x8A, 0x01, 0x00, 0x00, 0x01,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+
+    0x00
+};
+
+
+
+
+// Partielle Initialisierung (Partial) – Setup der Fenster/Counter für Teilbereiche
+// Achtung: Viele 3-Farb-EPDs unterstützen echte Teilupdates nicht. Diese Sequenz
+// bereitet dennoch ein Teilfenster vor; die Bibliothek setzt bei 3-Farb-Flag intern Fast.
+const uint8_t epd75r_ssd1675b_init_sequence_part[] PROGMEM = {
+    0x02, 0x11, 0x03,                    // Data Entry Mode
+
+    // Beispiel: komplettes Fenster (du kannst hier Teilbereiche setzen)
+    0x03, 0x44, 0x00, 0x63,              // RAM X start/end
+    0x05, 0x45, 0x00, 0x00, 0xDF, 0x01,  // RAM Y start/end
+
+    // RAM Counter
+    0x02, 0x4E, 0x00,                    // RAM X counter
+    0x03, 0x4F, 0x00, 0x00,              // RAM Y counter
+
+    // Optional: Border/Interval für weniger Flackern
+    0x03, 0x50, 0x11, 0x07,              // VCOM & Data Interval
+    0x02, 0x3C, 0x80,                    // Border
+
+    0x00
+};
+
 #ifdef NO_RAM
 uint8_t u8Cache[128]; // buffer a single line of up to 1024 pixels
 #else // we need a larger cache for 4-bit panels
@@ -2105,7 +2208,7 @@ const EPD_PANEL panelDefs[] PROGMEM = {
     {400, 300, 0, epd42r2_init_sequence_full, epd42r2_init_sequence_fast, NULL, BBEP_RED_SWAPPED | BBEP_3COLOR, BBEP_CHIP_UC81xx, u8Colors_3clr}, // EP42R2_400x300
     {240, 416, 0, epd37_init_sequence_full, NULL, epd37_init_sequence_part, 0, BBEP_CHIP_UC81xx, u8Colors_2clr}, // EP37_240x416
     {104, 212, 0, epd213_inky_init_sequence_full, NULL, NULL, 0, BBEP_CHIP_UC81xx, u8Colors_2clr}, // EP213_104x212, older InkyPHAT black and white
-    {800, 480, 0, epd75_init_sequence_full, epd75_init_sequence_fast, epd75_init_sequence_partial, 0, BBEP_CHIP_UC81xx, u8Colors_2clr}, // EP75_800x480
+    {800, 480, 0, epd75_init_sequence_fast, epd75_init_sequence_fast, epd75_init_sequence_partial, 0, BBEP_CHIP_UC81xx, u8Colors_2clr}, // EP75_800x480
     {800, 480, 0, epd75_init_sequence_full, epd75_init_fast_gen2, epd75_init_partial_gen2, 0, BBEP_CHIP_UC81xx, u8Colors_2clr}, // EP75_800x480_GEN2
     {800, 480, 0, epd75_gray_init, NULL, NULL, BBEP_4GRAY, BBEP_CHIP_UC81xx, u8Colors_4gray_v2}, // EP75_800x480_4GRAY_GEN2
     {800, 480, 0, epd75_old_gray_init, NULL, NULL, BBEP_4GRAY, BBEP_CHIP_UC81xx, u8Colors_4gray}, // EP75_800x480_4GRAY
@@ -2134,6 +2237,14 @@ const EPD_PANEL panelDefs[] PROGMEM = {
     {1024, 576, 0, epd81c_init_full, NULL, NULL, BBEP_SPLIT_BUFFER | BBEP_7COLOR, BBEP_CHIP_UC81xx, u8Colors_spectra}, // 8.1" 1024x576 dual cable Spectra 6 EP81_SPECTRA_1024x576
     {960, 640, 0, ep7_init, NULL, ep7_init_partial, 0, BBEP_CHIP_SSD16xx, u8Colors_2clr}, // EP7_960x640 (ED070EC1)
     {122, 250, 0, epd213r2_init_sequence_full, epd213r2_init_sequence_fast, NULL, BBEP_RED_SWAPPED | BBEP_3COLOR, BBEP_CHIP_UC81xx, u8Colors_3clr}, // EP213R2_122x250 3 color
+    // --- Panel-Liste erweitern (am ENDE der Liste hinzufügen; Reihenfolge beibehalten!) ---
+// SSD16xx-Variante der Waveshare 7.5" B/W/R (V2, SSD1675B)
+// Verwendung:
+//  - Flags: BBEP_3COLOR
+//  - Chip:  BBEP_CHIP_SSD16xx
+//  - Farben: u8Colors_3clr
+//  - Init: Full/Fast/Part gemäß oben
+    {800, 480, 0, epd75r_ssd1675b_init_sequence_full, epd75r_ssd1675b_init_sequence_fast, epd75r_ssd1675b_init_sequence_part,  BBEP_RED_SWAPPED |BBEP_3COLOR, BBEP_CHIP_SSD16xx, u8Colors_3clr}, // EP75R_800x480_SSD1675B
 };
 //
 // Set the e-paper panel type
@@ -2247,7 +2358,7 @@ void bbepWaitBusy(BBEPDISP *pBBEP)
     delay(1); // some panels need a short delay before testing the BUSY line
     while (iTimeout < 5000) { // B/W updates should never take more than 3 seconds
         if (digitalRead(pBBEP->iBUSYPin) == busy_idle) break;
-        // delay(1);
+        //delay(1);
         iTimeout += 200;
         bbepLightSleep(200); // save battery power by checking every 200ms
         iTimeout += 200;
@@ -2637,7 +2748,10 @@ int bbepRefresh(BBEPDISP *pBBEP, int iMode)
         }
     } else {
         const uint8_t u8CMD[4] = {0xf7, 0xc7, 0xff, 0xc0}; // normal, fast, partial, partial2
-        if (pBBEP->iFlags & (BBEP_4GRAY | BBEP_3COLOR | BBEP_4COLOR)) {
+        // WICHTIG: Für Tri-Color SSD16xx auf FULL erzwingen (vermeidet Banding/Scanlines)
+        if (pBBEP->chip_type == BBEP_CHIP_SSD16xx && (pBBEP->iFlags & BBEP_3COLOR)) {
+            iMode = REFRESH_FULL; // statt REFRESH_FAST
+        } else if (pBBEP->iFlags & (BBEP_4GRAY | BBEP_3COLOR | BBEP_4COLOR)) {
             iMode = REFRESH_FAST;
         } // 3/4-color = 0xc7
         if (iMode == REFRESH_PARTIAL && pBBEP->iFlags & BBEP_PARTIAL2) {
@@ -2648,6 +2762,24 @@ int bbepRefresh(BBEPDISP *pBBEP, int iMode)
     }
     return BBEP_SUCCESS;
 } /* bbepRefresh() */
+
+
+// Beispiel-Nutzung vor dem Bildrendern:
+void bbepPrepareImageSSD1675B(BBEPDISP *pBBEP)
+{
+    if (!pBBEP) return;
+
+    // RAM-Fenster komplett setzen (800x480 SSD1675B)
+    bbepSetAddrWindow(pBBEP, 0, 0, pBBEP->native_width, pBBEP->native_height);
+
+    // Rot-Ebene (PLANE_1) auf "weiß" (Rot aus) leeren
+    bbepFill(pBBEP, BBEP_WHITE, PLANE_1);
+
+    // B/W-Ebene wird dann von deinem Bildpfad geschrieben:
+    // bbepWritePlane(pBBEP, PLANE_0, /*bInvert=*/0);
+    // Danach Refresh ausführen (durch Änderung oben jetzt FULL):
+    // bbepRefresh(pBBEP, REFRESH_FULL);
+}
 
 void bbepSetRotation(BBEPDISP *pBBEP, int iRotation)
 {
