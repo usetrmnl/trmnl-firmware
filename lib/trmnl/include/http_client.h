@@ -52,6 +52,7 @@ ReturnType withHttp(const String &url, Callback callback)
     HTTPClient https;
     if (https.begin(*client, url))
     {
+      https.setReuse(false);  // Disable keep-alive to ensure connection closes properly
       result = callback(&https, HTTPCLIENT_SUCCESS);
       https.end();
     }
@@ -60,6 +61,7 @@ ReturnType withHttp(const String &url, Callback callback)
       result = callback(nullptr, HTTPCLIENT_HTTPCLIENT_ERROR);
     }
   }
+  client->stop();  // Explicitly close TCP socket before deleting
   delete client;
 
   return result;
