@@ -1296,13 +1296,13 @@ void IQS323::readRandomBytes(uint8_t memoryAddress, uint8_t numBytes, uint8_t by
   register to send information from. */
 
   /* Request "numBytes" bytes from the device which has address "_deviceAddress"*/
-  do
-  {
-    Wire.requestFrom((int)_deviceAddress, (int)numBytes, (int)stopOrRestart);
-  }while(Wire.available() == 0);  // Wait for response, this sometimes takes a few attempts
+//  do
+//  {
+    Wire.requestFrom((int)_deviceAddress, (int)numBytes); //, (int)stopOrRestart);
+//  }while(Wire.available() == 0);  // Wait for response, this sometimes takes a few attempts
 
   /* Load the received bytes into the array until there are no more */
-  while(Wire.available())
+  while(Wire.available() && i < numBytes)
   {
     /* Load the received bytes into the user-supplied array */
     bytesArray[i] = Wire.read();
