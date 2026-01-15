@@ -1017,7 +1017,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
               if (res)
                 Log.info("%s [%d]: Flag written true successfully\r\n", __FILE__, __LINE__);
               else
-                Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
+                Log.error("%s [%d]: Flag writing failed\r\n", __FILE__, __LINE__);
             }
           }
           else
@@ -1039,7 +1039,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
               if (res)
                 Log.info("%s [%d]: Flag written false successfully\r\n", __FILE__, __LINE__);
               else
-                Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
+                Log.error("%s [%d]: Flag writing failed\r\n", __FILE__, __LINE__);
             }
           }
           // Using filename from API response
@@ -1152,7 +1152,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
                   if (res)
                     Log.info("%s [%d]: Flag written true successfully\r\n", __FILE__, __LINE__);
                   else
-                    Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
+                    Log.error("%s [%d]: Flag writing failed\r\n", __FILE__, __LINE__);
                 }
               }
               else
@@ -1171,7 +1171,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
                   if (res)
                     Log.info("%s [%d]: Flag written false successfully\r\n", __FILE__, __LINE__);
                   else
-                    Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
+                    Log.error("%s [%d]: Flag writing failed\r\n", __FILE__, __LINE__);
                 }
               }
               status = true;
@@ -1254,7 +1254,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
                   if (res)
                     Log.info("%s [%d]: Flag written true successfully\r\n", __FILE__, __LINE__);
                   else
-                    Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
+                    Log.error("%s [%d]: Flag writing failed\r\n", __FILE__, __LINE__);
                 }
               }
               else
@@ -1274,7 +1274,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
                   if (res)
                     Log.info("%s [%d]: Flag written false successfully\r\n", __FILE__, __LINE__);
                   else
-                    Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
+                    Log.error("%s [%d]: Flag writing failed\r\n", __FILE__, __LINE__);
                 }
               }
               status = true;
@@ -1467,7 +1467,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
                   if (res)
                     Log.info("%s [%d]: Flag written true successfully\r\n", __FILE__, __LINE__);
                   else
-                    Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
+                    Log.error("%s [%d]: Flag writing failed\r\n", __FILE__, __LINE__);
                 }
               }
               else
@@ -1487,7 +1487,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
                   if (res)
                     Log.info("%s [%d]: Flag written false successfully\r\n", __FILE__, __LINE__);
                   else
-                    Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
+                    Log.error("%s [%d]: Flag writing failed\r\n", __FILE__, __LINE__);
                 }
               }
               status = true;
