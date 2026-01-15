@@ -864,7 +864,7 @@ PNG *png = new PNG();
                     }
                     png->decode(&iPlane, 0);
                 } // temp profile needs the second plane written
-            } else { // 2-bpp
+            } else { // 2-bpp (or greater, but reduced to 2-bpp)
                 bbep.setPanelType(dpList[iTempProfile].TwoBit);
                 rc = REFRESH_FULL; // 4gray mode must be full refresh
                 iUpdateCount = 0; // grayscale mode resets the partial update counter
