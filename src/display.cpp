@@ -48,9 +48,9 @@ RTC_DATA_ATTR int iUpdateCount = 0;
 #include <api-client/display.h>
 #include <trmnl_log.h>
 #include "png_flip.h"
-#include "../lib/bb_epaper/Fonts/nicoclean_8.h"
-#include "../lib/bb_epaper/Fonts/Inter_18.h"
-#include "../lib/bb_epaper/Fonts/Roboto_Black_24.h"
+#include "nicoclean_8.h"
+#include "Inter_18.h"
+#include "Roboto_Black_24.h"
 extern char filename[];
 extern Preferences preferences;
 extern ApiDisplayResult apiDisplayResult;
@@ -85,9 +85,9 @@ void display_init(void)
  * @param enabled true to enable light sleep, false to disable
  * @return none
  */
-void display_set_light_sleep(bool enabled)
+void display_set_light_sleep(uint8_t enabled)
 {
-    g_light_sleep_enabled = enabled;
+    bbep.setLightSleep(enabled);
 }
 
 /**
