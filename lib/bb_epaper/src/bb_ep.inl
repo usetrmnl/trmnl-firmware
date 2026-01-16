@@ -2764,20 +2764,20 @@ int bbepRefresh(BBEPDISP *pBBEP, int iMode)
 } /* bbepRefresh() */
 
 
-// Beispiel-Nutzung vor dem Bildrendern:
+// Example usage before rendering the image:
 void bbepPrepareImageSSD1675B(BBEPDISP *pBBEP)
 {
     if (!pBBEP) return;
 
-    // RAM-Fenster komplett setzen (800x480 SSD1675B)
+    // Set the full RAM window (800x480 SSD1675B)
     bbepSetAddrWindow(pBBEP, 0, 0, pBBEP->native_width, pBBEP->native_height);
 
-    // Rot-Ebene (PLANE_1) auf "weiß" (Rot aus) leeren
+    // Clear the red plane (PLANE_1) to "white" (red off)
     bbepFill(pBBEP, BBEP_WHITE, PLANE_1);
 
-    // B/W-Ebene wird dann von deinem Bildpfad geschrieben:
+    // The B/W plane will then be written by your image path:
     // bbepWritePlane(pBBEP, PLANE_0, /*bInvert=*/0);
-    // Danach Refresh ausführen (durch Änderung oben jetzt FULL):
+    // After that, perform a refresh (now FULL due to the change above):
     // bbepRefresh(pBBEP, REFRESH_FULL);
 }
 
