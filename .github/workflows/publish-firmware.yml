@@ -59,7 +59,7 @@ jobs:
         run: cp .pio/build/trmnl/firmware.bin ${{ env.APP_FIRMWARE_FILE }}
 
       - name: Upload firmware artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: firmware images
           path: "*.bin"
