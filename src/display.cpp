@@ -30,7 +30,7 @@ BBEPAPER bbep;
 #define TWO_BIT_PANEL EP426_800x480_4GRAY
 #else
 #define ONE_BIT_PANEL EP75_800x480
-#define TWO_BIT_PANEL EP75_800x480_4GRAY_OLD
+#define TWO_BIT_PANEL EP75_800x480_4GRAY
 #endif // MINI_EPD
 BBEPAPER bbep(ONE_BIT_PANEL);
 #endif // USE_TEMP_PROFILE
@@ -90,7 +90,11 @@ void display_init(void)
     bbep.setPanelType(dpList[iTempProfile].OneBit); // must be set BEFORE calling initIO()
 #endif // USE_TEMP_PROFILE
     bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
+#ifdef USE_TEMP_PROFILE
     bbep.setPanelType(dpList[iTempProfile].OneBit);
+#else
+    bbep.setPanelType(ONE_BIT_PANEL);
+#endif // USE_TEMP_PROFILE
 #else
     bbep.initPanel(BB_PANEL_EPDIY_V7_16); //, 26000000);
     bbep.setPanelSize(1872, 1404, BB_PANEL_FLAG_MIRROR_X);
@@ -885,6 +889,7 @@ PNG *png = new PNG();
                     png->decode(&iPlane, 0);
                 } // temp profile needs the second plane written
             } else { // 2-bpp (or greater, but reduced to 2-bpp)
+#ifdef USE_TEMP_PROFILE
                 bbep.setPanelType(dpList[iTempProfile].TwoBit);
 #else
                 bbep.setPanelType(TWO_BIT_PANEL);
