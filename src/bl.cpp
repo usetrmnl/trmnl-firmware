@@ -2119,22 +2119,23 @@ static uint8_t *storedLogoOrDefault(int iType)
 //
    uint32_t u32Size;
    //esp_flash_t chip;
-   uint8_t *s, *pBuffer;
+   uint8_t *s;
    uint16_t u16Size;
+   BRAND *pBrand;
 
    u32Size = ESP.getFlashChipSize();
    Log_info("%s [%d]: esp flash size: %d\r\n", __FILE__, __LINE__, u32Size);
    if (u32Size != 0) {
-   pBuffer = (uint8_t *)malloc(4096); // DEBUG - we can leak this memory for now
+   pBrand = (BRAND *)malloc(sizeof(BRAND)); // DEBUG - we can leak this memory for now
    esp_flash_init(NULL);
-   esp_flash_read(NULL, pBuffer, u32Size-4096, 4096);
-   if (*(uint16_t *)pBuffer == 0xBBBF /*BB_BITMAP_MARKER*/) {
+   esp_flash_read(NULL, (void *)pBrand, u32Size-sizeof(BRAND), sizeof(BRAND));
+   if (*(uint16_t *)&pBrand->u8Images[0] == 0xBBBF /*BB_BITMAP_MARKER*/) {
       // Group5 compressed images are present, use them
       if (iType == 0) {
-        return pBuffer; // the first image is the medium sized logo
+        return &pBrand->u8Images[0]; // the first image is the medium sized logo
       } else { // the second image is the loading screen with small logo
         // get the pointer to the loading image
-        s = pBuffer;
+        s = &pBrand->u8Images[0];
         u16Size = *(uint16_t *)&s[6]; // compressed image size
         s += u16Size + 8; // skip to loading image
         return s;
