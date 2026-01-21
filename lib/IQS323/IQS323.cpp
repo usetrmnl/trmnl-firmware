@@ -29,7 +29,7 @@
 /* Include Files */
 #include "IQS323.h"
 
-#include "IQS323_config.h"
+#include "IQS323_config_LP.h"
 #include "rtc_wake_stub_trmnl_x.h"
 
 /* Private Global Variables */
@@ -629,14 +629,12 @@ void IQS323::SW_Reset(bool stopOrRestart)
 {
   uint8_t transferByte[2]; // Array to store the bytes transferred.
 
-  force_I2C_communication();
   printf("Reading random bytes...\n");
   readRandomBytes(IQS323_MM_SYSTEM_CONTROL, 2, transferByte, STOP);
   /* Set the the SW_RESET_BIT in the SYSTEM_CONTROL register */
   transferByte[0] = setBit(transferByte[0], IQS323_SW_RESET_BIT);
   /* Write the new byte to the required device. */
 
-  force_I2C_communication();
   printf("Writing random bytes...\n");
   writeRandomBytes(IQS323_MM_SYSTEM_CONTROL, 2, transferByte, stopOrRestart);
 }

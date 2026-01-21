@@ -41,7 +41,14 @@ void display_init(void);
 
 uint8_t pca9535_interrupt_clear();
 void config_bma530_interrupt();
-bool turn_otg();
+void config_pca95535_pins_for_lp();
+void otg_turn_on();
+void otg_turn_off();
+
+extern "C" {
+  void modem_enter_bootloader();
+  void modem_reset_target();
+}
 
 /**
  * @brief Diagnostic function to continuously show the battery voltage

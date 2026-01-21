@@ -11,104 +11,104 @@
 /* Sensor 0 Settings */
 /* Memory Map Position 0x30 - 0x39 */
 #define S0_SETUP                                 0x01
-#define S0_TX_SELECT                             0x02
+#define S0_TX_SELECT                             0x04
 #define S0_CONV_FREQ_FRAC                        0x7F
-#define S0_CONV_FREQ_PERIOD                      0x01
+#define S0_CONV_FREQ_PERIOD                      0x0C
 #define S0_PRX_CTRL_0                            0x90
-#define S0_PRX_CTRL_1                            0x12
+#define S0_PRX_CTRL_1                            0x13
 #define S0_TG_CTRL                               0xCF
-#define S0_RX_SELECT                             0x02
+#define S0_RX_SELECT                             0x04
 #define S0_CALCAP_INACTIVE_RX                    0x0A
 #define S0_PATTERN_SETUP                         0x03
 #define S0_PATTERN_SELECT                        0x00
 #define S0_BIAS_CURRENT                          0x00
 #define S0_ATI_SETUP_0                           0xC4
-#define S0_ATI_SETUP_1                           0x03
-#define S0_ATI_BASE_0                            0x96
+#define S0_ATI_SETUP_1                           0x12
+#define S0_ATI_BASE_0                            0x64
 #define S0_ATI_BASE_1                            0x00
-#define S0_ATI_COARSE                            0x42
-#define S0_ATI_FINE                              0x54
-#define S0_COMPENSATION_0                        0xD8
-#define S0_COMPENSATION_1                        0x9B
+#define S0_ATI_COARSE                            0x44
+#define S0_ATI_FINE                              0x5C
+#define S0_COMPENSATION_0                        0xC0
+#define S0_COMPENSATION_1                        0x53
 
 /* Sensor 1 Settings */
 /* Memory Map Position 0x40 - 0x49 */
 #define S1_SETUP                                 0x01
 #define S1_TX_SELECT                             0x01
 #define S1_CONV_FREQ_FRAC                        0x7F
-#define S1_CONV_FREQ_PERIOD                      0x01
+#define S1_CONV_FREQ_PERIOD                      0x0C
 #define S1_PRX_CTRL_0                            0x90
-#define S1_PRX_CTRL_1                            0x12
+#define S1_PRX_CTRL_1                            0x13
 #define S1_TG_CTRL                               0xCF
 #define S1_RX_SELECT                             0x01
 #define S1_CALCAP_INACTIVE_RX                    0x0A
 #define S1_PATTERN_SETUP                         0x03
 #define S1_PATTERN_SELECT                        0x00
 #define S1_BIAS_CURRENT                          0x00
-#define S1_ATI_SETUP_0                           0xC4
-#define S1_ATI_SETUP_1                           0x03
-#define S1_ATI_BASE_0                            0x96
+#define S1_ATI_SETUP_0                           0x84
+#define S1_ATI_SETUP_1                           0x0C
+#define S1_ATI_BASE_0                            0x64
 #define S1_ATI_BASE_1                            0x00
-#define S1_ATI_COARSE                            0x82
-#define S1_ATI_FINE                              0x68
-#define S1_COMPENSATION_0                        0xE0
-#define S1_COMPENSATION_1                        0xA3
+#define S1_ATI_COARSE                            0x47
+#define S1_ATI_FINE                              0x58
+#define S1_COMPENSATION_0                        0xE5
+#define S1_COMPENSATION_1                        0x53
 
 /* Sensor 2 Settings */
 /* Memory Map Position 0x50 - 0x59 */
 #define S2_SETUP                                 0x01
-#define S2_TX_SELECT                             0x04
+#define S2_TX_SELECT                             0x02
 #define S2_CONV_FREQ_FRAC                        0x7F
-#define S2_CONV_FREQ_PERIOD                      0x01
+#define S2_CONV_FREQ_PERIOD                      0x0C
 #define S2_PRX_CTRL_0                            0x90
-#define S2_PRX_CTRL_1                            0x12
+#define S2_PRX_CTRL_1                            0x13
 #define S2_TG_CTRL                               0xCF
-#define S2_RX_SELECT                             0x04
+#define S2_RX_SELECT                             0x02
 #define S2_CALCAP_INACTIVE_RX                    0x0A
 #define S2_PATTERN_SETUP                         0x03
 #define S2_PATTERN_SELECT                        0x00
 #define S2_BIAS_CURRENT                          0x00
 #define S2_ATI_SETUP_0                           0xC4
-#define S2_ATI_SETUP_1                           0x03
-#define S2_ATI_BASE_0                            0x96
+#define S2_ATI_SETUP_1                           0x12
+#define S2_ATI_BASE_0                            0x64
 #define S2_ATI_BASE_1                            0x00
-#define S2_ATI_COARSE                            0x82
-#define S2_ATI_FINE                              0x68
-#define S2_COMPENSATION_0                        0xEB
-#define S2_COMPENSATION_1                        0xA3
+#define S2_ATI_COARSE                            0x44
+#define S2_ATI_FINE                              0x58
+#define S2_COMPENSATION_0                        0xC5
+#define S2_COMPENSATION_1                        0x53
 
 /* Channel 0 Settings */
 /* Memory Map Position 0x60 - 0x63 */
 #define CH0_REF_UI_SETUP                         0x00
 #define CH0_FOLLOWER_MASK                        0x00
-#define CH0_PROX_THRESHOLD                       0x00
+#define CH0_PROX_THRESHOLD                       0x14
 #define CH0_PROX_DEBOUNCE                        0x44
-#define CH0_TOUCH_THRESHOLD                      0x05
+#define CH0_TOUCH_THRESHOLD                      0x1B
 #define CH0_TOUCH_HYSTERESIS                     0x00
-#define CH0_FOLLOWER_WEIGHT_0                    0x00
-#define CH0_FOLLOWER_WEIGHT_1                    0x00
+#define CH0_FOLLOWER_WEIGHT_0                    0x90
+#define CH0_FOLLOWER_WEIGHT_1                    0x01
 
 /* Channel 1 Settings */
 /* Memory Map Position 0x70 - 0x75 */
 #define CH1_REF_UI_SETUP                         0x00
 #define CH1_FOLLOWER_MASK                        0x00
-#define CH1_PROX_THRESHOLD                       0x00
+#define CH1_PROX_THRESHOLD                       0x14
 #define CH1_PROX_DEBOUNCE                        0x44
-#define CH1_TOUCH_THRESHOLD                      0x05
+#define CH1_TOUCH_THRESHOLD                      0x1A
 #define CH1_TOUCH_HYSTERESIS                     0x00
-#define CH1_FOLLOWER_WEIGHT_0                    0x00
-#define CH1_FOLLOWER_WEIGHT_1                    0x00
+#define CH1_FOLLOWER_WEIGHT_0                    0x90
+#define CH1_FOLLOWER_WEIGHT_1                    0x01
 
 /* Channel 2 Settings */
 /* Memory Map Position 0x80 - 0x85 */
 #define CH2_REF_UI_SETUP                         0x00
 #define CH2_FOLLOWER_MASK                        0x00
-#define CH2_PROX_THRESHOLD                       0x00
+#define CH2_PROX_THRESHOLD                       0x14
 #define CH2_PROX_DEBOUNCE                        0x44
-#define CH2_TOUCH_THRESHOLD                      0x05
+#define CH2_TOUCH_THRESHOLD                      0x1A
 #define CH2_TOUCH_HYSTERESIS                     0x00
-#define CH2_FOLLOWER_WEIGHT_0                    0x00
-#define CH2_FOLLOWER_WEIGHT_1                    0x00
+#define CH2_FOLLOWER_WEIGHT_0                    0x90
+#define CH2_FOLLOWER_WEIGHT_1                    0x01
 
 /* Slider Configuration */
 /* Memory Map Position 0x90 - 0x98 */
@@ -163,13 +163,13 @@
 
 /* Power Mode & System Settings */
 /* Memory Map Position 0xC0 - 0xC5 */
-#define SYSTEM_CONTROL                           0x50
+#define SYSTEM_CONTROL                           0x10
 #define CHANNEL_TIMEOUT_DISABLE                  0x00
 #define NP_REPORT_RATE_0                         0x10
 #define NP_REPORT_RATE_1                         0x00
 #define LP_REPORT_RATE_0                         0x3C
 #define LP_REPORT_RATE_1                         0x00
-#define ULP_REPORT_RATE_0                        0xA0
+#define ULP_REPORT_RATE_0                        0x64
 #define ULP_REPORT_RATE_1                        0x00
 #define HALT_REPORT_RATE_0                       0xB8
 #define HALT_REPORT_RATE_1                       0x0B

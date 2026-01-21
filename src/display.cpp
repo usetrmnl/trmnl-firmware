@@ -73,10 +73,52 @@ void display_init(void)
     Log_info("dev module end");
 }
 
+#ifdef BOARD_TRMNL_X
+
+void config_pca95535_pins_for_lp()
+{
+    bbep.ioPinMode(0, INPUT);
+
+    // Pin 1 (OTG) is configured separately in init_otg()
+
+    bbep.ioPinMode(2, INPUT);
+
+    bbep.ioPinMode(3, INPUT);
+
+    bbep.ioPinMode(4, INPUT);
+
+    bbep.ioPinMode(5, INPUT);
+
+    bbep.ioPinMode(6, OUTPUT);
+    bbep.ioWrite(6, LOW);
+
+    bbep.ioPinMode(7, INPUT);
+
+    bbep.ioPinMode(8, OUTPUT);
+    bbep.ioWrite(8, LOW);
+
+    bbep.ioPinMode(9, OUTPUT);
+    bbep.ioWrite(9, LOW);
+
+    bbep.ioPinMode(10, INPUT);
+
+    bbep.ioPinMode(11, OUTPUT);
+    bbep.ioWrite(11, LOW);
+
+    bbep.ioPinMode(12, OUTPUT);
+    bbep.ioWrite(12, LOW);
+
+    bbep.ioPinMode(13, OUTPUT);
+    bbep.ioWrite(13, LOW);
+
+    bbep.ioPinMode(14, INPUT);
+
+    bbep.ioPinMode(15, INPUT);
+}
+
 void config_bma530_interrupt()
 {
     bbep.ioPinMode(3, INPUT);
-    // bbep.ioRead(3);
     bbep.ioRead(10);
 }
 
@@ -85,23 +127,57 @@ uint8_t pca9535_interrupt_clear()
     return bbep.ioRead(3);
 }
 
-bool turn_otg()
+void otg_turn_on()
 {
-    Serial.printf("IO Pin 1 read before: %d\n", bbep.ioRead(1));
-    if (bbep.ioRead(1) == 1)
-    {
-        bbep.ioPinMode(1, OUTPUT);
-        bbep.ioWrite(1, 0);
-        Log_info("OTG turned off");
-        Serial.printf("IO Pin 1 read after: %d\n", bbep.ioRead(1));
-        return false;
-    }
     bbep.ioPinMode(1, OUTPUT);
-    bbep.ioWrite(1, 1);
+    bbep.ioWrite(1, HIGH);
     Log_info("OTG turned on");
-    Serial.printf("IO Pin 1 read after: %d\n", bbep.ioRead(1));
-    return true;
 }
+
+void otg_turn_off()
+{
+    bbep.ioPinMode(1, OUTPUT);
+    bbep.ioWrite(1, LOW);
+    Log_info("OTG turned off");
+}
+
+#define PIN_ESP32C5_SPI_BOOT 4
+#define PIN_ESP32C5_USB_BOOT 5
+#define PIN_ESP32C5_EN 6
+
+
+void modem_enter_bootloader(void) {
+  // Disable target and wait for full power down
+  bbep.ioWrite(PIN_ESP32C5_EN, 0);
+  delay(100);
+
+  // Configure boot pins for bootloader mode
+  bbep.ioPinMode(PIN_ESP32C5_SPI_BOOT, OUTPUT);
+  bbep.ioPinMode(PIN_ESP32C5_USB_BOOT, OUTPUT);
+  bbep.ioWrite(PIN_ESP32C5_SPI_BOOT, 0);
+  bbep.ioWrite(PIN_ESP32C5_USB_BOOT, 1);
+  delay(50);
+
+  // Enable target in bootloader mode
+  bbep.ioWrite(PIN_ESP32C5_EN, 1);
+  delay(300);
+}
+
+void modem_reset_target(void) {
+  // Disable target
+  bbep.ioWrite(PIN_ESP32C5_EN, 0);
+  delay(50);
+
+  // Release boot pins (set to input for normal boot)
+  bbep.ioPinMode(PIN_ESP32C5_SPI_BOOT, INPUT);
+  bbep.ioPinMode(PIN_ESP32C5_USB_BOOT, INPUT);
+  delay(50);
+
+  // Enable target (normal boot)
+  bbep.ioWrite(PIN_ESP32C5_EN, 1);
+}
+
+#endif
 
 /**
  * @brief Function to sleep the ESP32 while saving power
@@ -1355,6 +1431,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     bbep.refresh(REFRESH_FULL, true);
     bbep.freeBuffer();
 #else
+    Serial.println("FastEPD full update");
     bbep.fullUpdate();
 #endif
     Log_info("display_show_msg end");
