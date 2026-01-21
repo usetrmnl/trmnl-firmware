@@ -1279,10 +1279,7 @@ void IQS323::readRandomBytes(uint8_t memoryAddress, uint8_t numBytes, uint8_t by
   uint8_t i = 0;
 
   force_I2C_communication();
-  while (!iqs323_deviceRDY)
-  {
-    delayMicroseconds(10);
-  }
+  delay(45);
 
   /* Select the device with the address "_deviceAddress" and start communication. */
   Wire.beginTransmission(_deviceAddress);
@@ -1344,10 +1341,7 @@ void IQS323::writeRandomBytes(uint8_t memoryAddress, uint8_t numBytes, uint8_t b
   communication. */
 
   force_I2C_communication();
-  while (!iqs323_deviceRDY)
-  {
-    delayMicroseconds(10);
-  }
+  delay(45);
 
   Wire.beginTransmission(_deviceAddress);
   /* Specify the memory address where the IQS323 must start saving the data,

@@ -454,35 +454,23 @@ void bl_init(void)
 
   rslt = bma530_init_device(&bma530_dev);
   if (rslt != BMA5_OK) {
-    while (1) {
-      Serial.println("Failed to initialize BMA530!");
-      delay(10000);
-    }
+    Serial.println("Failed to initialize BMA530!");
   }
 
   rslt = bma530_configure_low_power_mode(&bma530_dev);
   if (rslt != BMA5_OK) {
-    while (1) {
-      Serial.println("Failed to configure low power mode!");
-      delay(10000);
-    }
+    Serial.println("Failed to configure BMA530 low power mode!");
   }
 
   rslt = bma530_configure_orientation(&bma530_dev);
   if (rslt != BMA5_OK) {
-    while (1) {
-      Serial.println("Failed to configure orientation!");
-      delay(10000);
-    }
+    Serial.println("Failed to configure BMA530 orientation!");
   }
 
   // Configure INT1 pin
   rslt = bma530_configure_int1(&bma530_dev);
   if (rslt != BMA5_OK) {
-    while (1) {
-      Serial.println("Failed to configure INT1!");
-      delay(10000);
-    }
+      Serial.println("Failed to configure BMA530 INT1!");
   }
 
   config_bma530_interrupt();
