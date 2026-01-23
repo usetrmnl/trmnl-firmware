@@ -301,6 +301,8 @@ std::vector<WifiNetwork> WifiCaptive::getScannedUniqueNetworks(bool runScan)
         WiFi.scanNetworks(false);
         delay(100);
         int n = WiFi.scanComplete();
+        int scanRetries = 0;
+        const int maxScanRetries = 3;
         while (n == WIFI_SCAN_RUNNING || n == WIFI_SCAN_FAILED)
         {
             delay(100);
@@ -310,11 +312,18 @@ std::vector<WifiNetwork> WifiCaptive::getScannedUniqueNetworks(bool runScan)
             }
             else if (n == WIFI_SCAN_FAILED)
             {
+                if (scanRetries >= maxScanRetries)
+                {
+                    Log_info("Scan failed after %d retries, giving up", maxScanRetries);
+                    break;
+                }
+                scanRetries++;
+
                 // There is a race coniditon that can occur, particularly if you use the async flag of WiFi.scanNetworks(true),
                 // where you can race before the data is parsed. scanComplete will be -2, we'll see that and fail out, but then a few microseconds later it actually
                 // fills in. This fixes that, in case we ever move back to the async version of scanNetworks, but as long as it's sync above it'll work
                 // first shot always.
-                Log_verbose("Supposedly failed to finish scan, let's wait 10 seconds before checking again");
+                Log_verbose("Supposedly failed to finish scan, let's wait 10 seconds before checking again (retry %d/%d)", scanRetries, maxScanRetries);
                 delay(10000);
                 n = WiFi.scanComplete();
                 if (n > 0)
@@ -323,6 +332,8 @@ std::vector<WifiNetwork> WifiCaptive::getScannedUniqueNetworks(bool runScan)
                     // it didn't actually fail, we just raced before the scan was done filling in data
                     break;
                 }
+                WiFi.scanDelete();  // Clean up failed scan state
+                delay(100);
                 WiFi.scanNetworks(false);
                 delay(500);
                 n = WiFi.scanComplete();

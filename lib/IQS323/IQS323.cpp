@@ -72,8 +72,8 @@ void IQS323::begin(uint8_t deviceAddressIn, int sdaPinIn, int sclPinIn, uint8_t 
 {
   /* Initialize I2C communication here, since this library can't function
   without it. */
-  Wire.begin(sdaPinIn, sclPinIn); // ADDED to use custom pins
-  Wire.setClock(100000);
+  // Wire.begin(sdaPinIn, sclPinIn); // ADDED to use custom pins
+  // Wire.setClock(100000);
   
   // device_reset(); // Reset the device to ensure it is in a known state
 
@@ -1279,7 +1279,6 @@ void IQS323::readRandomBytes(uint8_t memoryAddress, uint8_t numBytes, uint8_t by
   uint8_t i = 0;
 
   force_I2C_communication();
-  delay(45);
 
   /* Select the device with the address "_deviceAddress" and start communication. */
   Wire.beginTransmission(_deviceAddress);
@@ -1341,7 +1340,6 @@ void IQS323::writeRandomBytes(uint8_t memoryAddress, uint8_t numBytes, uint8_t b
   communication. */
 
   force_I2C_communication();
-  delay(45);
 
   Wire.beginTransmission(_deviceAddress);
   /* Specify the memory address where the IQS323 must start saving the data,
@@ -1422,6 +1420,7 @@ void IQS323::force_I2C_communication(void)
     /* End the transmission and the user decides to STOP or RESTART. */
     Wire.endTransmission(STOP);
     iqs323_deviceRDY = false;
+    delay(45);
   }
 }
 

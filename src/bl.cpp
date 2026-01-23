@@ -272,6 +272,9 @@ void bl_init(void)
   pins_init();
   vBatt = readBatteryVoltage(); // Read the battery voltage BEFORE WiFi is turned on
 
+  Wire.begin(SENSOR_SDA_PIN, SENSOR_SCL_PIN);
+  Wire.setClock(400000);
+
 #if defined(BOARD_SEEED_XIAO_ESP32C3)
   delay(2000);
 
@@ -296,7 +299,9 @@ void bl_init(void)
       iqs323.begin(IQS323_I2C_ADDRESS, SENSOR_SDA_PIN, SENSOR_SCL_PIN, PIN_INTERRUPT, true);
       iqs323.new_data_available = false;
 
-      while (true) {
+      time_t start_time = millis();
+
+      while (true && start_time + 5000 > millis()) {
         iqs323.run();
         if (iqs323.iqs323_state.init_state == IQS323_INIT_DONE) {
           iqs323.iqs323_state.state = IQS323_STATE_RUN;
@@ -443,41 +448,40 @@ void bl_init(void)
   Log.info("%s [%d]: Display init\r\n", __FILE__, __LINE__);
   display_init();
 
-#ifdef BOARD_TRMNL_X
+// #ifdef BOARD_TRMNL_X
 
-  int8_t rslt;
-  Wire.begin(SENSOR_SDA_PIN, SENSOR_SCL_PIN);
-  Wire.setClock(100000);  // 100kHz I2C clock
-  Serial.printf("I2C initialized (SDA: %d, SCL: %d)\n\n", SENSOR_SDA_PIN, SENSOR_SCL_PIN);
+//   int8_t rslt;
+//   // I2C already initialized by IQS323 - do not call Wire.begin() again as it corrupts the bus on ESP32S3
+//   Serial.printf("Using I2C bus already initialized (SDA: %d, SCL: %d)\n\n", SENSOR_SDA_PIN, SENSOR_SCL_PIN);
 
-  struct bma5_dev bma530_dev;
+//   struct bma5_dev bma530_dev;
 
-  rslt = bma530_init_device(&bma530_dev);
-  if (rslt != BMA5_OK) {
-    Serial.println("Failed to initialize BMA530!");
-  }
+//   rslt = bma530_init_device(&bma530_dev);
+//   if (rslt != BMA5_OK) {
+//     Serial.println("Failed to initialize BMA530!");
+//   }
 
-  rslt = bma530_configure_low_power_mode(&bma530_dev);
-  if (rslt != BMA5_OK) {
-    Serial.println("Failed to configure BMA530 low power mode!");
-  }
+//   rslt = bma530_configure_low_power_mode(&bma530_dev);
+//   if (rslt != BMA5_OK) {
+//     Serial.println("Failed to configure BMA530 low power mode!");
+//   }
 
-  rslt = bma530_configure_orientation(&bma530_dev);
-  if (rslt != BMA5_OK) {
-    Serial.println("Failed to configure BMA530 orientation!");
-  }
+//   rslt = bma530_configure_orientation(&bma530_dev);
+//   if (rslt != BMA5_OK) {
+//     Serial.println("Failed to configure BMA530 orientation!");
+//   }
 
-  // Configure INT1 pin
-  rslt = bma530_configure_int1(&bma530_dev);
-  if (rslt != BMA5_OK) {
-      Serial.println("Failed to configure BMA530 INT1!");
-  }
+//   // Configure INT1 pin
+//   rslt = bma530_configure_int1(&bma530_dev);
+//   if (rslt != BMA5_OK) {
+//       Serial.println("Failed to configure BMA530 INT1!");
+//   }
 
-  config_bma530_interrupt();
+//   config_bma530_interrupt();
 
-  pinMode(TCA9535_INT, INPUT);
+//   pinMode(TCA9535_INT, INPUT);
 
-#endif
+// #endif
 
   filesystem_init();
 
@@ -2119,7 +2123,6 @@ static void goToSleep(void)
   Serial.println("Preparing iqs323 to sleep...");
   iqs323.begin(IQS323_I2C_ADDRESS, SENSOR_SDA_PIN, SENSOR_SCL_PIN, PIN_INTERRUPT, false);
   iqs323.force_I2C_communication(); // to clear any pending operations before sleep
-  delay(45);
   iqs323.run();
   Serial.println("IQS323 is ready for sleep.");
 
@@ -2127,7 +2130,7 @@ static void goToSleep(void)
   display_sleep();
   config_pca95535_pins_for_lp();
   config_gpio_for_lp();
-  printf("Configured pins for low power\r\n");
+  Serial.println("Configured pins for low power");
 #endif
 
   filesystem_deinit();
