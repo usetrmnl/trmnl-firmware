@@ -52,6 +52,7 @@ private:
     void setUpDNSServer(DNSServer &dnsServer, const IPAddress &localIP);
     void readWifiCredentials();
     void saveWifiCredentials(const WifiCredentials credentials);
+    void promoteCredentialToFront(int index);
     void saveLastUsedWifiIndex(int index);
     int readLastUsedWifiIndex();
     void saveApiServer(String url);

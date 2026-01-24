@@ -237,11 +237,51 @@ void WifiCaptive::readWifiCredentials()
     preferences.end();
 }
 
+void WifiCaptive::promoteCredentialToFront(int index)
+{
+    if (index <= 0 || index >= WIFI_MAX_SAVED_CREDS)
+    {
+        return; // Already at front or invalid index
+    }
+
+    if (_savedWifis[index].ssid == "")
+    {
+        return; // No credential at this index
+    }
+
+    Log_info("Promoting credential %s from index %d to front", _savedWifis[index].ssid.c_str(), index);
+
+    // Save the credential to promote
+    WifiCredentials promoted = _savedWifis[index];
+
+    // Shift all credentials from 0 to index-1 down by one position
+    for (int i = index; i > 0; i--)
+    {
+        _savedWifis[i] = _savedWifis[i - 1];
+    }
+
+    // Place promoted credential at front
+    _savedWifis[0] = promoted;
+
+    // Persist to NVS
+    Preferences preferences;
+    preferences.begin("wificaptive", false);
+    for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
+    {
+        preferences.putString(WIFI_SSID_KEY(i), _savedWifis[i].ssid);
+        preferences.putString(WIFI_PSWD_KEY(i), _savedWifis[i].pswd);
+        preferences.putBool(WIFI_ENT_KEY(i), _savedWifis[i].isEnterprise);
+        preferences.putString(WIFI_USERNAME_KEY(i), _savedWifis[i].username);
+        preferences.putString(WIFI_IDENTITY_KEY(i), _savedWifis[i].identity);
+    }
+    preferences.end();
+}
+
 void WifiCaptive::saveWifiCredentials(const WifiCredentials credentials)
 {
     Log_info("Saving wifi credentials: %s (Enterprise: %s)", credentials.ssid.c_str(), credentials.isEnterprise ? "yes" : "no");
 
-    // Check if the credentials already exist
+    // Check if the credentials already exist - if so, promote to front
     for (u16_t i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
     {
         // For regular networks, check SSID and password
@@ -249,8 +289,14 @@ void WifiCaptive::saveWifiCredentials(const WifiCredentials credentials)
         {
             if (_savedWifis[i].ssid == credentials.ssid && _savedWifis[i].pswd == credentials.pswd)
             {
-                Log_info("Duplicate regular network found, not saving");
-                return; // Avoid saving duplicate networks
+                if (i == 0)
+                {
+                    Log_info("Credential already at front, no action needed");
+                    return;
+                }
+                Log_info("Existing regular network found at index %d, promoting to front", i);
+                promoteCredentialToFront(i);
+                return;
             }
         }
         // For enterprise networks, check SSID, username, identity, and password
@@ -261,12 +307,19 @@ void WifiCaptive::saveWifiCredentials(const WifiCredentials credentials)
                 _savedWifis[i].identity == credentials.identity &&
                 _savedWifis[i].pswd == credentials.pswd)
             {
-                Log_info("Duplicate enterprise network found, not saving");
-                return; // Avoid saving duplicate networks
+                if (i == 0)
+                {
+                    Log_info("Credential already at front, no action needed");
+                    return;
+                }
+                Log_info("Existing enterprise network found at index %d, promoting to front", i);
+                promoteCredentialToFront(i);
+                return;
             }
         }
     }
 
+    // New credential - shift existing ones down and insert at front
     for (u16_t i = WIFI_MAX_SAVED_CREDS - 1; i > 0; i--)
     {
         _savedWifis[i] = _savedWifis[i - 1];
@@ -501,16 +554,15 @@ bool WifiCaptive::autoConnect()
     Log_info("Trying to autoconnect to wifi...");
     readWifiCredentials();
 
-    int last_used_index = readLastUsedWifiIndex();
-
-    if (_savedWifis[last_used_index].ssid != "")
+    // Last-used network is always at index 0 (promoted on successful connection)
+    if (_savedWifis[0].ssid != "")
     {
-        Log_info("Trying to connect to last used %s...", _savedWifis[last_used_index].ssid.c_str());
+        Log_info("Trying to connect to last used %s...", _savedWifis[0].ssid.c_str());
         WiFi.setSleep(0);
         WiFi.setMinSecurity(WIFI_AUTH_OPEN);
         WiFi.mode(WIFI_STA);
 
-        if (tryConnectWithRetries(_savedWifis[last_used_index], last_used_index))
+        if (tryConnectWithRetries(_savedWifis[0], 0))
         {
             return true;
         }
@@ -528,7 +580,8 @@ bool WifiCaptive::autoConnect()
     WiFi.mode(WIFI_STA);
     for (auto &network : sortedNetworks)
     {
-        if (network.ssid == "" || (network.ssid == _savedWifis[last_used_index].ssid && network.pswd == _savedWifis[last_used_index].pswd))
+        // Skip empty networks and the network we already tried (index 0)
+        if (network.ssid == "" || (network.ssid == _savedWifis[0].ssid && network.pswd == _savedWifis[0].pswd))
         {
             continue;
         }
@@ -562,10 +615,9 @@ bool WifiCaptive::tryConnectWithRetries(const WifiCredentials creds, int last_us
         if (WiFi.status() == WL_CONNECTED)
         {
             Log_info("Connected to %s", creds.ssid.c_str());
-            if (last_used_index >= 0)
-            {
-                saveLastUsedWifiIndex(last_used_index);
-            }
+            // Promote successfully connected network to front of saved list
+            // This ensures the last-used network is always at index 0
+            saveWifiCredentials(creds);
             return true;
         }
 
