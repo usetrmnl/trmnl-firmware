@@ -1791,6 +1791,18 @@ static void resetDeviceCredentials(void)
  */
 static void checkAndPerformFirmwareUpdate(void)
 {
+  // Prevent OTA infinite loop: skip update if we already tried this exact URL
+  // This addresses the version mismatch issue where Terminus keeps sending
+  // the same firmware URL even when the device is already up to date
+  String lastFirmwareUrl = preferences.getString(PREFERENCES_LAST_FIRMWARE_URL, "");
+  String currentUrl = String(binUrl);
+
+  if (lastFirmwareUrl.length() > 0 && lastFirmwareUrl.equals(currentUrl))
+  {
+    Log.info("%s [%d]: Skipping OTA - already attempted this firmware URL: %s\r\n", __FILE__, __LINE__, binUrl);
+    update_firmware = false;
+    return;
+  }
 
   withHttp(binUrl, [&](HTTPClient *https, HttpError errorCode) -> bool
            {
@@ -1817,6 +1829,10 @@ static void checkAndPerformFirmwareUpdate(void)
                if (Update.begin(contentLength))
                {
                  Log.info("%s [%d]: Firmware update start\r\n", __FILE__, __LINE__);
+                 // Store the firmware URL to prevent infinite OTA loops
+                 // If this update installs successfully but version labels mismatch,
+                 // we won't re-download the same firmware on next boot
+                 preferences.putString(PREFERENCES_LAST_FIRMWARE_URL, binUrl);
                  showMessageWithLogo(FW_UPDATE);
 
                  if (Update.writeStream(https->getStream()))
