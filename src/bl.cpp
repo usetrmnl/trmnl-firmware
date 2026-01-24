@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <WiFi.h>
+#include <esp_sntp.h>
 #include <bl.h>
 #include <trmnl_log.h>
 #include <types.h>
@@ -270,6 +271,11 @@ void bl_init(void)
   // wifiErrorDeepSleep();
 
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
+
+  // Enable NTP server from DHCP option 42 (must be done before WiFi connects)
+  // DHCP-provided NTP will be used if available, otherwise fallback to hardcoded servers
+  esp_sntp_servermode_dhcp(true);
+  Log_info("SNTP: Enabled DHCP NTP server discovery");
 
 // uncdcomment this to hardcode WiFi credentials (useful for testing wifi errors, etc.)
 // #define HARDCODED_WIFI
@@ -1894,7 +1900,19 @@ static bool setClock()
   bool sync_status = false;
   struct tm timeinfo;
 
-  configTime(0, 0, "time.google.com", "time.cloudflare.com");
+  // Check if DHCP provided an NTP server (option 42)
+  const char* dhcp_ntp = esp_sntp_getservername(0);
+  if (dhcp_ntp != NULL && strlen(dhcp_ntp) > 0) {
+    Log.info("%s [%d]: Using DHCP-provided NTP server: %s\r\n", __FILE__, __LINE__, dhcp_ntp);
+    // DHCP server already configured at index 0, add fallbacks at index 1 and 2
+    esp_sntp_setservername(1, "time.google.com");
+    esp_sntp_setservername(2, "time.cloudflare.com");
+  } else {
+    // No DHCP NTP, use hardcoded servers
+    Log.info("%s [%d]: No DHCP NTP server, using defaults\r\n", __FILE__, __LINE__);
+    configTime(0, 0, "time.google.com", "time.cloudflare.com");
+  }
+
   Log.info("%s [%d]: Time synchronization...\r\n", __FILE__, __LINE__);
 
   // Wait for time to be set
