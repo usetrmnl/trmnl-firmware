@@ -179,6 +179,13 @@ void WifiCaptive::resetSettings()
         preferences.remove(WIFI_ENT_KEY(i));
         preferences.remove(WIFI_USERNAME_KEY(i));
         preferences.remove(WIFI_IDENTITY_KEY(i));
+        // Remove static IP settings
+        preferences.remove(WIFI_USE_STATIC_KEY(i));
+        preferences.remove(WIFI_STATIC_IP_KEY(i));
+        preferences.remove(WIFI_GATEWAY_KEY(i));
+        preferences.remove(WIFI_SUBNET_KEY(i));
+        preferences.remove(WIFI_DNS1_KEY(i));
+        preferences.remove(WIFI_DNS2_KEY(i));
     }
     preferences.end();
 
@@ -232,6 +239,13 @@ void WifiCaptive::readWifiCredentials()
         _savedWifis[i].isEnterprise = preferences.getBool(WIFI_ENT_KEY(i), false);
         _savedWifis[i].username = preferences.getString(WIFI_USERNAME_KEY(i), "");
         _savedWifis[i].identity = preferences.getString(WIFI_IDENTITY_KEY(i), "");
+        // Read static IP settings
+        _savedWifis[i].useStaticIP = preferences.getBool(WIFI_USE_STATIC_KEY(i), false);
+        _savedWifis[i].staticIP = preferences.getString(WIFI_STATIC_IP_KEY(i), "");
+        _savedWifis[i].gateway = preferences.getString(WIFI_GATEWAY_KEY(i), "");
+        _savedWifis[i].subnet = preferences.getString(WIFI_SUBNET_KEY(i), "");
+        _savedWifis[i].dns1 = preferences.getString(WIFI_DNS1_KEY(i), "");
+        _savedWifis[i].dns2 = preferences.getString(WIFI_DNS2_KEY(i), "");
     }
 
     preferences.end();
@@ -244,22 +258,27 @@ void WifiCaptive::saveWifiCredentials(const WifiCredentials credentials)
     // Check if the credentials already exist
     for (u16_t i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
     {
-        // For regular networks, check SSID and password
+        // For regular networks, check SSID, password, and static IP settings
         if (!credentials.isEnterprise && !_savedWifis[i].isEnterprise)
         {
-            if (_savedWifis[i].ssid == credentials.ssid && _savedWifis[i].pswd == credentials.pswd)
+            if (_savedWifis[i].ssid == credentials.ssid &&
+                _savedWifis[i].pswd == credentials.pswd &&
+                _savedWifis[i].useStaticIP == credentials.useStaticIP &&
+                _savedWifis[i].staticIP == credentials.staticIP)
             {
                 Log_info("Duplicate regular network found, not saving");
                 return; // Avoid saving duplicate networks
             }
         }
-        // For enterprise networks, check SSID, username, identity, and password
+        // For enterprise networks, check SSID, username, identity, password, and static IP
         else if (credentials.isEnterprise && _savedWifis[i].isEnterprise)
         {
             if (_savedWifis[i].ssid == credentials.ssid &&
                 _savedWifis[i].username == credentials.username &&
                 _savedWifis[i].identity == credentials.identity &&
-                _savedWifis[i].pswd == credentials.pswd)
+                _savedWifis[i].pswd == credentials.pswd &&
+                _savedWifis[i].useStaticIP == credentials.useStaticIP &&
+                _savedWifis[i].staticIP == credentials.staticIP)
             {
                 Log_info("Duplicate enterprise network found, not saving");
                 return; // Avoid saving duplicate networks
@@ -283,6 +302,13 @@ void WifiCaptive::saveWifiCredentials(const WifiCredentials credentials)
         preferences.putBool(WIFI_ENT_KEY(i), _savedWifis[i].isEnterprise);
         preferences.putString(WIFI_USERNAME_KEY(i), _savedWifis[i].username);
         preferences.putString(WIFI_IDENTITY_KEY(i), _savedWifis[i].identity);
+        // Save static IP settings
+        preferences.putBool(WIFI_USE_STATIC_KEY(i), _savedWifis[i].useStaticIP);
+        preferences.putString(WIFI_STATIC_IP_KEY(i), _savedWifis[i].staticIP);
+        preferences.putString(WIFI_GATEWAY_KEY(i), _savedWifis[i].gateway);
+        preferences.putString(WIFI_SUBNET_KEY(i), _savedWifis[i].subnet);
+        preferences.putString(WIFI_DNS1_KEY(i), _savedWifis[i].dns1);
+        preferences.putString(WIFI_DNS2_KEY(i), _savedWifis[i].dns2);
     }
     preferences.putInt(WIFI_LAST_INDEX, 0);
     preferences.end();

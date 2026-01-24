@@ -135,12 +135,26 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
         String username = data["username"].is<String>() ? data["username"].as<String>() : "";
         String identity = data["identity"].is<String>() ? data["identity"].as<String>() : "";
 
+        // Static IP configuration
+        bool useStaticIP = data["useStaticIP"].is<bool>() && data["useStaticIP"].as<bool>();
+        String staticIP = data["staticIP"].is<String>() ? data["staticIP"].as<String>() : "";
+        String gateway = data["gateway"].is<String>() ? data["gateway"].as<String>() : "";
+        String subnet = data["subnet"].is<String>() ? data["subnet"].as<String>() : "";
+        String dns1 = data["dns1"].is<String>() ? data["dns1"].as<String>() : "";
+        String dns2 = data["dns2"].is<String>() ? data["dns2"].as<String>() : "";
+
         WifiCredentials credentials;
         credentials.ssid = ssid;
         credentials.pswd = pswd;
         credentials.isEnterprise = isEnterprise;
         credentials.username = username;
         credentials.identity = identity;
+        credentials.useStaticIP = useStaticIP;
+        credentials.staticIP = staticIP;
+        credentials.gateway = gateway;
+        credentials.subnet = subnet;
+        credentials.dns1 = dns1;
+        credentials.dns2 = dns2;
 
         callbacks.setConnectionCredentials(credentials, api_server);
         String mac = WiFi.macAddress();

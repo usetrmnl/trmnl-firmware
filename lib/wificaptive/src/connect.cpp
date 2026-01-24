@@ -8,6 +8,68 @@
 #include "esp_wpa2.h"
 #include "esp_err.h"
 
+// Helper function to parse IP address string to IPAddress
+static bool parseIPAddress(const String &ipStr, IPAddress &ip)
+{
+    if (ipStr.length() == 0)
+    {
+        return false;
+    }
+    return ip.fromString(ipStr);
+}
+
+// Configure static IP if enabled in credentials
+static void configureStaticIP(const WifiCredentials &credentials)
+{
+    if (!credentials.useStaticIP)
+    {
+        Log_info("WiFi: Using DHCP (static IP not configured)");
+        return;
+    }
+
+    IPAddress ip, gateway, subnet, dns1, dns2;
+
+    if (!parseIPAddress(credentials.staticIP, ip))
+    {
+        Log_error("WiFi: Invalid static IP address: %s", credentials.staticIP.c_str());
+        return;
+    }
+
+    if (!parseIPAddress(credentials.gateway, gateway))
+    {
+        Log_error("WiFi: Invalid gateway address: %s", credentials.gateway.c_str());
+        return;
+    }
+
+    // Default subnet mask if not specified
+    if (!parseIPAddress(credentials.subnet, subnet))
+    {
+        subnet = IPAddress(255, 255, 255, 0);
+        Log_info("WiFi: Using default subnet mask 255.255.255.0");
+    }
+
+    // DNS is optional
+    parseIPAddress(credentials.dns1, dns1);
+    parseIPAddress(credentials.dns2, dns2);
+
+    Log_info("WiFi: Configuring static IP: %s, Gateway: %s, Subnet: %s",
+             ip.toString().c_str(), gateway.toString().c_str(), subnet.toString().c_str());
+
+    if (dns1)
+    {
+        Log_info("WiFi: DNS1: %s", dns1.toString().c_str());
+    }
+    if (dns2)
+    {
+        Log_info("WiFi: DNS2: %s", dns2.toString().c_str());
+    }
+
+    if (!WiFi.config(ip, gateway, subnet, dns1, dns2))
+    {
+        Log_error("WiFi: Failed to configure static IP");
+    }
+}
+
 void disableWpa2Enterprise()
 {
     Log_info("WiFi: Disabling WPA2 Enterprise");
@@ -149,6 +211,9 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
             return {WL_CONNECT_FAILED, eventData};
         }
 
+        // Configure static IP if enabled
+        configureStaticIP(credentials);
+
         WiFi.begin(credentials.ssid.c_str());
 
         beginResult = WiFi.status();
@@ -158,6 +223,10 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
     {
         // regular connection
         WiFi.mode(WIFI_STA);
+
+        // Configure static IP if enabled
+        configureStaticIP(credentials);
+
         beginResult = WiFi.begin(credentials.ssid.c_str(), credentials.pswd.c_str());
         Log_info("WiFi: begin (WPA2-Personal), starting from status %s", wifiStatusStr(beginResult));
     }

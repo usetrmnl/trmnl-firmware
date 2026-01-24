@@ -13,6 +13,13 @@ struct WifiCredentials
     bool isEnterprise = false;
     String username;
     String identity;
+    // Static IP configuration
+    bool useStaticIP = false;
+    String staticIP;
+    String gateway;
+    String subnet;
+    String dns1;
+    String dns2;
 };
 
 struct Network

@@ -414,6 +414,23 @@
         body.username = document.getElementById('username').value;
       }
 
+      // Static IP configuration
+      var useStaticIP = document.getElementById('useStaticIP').checked;
+      if (useStaticIP) {
+        var staticIP = document.getElementById('staticIP').value.trim();
+        var gateway = document.getElementById('gateway').value.trim();
+        if (!staticIP || !gateway) {
+          displayAlert('Static IP and Gateway are required when using static IP', "warning");
+          return;
+        }
+        body.useStaticIP = true;
+        body.staticIP = staticIP;
+        body.gateway = gateway;
+        body.subnet = document.getElementById('subnet').value.trim();
+        body.dns1 = document.getElementById('dns1').value.trim();
+        body.dns2 = document.getElementById('dns2').value.trim();
+      }
+
       showLoader();
       fetch('/connect', {
         method: 'POST',
@@ -466,6 +483,16 @@
         icon.classList.add("bi-eye");
         icon.classList.remove("bi-eye-slash");
         input.type = "password";
+      }
+    }
+
+    function toggleStaticIP() {
+      var checkbox = document.getElementById("useStaticIP");
+      var staticFields = document.getElementById("static_ip_fields");
+      if (checkbox.checked) {
+        staticFields.style.display = 'block';
+      } else {
+        staticFields.style.display = 'none';
       }
     }
 
@@ -682,6 +709,34 @@
       <div class="form-group" id="custom_server_form_group" style="display: none;">
         <label for="server">API Server</label>
         <input type="url" id="server" name="server" placeholder="Enter your custom server without a trailing / (e.g. https://trmnl.app)">
+      </div>
+      <!-- Static IP Configuration -->
+      <div class="form-group">
+        <label style="cursor: pointer;" onclick="toggleStaticIP()">
+          <input type="checkbox" id="useStaticIP" onchange="toggleStaticIP()"> Use Static IP (faster connection, saves battery)
+        </label>
+      </div>
+      <div id="static_ip_fields" style="display: none;">
+        <div class="form-group">
+          <label for="staticIP">IP Address (required)</label>
+          <input type="text" id="staticIP" name="staticIP" placeholder="e.g. 192.168.1.100" pattern="^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$">
+        </div>
+        <div class="form-group">
+          <label for="gateway">Gateway (required)</label>
+          <input type="text" id="gateway" name="gateway" placeholder="e.g. 192.168.1.1" pattern="^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$">
+        </div>
+        <div class="form-group">
+          <label for="subnet">Subnet Mask (optional, defaults to 255.255.255.0)</label>
+          <input type="text" id="subnet" name="subnet" placeholder="e.g. 255.255.255.0" pattern="^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$">
+        </div>
+        <div class="form-group">
+          <label for="dns1">DNS 1 (optional)</label>
+          <input type="text" id="dns1" name="dns1" placeholder="e.g. 8.8.8.8" pattern="^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$">
+        </div>
+        <div class="form-group">
+          <label for="dns2">DNS 2 (optional)</label>
+          <input type="text" id="dns2" name="dns2" placeholder="e.g. 8.8.4.4" pattern="^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$">
+        </div>
       </div>
     <div class="form-group">
       <div class="alert alert-primary" id="message" role="alert" style="display: none;"></div>
