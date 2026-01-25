@@ -272,10 +272,11 @@ void bl_init(void)
 
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
 
-  // Enable NTP server from DHCP option 42 (must be done before WiFi connects)
-  // DHCP-provided NTP will be used if available, otherwise fallback to hardcoded servers
+  // Enable DHCP NTP server discovery (option 42) for SNTP time sync
+  // DHCP-provided time server will be used if available, otherwise fallback to defaults
+  // Note: SNTP (Simple NTP) is the time synchronization protocol; NTP servers provide the service
   esp_sntp_servermode_dhcp(true);
-  Log_info("SNTP: Enabled DHCP NTP server discovery");
+  Log_info("SNTP: Enabled DHCP time server discovery (option 42)");
 
 // uncdcomment this to hardcode WiFi credentials (useful for testing wifi errors, etc.)
 // #define HARDCODED_WIFI
@@ -1900,16 +1901,16 @@ static bool setClock()
   bool sync_status = false;
   struct tm timeinfo;
 
-  // Check if DHCP provided an NTP server (option 42)
+  // Check if DHCP provided a time server via option 42 (for SNTP sync)
   const char* dhcp_ntp = esp_sntp_getservername(0);
   if (dhcp_ntp != NULL && strlen(dhcp_ntp) > 0) {
-    Log.info("%s [%d]: Using DHCP-provided NTP server: %s\r\n", __FILE__, __LINE__, dhcp_ntp);
+    Log.info("%s [%d]: SNTP: Using DHCP-provided time server: %s\r\n", __FILE__, __LINE__, dhcp_ntp);
     // DHCP server already configured at index 0, add fallbacks at index 1 and 2
     esp_sntp_setservername(1, "time.google.com");
     esp_sntp_setservername(2, "time.cloudflare.com");
   } else {
-    // No DHCP NTP, use hardcoded servers
-    Log.info("%s [%d]: No DHCP NTP server, using defaults\r\n", __FILE__, __LINE__);
+    // No DHCP time server, use default NTP servers
+    Log.info("%s [%d]: SNTP: No DHCP time server, using default NTP servers\r\n", __FILE__, __LINE__);
     configTime(0, 0, "time.google.com", "time.cloudflare.com");
   }
 
