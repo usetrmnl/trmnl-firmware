@@ -223,10 +223,10 @@ void read_gesture_event(void)
           goToSleep();
           break;
         case IQS323_GESTURE_FLICK_NEGATIVE:
-          Serial.println("SLIDER: Flick ->");
+          Serial.println("SLIDER: Flick <-");
           break;
         case IQS323_GESTURE_FLICK_POSITIVE:
-          Serial.println("SLIDER: Flick <-");
+          Serial.println("SLIDER: Flick ->");
           break;
         case IQS323_GESTURE_HOLD:
           Serial.println("SLIDER: Hold");
@@ -272,8 +272,25 @@ void bl_init(void)
   pins_init();
   vBatt = readBatteryVoltage(); // Read the battery voltage BEFORE WiFi is turned on
 
-  Wire.begin(SENSOR_SDA_PIN, SENSOR_SCL_PIN);
-  Wire.setClock(400000);
+  Wire.begin(SENSOR_SDA_PIN, SENSOR_SCL_PIN, 400000);
+  Wire.setTimeout(100);
+
+  for (uint8_t addr = 1; addr < 127; addr++) {
+    Wire.beginTransmission(addr);
+    if (Wire.endTransmission() == 0) {
+      Serial.print("Found: 0x");
+      if (addr < 16) Serial.print("0");
+      Serial.println(addr, HEX);
+    }
+  }
+
+  // Debug: Print all wakeup_stub_iqs_status structure fields
+  Log_info("wakeup_stub_iqs_status.status: 0x%02X 0x%02X", wakeup_stub_iqs_status.status[0], wakeup_stub_iqs_status.status[1]);
+  Log_info("wakeup_stub_iqs_status.gestures: 0x%02X 0x%02X", wakeup_stub_iqs_status.gestures[0], wakeup_stub_iqs_status.gestures[1]);
+  Log_info("wakeup_stub_iqs_status.slider_cords: 0x%02X 0x%02X", wakeup_stub_iqs_status.slider_cords[0], wakeup_stub_iqs_status.slider_cords[1]);
+  Log_info("wakeup_stub_iqs_status.ch0_cnts: 0x%02X 0x%02X 0x%02X 0x%02X", wakeup_stub_iqs_status.ch0_cnts[0], wakeup_stub_iqs_status.ch0_cnts[1], wakeup_stub_iqs_status.ch0_cnts[2], wakeup_stub_iqs_status.ch0_cnts[3]);
+  Log_info("wakeup_stub_iqs_status.ch1_cnts: 0x%02X 0x%02X 0x%02X 0x%02X", wakeup_stub_iqs_status.ch1_cnts[0], wakeup_stub_iqs_status.ch1_cnts[1], wakeup_stub_iqs_status.ch1_cnts[2], wakeup_stub_iqs_status.ch1_cnts[3]);
+  Log_info("wakeup_stub_iqs_status.ch2_cnts: 0x%02X 0x%02X 0x%02X 0x%02X", wakeup_stub_iqs_status.ch2_cnts[0], wakeup_stub_iqs_status.ch2_cnts[1], wakeup_stub_iqs_status.ch2_cnts[2], wakeup_stub_iqs_status.ch2_cnts[3]);
 
 #if defined(BOARD_SEEED_XIAO_ESP32C3)
   delay(2000);
@@ -299,12 +316,11 @@ void bl_init(void)
       iqs323.begin(IQS323_I2C_ADDRESS, SENSOR_SDA_PIN, SENSOR_SCL_PIN, PIN_INTERRUPT, true);
       iqs323.new_data_available = false;
 
-      time_t start_time = millis();
+      time_t timeout_time = millis();
 
-      while (true && start_time + 5000 > millis()) {
+      while (timeout_time + 5000 > millis()) {
         iqs323.run();
-        if (iqs323.iqs323_state.init_state == IQS323_INIT_DONE) {
-          iqs323.iqs323_state.state = IQS323_STATE_RUN;
+        if (iqs323.new_data_available) {
           break;
         }
         else if (iqs323.iqs323_state.init_state == IQS323_INIT_NONE) {
@@ -354,11 +370,11 @@ void bl_init(void)
     iqs323.SW_Reset(STOP);
     Serial.println("IQS323 Ready to configure!");
 
-    while (true)
-    {
+    time_t timeout_time = millis();
+
+    while (timeout_time + 5000 > millis()) {
       iqs323.run();
-      if (iqs323.iqs323_state.init_state == IQS323_INIT_DONE) {
-        iqs323.iqs323_state.state = IQS323_STATE_RUN;
+      if (iqs323.new_data_available) {
         break;
       }
       else if (iqs323.iqs323_state.init_state == IQS323_INIT_NONE) {
@@ -487,7 +503,7 @@ void bl_init(void)
 
 #ifdef BOARD_TRMNL_X
   // while (true) {
-    // iqs323.run();
+  //   iqs323.run();
     if (iqs323.new_data_available) {
       read_slider_coordinates();
       Serial.printf("Slider position: %d\n", slider_position);
@@ -497,8 +513,8 @@ void bl_init(void)
     }
     // delay(10);
 
+    // }
     Serial.printf("init time: %ld us\n", init_time);
-// }
 #endif
 
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
@@ -2121,9 +2137,8 @@ static void goToSleep(void)
 
 #if BOARD_TRMNL_X
   Serial.println("Preparing iqs323 to sleep...");
-  iqs323.begin(IQS323_I2C_ADDRESS, SENSOR_SDA_PIN, SENSOR_SCL_PIN, PIN_INTERRUPT, false);
-  iqs323.force_I2C_communication(); // to clear any pending operations before sleep
-  iqs323.run();
+  // iqs323.force_I2C_communication(); // to clear any pending operations before sleep
+  iqs323.queueValueUpdates();
   Serial.println("IQS323 is ready for sleep.");
 
   esp_set_deep_sleep_wake_stub(*wakeup_stub);

@@ -35,7 +35,7 @@ void wakeup_stub(void) {
 
   ESP_RTC_LOGI("before i2c read");
 
-  uint8_t buf[17];
+  uint8_t buf[18] = {0};
   wake_stub_i2c_read(IQS323_ADDR, IQS323_MM_SYSTEM_STATUS, buf, 18);
 
   ESP_RTC_LOGI("After i2c read");

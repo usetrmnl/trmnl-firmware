@@ -121,146 +121,105 @@ bool IQS323::init(void)
     /* Verifies product number to determine if the correct device is connected
     for this example */
     case IQS323_INIT_VERIFY_PRODUCT:
-      if(iqs323_deviceRDY)
+      force_I2C_communication();
+      Serial.println("\tIQS323_INIT_VERIFY_PRODUCT");
+      prod_num = getProductNum(RESTART);
+      ver_maj = getmajorVersion(RESTART);
+      ver_min = getminorVersion(STOP);
+      Serial.print("\t\tProduct number is: ");
+      Serial.print(prod_num);
+      Serial.print(" v");
+      Serial.print(ver_maj);
+      Serial.print(".");
+      Serial.println(ver_min);
+      if(prod_num == IQS323_PRODUCT_NUM_001)
       {
-        Serial.println("\tIQS323_INIT_VERIFY_PRODUCT");
-        prod_num = getProductNum(RESTART);
-        ver_maj = getmajorVersion(RESTART);
-        ver_min = getminorVersion(STOP);
-        Serial.print("\t\tProduct number is: ");
-        Serial.print(prod_num);
-        Serial.print(" v");
-        Serial.print(ver_maj);
-        Serial.print(".");
-        Serial.println(ver_min);
-        if(prod_num == IQS323_PRODUCT_NUM_001)
-        {
-          Serial.println("\t\tIQS323 Release UI Confirmed!");
-          iqs323_state.init_state = IQS323_INIT_READ_RESET;
-        }
-        else if(prod_num == IQS323_PRODUCT_NUM_A01)
-        {
-          Serial.println("\t\tIQS323 Movement UI Confirmed!");
-          iqs323_state.init_state = IQS323_INIT_READ_RESET;
-        }
-        else
-        {
-          Serial.println("\t\tDevice is not a IQS323!");
-          iqs323_state.init_state = IQS323_INIT_NONE;
-        }
+        Serial.println("\t\tIQS323 Release UI Confirmed!");
+        iqs323_state.init_state = IQS323_INIT_READ_RESET;
       }
-    break;
+      else if(prod_num == IQS323_PRODUCT_NUM_A01)
+      {
+        Serial.println("\t\tIQS323 Movement UI Confirmed!");
+        iqs323_state.init_state = IQS323_INIT_READ_RESET;
+      }
+      else
+      {
+        Serial.println("\t\tDevice is not a IQS323!");
+        iqs323_state.init_state = IQS323_INIT_NONE;
+      }
+      break;
 
     /* Verify if a reset has occurred */
     case IQS323_INIT_READ_RESET:
-      if(iqs323_deviceRDY)
+      Serial.println("\tIQS323_INIT_READ_RESET");
+      updateInfoFlags(STOP);
+      if (checkReset())
       {
-        Serial.println("\tIQS323_INIT_READ_RESET");
-        updateInfoFlags(STOP);
-        if (checkReset())
-        {
-          Serial.println("\t\tReset event occurred.");
-          iqs323_state.init_state = IQS323_INIT_UPDATE_SETTINGS;
-        }
-        else
-        {
-          Serial.println("\t\t No Reset Event Detected - Request SW Reset");
-          iqs323_state.init_state = IQS323_INIT_CHIP_RESET;
-        }
+        Serial.println("\t\tReset event occurred.");
+        iqs323_state.init_state = IQS323_INIT_UPDATE_SETTINGS;
       }
-    break;
+      else
+      {
+        Serial.println("\t\t No Reset Event Detected - Request SW Reset");
+        iqs323_state.init_state = IQS323_INIT_CHIP_RESET;
+      }
+      break;
 
     /* Perform SW Reset */
     case IQS323_INIT_CHIP_RESET:
-      if(iqs323_deviceRDY)
-      {
-        Serial.println("\tIQS323_INIT_CHIP_RESET");
+      Serial.println("\tIQS323_INIT_CHIP_RESET");
 
-        //Perform SW Reset
-        SW_Reset(STOP);
-        Serial.println("\t\tSoftware Reset Bit Set.");
-        delay(100);
-        iqs323_state.init_state = IQS323_INIT_READ_RESET;
-      }
-    break;
+      //Perform SW Reset
+      SW_Reset(STOP);
+      Serial.println("\t\tSoftware Reset Bit Set.");
+      delay(100);
+      iqs323_state.init_state = IQS323_INIT_READ_RESET;
+      break;
 
     /* Write all settings to IQS323 from .h file */
     case IQS323_INIT_UPDATE_SETTINGS:
-      if(iqs323_deviceRDY)
-      {
-        Serial.println("\tIQS323_INIT_UPDATE_SETTINGS");
-        writeMM(STOP);
-        iqs323_state.init_state = IQS323_INIT_ACK_RESET;
-      }
-    break;
+      Serial.println("\tIQS323_INIT_UPDATE_SETTINGS");
+      writeMM(STOP);
+      iqs323_state.init_state = IQS323_INIT_ACK_RESET;
+      break;
 
     /* Acknowledge that the device went through a reset */
     case IQS323_INIT_ACK_RESET:
-      if(iqs323_deviceRDY)
-      {
-        Serial.println("\tIQS323_INIT_ACK_RESET");
-        acknowledgeReset(STOP);
-        iqs323_state.init_state = IQS323_INIT_ATI;
-      }
+      Serial.println("\tIQS323_INIT_ACK_RESET");
+      acknowledgeReset(STOP);
+      iqs323_state.init_state = IQS323_INIT_ATI;
       break;
 
     /* Run the ATI algorithm to recalibrate the device with newly added settings */
     case IQS323_INIT_ATI:
-      // if (!comm_requested) {
-      //   force_I2C_communication();
-      //   comm_requested = true;
-      // }
-      if(iqs323_deviceRDY)
-      {
-        Serial.println("\tIQS323_INIT_ATI");
-        ReATI(STOP);
-        iqs323_state.init_state = IQS323_INIT_WAIT_FOR_ATI;
-        Serial.println("\tIQS323_INIT_WAIT_FOR_ATI");
-        // comm_requested = false;
-      }
-    break;
+      Serial.println("\tIQS323_INIT_ATI");
+      ReATI(STOP);
+      iqs323_state.init_state = IQS323_INIT_WAIT_FOR_ATI;
+      Serial.println("\tIQS323_INIT_WAIT_FOR_ATI");
+      break;
 
     /* Read the ATI Active bit to see if the rest of the program can continue */
     case IQS323_INIT_WAIT_FOR_ATI:
-      // if (!comm_requested) {
-      //   force_I2C_communication();
-      //   comm_requested = true;
-      // }
-      if(iqs323_deviceRDY)
+      if(!readATIactive())
       {
-        if(!readATIactive())
-        {
-          Serial.println("\t\tDONE");
-          iqs323_state.init_state = IQS323_INIT_READ_DATA;
-          // comm_requested = false;
-        }
+        Serial.println("\t\tDONE");
+        iqs323_state.init_state = IQS323_INIT_READ_DATA;
       }
-    break;
+      break;
 
     /* Read the latest data from the iqs323 */
     case IQS323_INIT_READ_DATA:
-      // if (!comm_requested) {
-      //   force_I2C_communication();
-      //   comm_requested = true;
-      // }
-      if (iqs323_deviceRDY)
-      {
-        Serial.println("\tIQS323_INIT_READ_DATA");
-        queueValueUpdates();
-        iqs323_state.init_state = IQS323_INIT_ACTIVATE_EVENT_MODE;
-        // comm_requested = false;
-      }
-    break;
+      Serial.println("\tIQS323_INIT_READ_DATA");
+      queueValueUpdates();
+      iqs323_state.init_state = IQS323_INIT_ACTIVATE_EVENT_MODE;
+      break;
 
     /* Turn on I2C event mode */
     case IQS323_INIT_ACTIVATE_EVENT_MODE:
-      if(iqs323_deviceRDY)
-      {
-        Serial.println("\tIQS323_INIT_ACTIVATE_EVENT_MODE");
-        setEventMode(STOP);
-        iqs323_state.init_state = IQS323_INIT_DONE;
-      }
-    break;
+      Serial.println("\tIQS323_INIT_ACTIVATE_EVENT_MODE");
+      setEventMode(STOP);
+      iqs323_state.init_state = IQS323_INIT_DONE;
+      break;
 
     /* If all operations have been completed correctly, the RDY pin can be set
      * up as an interrupt to indicate when new data is available */
@@ -268,7 +227,7 @@ bool IQS323::init(void)
       Serial.println("\tIQS323_INIT_DONE");
       new_data_available = true;
       return true;
-    break;
+      break;
 
     default:
       break;
@@ -677,7 +636,6 @@ void IQS323::updateInfoFlags(bool stopOrRestart)
 	uint8_t transferBytes[2];	// The array which will hold the bytes to be transferred.
 
 	/* Read the info flags. */
-  force_I2C_communication();
 	readRandomBytes(IQS323_MM_SYSTEM_STATUS, 2, transferBytes, stopOrRestart);
 	/* Assign the info flags to the local SYSTEM_STATUS register */
   IQSMemoryMap.SYSTEM_STATUS[0] =  transferBytes[0];
@@ -1420,7 +1378,12 @@ void IQS323::force_I2C_communication(void)
     /* End the transmission and the user decides to STOP or RESTART. */
     Wire.endTransmission(STOP);
     iqs323_deviceRDY = false;
-    delay(45);
+    for (int i = 0; i < 45; i++) {
+      if (iqs323_deviceRDY) {
+        break;
+      }
+      delay(1);
+    }
   }
 }
 

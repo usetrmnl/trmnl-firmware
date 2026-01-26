@@ -133,7 +133,7 @@
 
 /* Gesture Setup */
 /* Memory Map Position 0xA0 - 0xA6 */
-#define GESTURE_SELECT                           0x0F
+#define GESTURE_SELECT                           0x0B
 #define RESERVED_BYTE                            0x00
 #define MINIMUM_TIME_0                           0x0A
 #define MINIMUM_TIME_1                           0x00
@@ -152,18 +152,18 @@
 /* Memory Map Position 0xB0 - 0xB4 */
 #define NP_COUNTS_FILTER                         0x02
 #define LP_COUNTS_FILTER                         0x01
-#define NP_LTA_FILTER                            0x0F
-#define LP_LTA_FILTER                            0x0F
+#define NP_LTA_FILTER                            0x0C
+#define LP_LTA_FILTER                            0x0C
 #define NP_LTA_FAST_FILTER                       0x00
 #define LP_LTA_FAST_FILTER                       0x00
-#define NP_ACTIVATION_LTA_FILTER                 0x0A
-#define LP_ACTIVATION_LTA_FILTER                 0x05
+#define NP_ACTIVATION_LTA_FILTER                 0x02
+#define LP_ACTIVATION_LTA_FILTER                 0x01
 #define FAST_FILTER_BAND_0                       0x14
 #define FAST_FILTER_BAND_1                       0x00
 
 /* Power Mode & System Settings */
 /* Memory Map Position 0xC0 - 0xC5 */
-#define SYSTEM_CONTROL                           0x10
+#define SYSTEM_CONTROL                           0x90
 #define CHANNEL_TIMEOUT_DISABLE                  0x00
 #define NP_REPORT_RATE_0                         0x10
 #define NP_REPORT_RATE_1                         0x00
@@ -185,8 +185,8 @@
 #define PROX_EVENT_TIMEOUT                       0x00
 #define TOUCH_EVENT_TIMEOUT                      0x00
 #define EVENTS_ENABLE                            0x04
-#define ACTIVATION_THRESHOLD                     0x14
-#define RELEASE_DELTA_PERCENTAGE                 0x00
+#define ACTIVATION_THRESHOLD                     0x18
+#define RELEASE_DELTA_PERCENTAGE                 0x08
 #define DELTA_SNAP_SAMPLE_DELAY                  0x0A
 
 /* I2C Settings */
