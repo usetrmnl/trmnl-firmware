@@ -35,6 +35,12 @@ typedef struct dp_tag
   uint32_t OneBit, TwoBit; // profiles for 1 and 2-bit modes
 } DISPLAY_PROFILE;
 
+typedef struct theBrand {
+char name[16];
+char api_url[128];
+uint8_t u8Images[3952];
+} BRAND;
+
 /**
  * @brief Function to init the display
  * @param none
