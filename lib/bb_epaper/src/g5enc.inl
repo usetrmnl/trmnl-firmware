@@ -2,19 +2,23 @@
 // G5 Encoder
 // A 1-bpp image encoding library
 //
-// Written by Larry Bank
-// Copyright (c) 2024 BitBank Software, Inc.
+// Written by Larry Bank (bitbank@pobox.com)
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-//===========================================================================
+// SPDX-FileCopyrightText: 2024 BitBank Software, Inc.
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
 #include "Group5.h"
@@ -84,7 +88,7 @@ static void G5ENCFlushBits(G5_BUFFERED_BITS *bb)
 // Initialize the compressor
 // This must be called before adding data to the output
 //
-int g5_encode_init(G5ENCIMAGE *pImage, int iWidth, int iHeight, uint8_t *pOut, int iOutSize)
+static int g5_encode_init(G5ENCIMAGE *pImage, int iWidth, int iHeight, uint8_t *pOut, int iOutSize)
 {
     int iError = G5_SUCCESS;
     
@@ -197,7 +201,7 @@ doblack:
 // Returns G5ENC_SUCCESS for each line if all is well and G5ENC_IMAGE_COMPLETE
 // for the last line
 //
-int g5_encode_encodeLine(G5ENCIMAGE *pImage, uint8_t *pPixels)
+static int g5_encode_encodeLine(G5ENCIMAGE *pImage, uint8_t *pPixels)
 {
 int16_t a0, a0_c, b2, a1;
 int dx, run1, run2;
@@ -302,7 +306,7 @@ G5_BUFFERED_BITS bb;
 //
 // Returns the number of bytes of G5 created by the encoder
 //
-int g5_encode_getOutSize(G5ENCIMAGE *pImage)
+static int g5_encode_getOutSize(G5ENCIMAGE *pImage)
 {
     int iSize = 0;
     if (pImage != NULL)

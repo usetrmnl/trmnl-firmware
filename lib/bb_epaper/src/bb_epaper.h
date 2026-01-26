@@ -1,16 +1,23 @@
 //
 // bb_epaper
-// Copyright (c) 2024 BitBank Software, Inc.
 // Written by Larry Bank (bitbank@pobox.com)
 // Project started 9/11/2024
 //
-// Use of this software is governed by the Business Source License
-// included in the file ./LICENSE.
+// SPDX-FileCopyrightText: 2024 BitBank Software, Inc.
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
-// As of the Change Date specified in that file, in accordance with
-// the Business Source License, use of this software will be governed
-// by the Apache License, Version 2.0, included in the file
-// ./APL.txt.
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 #ifndef __BB_EPAPER__
 #define __BB_EPAPER__
@@ -32,6 +39,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#define OUTPUT 0
+#define INPUT  1
+#define INPUT_PULLUP 2
+#define HIGH 1
+#define LOW 0
+void delay(int);
+void pinMode(int pin, int mode);
+void digitalWrite(int pin, int value);
+int digitalRead(int pin);
 #endif // __LINUX__
 
 // error messages
@@ -45,12 +61,26 @@ enum {
     BBEP_ERROR_COUNT
 };
 
+#ifndef __ONEBITDISPLAY__
 typedef struct {
     int x; 
     int y;
     int w; 
     int h;
 } BB_RECT; 
+#endif
+
+// For Linux and esp-idf we add a file/device handle member
+// to the BBI2C structure
+#if !defined( ARDUINO ) && !defined(__BB_I2C__)
+#define __BB_I2C__
+typedef struct _tagbbi2c
+{
+  int file_i2c;
+  uint8_t iSDA, iSCL;
+  uint8_t bWire;
+} BBI2C;
+#endif
 
 #define LIGHT_SLEEP 0
 #define DEEP_SLEEP 1
@@ -83,9 +113,10 @@ enum {
     PLANE_BOTH,
     PLANE_DUPLICATE, // duplicate 0 to both 0 and 1
     PLANE_0_TO_1, // send plane 0 to plane 1 memory
-    PLANE_FALSE_DIFF // use 'partial' mode to force all pixels to update
+    PLANE_FALSE_DIFF, // use 'partial' mode to force all pixels to update
 };
-#ifndef __ONEBITDISPLAY__
+#ifndef __BB_FONT_SIZES__
+#define __BB_FONT_SIZES__
 // 5 possible font sizes: 8x8, 16x32, 6x8, 12x16 (stretched from 6x8 with smoothing), 16x16 (stretched from 8x8)
 enum {
    FONT_6x8 = 0,
@@ -94,8 +125,19 @@ enum {
    FONT_16x16,
    FONT_COUNT
 };
-#endif
+#endif // __BB_FONT_SIZES__
 
+// Pattern dither options
+enum {
+    DITHER_NONE=0,
+    DITHER_75, // 75%
+    DITHER_50, // 50%
+    DITHER_25_REG, // 25%, regular
+    DITHER_25_ALT, // alternating
+    DITHER_12_REG, // 12.5%
+    DITHER_12_ALT,
+    DITHER_COUNT
+};
 // Centering coordinates to pass to the character drawing functions
 #define CENTER_X 9998
 #define CENTER_Y 9999
@@ -112,6 +154,28 @@ typedef struct epd_panel {
     const uint8_t *pColorLookup; // color translation table
 } EPD_PANEL;
 
+// Products with built-in SPI EPDs
+enum {
+    EPD_PRODUCT_UNDEFINED=0,
+    EPD_BADGER2040,
+    EPD_LILYGO_S3_MINI,
+    EPD_TRMNL_OG,
+    EPD_CROWPANEL29,
+    EPD_CROWPANEL29_4GRAY,
+    EPD_CROWPANEL213,
+    EPD_CROWPANEL213_4GRAY,
+    EPD_CROWPANEL42,
+    EPD_CROWPANEL37,
+    EPD_CROWPANEL154,
+    EPD_CROWPANEL579,
+    EPD_RETERMINAL_SPECTRA,
+    EPD_BBBADGE,
+    EPD_LILYGO_T_DECK_PRO,
+    EPD_WAVESHARE_154,
+    EPD_XTEINK_X4,
+    EPD_PRODUCT_COUNT
+};
+
 // Display types
 enum {
     EP_PANEL_UNDEFINED=0,
@@ -122,6 +186,7 @@ enum {
     EP293_128x296,
     EP294_128x296, // Waveshare newer 2.9" 1-bit 128x296
     EP295_128x296, // harvested from Solum 2.9" BW ESLs
+    EP295_128x296_4GRAY,
     EP266_152x296, // GDEY0266T90
     EP102_80x128, // GDEW0102T4
     EP27B_176x264, // GDEY027T91
@@ -131,13 +196,15 @@ enum {
     EP42R_400x300,
     EP42R2_400x300, // GDEQ042Z21
     EP37_240x416, // GDEY037T03
+    EP37B_240x416, // CROWPANEL 3.7"
     EP213_104x212, // InkyPHAT 2.13 black and white
-    EP75_800x480, // GDEY075T7 (original TRMNL panel)
-    EP75_800x480_GEN2, // GEDY075-D2 (TRMNL gen2 panel)
-    EP75_800x480_4GRAY_GEN2, // GDEW075T7 in 4 grayscale mode
-    EP75_800x480_4GRAY, // GDEY075T7 in 4 grayscale mode
-    EP75_800x480_4GRAY_V2, // GDEY075T7 in 4 grayscale mode, panel which produces too light output
+    EP75_800x480, // GDEY075T7 (older version)
+    EP75_800x480_GEN2, // GEDY075-D2 (Waveshare/Xiao V2 panels)
+    EP75_800x480_4GRAY, // GDEW075T7 (older version) in 4 gray mode
+    EP75_800x480_4GRAY_GEN2, // GDEY075T7-D2 (newer version)  in 4 gray mode
+    EP75_800x480_4GRAY_V2, // older panel, darker grays needed
     EP29_128x296, // Pimoroni Badger2040
+    EP29_128x296_4GRAY, // Pimoroni Badger2040
     EP213R_122x250, // Inky phat 2.13 B/W/R
     EP154_200x200, // waveshare
     EP154B_200x200, // DEPG01540BN
@@ -158,6 +225,25 @@ enum {
     EP41_640x400, // EInk ED040TC1 SPI UC81xx
     EP81_SPECTRA_1024x576, // Spectra 8.1" 1024x576 6-colors
     EP7_960x640, // ED070EC1
+    EP213R2_122x250, // UC8151 3-color
+    EP29Z_128x296, // SSD1680 (CrowPanel 2.9")
+    EP29Z_128x296_4GRAY, // SSD1680 (CrowPanel 2.9")
+    EP213Z_122x250, // SSD1680 (CrowPanel 2.13")
+    EP213Z_122x250_4GRAY, // CrowPanel 2.13" 4 gray mode
+    EP154Z_152x152, // CrowPanel 1.54"
+    EP579_792x272, // CrowPanel 5.79"
+    EP213YR_122x250, // GDEY0213F52
+    EP37YR_240x416, // GDEM037F51
+    EP35YR_184x384, // GDEM035F51
+    EP397YR_800x480, // GDEM0397F81
+    EP154YR_200x200, // GDEM0154F51H
+    EP266YR2_184x360, // GDEY0266F52H
+    EP42YR_400x300, // GDEM042F52
+//    EP579YR_792x272, // GDEY0579F52
+    EP215YR_160x296, // Waveshare 2.15" 4 color
+    EP1085_1360x480, // GDEM1085T51
+    EP31_240x320, // GDEQ031T10 LilyGo T-Deck Pro
+    EP75YR_800x480, // GDEM075F52
     EP_PANEL_COUNT
 };
 #ifdef FUTURE
@@ -192,12 +278,13 @@ enum {
 #define BBEP_4COLOR   0x0008
 #define BBEP_4GRAY    0x0010
 #define BBEP_7COLOR   0x0020
-#define BBEP_16GRAY   0x0020
-#define BBEP_CS_EVERY_BYTE 0x0040
-#define BBEP_PARTIAL2 0x0080
-#define BBEP_4BPP_DATA 0x0100
-#define BBEP_SPLIT_BUFFER 0x0200
-#define BBEP_HAS_SECOND_PLANE 0x0400
+#define BBEP_16GRAY   0x0040
+#define BBEP_CS_EVERY_BYTE 0x0080
+#define BBEP_PARTIAL2 0x0100
+#define BBEP_4BPP_DATA 0x0200
+#define BBEP_SPLIT_BUFFER 0x0400
+#define BBEP_HAS_SECOND_PLANE 0x0800
+#define BBEP_NEEDS_EXTRA_INIT 0x1000
 
 #define BBEP_BLACK 0
 #define BBEP_WHITE 1
@@ -380,6 +467,8 @@ enum {
 #endif
 
 #define BUSY_WAIT 0xff
+#define EPD_RESET 0xfe
+#define MAKE_LUTS 0xfd
 
 // Normal pixel drawing function pointer
 typedef int (BB_SET_PIXEL)(void *pBBEP, int x, int y, unsigned char color);
@@ -394,7 +483,7 @@ int iCursorX, iCursorY;
 int width, height, native_width, native_height;
 int iScreenOffset, iOrientation;
 int iFG, iBG; //current color
-int iFont, iFlags;
+int iFont, iFlags, iPasses;
 void *pFont;
 int iDataTime, iOpTime; // time in milliseconds for data transmission and operation
 uint32_t iSpeed;
@@ -402,7 +491,7 @@ uint32_t iTimeout; // for e-paper panels
 uint8_t iDCPin, iMOSIPin, iCLKPin, iCSPin, iRSTPin, iBUSYPin;
 uint8_t iCS1Pin, iCS2Pin;
 uint8_t x_offset, y_offset; // memory offsets
-uint8_t is_awake, iPlane;
+uint8_t is_awake, iPlane, iDither, bLightSleep;
 const uint8_t *pColorLookup; // color translation table
 const uint8_t *pInitFull; // full update init sequence
 const uint8_t *pInitFast; // fast update init sequence
@@ -425,10 +514,12 @@ class BBEPAPER
 #endif // __LINUX__
 {
   public:
+    BBEPAPER(void) { memset(&_bbep, 0, sizeof(_bbep)); }
     BBEPAPER(int iPanel);
     int createVirtual(int iWidth, int iHeight, int iFlags);
     void setAddrWindow(int x, int y, int w, int h);
     int setPanelType(int iPanel);
+    int begin(int iProduct, bool bSharedSPI = false);
     void setCS2(uint8_t cs);
     bool hasFastRefresh();
     bool hasPartialRefresh();
@@ -443,16 +534,19 @@ class BBEPAPER
     void initIO(int iDC, int iReset, int iBusy, int iCS, int iMOSI, int iSCLK, uint32_t u32Speed);
 #endif // ARDUINO
 #else // __LINUX__
-    void initIO(int iDC, int iReset, int iBusy, int iCS, int iSPIChannel, uint32_t u32Speed = 8000000);
+    void initIO(int iDC, int iReset, int iBusy, int iCS, int iSPIChannel, int iNotUsed = -1, uint32_t u32Speed = 8000000);
 #endif
     int writePlane(int iPlane = PLANE_BOTH, bool bInvert = false);
     void startWrite(int iPlane);
     void writeData(uint8_t *pData, int iLen);
     void writeCmd(uint8_t u8Cmd);
     int refresh(int iMode, bool bWait = true);
+    void setPasses(int iPasses);
     void setBuffer(uint8_t *pBuffer);
-    int allocBuffer(bool bSecondPlane = true);
+    void setLightSleep(uint8_t bEnable) {_bbep.bLightSleep = bEnable;}
+    int allocBuffer(bool bSecondPlane = false);
     void * getBuffer(void);
+    int getPanelType(void) { return _panel_type;}
     uint8_t * getCache(void);
     void freeBuffer(void);
     uint32_t capabilities();
@@ -491,12 +585,14 @@ class BBEPAPER
     void drawCircle(int32_t x, int32_t y, int32_t r, uint32_t color);
     void fillCircle(int32_t x, int32_t y, int32_t r, uint32_t color);
     void drawEllipse(int16_t x, int16_t y, int32_t rx, int32_t ry, uint16_t color);
+    void writeRegion(int16_t x, int16_t y, int16_t w, int16_t h, int plane = PLANE_0);
     void fillEllipse(int16_t x, int16_t y, int32_t rx, int32_t ry, uint16_t color);
     void stretchAndSmooth(uint8_t *pSrc, uint8_t *pDest, int w, int h, int iSmoothType);
     void sleep(int bDeep);
     void wake(void);
     void wait(bool bQuick = false);
     bool isBusy(void);
+    void setDitherPattern(uint8_t iPattern);
     void drawString(const char *pText, int x, int y);
     void setPlane(int iPlane);
     int getPlane(void);
@@ -520,6 +616,7 @@ class BBEPAPER
 
   private:
     BBEPDISP _bbep;
+    int _panel_type;
     uint32_t _tar_memaddr   = 0x001236E0;
     uint16_t _dev_memaddr_l = 0x36E0;
     uint16_t _dev_memaddr_h = 0x0012;
@@ -540,6 +637,5 @@ typedef enum
 void bbepWriteCmd(BBEPDISP *pBBEP, uint8_t cmd);
 void bbepWriteData(BBEPDISP *pBBEP, uint8_t *pData, int iLen);
 void bbepCMD2(BBEPDISP *pBBEP, uint8_t cmd1, uint8_t cmd2);
-void bbepSetLightSleep(bool enabled);
 #endif // __BB_EPAPER__
 

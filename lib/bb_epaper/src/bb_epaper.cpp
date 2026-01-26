@@ -1,17 +1,23 @@
 //
 // bb_epaper
-// Copyright (c) 2024 BitBank Software, Inc.
 // Written by Larry Bank (bitbank@pobox.com)
 // Project started 9/11/2024
 //
-// Use of this software is governed by the Business Source License
-// included in the file ./LICENSE.
+// SPDX-FileCopyrightText: 2024 BitBank Software, Inc.
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
-// As of the Change Date specified in that file, in accordance with
-// As of the Change Date specified in that file, in accordance with
-// the Business Source License, use of this software will be governed
-// by the Apache License, Version 2.0, included in the file
-// ./APL.txt.
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
 #ifdef __LINUX__
@@ -21,23 +27,21 @@
 #include <stdio.h>
 #include <string.h>
 #include <fcntl.h>
-#define OUTPUT 0
-#define INPUT  1
-#define INPUT_PULLUP 2
-#define HIGH 1
-#define LOW 0
-void delay(int);
 #else // Arduino
 
 #endif // __LINUX__
 
 #include "bb_epaper.h"
+#ifdef __MEM_ONLY__
+#include "mem_io.inl"
+#endif // __MEM_ONLY__
+
 #ifdef __LINUX__
 #include "rpi_io.inl"
 #else
 #ifdef ARDUINO
 #include "arduino_io.inl" // I/O (non-portable) code is in here
-#else
+#elif !defined(__MACH__)
 #include "../esp_idf/esp_generic.inl" // ESP-IDF specific
 #endif // ARDUINO
 #endif // __LINUX__
@@ -60,13 +64,159 @@ BBEPAPER::BBEPAPER(int iPanel)
     bbepSetPanelType(&_bbep, iPanel);
 }
 
+void BBEPAPER::setDitherPattern(uint8_t iPattern)
+{
+    bbepSetDitherPattern(&_bbep, iPattern);
+} /* setDitherPattern() */
+
+void BBEPAPER::setPasses(int iPasses)
+{
+   _bbep.iPasses = iPasses;
+} /* setPasses() */
+
 void BBEPAPER::setAddrWindow(int x, int y, int w, int h)
 {
     bbepSetAddrWindow(&_bbep, x, y, w, h);
 }
 
+int BBEPAPER::begin(int iProduct, bool bSharedSPI)
+{
+int rc = BBEP_ERROR_BAD_PARAMETER;
+
+    switch (iProduct) {
+        case EPD_XTEINK_X4: // DC:4 RST:5 BUSY:6 CS:21 MOSI:10 SCK:8
+            if (setPanelType(EP426_800x480) == BBEP_SUCCESS) {
+                if (bSharedSPI) { // SPI is already initialized
+                    initIO(4,5,6,21,-1,-1, 10000000);
+                } else {
+                    initIO(4,5,6,21,10,8, 10000000);
+                }
+                return BBEP_SUCCESS;
+            }
+            break;
+
+        case EPD_WAVESHARE_154: // DC:10 RST:9 BUSY:8 CS:11 MOSI:13 SCK:12
+            pinMode(6, OUTPUT); // EPD power enable
+            digitalWrite(6, LOW);
+            if (setPanelType(EP154_200x200) == BBEP_SUCCESS) {
+                initIO(10, 9, 8, 11, 13, 12, 10000000);
+                return BBEP_SUCCESS;
+            }
+            break;
+
+        case EPD_LILYGO_T_DECK_PRO: // DC:35 RST:-1 BUSY:37 CS:34 MOSI:33 SCK:36
+// make sure other devices' CS lines are inactive
+            pinMode(3 /*BOARD_LORA_CS*/, OUTPUT); 
+            digitalWrite(3 /*BOARD_LORA_CS*/, HIGH);
+            pinMode(4 /*BOARD_LORA_RST*/, OUTPUT); 
+            digitalWrite(4 /*BOARD_LORA_RST*/, HIGH);
+            pinMode(48 /*BOARD_SD_CS*/, OUTPUT); 
+            digitalWrite(48 /*BOARD_SD_CS*/, HIGH);
+            pinMode(34/*BOARD_EPD_CS*/, OUTPUT); 
+            digitalWrite(34/*BOARD_EPD_CS*/, HIGH);
+            if (setPanelType(EP31_240x320) == BBEP_SUCCESS) {
+                initIO(35, -1, 37, 34, 33, 36, 10000000);
+                return BBEP_SUCCESS;
+            }
+            break;
+
+        case EPD_LILYGO_S3_MINI: // DC:12 CS:13 RST: 11 BUSY: 10 SCK: 14 MOSI: 15
+            if (setPanelType(EP102_80x128) == BBEP_SUCCESS) {
+                initIO(12, 11, 10, 13, 15, 14, 8000000);
+                return BBEP_SUCCESS;
+            }
+            break;
+        case EPD_BADGER2040: // DC:20 CS:17 RST:21 BUSY: 26 PWR: 10
+            if (setPanelType(EP29_128x296) == BBEP_SUCCESS) {
+                initIO(20, 21, 26, 17, -1, -1, 12000000);
+                setRotation(270);
+                pinMode(10, OUTPUT);
+                digitalWrite(10, HIGH); // keep power turned on
+                return BBEP_SUCCESS;
+            }
+            break;
+        case EPD_TRMNL_OG: // DC:5 CS:6 RST:10 BUSY:4 MOSI:8 SCK:7
+            if (setPanelType(EP75_800x480) == BBEP_SUCCESS) {
+                initIO(5, 10, 4, 6, 8, 7, 10000000);
+                return BBEP_SUCCESS;
+            }
+            break;
+
+        case EPD_RETERMINAL_SPECTRA: // Seeed Studio 7.3" color E1002
+            // DC:11 RST:12 BUSY:13 CS:10 MOSI:9 SCK:7
+            if (setPanelType(EP73_SPECTRA_800x480) == BBEP_SUCCESS) {
+                initIO(11, 12, 13, 10, 9, 7, 10000000);
+                return BBEP_SUCCESS;
+            }
+            break;
+
+        case EPD_CROWPANEL154: // DC:13 CS:14 RST:10 BUSY:9 MOSI:11 SCK:12
+            pinMode(7, OUTPUT);
+            digitalWrite(7, HIGH); // screen power on
+            if (setPanelType(EP154Z_152x152) == BBEP_SUCCESS) {
+                initIO(13, 10, 9, 14, 11, 12, 12000000);
+                return BBEP_SUCCESS;
+            }
+            break;
+
+        case EPD_BBBADGE:
+            setPanelType(EP29Z_128x296);
+            // Requesting SPI speed = 0 tells the library to use SPI bit banging
+            initIO(6, 3, 24, 8, 41, 7, 0);
+            setRotation(270);
+            break;
+
+        case EPD_CROWPANEL579:
+            pinMode(7, OUTPUT);
+            digitalWrite(7, HIGH); // screen power on
+            if (setPanelType(EP579_792x272) == BBEP_SUCCESS) {
+                initIO(46, 47, 48, 45, 11, 12, 12000000);
+                return BBEP_SUCCESS;
+            }   
+            break;
+        case EPD_CROWPANEL37:
+            pinMode(7, OUTPUT);
+            digitalWrite(7, HIGH); // screen power on
+            if (setPanelType(EP37B_240x416) == BBEP_SUCCESS) {
+                initIO(46, 47, 48, 45, 11, 12, 12000000);
+                return BBEP_SUCCESS;
+            }
+            break;
+        case EPD_CROWPANEL42: // DC:46 CS:45 RST:47 BUSY:48 MOSI:11 SCK:12
+            pinMode(7, OUTPUT); 
+            digitalWrite(7, HIGH); // screen power on
+            if (setPanelType(EP42B_400x300) == BBEP_SUCCESS) {
+                initIO(46, 47, 48, 45, 11, 12, 12000000);
+                return BBEP_SUCCESS;
+            }
+            break;
+        case EPD_CROWPANEL29: // DC:46 CS:45 RST:47 BUSY:48 MOSI:11 SCK:12
+        case EPD_CROWPANEL29_4GRAY:
+            pinMode(7, OUTPUT);
+            digitalWrite(7, HIGH); // screen power on
+            if (setPanelType((iProduct == EPD_CROWPANEL29) ? EP29Z_128x296 : EP29Z_128x296_4GRAY) == BBEP_SUCCESS) {
+                initIO(46, 47, 48, 45, 11, 12, 12000000);
+                setRotation(270);
+                return BBEP_SUCCESS;
+            } 
+            break;
+        case EPD_CROWPANEL213:
+        case EPD_CROWPANEL213_4GRAY:
+            pinMode(7, OUTPUT);
+            digitalWrite(7, HIGH); // screen power on
+            if (setPanelType((iProduct == EPD_CROWPANEL213) ? EP213Z_122x250 : EP213Z_122x250_4GRAY) == BBEP_SUCCESS) {
+                initIO(13, 10, 9, 14, 11, 12, 12000000);
+                setRotation(270);
+                return BBEP_SUCCESS;
+            } 
+            break;
+    } // switch on product type
+    return rc;
+} /* begin() */
+
 int BBEPAPER::setPanelType(int iPanel)
 {
+    _panel_type = iPanel;
     return bbepSetPanelType(&_bbep, iPanel);
 }
 // Special setup for dual-cable displays
@@ -81,8 +231,9 @@ void BBEPAPER::initIO(int iDC, int iReset, int iBusy, int iCS, int iMOSI, int iS
     bbepInitIO(&_bbep, iDC, iReset, iBusy, iCS, iMOSI, iSCLK, u32Speed);
 } /* initIO() */
 #else // Linux
-void BBEPAPER::initIO(int iDC, int iReset, int iBusy, int iCS, int iSPIChannel, uint32_t u32Speed)
+void BBEPAPER::initIO(int iDC, int iReset, int iBusy, int iCS, int iSPIChannel, int iNotUsed, uint32_t u32Speed)
 {
+	(void)iNotUsed;
 	_bbep.iCSPin = iCS;
 	_bbep.iDCPin = iDC;
 	_bbep.iBUSYPin = iBusy;
@@ -91,6 +242,12 @@ void BBEPAPER::initIO(int iDC, int iReset, int iBusy, int iCS, int iSPIChannel, 
 	bbepInitIO(&_bbep, u32Speed);
 } /* initIO() */
 #endif
+
+void BBEPAPER::writeRegion(int16_t x, int16_t y, int16_t w, int16_t h, int plane)
+{
+   bbepWriteRegion(&_bbep, x, y, w, h, plane);
+} /* writeRegion() */
+
 int BBEPAPER::writePlane(int iPlane, bool bInvert)
 {
     long l = millis();
@@ -146,6 +303,7 @@ void BBEPAPER::backupPlane(void)
 }
 int BBEPAPER::allocBuffer(bool bSecondPlane)
 {
+    if (_bbep.iFlags & (BBEP_4COLOR | BBEP_3COLOR | BBEP_4GRAY)) bSecondPlane = 1;
     return bbepAllocBuffer(&_bbep, (int)bSecondPlane);
 } /* allocBuffer() */
 
@@ -532,7 +690,7 @@ int BBEPAPER::testPanelType(void)
 void BBEPAPER::wake(void)
 {
     bbepWakeUp(&_bbep);
-    if (_bbep.iFlags & BBEP_7COLOR) { // need to send before you can send it data
+    if (_bbep.iFlags & (BBEP_7COLOR | BBEP_4COLOR)) { // need to send before you can send it data
         bbepSendCMDSequence(&_bbep, _bbep.pInitFull);
         if (_bbep.iFlags & BBEP_SPLIT_BUFFER) { // dual cable EPD
             _bbep.iCSPin = _bbep.iCS2Pin;
