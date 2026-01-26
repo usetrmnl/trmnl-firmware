@@ -640,7 +640,7 @@ int png_draw_6clr(PNGDRAW *pDraw)
                     break;
 		case 2:
 		    if (pPalette) {
-			pPal = &pPalette[(s[0] >> ((3-(x&3))*2)) & 3];
+			pPal = &pPalette[((s[0] >> ((3-(x&3))*2)) & 3) * 3];
 			r = pPal[0]; g = pPal[1]; b = pPal[2];
 		    } else {
 			r = g = b = (s[0] << ((x&3)*2)) & 0xc0;
@@ -649,7 +649,7 @@ int png_draw_6clr(PNGDRAW *pDraw)
 		    break;
                 case 1:
                     if (pPalette) {
-                        pPal = &pPalette[(s[0] >> (7-(x&7))) & 1];
+                        pPal = &pPalette[((s[0] >> (7-(x&7))) & 1) * 3];
                         r = pPal[0]; g = pPal[1]; b = pPal[2];
                     } else {
                         r = g = b = ((s[0] << (x&7)) & 0x80);
