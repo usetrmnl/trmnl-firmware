@@ -60,7 +60,6 @@
 //   #define EPD_DC_PIN   5
 //   #define EPD_BUSY_PIN 7
    // Pin definition for TRMNL Board
-   #define FAKE_BATTERY_VOLTAGE
   #define EPD_SCK_PIN  7
   #define EPD_MOSI_PIN 8
   #define EPD_CS_PIN   6

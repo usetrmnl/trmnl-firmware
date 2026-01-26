@@ -112,7 +112,7 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #define VBAT_SWITCH_LEVEL HIGH  //load switch enable pin active level
 #endif
 
-#if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_XIAO_EPAPER_DISPLAY_3CLR)
+#if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002)
 #define PIN_BATTERY 1
 #elif defined(BOARD_XTEINK_X4)
 #define PIN_BATTERY 0
