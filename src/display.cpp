@@ -115,9 +115,9 @@ void display_init(void)
  * @param enabled true to enable light sleep, false to disable
  * @return none
  */
-void display_set_light_sleep(bool enabled)
+void display_set_light_sleep(uint8_t enabled)
 {
-    g_light_sleep_enabled = enabled;
+    bbep.setLightSleep(enabled);
 }
 
 /**
@@ -1253,21 +1253,21 @@ PNG *png = new PNG();
                     }
                     png->decode(&iPlane, 0);
                 } // temp profile needs the second plane written
-            } else { // >= 2-bpp
-             // decode as 2-bit grayscale
-                    bbep.setPanelType(dpList[iTempProfile].TwoBit);
-                    iUpdateCount = 0; // grayscale mode resets the partial update counter
-                    bbep.startWrite(PLANE_0); // start writing image data to plane 0
-                    iPlane = PNG_2_BIT_0;
-                    Log_info("%s [%d]: decoding 4-gray plane 0\r\n", __FILE__, __LINE__);
-                    png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
-                    png->decode(&iPlane, 0); // tell PNGDraw to use bits for plane 0
-                    png->close(); // start over for plane 1
-                    iPlane = PNG_2_BIT_1;
-                    Log_info("%s [%d]: decoding 4-gray plane 1\r\n", __FILE__, __LINE__);
-                    png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
-                    bbep.startWrite(PLANE_1); // start writing image data to plane 1
-                    png->decode(&iPlane, 0); // decode it again to get plane 1 data
+            } else { // 2-bpp (or greater, but reduced to 2-bpp)
+                bbep.setPanelType(dpList[iTempProfile].TwoBit);
+                rc = REFRESH_FULL; // 4gray mode must be full refresh
+                iUpdateCount = 0; // grayscale mode resets the partial update counter
+                bbep.startWrite(PLANE_0); // start writing image data to plane 0
+                iPlane = PNG_2_BIT_0;
+                Log_info("%s [%d]: decoding 4-gray plane 0\r\n", __FILE__, __LINE__);
+                png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
+                png->decode(&iPlane, 0); // tell PNGDraw to use bits for plane 0
+                png->close(); // start over for plane 1
+                iPlane = PNG_2_BIT_1;
+                Log_info("%s [%d]: decoding 4-gray plane 1\r\n", __FILE__, __LINE__);
+                png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
+                bbep.startWrite(PLANE_1); // start writing image data to plane 1
+                png->decode(&iPlane, 0); // decode it again to get plane 1 data
             }
 #else // FastEPD
             bbep.setMode((png->getBpp() == 1) ? BB_MODE_1BPP : BB_MODE_4BPP);

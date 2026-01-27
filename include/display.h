@@ -35,6 +35,12 @@ typedef struct dp_tag
   uint32_t OneBit, TwoBit; // profiles for 1 and 2-bit modes
 } DISPLAY_PROFILE;
 
+typedef struct theBrand {
+char name[16];
+char api_url[128];
+uint8_t u8Images[3952];
+} BRAND;
+
 /**
  * @brief Function to init the display
  * @param none
@@ -138,7 +144,7 @@ void display_show_msg_qa(uint8_t *image_buffer, const float *voltage, const floa
  * @param enabled true to enable light sleep, false to disable
  * @return none
  */
-void display_set_light_sleep(bool enabled);
+void display_set_light_sleep(uint8_t enabled);
 
 /**
  * @brief Function to got the display to the sleep

@@ -1016,7 +1016,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
               if (res)
                 Log.info("%s [%d]: Flag written true successfully\r\n", __FILE__, __LINE__);
               else
-                Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
+                Log.error("%s [%d]: Flag writing failed\r\n", __FILE__, __LINE__);
             }
           }
           else
@@ -1038,7 +1038,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
               if (res)
                 Log.info("%s [%d]: Flag written false successfully\r\n", __FILE__, __LINE__);
               else
-                Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
+                Log.error("%s [%d]: Flag writing failed\r\n", __FILE__, __LINE__);
             }
           }
           // Using filename from API response
@@ -1151,7 +1151,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
                   if (res)
                     Log.info("%s [%d]: Flag written true successfully\r\n", __FILE__, __LINE__);
                   else
-                    Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
+                    Log.error("%s [%d]: Flag writing failed\r\n", __FILE__, __LINE__);
                 }
               }
               else
@@ -1170,7 +1170,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
                   if (res)
                     Log.info("%s [%d]: Flag written false successfully\r\n", __FILE__, __LINE__);
                   else
-                    Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
+                    Log.error("%s [%d]: Flag writing failed\r\n", __FILE__, __LINE__);
                 }
               }
               status = true;
@@ -1253,7 +1253,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
                   if (res)
                     Log.info("%s [%d]: Flag written true successfully\r\n", __FILE__, __LINE__);
                   else
-                    Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
+                    Log.error("%s [%d]: Flag writing failed\r\n", __FILE__, __LINE__);
                 }
               }
               else
@@ -1273,7 +1273,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
                   if (res)
                     Log.info("%s [%d]: Flag written false successfully\r\n", __FILE__, __LINE__);
                   else
-                    Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
+                    Log.error("%s [%d]: Flag writing failed\r\n", __FILE__, __LINE__);
                 }
               }
               status = true;
@@ -1466,7 +1466,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
                   if (res)
                     Log.info("%s [%d]: Flag written true successfully\r\n", __FILE__, __LINE__);
                   else
-                    Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
+                    Log.error("%s [%d]: Flag writing failed\r\n", __FILE__, __LINE__);
                 }
               }
               else
@@ -1486,7 +1486,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
                   if (res)
                     Log.info("%s [%d]: Flag written false successfully\r\n", __FILE__, __LINE__);
                   else
-                    Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
+                    Log.error("%s [%d]: Flag writing failed\r\n", __FILE__, __LINE__);
                 }
               }
               status = true;
@@ -2111,14 +2111,40 @@ static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiRes
   preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
 }
 
-// 0 = larger glyph, centered for message screens
-// 1 = small glyph, set in lower-right corner for loading screen
+// 0 = larger glyph for message screens
+// 1 = loading screen (mostly blank, small glyph in lower right corner)
 static uint8_t *storedLogoOrDefault(int iType)
 {
-//  if (filesystem_read_from_file("/logo.bmp", buffer, DEFAULT_IMAGE_SIZE))
-//  {
-//    return buffer;
-//  }
+//
+// See if there are custom art assets in FLASH memory.
+// The top 4K of FLASH would be reserved for this data.
+// The images are stored as: logo_medium, loading
+//
+   uint32_t u32Size;
+   //esp_flash_t chip;
+   uint8_t *s;
+   uint16_t u16Size;
+   BRAND *pBrand;
+
+   u32Size = ESP.getFlashChipSize();
+   Log_info("%s [%d]: esp flash size: %d\r\n", __FILE__, __LINE__, u32Size);
+   if (u32Size != 0) {
+   pBrand = (BRAND *)malloc(sizeof(BRAND)); // DEBUG - we can leak this memory for now
+   esp_flash_init(NULL);
+   esp_flash_read(NULL, (void *)pBrand, u32Size-sizeof(BRAND), sizeof(BRAND));
+   if (*(uint16_t *)&pBrand->u8Images[0] == 0xBBBF /*BB_BITMAP_MARKER*/) {
+      // Group5 compressed images are present, use them
+      if (iType == 0) {
+        return &pBrand->u8Images[0]; // the first image is the medium sized logo
+      } else { // the second image is the loading screen with small logo
+        // get the pointer to the loading image
+        s = &pBrand->u8Images[0];
+        u16Size = *(uint16_t *)&s[6]; // compressed image size
+        s += u16Size + 8; // skip to loading image
+        return s;
+      }
+   }
+  }
 #ifdef BOARD_TRMNL_X
     return const_cast<uint8_t *>(logo_medium);
 #else
