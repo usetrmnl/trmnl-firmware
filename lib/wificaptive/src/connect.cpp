@@ -7,6 +7,117 @@
 #include "esp_wifi.h"
 #include "esp_wpa2.h"
 #include "esp_err.h"
+#include "esp_netif.h"
+
+/**
+ * @brief Configure static IP with smart defaults
+ *
+ * If gateway/subnet/dns are not specified, derives sensible defaults:
+ * - Gateway: x.x.x.1 (same network as static IP)
+ * - Subnet: 255.255.255.0
+ * - DNS1: 8.8.8.8 (Google DNS)
+ * - DNS2: 8.8.8.8 (Google DNS)
+ *
+ * @param credentials WiFi credentials containing static IP settings
+ * @return true if static IP was configured, false if using DHCP
+ */
+static bool configureStaticIP(const WifiCredentials &credentials)
+{
+    if (!credentials.useStaticIP || credentials.staticIP.length() == 0)
+    {
+        Log_info("WiFi: Using DHCP");
+        return false;
+    }
+
+    IPAddress ip, gateway, subnet, dns1, dns2;
+
+    // Parse static IP (required)
+    if (!ip.fromString(credentials.staticIP))
+    {
+        Log_error("WiFi: Invalid static IP address: %s", credentials.staticIP.c_str());
+        return false;
+    }
+
+    // Parse or derive gateway (default: x.x.x.1)
+    if (credentials.gateway.length() > 0 && gateway.fromString(credentials.gateway))
+    {
+        Log_info("WiFi: Using specified gateway: %s", credentials.gateway.c_str());
+    }
+    else
+    {
+        gateway = IPAddress(ip[0], ip[1], ip[2], 1);
+        Log_info("WiFi: Using default gateway: %s", gateway.toString().c_str());
+    }
+
+    // Parse or use default subnet (default: 255.255.255.0)
+    if (credentials.subnet.length() > 0 && subnet.fromString(credentials.subnet))
+    {
+        Log_info("WiFi: Using specified subnet: %s", credentials.subnet.c_str());
+    }
+    else
+    {
+        subnet = IPAddress(255, 255, 255, 0);
+        Log_info("WiFi: Using default subnet: %s", subnet.toString().c_str());
+    }
+
+    // Parse or use default DNS1 (default: 8.8.8.8 Google DNS)
+    if (credentials.dns1.length() > 0 && dns1.fromString(credentials.dns1))
+    {
+        Log_info("WiFi: Using specified DNS1: %s", credentials.dns1.c_str());
+    }
+    else
+    {
+        dns1 = IPAddress(8, 8, 8, 8);
+        Log_info("WiFi: Using default DNS1: %s", dns1.toString().c_str());
+    }
+
+    // Parse or use default DNS2 (default: 8.8.8.8 Google DNS)
+    if (credentials.dns2.length() > 0 && dns2.fromString(credentials.dns2))
+    {
+        Log_info("WiFi: Using specified DNS2: %s", credentials.dns2.c_str());
+    }
+    else
+    {
+        dns2 = IPAddress(8, 8, 8, 8);
+        Log_info("WiFi: Using default DNS2: %s", dns2.toString().c_str());
+    }
+
+    // Apply static IP configuration
+    Log_info("WiFi: Configuring static IP: %s", ip.toString().c_str());
+    if (!WiFi.config(ip, gateway, subnet, dns1, dns2))
+    {
+        Log_error("WiFi: Failed to configure static IP");
+        return false;
+    }
+
+    // Explicitly stop DHCP client to prevent any DHCP requests on boot/wake
+    // This saves battery by avoiding DHCP negotiation delays
+    esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    if (netif != nullptr)
+    {
+        esp_err_t err = esp_netif_dhcpc_stop(netif);
+        if (err == ESP_OK)
+        {
+            Log_info("WiFi: DHCP client disabled (static IP mode)");
+        }
+        else if (err == ESP_ERR_ESP_NETIF_DHCP_ALREADY_STOPPED)
+        {
+            Log_info("WiFi: DHCP client already disabled");
+        }
+        else
+        {
+            Log_error("WiFi: Failed to disable DHCP client: %d", err);
+        }
+    }
+
+    Log_info("WiFi: Static IP configured - IP: %s, GW: %s, Subnet: %s, DNS1: %s, DNS2: %s",
+             ip.toString().c_str(),
+             gateway.toString().c_str(),
+             subnet.toString().c_str(),
+             dns1.toString().c_str(),
+             dns2.toString().c_str());
+    return true;
+}
 
 void disableWpa2Enterprise()
 {
@@ -149,6 +260,9 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
             return {WL_CONNECT_FAILED, eventData};
         }
 
+        // Configure static IP if specified (must be before WiFi.begin)
+        configureStaticIP(credentials);
+
         WiFi.begin(credentials.ssid.c_str());
 
         beginResult = WiFi.status();
@@ -158,6 +272,10 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
     {
         // regular connection
         WiFi.mode(WIFI_STA);
+
+        // Configure static IP if specified (must be before WiFi.begin)
+        configureStaticIP(credentials);
+
         beginResult = WiFi.begin(credentials.ssid.c_str(), credentials.pswd.c_str());
         Log_info("WiFi: begin (WPA2-Personal), starting from status %s", wifiStatusStr(beginResult));
     }

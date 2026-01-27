@@ -414,6 +414,16 @@
         body.username = document.getElementById('username').value;
       }
 
+      // Include static IP settings from localStorage (configured in Advanced settings)
+      var useStaticIP = localStorage.getItem('useStaticIP') === 'true';
+      if (useStaticIP) {
+        body.useStaticIP = true;
+        body.staticIP = localStorage.getItem('staticIP') || '';
+        body.gateway = localStorage.getItem('gateway') || '';
+        body.subnet = localStorage.getItem('subnet') || '';
+        body.dns1 = localStorage.getItem('dns1') || '';
+      }
+
       showLoader();
       fetch('/connect', {
         method: 'POST',
