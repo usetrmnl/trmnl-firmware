@@ -44,7 +44,7 @@
 /**
  * GPIO config
 **/
-#if defined(BOARD_TRMNL)
+#if defined(BOARD_TRMNL) || defined (BOARD_TRMNL_4CLR)
 // Xiao ESP32C3 plus 8-pin breakout
 //   #define EPD_SCK_PIN  8
 //   #define EPD_MOSI_PIN 10
@@ -66,6 +66,14 @@
   #define EPD_RST_PIN  10
   #define EPD_DC_PIN   5
   #define EPD_BUSY_PIN 4
+
+#elif defined(BOARD_XTEINK_X4)
+  #define EPD_SCK_PIN  8
+  #define EPD_MOSI_PIN 10
+  #define EPD_CS_PIN   21
+  #define EPD_RST_PIN  5
+  #define EPD_DC_PIN   4
+  #define EPD_BUSY_PIN 6
 
 #elif defined(BOARD_WAVESHARE_ESP32_DRIVER)
    // Pin definition for Waveshare ESP32 Driver Board
@@ -94,7 +102,7 @@
    #define EPD_DC_PIN   4
    #define EPD_BUSY_PIN 3
    
-#elif defined(BOARD_XIAO_EPAPER_DISPLAY)
+#elif (defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_XIAO_EPAPER_DISPLAY_3CLR))
    // Pin definition for TRMNL 7inch5 OG DIY Kit
    #define EPD_SCK_PIN  7
    #define EPD_MOSI_PIN 9
@@ -102,11 +110,13 @@
    #define EPD_RST_PIN  38
    #define EPD_DC_PIN   10
    #define EPD_BUSY_PIN 4
+   // DEBUG - remove the fake battery line after testing
+   #define FAKE_BATTERY_VOLTAGE
 #elif defined(BOARD_TRMNL_X)
    #define FAKE_BATTERY_VOLTAGE
 
-#elif defined(BOARD_SEEED_RETERMINAL_E1001)
-   // Pin definition for reTerminal E1001
+#elif defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002)
+   // Pin definition for reTerminal E1001 & E1002
    #define EPD_SCK_PIN  7
    #define EPD_MOSI_PIN 9
    #define EPD_CS_PIN   10
