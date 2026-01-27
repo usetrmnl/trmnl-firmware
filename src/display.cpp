@@ -77,9 +77,9 @@ RTC_DATA_ATTR int iUpdateCount = 0;
 #include <api-client/display.h>
 #include <trmnl_log.h>
 #include "png_flip.h"
-#include "../lib/bb_epaper/Fonts/nicoclean_8.h"
-#include "../lib/bb_epaper/Fonts/Inter_18.h"
-#include "../lib/bb_epaper/Fonts/Roboto_Black_24.h"
+#include "nicoclean_8.h"
+#include "Inter_18.h"
+#include "Roboto_Black_24.h"
 extern char filename[];
 extern Preferences preferences;
 extern ApiDisplayResult apiDisplayResult;
