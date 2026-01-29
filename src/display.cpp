@@ -13,31 +13,31 @@
 const DISPLAY_PROFILE dpList[4] = { // 1-bit and 2-bit display types for each profile
 #ifdef BOARD_XTEINK_X4
     {EP426_800x480, EP426_800x480_4GRAY}, // default (for original EPD)
-    {EP426_800x480, EP426_800x480_4GRAY}, // a = uses built-in fast + 4-gray 
+    {EP426_800x480, EP426_800x480_4GRAY}, // a = uses built-in fast + 4-gray
     {EP426_800x480, EP426_800x480_4GRAY}, // b = darker grays
 };
 BBEPAPER bbep(EP426_800x480);
 #elif defined(BOARD_XIAO_EPAPER_DISPLAY_3CLR)
     {EP75R_800x480, EP75R_800x480}, // default (for original EPD)
-    {EP75R_800x480, EP75R_800x480}, // a = uses built-in fast + 4-gray 
+    {EP75R_800x480, EP75R_800x480}, // a = uses built-in fast + 4-gray
     {EP75R_800x480, EP75R_800x480}, // b = darker grays
 };
 BBEPAPER bbep(EP75R_800x480);
 #elif defined(BOARD_TRMNL_4CLR)
     {EP75YR_800x480, EP75YR_800x480}, // default (for original EPD)
-    {EP75YR_800x480, EP75YR_800x480}, // a = uses built-in fast + 4-gray 
+    {EP75YR_800x480, EP75YR_800x480}, // a = uses built-in fast + 4-gray
     {EP75YR_800x480, EP75YR_800x480}, // b = darker grays
 };
 BBEPAPER bbep(EP75YR_800x480);
 #elif defined(BOARD_SEEED_RETERMINAL_E1002)
     {EP73_SPECTRA_800x480, EP73_SPECTRA_800x480}, // default (for original EPD)
-    {EP73_SPECTRA_800x480, EP73_SPECTRA_800x480}, // a = uses built-in fast + 4-gray 
+    {EP73_SPECTRA_800x480, EP73_SPECTRA_800x480}, // a = uses built-in fast + 4-gray
     {EP73_SPECTRA_800x480, EP73_SPECTRA_800x480}, // b = darker grays
 };
 BBEPAPER bbep(EP73_SPECTRA_800x480);
 #else
     {EP75_800x480, EP75_800x480_4GRAY}, // default (for original EPD)
-    {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, // a = uses built-in fast + 4-gray 
+    {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, // a = uses built-in fast + 4-gray
     {EP75_800x480, EP75_800x480_4GRAY_V2}, // b = darker grays
 };
 BBEPAPER bbep(EP75_800x480);
@@ -49,21 +49,21 @@ uint8_t u8SpectraPal[512]; // RGB333 mapped to closest Spectra6 color
 #include "FastEPD.h"
 FASTEPD bbep;
 const uint8_t u8_graytable[] = {
-/* 0 */  2, 2, 1, 1, 1, 1, 1, 1, 
+/* 0 */  2, 2, 1, 1, 1, 1, 1, 1,
 /* 1 */  2, 2, 2, 2, 1, 1, 2, 1,
-/* 2 */  2, 2, 2, 1, 1, 1, 1, 2, 
+/* 2 */  2, 2, 2, 1, 1, 1, 1, 2,
 /* 3 */  2, 2, 2, 1, 1, 1, 1, 2,
 /* 4 */  2, 2, 2, 2, 1, 1, 1, 2,
 /* 5 */  2, 2, 2, 2, 1, 2, 2, 1,
 /* 6 */  2, 2, 1, 1, 1, 2, 1, 2,
-/* 7 */  2, 2, 2, 1, 1, 2, 1, 2, 
-/* 8 */  1, 1, 1, 1, 1, 1, 2, 2, 
-/* 9 */  2, 1, 1, 1, 1, 1, 2, 2, 
-/* 10 */  2, 2, 1, 1, 1, 1, 2, 2, 
-/* 11 */  2, 2, 2, 1, 1, 1, 2, 2, 
-/* 12 */  2, 1, 1, 2, 1, 1, 2, 2, 
-/* 13 */  2, 2, 2, 2, 1, 1, 2, 2, 
-/* 14 */  2, 2, 2, 2, 2, 1, 2, 2, 
+/* 7 */  2, 2, 2, 1, 1, 2, 1, 2,
+/* 8 */  1, 1, 1, 1, 1, 1, 2, 2,
+/* 9 */  2, 1, 1, 1, 1, 1, 2, 2,
+/* 10 */  2, 2, 1, 1, 1, 1, 2, 2,
+/* 11 */  2, 2, 2, 1, 1, 1, 2, 2,
+/* 12 */  2, 1, 1, 2, 1, 1, 2, 2,
+/* 13 */  2, 2, 2, 2, 1, 1, 2, 2,
+/* 14 */  2, 2, 2, 2, 2, 1, 2, 2,
 /* 15 */  2, 2, 2, 2, 2, 2, 2, 2
 };
 #endif
@@ -338,7 +338,7 @@ void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message,
         bbep.print(lines[j]);
     }
 }
-/** 
+/**
  * @brief Reduce the bit depth of line of pixels using thresholding (aka simple color mapping)
  * @param Destination bit count (1 or 2)
  * @param Pointer to a PNG palette (3 bytes per entry)
@@ -414,7 +414,7 @@ void ReduceBpp(int iDestBpp, int iPixelType, uint8_t *pPalette, uint8_t *pSrc, u
         } else { // generate 4 gray levels (2 bits)
             u8 |= (3 ^ (g >> 6)); // 4 gray levels (inverted relative to 1-bit)
         }
-        count -= iDestBpp;        
+        count -= iDestBpp;
         if (count == 0) { // byte is full, move on
             *d++ = u8;
             u8 = 0;
@@ -500,20 +500,20 @@ unsigned char GetBWYRPixel(int r, int g, int b)
     return ucOut;
 } /* GetBWYRPixel() */
 #ifdef BOARD_SEEED_RETERMINAL_E1002
-//      
+//
 // bb_epaper colors to map to Spectra6 colors
 // The RGB values are not correct for the panel, but for simple mapping
 // these work best. These get mapped from bb_epaper color indices to
 // Spectra6 color indices by the setPixel() method.
-//      
+//
 const int iSpectraRGB[] = { // r, g, b
     0, 0, 0, // black = 0
     192,192,192, // white = 1
     192,192,0, // yellow = 2
-    192,0,0, // red = 3 
+    192,0,0, // red = 3
     0,0,192, // blue = 4
     0,192,0, // green = 5
-};              
+};
 // Map the Spectra6 palette to the closest RGB333 values
 void CreateSpectra6Pal(void)
 {
@@ -542,12 +542,12 @@ void CreateSpectra6Pal(void)
         u8SpectraPal[i] = min_index; // best match palette index for this RGB333 color
     } // for i
 } /* CreateSpectra6Pal() */
-// 
+//
 // Convert the RGB value into one of 6 Spectra6 colors
-//    
+//
 uint8_t GetSpectraPixel(int r, int g, int b)
 {
-uint8_t c; 
+uint8_t c;
 uint16_t rgb333;
 
     rgb333 = (r>>5) + ((g & 0xe0) >> 2) + ((b & 0xe0) << 1);
@@ -555,7 +555,7 @@ uint16_t rgb333;
     return c;
 } /* GetSpectraPixel() */
 #endif // E1002
-/** 
+/**
  * @brief Callback function for each line of PNG decoded
  * @param PNGDRAW structure containing the current line and relevant info
  * @return none
@@ -1030,7 +1030,7 @@ int png_draw_count(PNGDRAW *pDraw)
     pFlags[0] = set_bits; // put it back in the flags array
     return 1;
 } /* png_draw_count() */
-/** 
+/**
  * @brief Function to decode a PNG and count the number of unique colors
  *        This is needed because 2-bit (4gray) images can sometimes contain
  *        only 2 unique colors. This will allow us to use partial (non-flickering)
@@ -1056,7 +1056,7 @@ int i, iColors;
     return iColors;
 } /* png_count_colors() */
 
-/** 
+/**
  * @brief JPEGDEC callback function passed blocks of MCUs (minimum coded units)
  * @param pointer to the JPEGDRAW structure
  * @return 1 to continue decoding or 0 to abort
@@ -1112,7 +1112,7 @@ uint8_t src=0, uc=0, ucMask, *s, *d, *pTemp = bbep.getCache();
 #endif
     return 1; // continue decoding
 } /* jpeg_draw() */
-/** 
+/**
  * @brief Function to decode and display a JPEG image from memory
  *        The decoded lines are written directly into the EPD framebuffer
  *        due to insufficient RAM to hold the fully decoded image
@@ -1168,7 +1168,7 @@ int iPlane = 0;
     free(jpg);
     return rc;
 } /* jpeg_to_epd() */
-/** 
+/**
  * @brief Function to decode and display a PNG image from memory
  *        The decoded lines are written directly into the EPD framebuffer
  *        due to insufficient RAM to hold the fully decoded image
@@ -1279,7 +1279,7 @@ PNG *png = new PNG();
     free(png); // free the decoder instance
     return rc;
 } /* png_to_epd() */
-/** 
+/**
  * @brief Function to show the image on the display
  * @param image_buffer pointer to the uint8_t image buffer
  * @param reverse shows if the color scheme is reverse
@@ -1349,11 +1349,11 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
             int y = (height - pBBB->height)/2; // center it
             if (x > 0 || y > 0) // only clear if the image is smaller than the display
             {
-                bbep.fillScreen(BBEP_WHITE); 
-            }     
+                bbep.fillScreen(BBEP_WHITE);
+            }
             bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
-        } 
-        else 
+        }
+        else
         {
          // This work-around is due to a lack of RAM; the correct method would be to use loadBMP()
             flip_image(image_buffer+62, bbep.width(), bbep.height(), false); // fix bottom-up bitmap images
@@ -1459,7 +1459,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         int y = (height - pBBB->height)/2; // center it
         if (x > 0 || y > 0) // only clear if the image is smaller than the display
         {
-            bbep.fillScreen(BBEP_WHITE); 
+            bbep.fillScreen(BBEP_WHITE);
         }
         bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
     }
@@ -1752,7 +1752,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     }
     break;
     case FILL_WHITE:
-    {   
+    {
         Log_info("Display set to white");
         bbep.fillScreen(BBEP_WHITE);
     }
@@ -1790,7 +1790,7 @@ void display_show_msg_qa(uint8_t *image_buffer, const float *voltage, const floa
         int y = (height - pBBB->height)/2; // center it
         if (x > 0 || y > 0) // only clear if the image is smaller than the display
         {
-            bbep.fillScreen(BBEP_WHITE); 
+            bbep.fillScreen(BBEP_WHITE);
         }
         bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
     }
@@ -1802,11 +1802,11 @@ void display_show_msg_qa(uint8_t *image_buffer, const float *voltage, const floa
     }
 
     bbep.setFont(nicoclean_8); //Roboto_20);
-    bbep.setTextColor(BBEP_BLACK, BBEP_WHITE); 
+    bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
 
-    String voltageString = String("Initial voltage: ") 
-    + String(voltage[0], 4) 
-    + String(" V, ") 
+    String voltageString = String("Initial voltage: ")
+    + String(voltage[0], 4)
+    + String(" V, ")
     + String("  Final voltage: ")
     + String(voltage[1], 4)
     + String(" V, ")
@@ -1814,8 +1814,8 @@ void display_show_msg_qa(uint8_t *image_buffer, const float *voltage, const floa
     + String(voltage[2], 4)
     + String(" V");
 
-    String temperatureString = String("Initial temperature: ") 
-    + String(temperature[0], 4) 
+    String temperatureString = String("Initial temperature: ")
+    + String(temperature[0], 4)
     + String(" C, ")
     + String("  Final temperature: ")
     + String(temperature[1], 4)
@@ -1824,17 +1824,17 @@ void display_show_msg_qa(uint8_t *image_buffer, const float *voltage, const floa
     + String(temperature[2], 4)
     + String(" C");
 
-    
+
     bbep.getStringBox(voltageString.c_str(), &rect);
     bbep.setCursor((bbep.width() - rect.w) / 2, 340);
     bbep.print(voltageString);
-    
+
     bbep.getStringBox(temperatureString.c_str(), &rect);
     bbep.setCursor((bbep.width() - rect.w) / 2, 370);
     bbep.print(temperatureString);
 
-    String qaResultInstruction = (qa_result) 
-    ? "QA passed, press button to clear screen" 
+    String qaResultInstruction = (qa_result)
+    ? "QA passed, press button to clear screen"
     : "QA failed, please use another board and put in failure pile for investigation";
 
     bbep.getStringBox(qaResultInstruction.c_str(), &rect);
@@ -1864,7 +1864,7 @@ void display_show_msg_qa(uint8_t *image_buffer, const float *voltage, const floa
         bbep.getStringBox(string3.c_str(), &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.print(string3);
-    */ 
+    */
 }
 
 /**
@@ -1918,7 +1918,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         int x = (width - pBBB->width)/2;
         int y = (height - pBBB->height)/2; // center it
         if (x > 0 || y > 0) // only clear if the image is smaller than the display
-        { 
+        {
             bbep.fillScreen(BBEP_WHITE);
         }
         bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
@@ -1941,7 +1941,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     case FRIENDLY_ID:
     {
         Log_info("friendly id case");
-        const char string1[] = "Please sign up at usetrmnl.com/signup";
+        const char string1[] = "Please sign up at trmnl.com/signup";
         bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
         bbep.setCursor((bbep.width() - rect.w)/2, 400);
