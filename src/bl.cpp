@@ -38,6 +38,7 @@
 #include "logo_medium.h"
 #include "loading.h"
 #include <wifi-helpers.h>
+#include <device_identity.h>
 
 bool pref_clear = false;
 String new_filename = "";
@@ -64,6 +65,7 @@ RTC_DATA_ATTR uint8_t need_to_refresh_display = 1;
 Preferences preferences;
 PreferencesPersistence preferencesPersistence(preferences);
 StoredLogs storedLogs(LOG_MAX_NOTES_NUMBER / 2, LOG_MAX_NOTES_NUMBER / 2, PREFERENCES_LOG_KEY, PREFERENCES_LOG_BUFFER_HEAD_KEY, preferencesPersistence);
+DeviceIdentity deviceIdentity;
 
 static https_request_err_e downloadAndShow(); // download and show the image
 static uint32_t downloadStream(WiFiClient *stream, int content_size, uint8_t *buffer);
@@ -336,6 +338,12 @@ void bl_init(void)
 
 #endif
 
+  // Initialize Ed25519 device identity (after WiFi is active for RF-based entropy)
+  if (!initDeviceIdentity(preferencesPersistence, deviceIdentity))
+  {
+    Log_error("Failed to initialize device identity");
+  }
+
   // clock synchronization
   if (setClock())
   {
@@ -580,6 +588,10 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   inputs.displayHeight = display_height();
   inputs.model = DEVICE_MODEL;
   inputs.specialFunction = special_function;
+
+  // Ed25519 authentication
+  inputs.authMode = preferences.getString(PREFERENCES_AUTH_MODE, PREFERENCES_AUTH_MODE_DEFAULT);
+  inputs.identity = &deviceIdentity;
 
   return inputs;
 }
@@ -1609,6 +1621,12 @@ static bool performApiSetup()
     Log.info("%s [%d]: message - %s\r\n", __FILE__, __LINE__, message_str.c_str());
     message_str.toCharArray(message_buffer, message_str.length() + 1);
 
+    // Store auth mode from server
+    String auth_mode = apiResponse.auth_mode;
+    Log.info("%s [%d]: auth_mode - %s\r\n", __FILE__, __LINE__, auth_mode.c_str());
+    res = preferences.putString(PREFERENCES_AUTH_MODE, auth_mode);
+    Log.info("%s [%d]: auth_mode saved in the preferences - %d\r\n", __FILE__, __LINE__, res);
+
     Log.info("%s [%d]: status - %d\r\n", __FILE__, __LINE__, status);
     return true;
   }
@@ -1774,6 +1792,8 @@ static void resetDeviceCredentials(void)
   Log.info("%s [%d]: WiFi reseting...\r\n", __FILE__, __LINE__);
   WifiCaptivePortal.resetSettings();
   need_to_refresh_display = 1;
+  // Clear device identity (Ed25519 keys) - will regenerate on next boot
+  clearDeviceIdentity(preferencesPersistence);
   bool res = preferences.clear();
   if (res)
     Log.info("%s [%d]: The device reset success. Restarting...\r\n", __FILE__, __LINE__);
@@ -1970,7 +1990,12 @@ bool submitLogString(const char *log_buffer)
     return false;
   }
 
-  LogApiInput input{api_key, log_buffer};
+  LogApiInput input{
+    .api_key = api_key,
+    .log_buffer = log_buffer,
+    .authMode = preferences.getString(PREFERENCES_AUTH_MODE, PREFERENCES_AUTH_MODE_DEFAULT),
+    .identity = &deviceIdentity
+  };
   return submitLogToApi(input, preferences.getString(PREFERENCES_API_URL, API_BASE_URL).c_str());
 }
 
@@ -2030,7 +2055,12 @@ static void submitStoredLogs(void)
     Log.info("%s [%d]: log string - %s\r\n", __FILE__, __LINE__, log.c_str());
     Log.info("%s [%d]: need to send the log\r\n", __FILE__, __LINE__);
 
-    LogApiInput input{api_key, log.c_str()};
+    LogApiInput input{
+      .api_key = api_key,
+      .log_buffer = log.c_str(),
+      .authMode = preferences.getString(PREFERENCES_AUTH_MODE, PREFERENCES_AUTH_MODE_DEFAULT),
+      .identity = &deviceIdentity
+    };
     submitLogToApiResult = submitLogToApi(input, preferences.getString(PREFERENCES_API_URL, API_BASE_URL).c_str());
   }
   else
