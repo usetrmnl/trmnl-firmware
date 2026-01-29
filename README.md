@@ -1,6 +1,6 @@
 # TRMNL Firmware
 
-created for the [TRMNL](https://usetrmnl.com) e-ink display.
+created for the [TRMNL](https://trmnl.com) e-ink display.
 
 ## **Algorithm block scheme**
 
@@ -122,6 +122,7 @@ headers = {
 }
 
 response example (success):
+
 {
   "status": 200,
   "api_key": "2r--SahjsAKCFksVcped2Q",
@@ -264,7 +265,7 @@ There are technical and non-technical options to flashing firmware.
 
 **No code required**
 
-* Flash directly from a web browser: https://usetrmnl.com/flash
+* Flash directly from a web browser: https://trmnl.com/flash
 * Enable OTA updates from your TRMNL dashboard > Device settings (native hardware only)
 
 **For developers**
