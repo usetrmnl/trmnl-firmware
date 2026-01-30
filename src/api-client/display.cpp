@@ -38,6 +38,8 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
   https.addHeader("temperature-profile", "true");
   https.addHeader("Width", String(inputs.displayWidth));
   https.addHeader("Height", String(inputs.displayHeight));
+  https.addHeader("Colors", inputs.displayColors);
+  https.addHeader("Board", inputs.board);
 
   if (inputs.specialFunction != SF_NONE)
   {

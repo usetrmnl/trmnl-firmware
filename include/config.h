@@ -112,6 +112,45 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #define VBAT_SWITCH_LEVEL HIGH  //load switch enable pin active level
 #endif
 
+// Board identifier and display color palette
+#if defined(BOARD_TRMNL) && !defined(BOARD_TRMNL_4CLR)
+#define DEVICE_BOARD "trmnl_og"
+#define DISPLAY_COLORS "#000000,#555555,#AAAAAA,#FFFFFF"
+#elif defined(BOARD_TRMNL_4CLR)
+#define DEVICE_BOARD "trmnl_og_4clr"
+#define DISPLAY_COLORS "#000000,#FFFFFF,#FF0000,#FFFF00"
+#elif defined(BOARD_XTEINK_X4)
+#define DEVICE_BOARD "xteink_x4"
+#define DISPLAY_COLORS "#000000,#555555,#AAAAAA,#FFFFFF"
+#elif defined(BOARD_TRMNL_X)
+#define DEVICE_BOARD "trmnl_x"
+#define DISPLAY_COLORS "#000000,#111111,#222222,#333333,#444444,#555555,#666666,#777777,#888888,#999999,#AAAAAA,#BBBBBB,#CCCCCC,#DDDDDD,#EEEEEE,#FFFFFF"
+#elif defined(BOARD_WAVESHARE_ESP32_DRIVER)
+#define DEVICE_BOARD "waveshare"
+#define DISPLAY_COLORS "#000000,#555555,#AAAAAA,#FFFFFF"
+#elif defined(BOARD_SEEED_XIAO_ESP32C3)
+#define DEVICE_BOARD "seeed_xiao_c3"
+#define DISPLAY_COLORS "#000000,#555555,#AAAAAA,#FFFFFF"
+#elif defined(BOARD_SEEED_XIAO_ESP32S3)
+#define DEVICE_BOARD "seeed_xiao_s3"
+#define DISPLAY_COLORS "#000000,#555555,#AAAAAA,#FFFFFF"
+#elif defined(BOARD_XIAO_EPAPER_DISPLAY)
+#define DEVICE_BOARD "xiao_epaper"
+#define DISPLAY_COLORS "#000000,#555555,#AAAAAA,#FFFFFF"
+#elif defined(BOARD_XIAO_EPAPER_DISPLAY_3CLR)
+#define DEVICE_BOARD "xiao_epaper_3clr"
+#define DISPLAY_COLORS "#000000,#FFFFFF,#FF0000"
+#elif defined(BOARD_SEEED_RETERMINAL_E1001)
+#define DEVICE_BOARD "reterminal_e1001"
+#define DISPLAY_COLORS "#000000,#555555,#AAAAAA,#FFFFFF"
+#elif defined(BOARD_SEEED_RETERMINAL_E1002)
+#define DEVICE_BOARD "reterminal_e1002"
+#define DISPLAY_COLORS "#000000,#FFFFFF,#FF0000,#FFFF00,#0000FF,#00FF00"
+#else
+#define DEVICE_BOARD "unknown"
+#define DISPLAY_COLORS "#000000,#FFFFFF"
+#endif
+
 #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002)
 #define PIN_BATTERY 1
 #elif defined(BOARD_XTEINK_X4)
