@@ -207,6 +207,7 @@ public:
         bool getRDYStatus(void);
 
         void setEventMode(bool stopOrRestart);
+        void clearEventMode(bool stopOrRestart);
 
         void updateInfoFlags(bool stopOrRestart);
         void setIQSMemoryMap(iqs323_system_status_t iqs_status);
@@ -223,7 +224,7 @@ public:
         uint16_t readChannelLTA(iqs323_channel_e channel);
 
         void force_I2C_communication(void);
-        void read_gesture(void);
+        bool check_i2c_lockup(void);
 
 private:
         // Private Variables

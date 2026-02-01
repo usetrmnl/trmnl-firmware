@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <WiFi.h>
+#include <esp_log.h>
 #include <bl.h>
 #include <trmnl_log.h>
 #include <types.h>
@@ -113,6 +114,10 @@ void wait_for_serial() {
 #include "rtc_wake_stub_trmnl_x.h"
 // ############################ WAKEUP STUB #############################
 
+// ############################ IQS323 TASK #############################
+#include "iqs323_task.h"
+// ############################ IQS323 TASK #############################
+
 // ############################ SLIDER #############################
 #include "IQS323.h"
 IQS323 iqs323;
@@ -134,7 +139,7 @@ void check_channel_states(void)
   for (uint8_t i = 0; i < 3; i++) {
     /* Check if the touch state bit is set */
     if (iqs323.channel_touchState((iqs323_channel_e)(i))) {
-      if (button_states[i] != IQS323_CH_TOUCH && (slider_event == IQS323_GESTURE_TAP || slider_event == IQS323_GESTURE_HOLD)) {
+      if ((slider_event == IQS323_GESTURE_TAP || slider_event == IQS323_GESTURE_HOLD)) {
         printf("CH: %d: Touch\n", i);
         switch (i) {
         case 0:
@@ -188,7 +193,7 @@ void read_gesture_event(void)
     /* returns slider event that occurred (tap, swipe or flick) by reading event bits from MM */
     iqs323_gesture_events gesture_buffer = iqs323.getGestureType();
     printf("Gesture type: %d\n", gesture_buffer);
-    if(slider_event != gesture_buffer)
+    if(gesture_buffer != IQS323_GESTURE_NONE)
     {
       slider_event = gesture_buffer;
       int file_size = 0;
@@ -244,6 +249,27 @@ void read_gesture_event(void)
     }
   }
 }
+
+void process_iqs323_data(void)
+{
+  /* Read slider coordinates from memory */
+  uint16_t buffer = iqs323.sliderCoordinate();
+
+  if(buffer != slider_position)
+  {
+    slider_position = buffer;
+  }
+
+  iqs323_task_i2c_lock();
+
+  /* Read gesture event if available */
+  read_gesture_event();
+
+  /* Check channel touch states */
+  check_channel_states();
+
+  iqs323_task_i2c_unlock();
+}
 // ############################ SLIDER #############################
 
 // ############################ ACCELERATOR #############################
@@ -253,6 +279,13 @@ void read_gesture_event(void)
 // ############################ esp32c5 modem #############################
 #include "modem.h"
 // ############################ esp32c5 modem #############################
+
+// ############################ Gas gauge #############################
+
+#include "BQ27427.h"
+
+// ############################ Gas gauge #############################
+
 #endif
 
 /**
@@ -303,42 +336,76 @@ void bl_init(void)
 #endif
 
   wakeup_reason = esp_sleep_get_wakeup_cause();
+  bool gpio_wakeup = (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO ||
+                      wakeup_reason == ESP_SLEEP_WAKEUP_EXT0 ||
+                      wakeup_reason == ESP_SLEEP_WAKEUP_EXT1);
 
-  if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO || wakeup_reason == ESP_SLEEP_WAKEUP_EXT0 || wakeup_reason == ESP_SLEEP_WAKEUP_EXT1)
-  {
-    Log_info("GPIO wakeup detected (%d)", wakeup_reason);
-    #ifdef BOARD_TRMNL_X
-    // iqs323.read_gesture();
-    // iqs323.run();
-    iqs323.setIQSMemoryMap(wakeup_stub_iqs_status);
-    if (iqs323.checkReset()) {
-      Serial.println("IQS323 Reset Occurred!\n");
-      iqs323.begin(IQS323_I2C_ADDRESS, SENSOR_SDA_PIN, SENSOR_SCL_PIN, PIN_INTERRUPT, true);
-      iqs323.new_data_available = false;
+#ifdef BOARD_TRMNL_X
+  // Notify IQS323 task about wakeup type BEFORE starting the task
 
-      time_t timeout_time = millis();
+  Log.info("%s [%d]: Display init\r\n", __FILE__, __LINE__);
+  iqs323_task_i2c_lock();
+  display_init();
+  iqs323_task_i2c_unlock();
+  filesystem_init();
 
-      while (timeout_time + 5000 > millis()) {
-        iqs323.run();
-        if (iqs323.new_data_available) {
-          break;
-        }
-        else if (iqs323.iqs323_state.init_state == IQS323_INIT_NONE) {
-          Serial.println("IQS323 Initialization Error! Reboot device...");
-          ESP.restart();
-          break;
-        }
-      }
+  if (gpio_wakeup) {
+    Log_info("GPIO wakeup detected (%d) - using wake stub data", wakeup_reason);
+    iqs323_task_notify_gpio_wakeup(true);
+  } else {
+    Log_info("Non-GPIO wakeup (%d)", wakeup_reason);
+
+    BQ27427_reset();
+    delay(300); // BQ27427 needs 250 ms to power up
+
+    if (!lipo.begin(SENSOR_SDA_PIN, SENSOR_SCL_PIN, 400000)) // begin() will return true if communication is successful
+    {
+    // If communication fails, print an error message and loop forever.
+      Serial.println("Error: Unable to communicate with BQ27427.");
+      gpio_dump_io_configuration(stdout, (1ULL << 39));
+      gpio_dump_io_configuration(stdout, (1ULL << 40));
     }
     else {
-      iqs323.iqs323_state.state = IQS323_STATE_RUN;
-      iqs323.iqs323_state.init_state = IQS323_INIT_DONE;
-      iqs323.new_data_available = 1;
+      Serial.println("Connected to BQ27427!");
+
+      // Set battery capacity
+      lipo.setCapacity(6000); // capacity in mAh
+
+      unsigned int soc = lipo.soc();
+      unsigned int volts = lipo.voltage();
+      int current = lipo.current(AVG);
+      Serial.printf("Battery: %d%% | %dmV | %dmA\n", soc, volts, current);
     }
-    auto button = 2;
-    #else
+  }
+
+  // Start IQS323 task manager
+  if (!iqs323_task_init(NULL)) {
+    Serial.println("IQS323 Task: Failed to start - rebooting");
+    delay(1000);
+    ESP.restart();
+  }
+
+  // Wait for IQS323 initialization to complete
+  if (!iqs323_task_wait_ready(5000)) {
+    Serial.println("IQS323 Task: Initialization timeout - rebooting");
+    delay(1000);
+    ESP.restart();
+  }
+
+  if (gpio_wakeup) {
+    process_iqs323_data();
+  }
+
+  // For future
+  // iqs323_task_set_data_callback(process_iqs323_data);
+
+  Serial.printf("init time: %ld us\n", init_time);
+
+#else
+  if (gpio_wakeup)
+  {
+    Log_info("GPIO wakeup (%d)", wakeup_reason);
     auto button = read_button_presses();
-    #endif
     Log_info("GPIO wakeup (%d) -> button was read (%s)", wakeup_reason, ButtonPressResultNames[button]);
     switch (button)
     {
@@ -358,33 +425,9 @@ void bl_init(void)
   }
   else
   {
-    // wait_for_serial();
     Log_info("Non-GPIO wakeup (%d) -> didn't read buttons", wakeup_reason);
-
-    #ifdef BOARD_TRMNL_X
-
-    // If we woke up not from GPIO, need to initialize the IQS323
-
-    iqs323.begin(IQS323_I2C_ADDRESS, SENSOR_SDA_PIN, SENSOR_SCL_PIN, PIN_INTERRUPT, true);
-    printf("IQS323 resetting device...\n");
-    iqs323.SW_Reset(STOP);
-    Serial.println("IQS323 Ready to configure!");
-
-    time_t timeout_time = millis();
-
-    while (timeout_time + 5000 > millis()) {
-      iqs323.run();
-      if (iqs323.new_data_available) {
-        break;
-      }
-      else if (iqs323.iqs323_state.init_state == IQS323_INIT_NONE) {
-        Serial.println("IQS323 Initialization Error! Reboot device...");
-        ESP.restart();
-        break;
-      }
-    }
-    #endif
   }
+#endif
 
   Log_info("preferences start");
   bool res = preferences.begin("data", false);
@@ -407,6 +450,7 @@ void bl_init(void)
   }
   Log_info("preferences end");
 
+#ifndef BOARD_TRMNL_X
   if (double_click)
   { // special function reading
     if (preferences.isKey(PREFERENCES_SF_KEY))
@@ -462,7 +506,11 @@ void bl_init(void)
     }
   }
   Log.info("%s [%d]: Display init\r\n", __FILE__, __LINE__);
+  iqs323_task_i2c_lock();
   display_init();
+  iqs323_task_i2c_unlock();
+  filesystem_init();
+#endif
 
 // #ifdef BOARD_TRMNL_X
 
@@ -499,31 +547,17 @@ void bl_init(void)
 
 // #endif
 
-  filesystem_init();
-
-#ifdef BOARD_TRMNL_X
-  // while (true) {
-  //   iqs323.run();
-    if (iqs323.new_data_available) {
-      read_slider_coordinates();
-      Serial.printf("Slider position: %d\n", slider_position);
-      read_gesture_event();
-      check_channel_states();
-      iqs323.new_data_available = false;
-    }
-    // delay(10);
-
-    // }
-    Serial.printf("init time: %ld us\n", init_time);
-#endif
-
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
   {
     Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
 
+    iqs323_task_i2c_lock();
+
     if (!otg_message) {
       display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false);
     }
+
+    iqs323_task_i2c_unlock();
 
     need_to_refresh_display = 1;
     preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
@@ -647,7 +681,9 @@ void bl_init(void)
 
   if (request_result == HTTPS_IMAGE_FILE_TOO_BIG)
   {
+    iqs323_task_i2c_lock();
     showMessageWithLogo(MSG_TOO_BIG);
+    iqs323_task_i2c_unlock();
   }
 
   if (!preferences.isKey(PREFERENCES_CONNECT_API_RETRY_COUNT))
@@ -658,6 +694,8 @@ void bl_init(void)
   if (request_result != HTTPS_SUCCESS && request_result != HTTPS_NO_ERR && request_result != HTTPS_NO_REGISTER && request_result != HTTPS_RESET && request_result != HTTPS_PLUGIN_NOT_ATTACHED)
   {
     uint8_t retries = preferences.getInt(PREFERENCES_CONNECT_API_RETRY_COUNT);
+
+    iqs323_task_i2c_lock();
 
     switch (retries)
     {
@@ -691,6 +729,7 @@ void bl_init(void)
       preferences.putInt(PREFERENCES_CONNECT_API_RETRY_COUNT, ++retries);
       break;
     }
+    iqs323_task_i2c_unlock();
   }
 
   else
@@ -700,6 +739,8 @@ void bl_init(void)
   }
 
   submitStoredLogs();
+
+  iqs323_task_i2c_lock();
 
   if (request_result == HTTPS_NO_REGISTER && need_to_refresh_display == 1)
   {
@@ -2136,9 +2177,15 @@ static void goToSleep(void)
   WiFi.mode(WIFI_OFF); 
 
 #if BOARD_TRMNL_X
-  Serial.println("Preparing iqs323 to sleep...");
-  // iqs323.force_I2C_communication(); // to clear any pending operations before sleep
-  iqs323.queueValueUpdates();
+  Serial.println("Preparing IQS323 for sleep via task...");
+
+  // Use task manager for sleep preparation (sets event mode, checks I2C health)
+  if (!iqs323_task_prepare_sleep(5000)) {
+    Serial.println("IQS323 sleep preparation timeout - proceeding anyway");
+  }
+
+  // Cleanup the task before entering deep sleep
+  iqs323_task_deinit();
   Serial.println("IQS323 is ready for sleep.");
 
   esp_set_deep_sleep_wake_stub(*wakeup_stub);
@@ -2164,6 +2211,7 @@ static void goToSleep(void)
 #elif CONFIG_IDF_TARGET_ESP32C3
   esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
 #elif CONFIG_IDF_TARGET_ESP32S3
+  esp_deep_sleep_disable_rom_logging();
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
 #elif CONFIG_IDF_TARGET_ESP32C5
   esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
@@ -2190,8 +2238,8 @@ void config_gpio_for_lp() {
   pinMode(GPIO_NUM_8, INPUT);
 
   // D+ D-
-  pinMode(GPIO_NUM_19, INPUT);
-  pinMode(GPIO_NUM_20, INPUT);
+  // pinMode(GPIO_NUM_19, INPUT);
+  // pinMode(GPIO_NUM_20, INPUT);
 
   // Data pins (d0 to d7)
   pinMode(GPIO_NUM_9, INPUT);

@@ -75,6 +75,17 @@ void display_init(void)
 
 #ifdef BOARD_TRMNL_X
 
+void BQ27427_reset()
+{
+    bbep.ioPinMode(10, OUTPUT);
+
+    bbep.ioWrite(10, LOW);
+    delay(10);
+
+    bbep.ioWrite(10, HIGH);
+    Serial.println("BQ27427 reset performed");
+}
+
 void config_pca95535_pins_for_lp()
 {
     bbep.ioPinMode(0, INPUT);

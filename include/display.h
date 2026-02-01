@@ -42,6 +42,7 @@ void display_init(void);
 uint8_t pca9535_interrupt_clear();
 void config_bma530_interrupt();
 void config_pca95535_pins_for_lp();
+void BQ27427_reset();
 void otg_turn_on();
 void otg_turn_off();
 

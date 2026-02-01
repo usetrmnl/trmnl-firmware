@@ -57,17 +57,16 @@ void wake_stub_i2c_init(int sda, int scl)
     gpio_ll_func_sel(gpio_dev, sda, PIN_FUNC_GPIO); 
     gpio_ll_od_enable(gpio_dev, sda);
     gpio_ll_pullup_en(gpio_dev, sda);
+    sda_high();
     
     // Configure SCL pin
     gpio_ll_output_enable(gpio_dev, scl);
     gpio_ll_func_sel(gpio_dev, scl, PIN_FUNC_GPIO);
     gpio_ll_od_enable(gpio_dev, scl);
     gpio_ll_pullup_en(gpio_dev, scl);
-
-    // Set idle state (both high)
-    sda_high();
     scl_high();
-    delay_us(100);
+
+    // delay_us(100);
 }
 
 static void i2c_start(void)

@@ -27,8 +27,8 @@
 #define S0_ATI_BASE_0                            0x64
 #define S0_ATI_BASE_1                            0x00
 #define S0_ATI_COARSE                            0x44
-#define S0_ATI_FINE                              0x5C
-#define S0_COMPENSATION_0                        0xC3
+#define S0_ATI_FINE                              0x64
+#define S0_COMPENSATION_0                        0xD9
 #define S0_COMPENSATION_1                        0x53
 
 /* Sensor 1 Settings */
@@ -50,8 +50,8 @@
 #define S1_ATI_BASE_0                            0x64
 #define S1_ATI_BASE_1                            0x00
 #define S1_ATI_COARSE                            0x47
-#define S1_ATI_FINE                              0x58
-#define S1_COMPENSATION_0                        0xEE
+#define S1_ATI_FINE                              0x5E
+#define S1_COMPENSATION_0                        0xD6
 #define S1_COMPENSATION_1                        0x53
 
 /* Sensor 2 Settings */
@@ -73,9 +73,9 @@
 #define S2_ATI_BASE_0                            0x64
 #define S2_ATI_BASE_1                            0x00
 #define S2_ATI_COARSE                            0x44
-#define S2_ATI_FINE                              0x58
-#define S2_COMPENSATION_0                        0xE0
-#define S2_COMPENSATION_1                        0x53
+#define S2_ATI_FINE                              0x5C
+#define S2_COMPENSATION_0                        0xA2
+#define S2_COMPENSATION_1                        0x4B
 
 /* Channel 0 Settings */
 /* Memory Map Position 0x60 - 0x63 */
@@ -135,15 +135,15 @@
 /* Memory Map Position 0xA0 - 0xA6 */
 #define GESTURE_SELECT                           0x0B
 #define RESERVED_BYTE                            0x00
-#define MINIMUM_TIME_0                           0x0A
+#define MINIMUM_TIME_0                           0x32
 #define MINIMUM_TIME_1                           0x00
-#define MAXIMUM_TAP_TIME_0                       0xC8
-#define MAXIMUM_TAP_TIME_1                       0x00
+#define MAXIMUM_TAP_TIME_0                       0x5E
+#define MAXIMUM_TAP_TIME_1                       0x01
 #define MAXIMUM_SWIPE_TIME_0                     0xF4
 #define MAXIMUM_SWIPE_TIME_1                     0x01
-#define MINIMUM_HOLD_TIME_0                      0xF4
-#define MINIMUM_HOLD_TIME_1                      0x01
-#define MAXIMUM_TAP_DISTANCE_0                   0x5E
+#define MINIMUM_HOLD_TIME_0                      0x58
+#define MINIMUM_HOLD_TIME_1                      0x02
+#define MAXIMUM_TAP_DISTANCE_0                   0x90
 #define MAXIMUM_TAP_DISTANCE_1                   0x01
 #define MINIMUM_SWIPE_DISTANCE_0                 0xF4
 #define MINIMUM_SWIPE_DISTANCE_1                 0x01
@@ -163,7 +163,7 @@
 
 /* Power Mode & System Settings */
 /* Memory Map Position 0xC0 - 0xC5 */
-#define SYSTEM_CONTROL                           0x90
+#define SYSTEM_CONTROL                           0x10
 #define CHANNEL_TIMEOUT_DISABLE                  0x00
 #define NP_REPORT_RATE_0                         0x10
 #define NP_REPORT_RATE_1                         0x00
@@ -178,12 +178,12 @@
 
 /* I2C Settings and Events Mask */
 /* Memory Map Position 0xD0 - 0xD4 */
-#define OUTA_MASK_0                              0x80
+#define OUTA_MASK_0                              0x00
 #define OUTA_MASK_1                              0x00
 #define I2C_TIMEOUT_0                            0xC8
 #define I2C_TIMEOUT_1                            0x00
-#define PROX_EVENT_TIMEOUT                       0x00
-#define TOUCH_EVENT_TIMEOUT                      0x00
+#define PROX_EVENT_TIMEOUT                       0x06
+#define TOUCH_EVENT_TIMEOUT                      0x06
 #define EVENTS_ENABLE                            0x04
 #define ACTIVATION_THRESHOLD                     0x18
 #define RELEASE_DELTA_PERCENTAGE                 0x08

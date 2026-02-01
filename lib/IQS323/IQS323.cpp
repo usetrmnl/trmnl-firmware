@@ -121,7 +121,7 @@ bool IQS323::init(void)
     /* Verifies product number to determine if the correct device is connected
     for this example */
     case IQS323_INIT_VERIFY_PRODUCT:
-      force_I2C_communication();
+      // force_I2C_communication();
       Serial.println("\tIQS323_INIT_VERIFY_PRODUCT");
       prod_num = getProductNum(RESTART);
       ver_maj = getmajorVersion(RESTART);
@@ -310,8 +310,7 @@ void IQS323::run(void)
         prev_rdy_time = last_rdy_time;
         queueValueUpdates();
         iqs323_deviceRDY = false;
-        new_data_available = false;
-        iqs323_state.state = IQS323_STATE_CHECK_RESET;
+        new_data_available = true;
       }
     break;
   }
@@ -618,6 +617,53 @@ void IQS323::setEventMode(bool stopOrRestart)
   transferByte[0] = setBit(transferByte[0], IQS323_EVENT_MODE_BIT);
   /* Write the bytes back to the device */
   writeRandomBytes(IQS323_MM_SYSTEM_CONTROL, 2, transferByte, stopOrRestart);
+
+  /* Verify event mode was actually set */
+  delay(10);
+  readRandomBytes(IQS323_MM_SYSTEM_CONTROL, 2, transferByte, STOP);
+  if (getBit(transferByte[0], IQS323_EVENT_MODE_BIT) == 0) {
+    Serial.println("WARNING: Event mode bit not set after write!");
+    Serial.print("System Control register value: 0x");
+    Serial.println(transferByte[0], HEX);
+  } else {
+    Serial.println("Event mode successfully activated and verified");
+  }
+}
+
+/**
+  * @name   clearEventMode
+  * @brief  A method to clear event mode and enable streaming mode on the IQS323.
+  *         In streaming mode, the device continuously opens communication windows
+  *         which reduces the need for force_I2C_communication() and lowers the
+  *         risk of I2C lockup.
+  * @param  stopOrRestart ->  Specifies whether the communications window must
+  *                           be kept open or must be closed after this action.
+  *                           Use the STOP and RESTART definitions.
+  * @retval None.
+  * @note   All other bits at the IQS323_MM_SYSTEM_CONTROL register address
+  *         are preserved.
+  */
+void IQS323::clearEventMode(bool stopOrRestart)
+{
+  uint8_t transferByte[2];
+
+  /* First read the bytes at the memory address so that they can be preserved */
+  readRandomBytes(IQS323_MM_SYSTEM_CONTROL, 2, transferByte, RESTART);
+  /* Clear the EVENT_MODE_BIT in SYSTEM_CONTROL to enable streaming mode */
+  transferByte[0] = clearBit(transferByte[0], IQS323_EVENT_MODE_BIT);
+  /* Write the bytes back to the device */
+  writeRandomBytes(IQS323_MM_SYSTEM_CONTROL, 2, transferByte, stopOrRestart);
+
+  /* Verify event mode was actually cleared */
+  delay(10);
+  readRandomBytes(IQS323_MM_SYSTEM_CONTROL, 2, transferByte, STOP);
+  if (getBit(transferByte[0], IQS323_EVENT_MODE_BIT) != 0) {
+    Serial.println("WARNING: Event mode bit not cleared after write!");
+    Serial.print("System Control register value: 0x");
+    Serial.println(transferByte[0], HEX);
+  } else {
+    Serial.println("Streaming mode successfully activated (event mode cleared)");
+  }
 }
 
 /**
@@ -1238,6 +1284,12 @@ void IQS323::readRandomBytes(uint8_t memoryAddress, uint8_t numBytes, uint8_t by
 
   force_I2C_communication();
 
+  if (gpio_get_level((gpio_num_t)iqs323_ready_pin))
+  {
+    Serial.println("IQS323 not ready for I2C read communication after force i2c!");
+    return;
+  }
+
   /* Select the device with the address "_deviceAddress" and start communication. */
   Wire.beginTransmission(_deviceAddress);
   /* Send a bit asking for the "memoryAddress" register. */
@@ -1298,6 +1350,12 @@ void IQS323::writeRandomBytes(uint8_t memoryAddress, uint8_t numBytes, uint8_t b
   communication. */
 
   force_I2C_communication();
+
+  if (gpio_get_level((gpio_num_t)iqs323_ready_pin))
+  {
+    Serial.println("IQS323 not ready for I2C write communication after force i2c!");
+    return;
+  }
 
   Wire.beginTransmission(_deviceAddress);
   /* Specify the memory address where the IQS323 must start saving the data,
@@ -1365,8 +1423,9 @@ uint8_t IQS323::clearBit(uint8_t data, uint8_t bit_number)
 void IQS323::force_I2C_communication(void)
 {
   /* Ensure RDY is HIGH at the moment */
-  if (!iqs323_deviceRDY)
+  if (gpio_get_level((gpio_num_t)iqs323_ready_pin))
   {
+    Serial.println("Forcing I2C communication...");
     /* Select the device with the address "DEMO_IQS323_ADDR" and start
     communication. */
     Wire.beginTransmission(_deviceAddress);
@@ -1378,8 +1437,9 @@ void IQS323::force_I2C_communication(void)
     /* End the transmission and the user decides to STOP or RESTART. */
     Wire.endTransmission(STOP);
     iqs323_deviceRDY = false;
-    for (int i = 0; i < 45; i++) {
-      if (iqs323_deviceRDY) {
+    for (int i = 0; i < 100; i++) {
+      if (!gpio_get_level((gpio_num_t)iqs323_ready_pin)) {
+        Serial.println("IQS323 ready for I2C communication after force i2c on iteration " + String(i));
         break;
       }
       delay(1);
@@ -1387,14 +1447,44 @@ void IQS323::force_I2C_communication(void)
   }
 }
 
-void IQS323::read_gesture(void)
+/**
+  * @name   check_i2c_lockup
+  * @brief  A method to detect I2C bus lock-up condition according to datasheet
+  *         Appendix C. Reads from a non-existent register to verify bus health.
+  * @param  None.
+  * @retval Returns true if I2C lock-up is detected, false otherwise.
+  * @note   This should be called periodically during I2C communications to
+  *         detect and potentially recover from I2C bus lock-up conditions.
+  */
+bool IQS323::check_i2c_lockup(void)
 {
-  if(!gpio_get_level((gpio_num_t)iqs323_ready_pin))
-  {
-    iqs323_deviceRDY = true;
-    queueValueUpdates();
-    iqs323_deviceRDY = false;
-    new_data_available = false;
-    iqs323_state.state = IQS323_STATE_CHECK_RESET;
+  uint8_t lockup_check = 0;
+
+  // Try to read from a non-existent register (0xFE)
+  // A locked-up I2C bus may return 0xEE or fail to respond properly
+  Wire.beginTransmission(_deviceAddress);
+  Wire.write(0xFE);  // Non-existent register
+  uint8_t result = Wire.endTransmission(RESTART);
+
+  if (result != 0) {
+    Serial.println("I2C Lock-up detected: beginTransmission failed");
+    Serial.print("Error code: ");
+    Serial.println(result);
+    return true;
   }
+
+  Wire.requestFrom((int)_deviceAddress, 1);
+  if (Wire.available()) {
+    lockup_check = Wire.read();
+    // If we don't get 0xEE, it indicates a potential lock-up condition
+    if (lockup_check != 0xEE) {
+      Serial.println("I2C Lock-up detected: received 0xEE marker");
+      return true;
+    }
+  } else {
+    Serial.println("I2C Lock-up detected: no data available");
+    return true;
+  }
+
+  return false;
 }

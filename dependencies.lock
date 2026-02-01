@@ -10,6 +10,12 @@ dependencies:
       registry_url: https://components.espressif.com/
       type: service
     version: 1.0.3
+  esp-serial-flasher:
+    dependencies: []
+    source:
+      path: C:\Users\dimat\Documents\GitHub\trmnl-firmware\components\esp-serial-flasher
+      type: local
+    version: 1.11.0
   espressif/cbor:
     component_hash: 440f4ee4504841cc9b4f3a8ef755776a612ac9dace355514c68b999868f990ff
     dependencies:
@@ -42,13 +48,6 @@ dependencies:
       registry_url: https://components.espressif.com/
       type: service
     version: 1.0.18
-  espressif/esp-serial-flasher:
-    component_hash: dcc42a16712a1a636509cf0bf90e14032d7f2141784b533613b267b6aa318d52
-    dependencies: []
-    source:
-      registry_url: https://components.espressif.com
-      type: service
-    version: 0.0.11
   espressif/esp-sr:
     component_hash: 9b41fd5ae5960c393bfd3559cd6e5fa2a95c0bf833915cebafe57fb8c4e4c396
     dependencies:
@@ -222,7 +221,7 @@ dependencies:
       type: service
     version: 1.2.0
   espressif/esp_secure_cert_mgr:
-    component_hash: e8ce8d5ac0ef4ef5df12fdb266190413c4170ad39b394435f0e3115a4fddc6a6
+    component_hash: 29248e402b2014394228b289a3c02fdb1dc43168ef18fc83449a868dfbc2341f
     dependencies:
     - name: idf
       require: private
@@ -230,7 +229,7 @@ dependencies:
     source:
       registry_url: https://components.espressif.com
       type: service
-    version: 2.7.2
+    version: 2.8.0
   espressif/jsmn:
     component_hash: d80350c41bbaa827c98a25b6072df00884e72f54885996fab4a4f0aebce6b6c3
     dependencies:
@@ -307,6 +306,50 @@ dependencies:
       registry_url: https://components.espressif.com/
       type: service
     version: 1.4.6
+  espressif/usb_host_cdc_acm:
+    component_hash: 71f9ae30021b1edb6f42980eb151ab24d0b602b8463861569a151b5254ba1e4b
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    targets:
+    - esp32s2
+    - esp32s3
+    - esp32p4
+    - esp32h4
+    - linux
+    version: 2.3.0
+  espressif/usb_host_ch34x_vcp:
+    component_hash: cc6f17936a11aa0ba460e716bd9b70fcd445824bcc7882afbe3ede3513f80c59
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=4.4'
+    - name: espressif/usb_host_cdc_acm
+      registry_url: https://components.espressif.com
+      require: public
+      version: ^2.1.0
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 2.2.0
+  espressif/usb_host_cp210x_vcp:
+    component_hash: c0404c598e2620fe88c35b5bf24d8e3b3ded41d9946fc865843be7f2f75da40e
+    dependencies:
+    - name: espressif/usb_host_cdc_acm
+      registry_url: https://components.espressif.com
+      require: public
+      version: ^2.1.0
+    - name: idf
+      require: private
+      version: '>=4.4'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 2.2.0
   idf:
     source:
       type: idf
@@ -339,8 +382,11 @@ direct_dependencies:
 - espressif/network_provisioning
 - espressif/qrcode
 - espressif/rmaker_common
+- espressif/usb_host_cdc_acm
+- espressif/usb_host_ch34x_vcp
+- espressif/usb_host_cp210x_vcp
 - idf
 - joltwallet/littlefs
-manifest_hash: d4982e9096cdc1deb27a8d5e9365200810e8d9512678f5f2095695b51e4b2c7b
+manifest_hash: 4f1d5a1fc6d0a1ebad7739fe35aed21074ab048ce64263ec265e6b0030868876
 target: esp32s3
 version: 2.0.0
