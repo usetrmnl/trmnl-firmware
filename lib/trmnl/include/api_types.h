@@ -60,6 +60,7 @@ struct ApiDisplayInputs
   int displayHeight;
   SPECIAL_FUNCTION specialFunction;
   String displayColors;
+  String displayMeasuredColors;
   String board;
 };
 

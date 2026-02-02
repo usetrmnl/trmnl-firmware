@@ -40,6 +40,7 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
   https.addHeader("Height", String(inputs.displayHeight));
   https.addHeader("Colors", inputs.displayColors);
   https.addHeader("Board", inputs.board);
+  https.addHeader("Measured-Colors", inputs.displayMeasuredColors);
 
   if (inputs.specialFunction != SF_NONE)
   {
