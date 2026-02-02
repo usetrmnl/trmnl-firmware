@@ -21,22 +21,22 @@ BBEPAPER bbep(ONE_BIT_PANEL);
 FASTEPD bbep;
 #define MAX_BIT_DEPTH 8
 const uint8_t u8_graytable[] = {
-/* 0 */  2, 2, 1, 1, 1, 1, 1, 1, 
-/* 1 */  2, 2, 2, 2, 1, 1, 2, 1,
-/* 2 */  2, 2, 2, 1, 1, 1, 1, 2, 
-/* 3 */  2, 2, 2, 1, 1, 1, 1, 2,
-/* 4 */  2, 2, 2, 2, 1, 1, 1, 2,
-/* 5 */  2, 2, 2, 2, 1, 2, 2, 1,
-/* 6 */  2, 2, 1, 1, 1, 2, 1, 2,
-/* 7 */  2, 2, 2, 1, 1, 2, 1, 2, 
-/* 8 */  1, 1, 1, 1, 1, 1, 2, 2, 
-/* 9 */  2, 1, 1, 1, 1, 1, 2, 2, 
-/* 10 */  2, 2, 1, 1, 1, 1, 2, 2, 
-/* 11 */  2, 2, 2, 1, 1, 1, 2, 2, 
-/* 12 */  2, 1, 1, 2, 1, 1, 2, 2, 
-/* 13 */  2, 2, 2, 2, 1, 1, 2, 2, 
-/* 14 */  2, 2, 2, 2, 2, 1, 2, 2, 
-/* 15 */  2, 2, 2, 2, 2, 2, 2, 2
+/* 0 */  2, 2, 2, 1, 1, 1, 1, 1, 1, 
+/* 1 */  2, 2, 1, 1, 1, 2, 2, 1, 1, 
+/* 2 */  2, 2, 2, 2, 1, 2, 2, 1, 1, 
+/* 3 */  1, 1, 2, 2, 1, 1, 1, 1, 2, 
+/* 4 */  2, 2, 2, 1, 2, 1, 1, 1, 2, 
+/* 5 */  1, 2, 2, 2, 2, 1, 1, 1, 2, 
+/* 6 */  2, 2, 1, 1, 2, 2, 1, 1, 2, 
+/* 7 */  2, 1, 1, 2, 1, 1, 2, 1, 2, 
+/* 8 */  2, 1, 1, 1, 2, 1, 2, 1, 2, 
+/* 9 */  2, 1, 1, 1, 1, 2, 2, 1, 2, 
+/* 10 */  1, 1, 1, 2, 1, 1, 1, 2, 2, 
+/* 11 */  2, 2, 1, 2, 1, 1, 1, 2, 2, 
+/* 12 */  2, 2, 2, 1, 2, 1, 1, 2, 2, 
+/* 13 */  2, 2, 2, 2, 1, 2, 1, 2, 2, 
+/* 14 */  2, 1, 1, 1, 2, 2, 2, 2, 2, 
+/* 15 */  2, 2, 2, 2, 2, 2, 2, 2, 2
 };
 #endif
 RTC_DATA_ATTR int iUpdateCount = 0;
@@ -69,6 +69,7 @@ void display_init(void)
     bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
 #else
     bbep.initPanel(BB_PANEL_TRMNL_X);
+    bbep.setPasses(3, 3);
 #endif
     Log_info("dev module end");
 }
@@ -1058,8 +1059,8 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     iUpdateCount++;
 #else
     bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
-    iRefreshMode = (bWait) ? CLEAR_SLOW : CLEAR_WHITE;
-    bbep.fullUpdate(iRefreshMode);
+    iRefreshMode = (bWait) ? CLEAR_SLOW : CLEAR_SLOW; // DEBUG
+    bbep.fullUpdate(iRefreshMode, true);
 #endif
     Log_info("display_show_image end");
 }
@@ -1443,7 +1444,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     bbep.freeBuffer();
 #else
     Serial.println("FastEPD full update");
-    bbep.fullUpdate();
+    bbep.fullUpdate(CLEAR_SLOW, true);
 #endif
     Log_info("display_show_msg end");
 }
