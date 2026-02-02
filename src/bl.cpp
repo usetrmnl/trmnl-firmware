@@ -731,6 +731,7 @@ static https_request_err_e downloadAndShow()
           heap_caps_check_integrity_all(true);
 
           // getString() handles chunked transfer encoding automatically
+          {
           String payload = https.getString();
           counter = payload.length();
 
@@ -756,6 +757,7 @@ static https_request_err_e downloadAndShow()
 
           memcpy(buffer, payload.c_str(), counter);
           content_size = counter;
+          }
 
           if (counter >= 2 && buffer[0] == 'B' && buffer[1] == 'M')
           {
