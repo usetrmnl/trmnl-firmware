@@ -390,9 +390,71 @@
     });
 }
 
+    // Static IP functions
+    function toggleStaticIP() {
+      var checkbox = document.getElementById('useStaticIP');
+      var fields = document.getElementById('static_ip_fields');
+      fields.style.display = checkbox.checked ? 'block' : 'none';
+    }
+
+    function loadStaticIPFromStorage() {
+      const useStaticIP = localStorage.getItem('useStaticIP') === 'true';
+      document.getElementById('useStaticIP').checked = useStaticIP;
+      document.getElementById('staticIP').value = localStorage.getItem('staticIP') || '';
+      document.getElementById('gateway').value = localStorage.getItem('gateway') || '';
+      document.getElementById('subnet').value = localStorage.getItem('subnet') || '';
+      document.getElementById('dns1').value = localStorage.getItem('dns1') || '';
+      toggleStaticIP();
+    }
+
+    function saveStaticIP() {
+      const useStaticIP = document.getElementById('useStaticIP').checked;
+      const staticIP = document.getElementById('staticIP').value.trim();
+
+      if (useStaticIP && !staticIP) {
+        displayAlert('Please enter a static IP address', 'warning');
+        return;
+      }
+
+      // Validate IP format if provided
+      const ipPattern = /^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.){3}(25[0-5]|(2[0-4]|1\d|[1-9]|)\d)$/;
+      if (useStaticIP && !ipPattern.test(staticIP)) {
+        displayAlert('Invalid IP address format. Use format like 192.168.1.100', 'warning');
+        return;
+      }
+
+      localStorage.setItem('useStaticIP', useStaticIP);
+      localStorage.setItem('staticIP', staticIP);
+      localStorage.setItem('gateway', document.getElementById('gateway').value.trim());
+      localStorage.setItem('subnet', document.getElementById('subnet').value.trim());
+      localStorage.setItem('dns1', document.getElementById('dns1').value.trim());
+
+      if (useStaticIP) {
+        displayAlert('Static IP configuration saved. Settings will be applied on next WiFi connection.', 'primary');
+      } else {
+        displayAlert('DHCP mode enabled. Device will obtain IP automatically.', 'primary');
+      }
+    }
+
+    function clearStaticIP() {
+      localStorage.removeItem('useStaticIP');
+      localStorage.removeItem('staticIP');
+      localStorage.removeItem('gateway');
+      localStorage.removeItem('subnet');
+      localStorage.removeItem('dns1');
+      document.getElementById('useStaticIP').checked = false;
+      document.getElementById('staticIP').value = '';
+      document.getElementById('gateway').value = '';
+      document.getElementById('subnet').value = '';
+      document.getElementById('dns1').value = '';
+      toggleStaticIP();
+      displayAlert('Static IP configuration cleared.', 'primary');
+    }
+
     // Load server value when page loads
     window.onload = function() {
       loadServerFromStorage();
+      loadStaticIPFromStorage();
     };
 
   </script>
@@ -416,6 +478,39 @@
     <span style="margin-top: 20px;">
       <button id="btnTest" class="button button-success" onclick="runTest()">Run Sensor Test</button>
     </span>
+
+    <!-- Static IP Configuration -->
+    <div style="width: 100%; margin-top: 30px; border-top: 1px solid #ccc; padding-top: 20px;">
+      <h3 style="margin-bottom: 15px;">Static IP Configuration</h3>
+      <div class="form-group">
+        <label style="display: flex; align-items: center; gap: 10px;">
+          <input type="checkbox" id="useStaticIP" onchange="toggleStaticIP()" style="width: auto;">
+          Use Static IP (disable DHCP)
+        </label>
+      </div>
+      <div id="static_ip_fields" style="display: none;">
+        <div class="form-group">
+          <label for="staticIP">Static IP Address *</label>
+          <input type="text" id="staticIP" name="staticIP" placeholder="e.g., 192.168.1.100">
+        </div>
+        <div class="form-group">
+          <label for="gateway">Gateway (optional)</label>
+          <input type="text" id="gateway" name="gateway" placeholder="Default: x.x.x.1 based on your IP">
+        </div>
+        <div class="form-group">
+          <label for="subnet">Subnet Mask (optional)</label>
+          <input type="text" id="subnet" name="subnet" placeholder="Default: 255.255.255.0">
+        </div>
+        <div class="form-group">
+          <label for="dns1">DNS Server (optional)</label>
+          <input type="text" id="dns1" name="dns1" placeholder="Default: 8.8.8.8 (Google DNS)">
+        </div>
+        <span style="margin-top: 10px;">
+          <button class="button button-success" onclick="saveStaticIP()">Save Static IP</button>
+          <button class="button button-primary" onclick="clearStaticIP()">Clear</button>
+        </span>
+      </div>
+    </div>
     <div class="form-group">
       <div class="alert alert-primary" id="test-output" role="alert" style="display: none;"></div>
     </div>

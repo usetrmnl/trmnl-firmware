@@ -32,6 +32,13 @@
 #define WIFI_ENT_KEY(i) ("wifi_" + String(i) + "_ent").c_str()
 #define WIFI_USERNAME_KEY(i) ("wifi_" + String(i) + "_username").c_str()
 #define WIFI_IDENTITY_KEY(i) ("wifi_" + String(i) + "_identity").c_str()
+// Static IP keys
+#define WIFI_STATIC_IP_KEY(i) ("wifi_" + String(i) + "_sip").c_str()
+#define WIFI_STATIC_GW_KEY(i) ("wifi_" + String(i) + "_sgw").c_str()
+#define WIFI_STATIC_SN_KEY(i) ("wifi_" + String(i) + "_ssn").c_str()
+#define WIFI_STATIC_DNS1_KEY(i) ("wifi_" + String(i) + "_dns1").c_str()
+#define WIFI_STATIC_DNS2_KEY(i) ("wifi_" + String(i) + "_dns2").c_str()
+#define WIFI_USE_STATIC_KEY(i) ("wifi_" + String(i) + "_usip").c_str()
 
 #define WIFI_LAST_INDEX "wifi_last_index"
 

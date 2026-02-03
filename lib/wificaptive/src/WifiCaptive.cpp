@@ -93,17 +93,17 @@ bool WifiCaptive::startPortal()
         else
         {
             // use enterprise credentials if available, otherwise use basic credentials
-            WifiCredentials credentials;
-            if (_enterprise_credentials.isEnterprise)
+            // Always start with _enterprise_credentials to preserve static IP settings
+            WifiCredentials credentials = _enterprise_credentials;
+            if (!credentials.isEnterprise)
             {
-                credentials = _enterprise_credentials;
-            }
-            else
-            {
+                // For non-enterprise, ensure basic fields are set
                 credentials.ssid = _ssid;
                 credentials.pswd = _password;
-                credentials.isEnterprise = false;
             }
+            Log_info("Connecting with static IP: %s, IP: %s",
+                     credentials.useStaticIP ? "yes" : "no",
+                     credentials.staticIP.c_str());
             bool res = connect(credentials) == WL_CONNECTED;
             if (res)
             {
@@ -136,17 +136,17 @@ bool WifiCaptive::startPortal()
         Log_info("Not connected after AP disconnect");
         WiFi.mode(WIFI_STA);
 
-        WifiCredentials credentials;
-        if (_enterprise_credentials.isEnterprise)
+        // Always start with _enterprise_credentials to preserve static IP settings
+        WifiCredentials credentials = _enterprise_credentials;
+        if (!credentials.isEnterprise)
         {
-            credentials = _enterprise_credentials;
-        }
-        else
-        {
+            // For non-enterprise, ensure basic fields are set
             credentials.ssid = _ssid;
             credentials.pswd = _password;
-            credentials.isEnterprise = false;
         }
+        Log_info("Reconnecting with static IP: %s, IP: %s",
+                 credentials.useStaticIP ? "yes" : "no",
+                 credentials.staticIP.c_str());
         auto result = initiateConnectionAndWaitForOutcome(credentials);
         status = result.status;
     }
@@ -179,6 +179,13 @@ void WifiCaptive::resetSettings()
         preferences.remove(WIFI_ENT_KEY(i));
         preferences.remove(WIFI_USERNAME_KEY(i));
         preferences.remove(WIFI_IDENTITY_KEY(i));
+        // Remove static IP settings
+        preferences.remove(WIFI_USE_STATIC_KEY(i));
+        preferences.remove(WIFI_STATIC_IP_KEY(i));
+        preferences.remove(WIFI_STATIC_GW_KEY(i));
+        preferences.remove(WIFI_STATIC_SN_KEY(i));
+        preferences.remove(WIFI_STATIC_DNS1_KEY(i));
+        preferences.remove(WIFI_STATIC_DNS2_KEY(i));
     }
     preferences.end();
 
@@ -232,6 +239,13 @@ void WifiCaptive::readWifiCredentials()
         _savedWifis[i].isEnterprise = preferences.getBool(WIFI_ENT_KEY(i), false);
         _savedWifis[i].username = preferences.getString(WIFI_USERNAME_KEY(i), "");
         _savedWifis[i].identity = preferences.getString(WIFI_IDENTITY_KEY(i), "");
+        // Load static IP settings
+        _savedWifis[i].useStaticIP = preferences.getBool(WIFI_USE_STATIC_KEY(i), false);
+        _savedWifis[i].staticIP = preferences.getString(WIFI_STATIC_IP_KEY(i), "");
+        _savedWifis[i].gateway = preferences.getString(WIFI_STATIC_GW_KEY(i), "");
+        _savedWifis[i].subnet = preferences.getString(WIFI_STATIC_SN_KEY(i), "");
+        _savedWifis[i].dns1 = preferences.getString(WIFI_STATIC_DNS1_KEY(i), "");
+        _savedWifis[i].dns2 = preferences.getString(WIFI_STATIC_DNS2_KEY(i), "");
     }
 
     preferences.end();
@@ -283,6 +297,13 @@ void WifiCaptive::saveWifiCredentials(const WifiCredentials credentials)
         preferences.putBool(WIFI_ENT_KEY(i), _savedWifis[i].isEnterprise);
         preferences.putString(WIFI_USERNAME_KEY(i), _savedWifis[i].username);
         preferences.putString(WIFI_IDENTITY_KEY(i), _savedWifis[i].identity);
+        // Save static IP settings
+        preferences.putBool(WIFI_USE_STATIC_KEY(i), _savedWifis[i].useStaticIP);
+        preferences.putString(WIFI_STATIC_IP_KEY(i), _savedWifis[i].staticIP);
+        preferences.putString(WIFI_STATIC_GW_KEY(i), _savedWifis[i].gateway);
+        preferences.putString(WIFI_STATIC_SN_KEY(i), _savedWifis[i].subnet);
+        preferences.putString(WIFI_STATIC_DNS1_KEY(i), _savedWifis[i].dns1);
+        preferences.putString(WIFI_STATIC_DNS2_KEY(i), _savedWifis[i].dns2);
     }
     preferences.putInt(WIFI_LAST_INDEX, 0);
     preferences.end();
@@ -574,7 +595,11 @@ bool WifiCaptive::tryConnectWithRetries(const WifiCredentials creds, int last_us
 {
     for (int attempt = 0; attempt < WIFI_CONNECTION_ATTEMPTS; attempt++)
     {
-        Log_info("Attempt %d to connect to %s (Enterprise: %s)", attempt + 1, creds.ssid.c_str(), creds.isEnterprise ? "yes" : "no");
+        Log_info("Attempt %d to connect to %s (Enterprise: %s, Static IP: %s, IP: %s)",
+                 attempt + 1, creds.ssid.c_str(),
+                 creds.isEnterprise ? "yes" : "no",
+                 creds.useStaticIP ? "yes" : "no",
+                 creds.staticIP.c_str());
         connect(creds);
         if (WiFi.status() == WL_CONNECTED)
         {
