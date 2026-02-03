@@ -6,7 +6,7 @@
 #include "WifiCaptivePage.h"
 #include "wifi-types.h"
 
-#define LocalIPURL "http://4.3.2.1"
+#define LocalIPURL "http://10.254.0.1"
 
 /** These are the things that the captive portal web app needs to interact with */
 struct WifiOperationCallbacks
