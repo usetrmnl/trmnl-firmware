@@ -2,6 +2,7 @@
 #include <WiFi.h>
 #include <test.h>
 #include <trmnl_log.h>
+#include <Preferences.h>
 
 void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperationCallbacks callbacks)
 {
@@ -158,10 +159,16 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
         credentials.dns1 = dns1;
         credentials.dns2 = dns2;
 
-        Log_info("WebServer: Received connection request - SSID: %s, Static IP: %s, IP: %s",
-                 ssid.c_str(),
-                 useStaticIP ? "yes" : "no",
-                 staticIP.c_str());
+        String ntpServer = data["ntpServer1"].is<String>() ? data["ntpServer1"].as<String>() : "";
+        if (ntpServer.length() > 0) {
+            Preferences prefs;
+            prefs.begin("data", false);
+            prefs.putString("ntp_server", ntpServer);
+            prefs.end();
+            Log_info("WebServer: Saved NTP server: %s", ntpServer.c_str());
+        }
+
+        Log_info("WebServer: Received SSID: %s, Static IP: %s", ssid.c_str(), useStaticIP ? "yes" : "no");
 
         callbacks.setConnectionCredentials(credentials, api_server);
         String mac = WiFi.macAddress();

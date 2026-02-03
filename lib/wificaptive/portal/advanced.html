@@ -451,10 +451,22 @@
       displayAlert('Static IP configuration cleared.', 'primary');
     }
 
+    
+    function loadNTPFromStorage() {
+      document.getElementById('ntpServer1').value = localStorage.getItem('ntpServer1') || '';
+    }
+
+    function saveNTP() {
+      const ntp = document.getElementById('ntpServer1').value.trim();
+      localStorage.setItem('ntpServer1', ntp);
+      displayAlert(ntp ? 'NTP server saved.' : 'Using default NTP (time.google.com).', 'primary');
+    }
+
     // Load server value when page loads
     window.onload = function() {
       loadServerFromStorage();
       loadStaticIPFromStorage();
+      loadNTPFromStorage();
     };
 
   </script>
@@ -510,6 +522,16 @@
           <button class="button button-primary" onclick="clearStaticIP()">Clear</button>
         </span>
       </div>
+    </div>
+
+    <!-- NTP Configuration -->
+    <div style="width: 100%; margin-top: 20px; border-top: 1px solid #ccc; padding-top: 15px;">
+      <h3 style="margin-bottom: 10px;">NTP Server</h3>
+      <div class="form-group">
+        <label for="ntpServer1">Custom NTP (default: time.google.com)</label>
+        <input type="text" id="ntpServer1" name="ntpServer1" placeholder="e.g., time.nist.gov">
+      </div>
+      <button class="button button-primary" onclick="saveNTP()" style="margin-top:5px;">Save</button>
     </div>
     <div class="form-group">
       <div class="alert alert-primary" id="test-output" role="alert" style="display: none;"></div>

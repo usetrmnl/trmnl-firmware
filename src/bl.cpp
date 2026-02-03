@@ -1897,7 +1897,13 @@ static bool setClock()
   bool sync_status = false;
   struct tm timeinfo;
 
-  configTime(0, 0, "time.google.com", "time.cloudflare.com");
+  Preferences prefs;
+  prefs.begin("data", true);
+  String ntp = prefs.getString("ntp_server", "time.google.com");
+  prefs.end();
+
+  Log.info("%s [%d]: Using NTP: %s, fallback: time.cloudflare.com\r\n", __FILE__, __LINE__, ntp.c_str());
+  configTime(0, 0, ntp.c_str(), "time.cloudflare.com");
   Log.info("%s [%d]: Time synchronization...\r\n", __FILE__, __LINE__);
 
   // Wait for time to be set

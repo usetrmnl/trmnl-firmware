@@ -424,6 +424,9 @@
         body.dns1 = localStorage.getItem('dns1') || '';
       }
 
+      var ntp = localStorage.getItem('ntpServer1');
+      if (ntp) body.ntpServer1 = ntp;
+
       showLoader();
       fetch('/connect', {
         method: 'POST',

@@ -189,6 +189,11 @@ void WifiCaptive::resetSettings()
     }
     preferences.end();
 
+    Preferences dataPrefs;
+    dataPrefs.begin("data", false);
+    dataPrefs.remove("ntp_server");
+    dataPrefs.end();
+
     for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
     {
         _savedWifis[i] = WifiCredentials{};
