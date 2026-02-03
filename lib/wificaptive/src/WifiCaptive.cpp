@@ -519,10 +519,27 @@ bool WifiCaptive::autoConnect()
     Log_info("Last used network unavailable, scanning for known networks...");
     std::vector<Network> scanResults = getScannedUniqueNetworks(true);
     std::vector<WifiCredentials> sortedNetworks = matchNetworks(scanResults, _savedWifis);
-    if (sortedNetworks.size() == 0)
+
+   
+    for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
     {
-        Log_info("No matched networks found in scan, trying all saved networks...");
-        sortedNetworks = std::vector<WifiCredentials>(_savedWifis, _savedWifis + WIFI_MAX_SAVED_CREDS);
+        if (_savedWifis[i].ssid == "")
+            continue;
+
+        bool alreadyInList = false;
+        for (const auto &network : sortedNetworks)
+        {
+            if (network.ssid == _savedWifis[i].ssid)
+            {
+                alreadyInList = true;
+                break;
+            }
+        }
+        if (!alreadyInList)
+        {
+            Log_info("Adding saved network: %s", _savedWifis[i].ssid.c_str());
+            sortedNetworks.push_back(_savedWifis[i]);
+        }
     }
 
     WiFi.mode(WIFI_STA);
