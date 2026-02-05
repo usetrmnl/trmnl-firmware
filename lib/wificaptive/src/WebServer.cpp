@@ -3,6 +3,10 @@
 #include <test.h>
 #include <trmnl_log.h>
 #include <Preferences.h>
+#include <SPIFFS.h>
+
+#define CLIENT_CERT_PATH "/client_cert.pem"
+#define CLIENT_KEY_PATH "/client_key.pem"
 
 void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperationCallbacks callbacks)
 {
@@ -176,6 +180,60 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
         request->send(200, "application/json", message); });
 
     server.addHandler(handler);
+
+    // Client certificate upload (mTLS for BYOS)
+    AsyncCallbackJsonWebHandler *certHandler = new AsyncCallbackJsonWebHandler("/upload-cert", [](AsyncWebServerRequest *request, JsonVariant &json)
+                                                                               {
+        JsonObject data = json.as<JsonObject>();
+        String cert = data["cert"].is<String>() ? data["cert"].as<String>() : "";
+        String key = data["key"].is<String>() ? data["key"].as<String>() : "";
+
+        if (cert.length() == 0 || key.length() == 0)
+        {
+            request->send(400, "application/json", "{\"success\":false,\"error\":\"cert and key required\"}");
+            return;
+        }
+
+        // Write cert to SPIFFS
+        File certFile = SPIFFS.open(CLIENT_CERT_PATH, FILE_WRITE);
+        if (!certFile)
+        {
+            Log_error("WebServer: Failed to open cert file for writing");
+            request->send(500, "application/json", "{\"success\":false,\"error\":\"failed to write cert\"}");
+            return;
+        }
+        certFile.print(cert);
+        certFile.close();
+
+        // Write key to SPIFFS
+        File keyFile = SPIFFS.open(CLIENT_KEY_PATH, FILE_WRITE);
+        if (!keyFile)
+        {
+            Log_error("WebServer: Failed to open key file for writing");
+            SPIFFS.remove(CLIENT_CERT_PATH);
+            request->send(500, "application/json", "{\"success\":false,\"error\":\"failed to write key\"}");
+            return;
+        }
+        keyFile.print(key);
+        keyFile.close();
+
+        Log_info("WebServer: Client certificate saved (%d bytes cert, %d bytes key)", cert.length(), key.length());
+        request->send(200, "application/json", "{\"success\":true}"); });
+
+    server.addHandler(certHandler);
+
+    server.on("/delete-cert", HTTP_POST, [](AsyncWebServerRequest *request)
+              {
+        SPIFFS.remove(CLIENT_CERT_PATH);
+        SPIFFS.remove(CLIENT_KEY_PATH);
+        Log_info("WebServer: Client certificate removed");
+        request->send(200, "application/json", "{\"success\":true}"); });
+
+    server.on("/cert-status", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+        bool installed = SPIFFS.exists(CLIENT_CERT_PATH) && SPIFFS.exists(CLIENT_KEY_PATH);
+        String json = "{\"installed\":" + String(installed ? "true" : "false") + "}";
+        request->send(200, "application/json", json); });
 
     server.onNotFound([](AsyncWebServerRequest *request)
                       { request->redirect(LocalIPURL); });

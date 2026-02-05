@@ -1,11 +1,15 @@
 #include "WifiCaptive.h"
 #include <WiFi.h>
+#include <SPIFFS.h>
 #include <trmnl_log.h>
 #include "WebServer.h"
 #include "wifi-helpers.h"
 #include "esp_event.h"
 #include "esp_wifi.h"
 #include "connect.h"
+
+#define CLIENT_CERT_PATH "/client_cert.pem"
+#define CLIENT_KEY_PATH "/client_key.pem"
 
 void WifiCaptive::setUpDNSServer(DNSServer &dnsServer, const IPAddress &localIP)
 {
@@ -198,6 +202,11 @@ void WifiCaptive::resetSettings()
     {
         _savedWifis[i] = WifiCredentials{};
     }
+
+    // Remove client certificate files
+    SPIFFS.remove(CLIENT_CERT_PATH);
+    SPIFFS.remove(CLIENT_KEY_PATH);
+    Log_info("WiFi: Client certificate files removed");
 
     // Clean up any WPA2 Enterprise state
     disableWpa2Enterprise();

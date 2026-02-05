@@ -462,11 +462,88 @@
       displayAlert(ntp ? 'NTP server saved.' : 'Using default NTP (time.google.com).', 'primary');
     }
 
+    // Client certificate functions
+    function saveCert() {
+      var cert = document.getElementById('clientCert').value.trim();
+      var key = document.getElementById('clientKey').value.trim();
+      if (!cert) { displayAlert('Please paste a client certificate.', 'warning'); return; }
+      if (!key) { displayAlert('Please paste a private key.', 'warning'); return; }
+      if (cert.indexOf('-----BEGIN CERTIFICATE-----') === -1) {
+        displayAlert('Certificate must be in PEM format (-----BEGIN CERTIFICATE-----).', 'warning');
+        return;
+      }
+      if (key.indexOf('-----BEGIN') === -1 || key.indexOf('PRIVATE KEY-----') === -1) {
+        displayAlert('Key must be in PEM format (-----BEGIN ... PRIVATE KEY-----).', 'warning');
+        return;
+      }
+      showLoader();
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', '/upload-cert', true);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.onreadystatechange = function() {
+        if (xhr.readyState !== 4) return;
+        hideLoader();
+        try {
+          var data = JSON.parse(xhr.responseText);
+          if (data.success) {
+            displayAlert('Client certificate and key saved.', 'primary');
+            updateCertStatus(true);
+          } else {
+            displayAlert('Failed: ' + (data.error || 'unknown error'), 'warning');
+          }
+        } catch(e) {
+          displayAlert('Error uploading certificate: ' + xhr.status, 'warning');
+        }
+      };
+      xhr.send(JSON.stringify({cert: cert, key: key}));
+    }
+
+    function clearCert() {
+      showLoader();
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', '/delete-cert', true);
+      xhr.onreadystatechange = function() {
+        if (xhr.readyState !== 4) return;
+        hideLoader();
+        document.getElementById('clientCert').value = '';
+        document.getElementById('clientKey').value = '';
+        updateCertStatus(false);
+        displayAlert('Client certificate removed.', 'primary');
+      };
+      xhr.send();
+    }
+
+    function checkCertStatus() {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', '/cert-status', true);
+      xhr.onreadystatechange = function() {
+        if (xhr.readyState !== 4) return;
+        try {
+          var data = JSON.parse(xhr.responseText);
+          updateCertStatus(data.installed);
+        } catch(e) {}
+      };
+      xhr.send();
+    }
+
+    function updateCertStatus(installed) {
+      var el = document.getElementById('certStatus');
+      if (installed) {
+        el.textContent = 'Client certificate is installed.';
+        el.className = 'alert alert-primary';
+      } else {
+        el.textContent = 'No client certificate installed.';
+        el.className = 'alert alert-warning';
+      }
+      el.style.display = 'block';
+    }
+
     // Load server value when page loads
     window.onload = function() {
       loadServerFromStorage();
       loadStaticIPFromStorage();
       loadNTPFromStorage();
+      checkCertStatus();
     };
 
   </script>
@@ -532,6 +609,25 @@
         <input type="text" id="ntpServer1" name="ntpServer1" placeholder="e.g., time.nist.gov">
       </div>
       <button class="button button-primary" onclick="saveNTP()" style="margin-top:5px;">Save</button>
+    </div>
+
+    <!-- Client Certificate (mTLS) -->
+    <div style="width: 100%; margin-top: 20px; border-top: 1px solid #ccc; padding-top: 15px;">
+      <h3 style="margin-bottom: 10px;">Client Certificate (BYOS)</h3>
+      <p style="font-size: 13px; color: #666; margin-bottom: 10px;">Paste a client certificate and private key in PEM format for mutual TLS authentication with your BYOS server.</p>
+      <div id="certStatus" class="alert" style="display: none;"></div>
+      <div class="form-group">
+        <label for="clientCert">Client Certificate (PEM)</label>
+        <textarea id="clientCert" rows="5" style="width:100%;box-sizing:border-box;font-family:monospace;font-size:11px;border-width:1px;border-radius:.75rem;padding:5px;" placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"></textarea>
+      </div>
+      <div class="form-group">
+        <label for="clientKey">Private Key (PEM)</label>
+        <textarea id="clientKey" rows="5" style="width:100%;box-sizing:border-box;font-family:monospace;font-size:11px;border-width:1px;border-radius:.75rem;padding:5px;" placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----"></textarea>
+      </div>
+      <span>
+        <button class="button button-success" onclick="saveCert()">Upload Certificate</button>
+        <button class="button button-primary" onclick="clearCert()">Remove</button>
+      </span>
     </div>
     <div class="form-group">
       <div class="alert alert-primary" id="test-output" role="alert" style="display: none;"></div>
