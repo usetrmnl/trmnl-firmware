@@ -8,6 +8,7 @@
 #include "esp_wpa2.h"
 #include "esp_err.h"
 #include "esp_netif.h"
+#include "esp_sntp.h"
 
 /**
  * @brief Configure static IP with smart defaults
@@ -169,6 +170,11 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
 
                          captureEventData(event, info, &eventData); },
                      (arduino_event_id_t)i);
+    }
+
+    if (!credentials.useStaticIP)
+    {
+        sntp_servermode_dhcp(1);
     }
 
     // always start with a clean state - disable any previous configuration

@@ -31,6 +31,7 @@
 #include "http_client.h"
 #include <api-client/display.h>
 #include "driver/gpio.h"
+#include "esp_sntp.h"
 #include <nvs.h>
 #include <serialize_log.h>
 #include <preferences_persistence.h>
@@ -1904,6 +1905,16 @@ static bool setClock()
 
   Log.info("%s [%d]: Using NTP: %s, fallback: time.cloudflare.com\r\n", __FILE__, __LINE__, ntp.c_str());
   configTime(0, 0, ntp.c_str(), "time.cloudflare.com");
+  
+  for (int i = 0; i < SNTP_MAX_SERVERS; i++)
+  {
+    const char *srv = esp_sntp_getservername(i);
+    if (srv && strlen(srv) > 0)
+    {
+      Log.info("%s [%d]: SNTP server[%d]: %s\r\n", __FILE__, __LINE__, i, srv);
+    }
+  }
+
   Log.info("%s [%d]: Time synchronization...\r\n", __FILE__, __LINE__);
 
   // Wait for time to be set
