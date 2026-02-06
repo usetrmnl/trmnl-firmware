@@ -689,6 +689,7 @@ static https_request_err_e downloadAndShow()
             httpCode == HTTP_CODE_TEMPORARY_REDIRECT){
               https.end();
               https.begin(API_BASE_URL +https.getLocation());
+              https.setReuse(false); // begin() resets reuse flag; keep-alive causes stale connections
               Log_info("Redirected to: %s", https.getLocation().c_str());
               https.setTimeout(15000);
               https.setConnectTimeout(15000);
