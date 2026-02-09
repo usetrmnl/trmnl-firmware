@@ -120,6 +120,9 @@ void wait_for_serial() {
 
 // ############################ SLIDER #############################
 #include "IQS323.h"
+
+void process_iqs323_data(void);
+
 IQS323 iqs323;
 #define IQS323_I2C_ADDRESS 0x44
 // Sensor states
@@ -133,8 +136,116 @@ bool otg_message = false;
 #define SENSOR_SCL_PIN 40
 #define SENSOR_READY_PIN GPIO_NUM_3
 
+// WiFi reset confirmation constants
+#define WIFI_RESET_CONFIRMATION_TIMEOUT_MS 15000
+#define WIFI_RESET_POLL_INTERVAL_MS 100
+
+// Static flag to prevent re-entry during confirmation
+static bool in_wifi_reset_confirmation = false;
+
+// Read gesture data directly without triggering other handlers
+void read_gesture_data_only()
+{
+  iqs323_task_i2c_lock();
+
+  // Read slider coordinates
+  uint16_t buffer = iqs323.sliderCoordinate();
+  if (buffer != slider_position) {
+    slider_position = buffer;
+  }
+
+  // Read gesture event
+  bool gesture_event = iqs323.getSliderEvent();
+  if (gesture_event) {
+    iqs323_gesture_events gesture_buffer = iqs323.getGestureType();
+    if (gesture_buffer != IQS323_GESTURE_NONE) {
+      slider_event = gesture_buffer;
+    }
+  }
+
+  // Clear event if finger removed
+  if (slider_position == 65535) {
+    slider_event = IQS323_GESTURE_NONE;
+  }
+
+  iqs323_task_i2c_unlock();
+}
+
+// Check if user wants to confirm WiFi reset (middle button hold)
+bool check_wifi_reset_confirm()
+{
+  if (slider_event == IQS323_GESTURE_HOLD && iqs323.channel_touchState(IQS323_CH1)) {
+    Log_info("WiFi reset confirmed by user - holding middle button");
+    return true;
+  }
+  return false;
+}
+
+// Check if user wants to cancel WiFi reset (any tap)
+bool check_wifi_reset_cancel()
+{
+  if (slider_event == IQS323_GESTURE_TAP) {
+    Log_info("WiFi reset cancelled by user - tap detected");
+    return true;
+  }
+  return false;
+}
+
+// Handle WiFi reset confirmation flow
+void handle_wifi_reset_confirmation()
+{
+  Log_info("Entering WiFi reset confirmation mode");
+  in_wifi_reset_confirmation = true;
+
+  showMessageWithLogo(WIFI_RESET_CONFIRM);
+
+  unsigned long start_time = millis();
+
+  // Poll for user input until timeout or action
+  while (millis() - start_time < WIFI_RESET_CONFIRMATION_TIMEOUT_MS) {
+    delay(WIFI_RESET_POLL_INTERVAL_MS);
+    read_gesture_data_only();  // Read gesture without triggering handlers
+
+    if (check_wifi_reset_confirm()) {
+      in_wifi_reset_confirmation = false;
+      resetDeviceCredentials();
+      return;
+    }
+
+    if (check_wifi_reset_cancel()) {
+      in_wifi_reset_confirmation = false;
+      goToSleep();
+      return;
+    }
+  }
+
+  // Timeout - cancel reset
+  Log_info("WiFi reset confirmation timeout - cancelling");
+  in_wifi_reset_confirmation = false;
+  goToSleep();
+}
+
+// Check if both left and right corners are being held
+bool check_wifi_reset_trigger()
+{
+  if (slider_event != IQS323_GESTURE_HOLD) {
+    return false;
+  }
+
+  bool left_held = iqs323.channel_touchState(IQS323_CH0);
+  bool right_held = iqs323.channel_touchState(IQS323_CH2);
+
+  return left_held && right_held;
+}
+
 void check_channel_states(void)
 {
+  // Don't check for WiFi reset trigger if already in confirmation mode
+  if (!in_wifi_reset_confirmation && check_wifi_reset_trigger()) {
+    handle_wifi_reset_confirmation();
+    return;
+  }
+
   /* Loop through all the active channels */
   for (uint8_t i = 0; i < 3; i++) {
     /* Check if the touch state bit is set */
@@ -143,26 +254,26 @@ void check_channel_states(void)
         printf("CH: %d: Touch\n", i);
         switch (i) {
         case 0:
-          Serial.println("Next button pressed");
+          Log_info("Back button pressed");
           break;
         case 1:
-          Serial.println("Middle button pressed");
+          Log_info("Middle button pressed");
           // Toggle OTG based on current state
           if (otg_state) {
             otg_turn_off();
             showMessageWithLogo(OTG_TURNED_OFF);
             otg_state = false;
-          } 
+          }
           else {
             otg_turn_on();
             showMessageWithLogo(OTG_TURNED_ON);
             otg_state = true;
           }
           otg_message = true;
-          Serial.printf("Free heap after drawing message with logo: %u bytes, max heap chunk: %u\n", ESP.getFreeHeap(), ESP.getMaxAllocHeap());
+          Log_info("Free heap after drawing message with logo: %u bytes, max heap chunk: %u", ESP.getFreeHeap(), ESP.getMaxAllocHeap());
           break;
         case 2:
-          Serial.println("Back button pressed");
+          Log_info("Next button pressed");
           break;
         }
         button_states[i] = IQS323_CH_TOUCH;
@@ -200,44 +311,44 @@ void read_gesture_event(void)
       switch (slider_event)
       {
         case IQS323_GESTURE_UNKNOWN:
-          Serial.println("SLIDER: UNKNOWN (something went wrong?)");
+          Log_info("SLIDER: UNKNOWN (something went wrong?)");
           break;
         case IQS323_GESTURE_TAP:
-          Serial.println("SLIDER: Tap");
+          Log_info("SLIDER: Tap");
           break;
         case IQS323_GESTURE_SWIPE_NEGATIVE:
-          Serial.println("SLIDER: Swipe <-");
+          Log_info("SLIDER: Swipe <-");
           buffer = display_read_file("/last.png", &file_size);
           if (!buffer || file_size == 0) {
-            Serial.println("No previous image found");
+            Log_info("No previous image found");
             break;
           }
-          Serial.printf("Drawing previous plugin... File size: %d\n", file_size);
+          Log_info("Drawing previous plugin... File size: %d", file_size);
           display_show_image(buffer, file_size, false);
           goToSleep();
           break;
         case IQS323_GESTURE_SWIPE_POSITIVE:
-          Serial.println("SLIDER: Swipe ->");
+          Log_info("SLIDER: Swipe ->");
           buffer = display_read_file("/current.png", &file_size);
           if (!buffer || file_size == 0) {
-            Serial.println("No previous image found");
+            Log_info("No previous image found");
             break;
           }
-          Serial.printf("Drawing current plugin... File size: %d\n", file_size);
+          Log_info("Drawing current plugin... File size: %d", file_size);
           display_show_image(buffer, file_size, false);
           goToSleep();
           break;
         case IQS323_GESTURE_FLICK_NEGATIVE:
-          Serial.println("SLIDER: Flick <-");
+          Log_info("SLIDER: Flick <-");
           break;
         case IQS323_GESTURE_FLICK_POSITIVE:
-          Serial.println("SLIDER: Flick ->");
+          Log_info("SLIDER: Flick ->");
           break;
         case IQS323_GESTURE_HOLD:
-          Serial.println("SLIDER: Hold");
+          Log_info("SLIDER: Hold");
           break;
         case IQS323_GESTURE_NONE:
-          Serial.println("SLIDER: None");
+          Log_info("SLIDER: None");
           break;
       }
 
@@ -259,6 +370,8 @@ void process_iqs323_data(void)
   {
     slider_position = buffer;
   }
+
+  Log_info("Slider position: %d", slider_position);
 
   iqs323_task_i2c_lock();
 
@@ -299,23 +412,24 @@ void bl_init(void)
 
   startup_time = millis();
   Serial.begin(115200);
+  // Serial.setTxTimeoutMs(1);
+  wait_for_serial();
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
-  // wait_for_serial();
   Log_info("BL init success");
   pins_init();
   vBatt = readBatteryVoltage(); // Read the battery voltage BEFORE WiFi is turned on
 
-  Wire.begin(SENSOR_SDA_PIN, SENSOR_SCL_PIN, 400000);
-  Wire.setTimeout(100);
+  // Wire.begin(SENSOR_SDA_PIN, SENSOR_SCL_PIN, 100000);
+  // Wire.setTimeout(100);
 
-  for (uint8_t addr = 1; addr < 127; addr++) {
-    Wire.beginTransmission(addr);
-    if (Wire.endTransmission() == 0) {
-      Serial.print("Found: 0x");
-      if (addr < 16) Serial.print("0");
-      Serial.println(addr, HEX);
-    }
-  }
+  // for (uint8_t addr = 1; addr < 127; addr++) {
+  //   Wire.beginTransmission(addr);
+  //   if (Wire.endTransmission() == 0) {
+  //     if (Serial) {
+  //       Serial.printf("Found I2C device: 0x%02X", addr);
+  //     }
+  //   }
+  // }
 
   // Debug: Print all wakeup_stub_iqs_status structure fields
   Log_info("wakeup_stub_iqs_status.status: 0x%02X 0x%02X", wakeup_stub_iqs_status.status[0], wakeup_stub_iqs_status.status[1]);
@@ -349,45 +463,51 @@ void bl_init(void)
   iqs323_task_i2c_unlock();
   filesystem_init();
 
+  Wire.setClock(100000);
+
   if (gpio_wakeup) {
     Log_info("GPIO wakeup detected (%d) - using wake stub data", wakeup_reason);
     iqs323_task_notify_gpio_wakeup(true);
-  } else {
+  } 
+  else {
     Log_info("Non-GPIO wakeup (%d)", wakeup_reason);
 
     BQ27427_reset();
     delay(300); // BQ27427 needs 250 ms to power up
 
-    if (!lipo.begin(SENSOR_SDA_PIN, SENSOR_SCL_PIN, 400000)) // begin() will return true if communication is successful
+    // Wire.end();
+
+    if (!lipo.begin(SENSOR_SDA_PIN, SENSOR_SCL_PIN)) // begin() will return true if communication is successful
     {
     // If communication fails, print an error message and loop forever.
-      Serial.println("Error: Unable to communicate with BQ27427.");
+      Log_error("Error: Unable to communicate with BQ27427.");
       gpio_dump_io_configuration(stdout, (1ULL << 39));
       gpio_dump_io_configuration(stdout, (1ULL << 40));
     }
     else {
-      Serial.println("Connected to BQ27427!");
+      Log_info("Connected to BQ27427!");
 
       // Set battery capacity
       lipo.setCapacity(6000); // capacity in mAh
 
       unsigned int soc = lipo.soc();
       unsigned int volts = lipo.voltage();
+      unsigned int capacity = lipo.capacity();
       int current = lipo.current(AVG);
-      Serial.printf("Battery: %d%% | %dmV | %dmA\n", soc, volts, current);
+      Log_info("Battery: %d%% | %dmV | %dmA | %dmAh", soc, volts, current, capacity);
     }
   }
 
   // Start IQS323 task manager
   if (!iqs323_task_init(NULL)) {
-    Serial.println("IQS323 Task: Failed to start - rebooting");
+    Log_error("IQS323 Task: Failed to start - rebooting");
     delay(1000);
     ESP.restart();
   }
 
   // Wait for IQS323 initialization to complete
   if (!iqs323_task_wait_ready(5000)) {
-    Serial.println("IQS323 Task: Initialization timeout - rebooting");
+    Log_error("IQS323 Task: Initialization timeout - rebooting");
     delay(1000);
     ESP.restart();
   }
@@ -399,7 +519,7 @@ void bl_init(void)
   // For future
   // iqs323_task_set_data_callback(process_iqs323_data);
 
-  Serial.printf("init time: %ld us\n", init_time);
+  Log_info("init time: %ld us", init_time);
 
 #else
   if (gpio_wakeup)
@@ -832,6 +952,7 @@ void bl_init(void)
   }
 
   // display go to sleep
+  Log_info("%s [%d]: BL done, going to sleep...", __FILE__, __LINE__);
   display_sleep();
   if (!update_firmware)
     goToSleep();
@@ -2171,28 +2292,28 @@ static void checkAndPerformFirmwareUpdate(void)
 static void goToSleep(void)
 {
   submitStoredLogs();
-  if (WiFi.status() == WL_CONNECTED) {
-    WiFi.disconnect();
-  }
+  // if (WiFi.status() == WL_CONNECTED) {
+  //   WiFi.disconnect();
+  // }
   WiFi.mode(WIFI_OFF); 
 
 #if BOARD_TRMNL_X
-  Serial.println("Preparing IQS323 for sleep via task...");
+  Log_info("Preparing IQS323 for sleep via task...");
 
   // Use task manager for sleep preparation (sets event mode, checks I2C health)
   if (!iqs323_task_prepare_sleep(5000)) {
-    Serial.println("IQS323 sleep preparation timeout - proceeding anyway");
+    Log.warning("IQS323 sleep preparation timeout - proceeding anyway\n");
   }
 
   // Cleanup the task before entering deep sleep
   iqs323_task_deinit();
-  Serial.println("IQS323 is ready for sleep.");
+  Log_info("IQS323 is ready for sleep.");
 
   esp_set_deep_sleep_wake_stub(*wakeup_stub);
   display_sleep();
-  config_pca95535_pins_for_lp();
+  config_tca95535_pins_for_lp();
   config_gpio_for_lp();
-  Serial.println("Configured pins for low power");
+  Log_info("Configured pins for low power");
 #endif
 
   filesystem_deinit();

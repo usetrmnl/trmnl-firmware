@@ -452,6 +452,20 @@ bool IQS323::checkReset(void)
 }
 
 /**
+  * @name	  checkATIError
+  * @brief  A method that checks if an ATI error has occurred.
+  * @param  None.
+  * @retval Returns true if an ATI error has occurred, false otherwise.
+  * @note   If an ATI error occurs, the master should manually trigger a re-ATI
+  *         by calling the ReATI() method. The ATI error indicates that counts
+  *         are outside the Re-ATI Boundary after ATI completion.
+  */
+bool IQS323::checkATIError(void)
+{
+  return getBit(IQSMemoryMap.SYSTEM_STATUS[0], IQS323_ATI_ERROR_BIT);
+}
+
+/**
   * @name	  checkProductNum
   * @brief  A method that checks the device product number and compares the
   *         result to the defined value to return a boolean result.

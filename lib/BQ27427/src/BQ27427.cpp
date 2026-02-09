@@ -34,21 +34,13 @@ BQ27427::BQ27427() : _deviceAddress(BQ27427_I2C_ADDRESS), _sealFlag(false), _use
 }
 
 // Initializes I2C and verifies communication with the BQ27427.
-bool BQ27427::begin(int sda, int scl, uint32_t frequency)
+bool BQ27427::begin(int sda, int scl)
 {
 	uint16_t deviceID = 0;
 	
-	if (!Wire.begin(sda, scl, frequency)) // Initialize I2C master
-	{
-		Serial.println("Failed to initialize I2C");
-		return false;
-	}
-
-	Serial.println("I2C initialized successfully");
+	Wire.begin(sda, scl); // Initialize I2C master
 	
 	deviceID = deviceType(); // Read deviceType from BQ27427
-
-	Serial.printf("BQ27427 Device ID: 0x%04X\n", deviceID);
 	
 	if (deviceID == BQ27427_DEVICE_ID)
 	{
@@ -511,7 +503,7 @@ bool BQ27427::setChemID(chemistry_profiles chem_id)
 
 	if (executeControlWord(BQ27427_CONTROL_SET_CFGUPDATE))
 	{
-		int16_t timeout = BQ27427_I2C_TIMEOUT;
+		int16_t timeout = BQ72441_I2C_TIMEOUT;
 		while ((timeout--) && (!(flags() & BQ27427_FLAG_CFGUPMODE)))
 			delay(1);
 		
@@ -521,7 +513,7 @@ bool BQ27427::setChemID(chemistry_profiles chem_id)
 				delay(100); // Wait for the BQ27427 to process the command
 				if (softReset())
 				{
-					int16_t timeout = BQ27427_I2C_TIMEOUT;
+					int16_t timeout = BQ72441_I2C_TIMEOUT;
 					while ((timeout--) && ((flags() & BQ27427_FLAG_CFGUPMODE)))
 						delay(1);
 					if (timeout > 0)
@@ -564,7 +556,7 @@ bool BQ27427::enterConfig(bool userControl)
 	
 	if (executeControlWord(BQ27427_CONTROL_SET_CFGUPDATE))
 	{
-		int16_t timeout = BQ27427_I2C_TIMEOUT;
+		int16_t timeout = BQ72441_I2C_TIMEOUT;
 		while ((timeout--) && (!(flags() & BQ27427_FLAG_CFGUPMODE)))
 			delay(1);
 		
@@ -582,7 +574,7 @@ bool BQ27427::exitConfig(bool userControl)
 
 	if (softReset())
 	{
-		int16_t timeout = BQ27427_I2C_TIMEOUT;
+		int16_t timeout = BQ72441_I2C_TIMEOUT;
 		while ((timeout--) && ((flags() & BQ27427_FLAG_CFGUPMODE)))
 			delay(1);
 		if (timeout > 0)
@@ -634,7 +626,7 @@ bool BQ27427::sealed(void)
 // Seal the BQ27427
 bool BQ27427::seal(void)
 {
-	return executeControlWord(BQ27427_CONTROL_SEALED);
+	return readControlWord(BQ27427_CONTROL_SEALED);
 }
 
 // UNseal the BQ27427
@@ -642,9 +634,9 @@ bool BQ27427::unseal(void)
 {
 	// To unseal the BQ27427, write the key to the control
 	// command. Then immediately write the same key to control again.
-	if (executeControlWord(BQ27427_UNSEAL_KEY))
+	if (readControlWord(BQ27427_UNSEAL_KEY))
 	{
-		return executeControlWord(BQ27427_UNSEAL_KEY);
+		return readControlWord(BQ27427_UNSEAL_KEY);
 	}
 	return false;
 }
@@ -687,19 +679,13 @@ uint16_t BQ27427::readControlWord(uint16_t function)
 	uint8_t subCommandLSB = (function & 0x00FF);
 	uint8_t command[2] = {subCommandLSB, subCommandMSB};
 	uint8_t data[2] = {0, 0};
-
-	Serial.println("BQ27427: Reading control word...");
 	
 	i2cWriteBytes((uint8_t) 0, command, 2);
-
-	Serial.println("BQ27427: Control word written, reading response...");
 	
 	if (i2cReadBytes((uint8_t) 0, data, 2))
 	{
 		return ((uint16_t)data[1] << 8) | data[0];
 	}
-
-	Serial.println("BQ27427: Failed to read control word.");
 	
 	return false;
 }
@@ -793,18 +779,14 @@ uint8_t BQ27427::readExtendedData(uint8_t classID, uint8_t offset)
 {
 	uint8_t retData = 0;
 	if (!_userConfigControl) enterConfig(false);
-
+		
 	if (!blockDataControl()) // // enable block data memory control
 		return false; // Return false if enable fails
-	delayMicroseconds(70); // 66μs bus-free time required by datasheet at 400kHz
-
 	if (!blockDataClass(classID)) // Write class ID using DataBlockClass()
 		return false;
-	delayMicroseconds(70); // 66μs bus-free time required by datasheet at 400kHz
-
+	
 	blockDataOffset(offset / 32); // Write 32-bit block offset (usually 0)
-	delayMicroseconds(70); // 66μs bus-free time required by datasheet at 400kHz
-
+	
 	computeBlockChecksum(); // Compute checksum going in
 	uint8_t oldCsum = blockDataChecksum();
 	/*for (int i=0; i<32; i++)
@@ -825,21 +807,16 @@ bool BQ27427::writeExtendedData(uint8_t classID, uint8_t offset, uint8_t * data,
 	
 	if (!_userConfigControl)
 	{
-		if (!enterConfig(false))
+		if (!enterConfig(false)) 
 			return false; // Return false if enterConfig fails
 	}
-
+	
 	if (!blockDataControl()) // // enable block data memory control
 		return false; // Return false if enable fails
-	delayMicroseconds(70); // 66μs bus-free time required by datasheet at 400kHz
-
 	if (!blockDataClass(classID)) // Write class ID using DataBlockClass()
 		return false;
-	delayMicroseconds(70); // 66μs bus-free time required by datasheet at 400kHz
-
+	
 	blockDataOffset(offset / 32); // Write 32-bit block offset (usually 0)
-	delayMicroseconds(70); // 66μs bus-free time required by datasheet at 400kHz
-
 	computeBlockChecksum(); // Compute checksum going in
 	uint8_t oldCsum = blockDataChecksum();
 
@@ -874,37 +851,18 @@ bool BQ27427::writeExtendedData(uint8_t classID, uint8_t offset, uint8_t * data,
 // Read a specified number of bytes over I2C at a given subAddress
 int16_t BQ27427::i2cReadBytes(uint8_t subAddress, uint8_t * dest, uint8_t count)
 {
-	int16_t timeout = BQ27427_I2C_TIMEOUT;
-
-	// Write the register address with STOP (ESP32 Wire library has issues with repeated start)
+	int16_t timeout = BQ72441_I2C_TIMEOUT;	
 	Wire.beginTransmission(_deviceAddress);
-	Serial.printf("Sent %d bytes to address 0x%02X\n", Wire.write(subAddress), _deviceAddress);
-	uint8_t error = Wire.endTransmission(true); // Send STOP instead of repeated start
-	Serial.printf("Wire.endTransmission(true) returned %d\n", error);
-
-	if (error != 0) {
-		Serial.printf("ERROR: endTransmission failed with code %d\n", error);
-		return 0;
-	}
-
-	// Small delay between transactions (required by BQ27427 datasheet)
-	delayMicroseconds(70);
-
-	// Read the data in a separate transaction
-	Serial.printf("Requesting %d bytes from address 0x%02X\n", count, _deviceAddress);
-	int available = Wire.requestFrom(_deviceAddress, count, (uint8_t)true);
-	Serial.printf("Wire.requestFrom returned %d bytes\n", available);
-
-	if (available < count) {
-		Serial.printf("ERROR: Expected %d bytes but got %d\n", count, available);
-		return 0;
-	}
-
+	Wire.write(subAddress);
+	Wire.endTransmission(true);
+	
+	Wire.requestFrom(_deviceAddress, count);
+	
 	for (int i=0; i<count; i++)
 	{
 		dest[i] = Wire.read();
 	}
-
+	
 	return timeout;
 }
 

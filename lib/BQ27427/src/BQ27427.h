@@ -27,7 +27,7 @@ See LICENSE.txt for full license terms.
 #include "Arduino.h"
 #include "BQ27427_Definitions.h"
 
-#define BQ27427_I2C_TIMEOUT 2000
+#define BQ72441_I2C_TIMEOUT 2000
 
 // Chemistry profiles
 typedef enum {
@@ -109,7 +109,7 @@ public:
 		@param scl pin number for I2C clock line
 		@return true if communication was successful.
 	*/
-	bool begin(int sda, int scl, uint32_t frequency = 100000);
+	bool begin(int sda, int scl);
 	
 	/**
 	    Configures the design capacity of the connected battery.

@@ -6,8 +6,6 @@
 
 #define BMA530_I2C_ADDRESS  0x18
 
-#define TCA9535_INT 38
-
 // Orientation output definitions
 #define FACE_UP            0x00
 #define FACE_DOWN          0x01

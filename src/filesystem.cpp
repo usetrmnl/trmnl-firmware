@@ -1,7 +1,14 @@
 #include <filesystem.h>
 #include <Arduino.h>
-#include <SPIFFS.h>
 #include <trmnl_log.h>
+
+#ifdef BOARD_TRMNL_X
+#include <LittleFS.h>
+#define FS LittleFS
+#else
+#include <SPIFFS.h>
+#define FS SPIFFS
+#endif
 
 /**
  * @brief Function to init the filesystem
@@ -10,15 +17,15 @@
  */
 bool filesystem_init(void)
 {
-    if (!SPIFFS.begin(true))
+    if (!FS.begin(true))
     {
-        Log_fatal("Failed to mount SPIFFS");
+        Log_fatal("Failed to mount filesystem");
         ESP.restart();
         return false;
     }
     else
     {
-        Log_info("SPIFFS mounted");
+        Log_info("Filesystem mounted");
         return true;
     }
 }
@@ -30,7 +37,7 @@ bool filesystem_init(void)
  */
 void filesystem_deinit(void)
 {
-    SPIFFS.end();
+    FS.end();
 }
 
 /**
@@ -41,10 +48,10 @@ void filesystem_deinit(void)
  */
 bool filesystem_read_from_file(const char *name, uint8_t *out_buffer, size_t size)
 {
-    if (SPIFFS.exists(name))
+    if (FS.exists(name))
     {
         Log_info("file %s exists", name);
-        File file = SPIFFS.open(name, FILE_READ);
+        File file = FS.open(name, FILE_READ);
         if (file)
         {
             file.readBytes((char *)out_buffer, size);
@@ -72,12 +79,12 @@ bool filesystem_read_from_file(const char *name, uint8_t *out_buffer, size_t siz
  */
 size_t filesystem_write_to_file(const char *name, uint8_t *in_buffer, size_t size)
 {
-    uint32_t SPIFFS_freeBytes = (SPIFFS.totalBytes() - SPIFFS.usedBytes());
-    Log_info("SPIFFS free space - %d, total -%d", SPIFFS_freeBytes, SPIFFS.totalBytes());
-    if (SPIFFS.exists(name))
+    uint32_t FS_freeBytes = (FS.totalBytes() - FS.usedBytes());
+    Log_info("FS free space - %d, total -%d", FS_freeBytes, FS.totalBytes());
+    if (FS.exists(name))
     {
         Log_info("file %s exists. Deleting...", name);
-        if (SPIFFS.remove(name))
+        if (FS.remove(name))
             Log_info("file %s deleted", name);
         else
             Log_info("file %s deleting failed", name);
@@ -87,7 +94,7 @@ size_t filesystem_write_to_file(const char *name, uint8_t *in_buffer, size_t siz
         Log_info("file %s not exists.", name);
     }
     delay(100);
-    File file = SPIFFS.open(name, FILE_WRITE);
+    File file = FS.open(name, FILE_WRITE);
     if (file)
     {
         // Write the buffer in chunks
@@ -102,14 +109,14 @@ size_t filesystem_write_to_file(const char *name, uint8_t *in_buffer, size_t siz
             {
                 file.close();
 
-                Log_info("Erasing SPIFFS...");
-                if (SPIFFS.format())
+                Log_info("Erasing FS...");
+                if (FS.format())
                 {
-                    Log_info("SPIFFS erased successfully.");
+                    Log_info("FS erased successfully.");
                 }
                 else
                 {
-                    Log_error("Error erasing SPIFFS.");
+                    Log_error("Error erasing FS.");
                 }
 
                 return bytesWritten;
@@ -134,7 +141,7 @@ size_t filesystem_write_to_file(const char *name, uint8_t *in_buffer, size_t siz
  */
 bool filesystem_file_exists(const char *name)
 {
-    if (SPIFFS.exists(name))
+    if (FS.exists(name))
     {
         Log_info("file %s exists.", name);
         return true;
@@ -153,9 +160,9 @@ bool filesystem_file_exists(const char *name)
  */
 bool filesystem_file_delete(const char *name)
 {
-    if (SPIFFS.exists(name))
+    if (FS.exists(name))
     {
-        if (SPIFFS.remove(name))
+        if (FS.remove(name))
         {
             Log_info("file %s deleted", name);
             return true;
@@ -181,10 +188,10 @@ bool filesystem_file_delete(const char *name)
  */
 bool filesystem_file_rename(const char *old_name, const char *new_name)
 {
-    if (SPIFFS.exists(old_name))
+    if (FS.exists(old_name))
     {
         Log_info("file %s exists.", old_name);
-        bool res = SPIFFS.rename(old_name, new_name);
+        bool res = FS.rename(old_name, new_name);
         if (res)
         {
             Log_info("file %s renamed to %s.", old_name, new_name);
@@ -203,8 +210,8 @@ bool filesystem_file_rename(const char *old_name, const char *new_name)
 
 void list_files()
 {
-    Log_info("Filesystem Usage: %d/%d", SPIFFS.usedBytes(), SPIFFS.totalBytes());
-    File rootDir = SPIFFS.open("/");
+    Log_info("Filesystem Usage: %d/%d", FS.usedBytes(), FS.totalBytes());
+    File rootDir = FS.open("/");
 
     while (File file = rootDir.openNextFile())
     {

@@ -62,6 +62,7 @@ I2C communication window open.*/
 
 // System event bits
 #define IQS323_ATI_ACTIVE_BIT		5
+#define IQS323_ATI_ERROR_BIT		6
 #define IQS323_SHOW_RESET_BIT		7
 
 // Channel proximity and touch bits
@@ -213,6 +214,7 @@ public:
         void setIQSMemoryMap(iqs323_system_status_t iqs_status);
         iqs323_power_modes get_PowerMode(void);
         bool checkReset(void);
+        bool checkATIError(void);
 
         bool channel_touchState(iqs323_channel_e channel);
         bool channel_proxState(iqs323_channel_e channel);

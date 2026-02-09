@@ -10,6 +10,8 @@ enum MSG
   FRIENDLY_ID,
   OTG_TURNED_ON,
   OTG_TURNED_OFF,
+  SHIPPING_MODE,
+  WIFI_RESET_CONFIRM,
   WIFI_CONNECT,
   WIFI_FAILED,
   WIFI_WEAK,
@@ -39,9 +41,12 @@ enum MSG
  */
 void display_init(void);
 
-uint8_t pca9535_interrupt_clear();
+uint8_t tca9535_interrupt_clear();
 void config_bma530_interrupt();
-void config_pca95535_pins_for_lp();
+void config_tca95535_pins_for_lp();
+void enter_shipment_sleep();
+bool check_usb_power();
+bool check_shipment_wakeup();
 void BQ27427_reset();
 void otg_turn_on();
 void otg_turn_off();

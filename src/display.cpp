@@ -2,11 +2,17 @@
 #include <display.h>
 #include <PNGdec.h>
 #include <JPEGDEC.h>
-#include <SPIFFS.h>
 #include <Preferences.h>
 #include <preferences_persistence.h>
 #include "DEV_Config.h"
+#ifdef BOARD_TRMNL_X
+#include "esp_sleep.h"
+#include "LittleFS.h"
+#define FS LittleFS
+#endif
 #ifndef BOARD_TRMNL_X
+#include <SPIFFS.h>
+#define FS SPIFFS
 #define BB_EPAPER
 #include "bb_epaper.h"
 #define MAX_BIT_DEPTH 2
@@ -76,6 +82,8 @@ void display_init(void)
 
 #ifdef BOARD_TRMNL_X
 
+#define TCA9535_INT 38
+
 void BQ27427_reset()
 {
     bbep.ioPinMode(10, OUTPUT);
@@ -87,7 +95,7 @@ void BQ27427_reset()
     Serial.println("BQ27427 reset performed");
 }
 
-void config_pca95535_pins_for_lp()
+void config_tca95535_pins_for_lp()
 {
     bbep.ioPinMode(0, INPUT);
 
@@ -134,7 +142,7 @@ void config_bma530_interrupt()
     bbep.ioRead(10);
 }
 
-uint8_t pca9535_interrupt_clear()
+uint8_t tca9535_interrupt_clear()
 {
     return bbep.ioRead(3);
 }
@@ -153,10 +161,49 @@ void otg_turn_off()
     Log_info("OTG turned off");
 }
 
+void enter_shipment_sleep()
+{
+    config_tca95535_pins_for_lp();
+
+    // Configure pin 0 as input to detect charger connection
+    bbep.ioPinMode(0, INPUT);
+
+    esp_deep_sleep_disable_rom_logging();
+    esp_sleep_enable_ext0_wakeup((gpio_num_t)TCA9535_INT, 0);
+
+    esp_deep_sleep_start();
+}
+
+bool check_usb_power()
+{
+    bbep.ioPinMode(0, INPUT);
+    uint8_t pin_state = bbep.ioRead(0);
+
+    return (pin_state == 0);
+}
+
+bool check_shipment_wakeup()
+{
+    bbep.ioPinMode(0, INPUT);
+    uint8_t pin0_state = bbep.ioRead(0);
+
+    if (pin0_state == 0) {
+        Log_info("Shipment mode: Pin 0 LOW (charger detected), exiting shipment mode");
+        return true;
+    }
+
+    // Pin 0 is not LOW, read all other pins to clear the interrupt
+    for (uint8_t pin = 0; pin < 16; pin++) {
+        bbep.ioPinMode(pin, INPUT);
+        bbep.ioRead(pin);
+    }
+
+    return false;
+}
+
 #define PIN_ESP32C5_SPI_BOOT 4
 #define PIN_ESP32C5_USB_BOOT 5
 #define PIN_ESP32C5_EN 6
-
 
 void modem_enter_bootloader(void) {
   // Disable target and wait for full power down
@@ -1072,7 +1119,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
  */
 uint8_t * display_read_file(const char *filename, int *file_size)
 {
-File f = SPIFFS.open(filename, "r");
+File f = FS.open(filename, "r");
 uint8_t *buffer;
 
   if (!f) {
@@ -1156,6 +1203,31 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w)/2, 430);
         bbep.println(string1);
+    break;
+    }
+    case SHIPPING_MODE:
+    {
+        const char string1[] = "Device is in shipping mode.";
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - rect.w)/2, 430);
+        bbep.println(string1);
+
+        const char string2[] = "Plug in charger to wake up.";
+        bbep.getStringBox(string2, &rect);
+        bbep.setCursor((bbep.width() - rect.w)/2, 500);
+        bbep.print(string2);
+    break;
+    }
+    case WIFI_RESET_CONFIRM:
+    {
+        const char string1[] = "Are you sure you want to reset WiFi settings?";
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - rect.w)/2, 430);
+        bbep.println(string1);
+        const char string2[] = "Hold middle button to confirm, tap to cancel.";
+        bbep.getStringBox(string2, &rect);
+        bbep.setCursor((bbep.width() - rect.w)/2, -1);
+        bbep.print(string2);
     break;
     }
     case WIFI_CONNECT:
