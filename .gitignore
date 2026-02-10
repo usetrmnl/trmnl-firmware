@@ -11,3 +11,4 @@
 managed_components/
 
 sdkconfig.*.old
+dependencies.lock
