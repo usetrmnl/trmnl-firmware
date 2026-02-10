@@ -1275,12 +1275,12 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     }
     case SHIPPING_MODE:
     {
-        const char string1[] = "Device is in shipping mode.";
+        const char string1[] = "Welcome to TRMNL.";
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w)/2, 430);
         bbep.println(string1);
 
-        const char string2[] = "Plug in charger to wake up.";
+        const char string2[] = "Plug in the dock to get started.";
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w)/2, 500);
         bbep.print(string2);
