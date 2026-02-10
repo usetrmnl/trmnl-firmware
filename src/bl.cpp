@@ -163,11 +163,6 @@ void read_gesture_data_only()
     }
   }
 
-  // Clear event if finger removed
-  if (slider_position == 65535) {
-    slider_event = IQS323_GESTURE_NONE;
-  }
-
   iqs323_task_i2c_unlock();
 }
 
@@ -214,15 +209,18 @@ void handle_wifi_reset_confirmation()
 
     if (check_wifi_reset_cancel()) {
       in_wifi_reset_confirmation = false;
-      goToSleep();
       return;
+    }
+
+    // Clear event after checking (if finger removed)
+    if (slider_position == 65535) {
+      slider_event = IQS323_GESTURE_NONE;
     }
   }
 
   // Timeout - cancel reset
   Log_info("WiFi reset confirmation timeout - cancelling");
   in_wifi_reset_confirmation = false;
-  goToSleep();
 }
 
 // Check if both left and right corners are being held
@@ -411,10 +409,11 @@ void bl_init(void)
   uint32_t init_time = esp_cpu_get_cycle_count() / esp_rom_get_cpu_ticks_per_us();
 
   startup_time = millis();
+#ifdef DEV_FIRMWARE
   Serial.begin(115200);
-  // Serial.setTxTimeoutMs(1);
   wait_for_serial();
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
+#endif
   Log_info("BL init success");
   pins_init();
   vBatt = readBatteryVoltage(); // Read the battery voltage BEFORE WiFi is turned on

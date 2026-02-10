@@ -7,6 +7,8 @@
 #include "DEV_Config.h"
 #ifdef BOARD_TRMNL_X
 #include "esp_sleep.h"
+#include "driver/gpio.h"
+#include "driver/rtc_io.h"
 #include "LittleFS.h"
 #define FS LittleFS
 #endif
@@ -164,14 +166,98 @@ void otg_turn_off()
 void enter_shipment_sleep()
 {
     config_tca95535_pins_for_lp();
+    bbep.ioPinMode(0, INPUT);  // Pin 0 = charger detect
 
-    // Configure pin 0 as input to detect charger connection
-    bbep.ioPinMode(0, INPUT);
+    // Clear any pending TCA9535 interrupts
+    for (uint8_t pin = 0; pin < 16; pin++) {
+        bbep.ioPinMode(pin, INPUT);
+        bbep.ioRead(pin);
+    }
+    delay(50);
 
-    esp_deep_sleep_disable_rom_logging();
-    esp_sleep_enable_ext0_wakeup((gpio_num_t)TCA9535_INT, 0);
+    pinMode(TCA9535_INT, INPUT_PULLUP);
 
-    esp_deep_sleep_start();
+    // Check initial GPIO38 state
+    int gpio38_state = digitalRead(TCA9535_INT);
+
+    // Enable GPIO wakeup for light sleep
+    esp_err_t err = esp_sleep_enable_gpio_wakeup();
+    if (err != ESP_OK) {
+        Serial.printf("ERROR: Failed to enable GPIO wakeup: %d\n", err);
+        return;
+    }
+
+    err = gpio_wakeup_enable((gpio_num_t)TCA9535_INT, GPIO_INTR_LOW_LEVEL);
+    if (err != ESP_OK) {
+        Serial.printf("ERROR: Failed to configure GPIO38 wakeup: %d\n", err);
+        return;
+    }
+
+    Serial.println("=== Entering shipment mode light sleep loop ===");
+    delay(100);
+
+    uint32_t sleep_count = 0;
+
+    // Main sleep loop
+    while (true) {
+        sleep_count++;
+
+        esp_light_sleep_start();
+
+        // Re-initialize Serial after light sleep (USB may have been disabled)
+        delay(100);
+        Serial.begin(115200);
+        delay(100);
+
+        Serial.println("\n=== WAKEUP from light sleep ===");
+        Serial.printf("Sleep cycle: %lu\n", sleep_count);
+
+        // Check wakeup cause
+        esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+        Serial.printf("Wakeup cause: %d (GPIO=%d)\n", wakeup_reason, ESP_SLEEP_WAKEUP_GPIO);
+
+        if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO) {
+            Serial.println("GPIO wakeup detected");
+
+            // Check GPIO38 state
+            gpio38_state = digitalRead(TCA9535_INT);
+            Serial.printf("GPIO38 state after wakeup: %d\n", gpio38_state);
+
+            // Check if charger connected (TCA9535 pin 0 LOW)
+            bbep.ioPinMode(0, INPUT);
+            delay(10);
+            uint8_t pin0_state = bbep.ioRead(0);
+            Serial.printf("TCA9535 pin 0 (charger detect): %d (0=charger present)\n", pin0_state);
+
+            if (pin0_state == 0) {
+                Serial.println("*** CHARGER DETECTED - Exiting shipment mode ***");
+                Serial.flush();
+                delay(100);
+                break;  // Exit shipment mode
+            }
+
+            // False wakeup - clear interrupt and continue
+            for (uint8_t pin = 0; pin < 16; pin++) {
+                bbep.ioPinMode(pin, INPUT);
+                bbep.ioRead(pin);
+            }
+            delay(50);
+
+            gpio38_state = digitalRead(TCA9535_INT);
+            Serial.printf("GPIO38 after clear: %d\n", gpio38_state);
+
+        } else {
+            Serial.printf("Unexpected wakeup cause: %d\n", wakeup_reason);
+        }
+
+        Serial.println("Returning to sleep...\n");
+        Serial.flush();
+        delay(100);
+    }
+
+    gpio_wakeup_disable((gpio_num_t)TCA9535_INT);
+    Serial.println("=== Exited shipment mode successfully ===");
+    Serial.flush();
 }
 
 bool check_usb_power()
@@ -182,24 +268,6 @@ bool check_usb_power()
     return (pin_state == 0);
 }
 
-bool check_shipment_wakeup()
-{
-    bbep.ioPinMode(0, INPUT);
-    uint8_t pin0_state = bbep.ioRead(0);
-
-    if (pin0_state == 0) {
-        Log_info("Shipment mode: Pin 0 LOW (charger detected), exiting shipment mode");
-        return true;
-    }
-
-    // Pin 0 is not LOW, read all other pins to clear the interrupt
-    for (uint8_t pin = 0; pin < 16; pin++) {
-        bbep.ioPinMode(pin, INPUT);
-        bbep.ioRead(pin);
-    }
-
-    return false;
-}
 
 #define PIN_ESP32C5_SPI_BOOT 4
 #define PIN_ESP32C5_USB_BOOT 5

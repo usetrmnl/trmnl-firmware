@@ -16,4 +16,8 @@ bool checkIfAlreadyShipped();
 
 bool saveShipmentDone();
 
+bool checkIfShipmentStarted();
+
+bool saveShipmentStarted();
+
 bool enableShipmentMode();

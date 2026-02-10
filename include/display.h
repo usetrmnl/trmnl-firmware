@@ -46,7 +46,6 @@ void config_bma530_interrupt();
 void config_tca95535_pins_for_lp();
 void enter_shipment_sleep();
 bool check_usb_power();
-bool check_shipment_wakeup();
 void BQ27427_reset();
 void otg_turn_on();
 void otg_turn_off();

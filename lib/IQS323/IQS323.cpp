@@ -86,12 +86,12 @@ void IQS323::begin(uint8_t deviceAddressIn, int sdaPinIn, int sclPinIn, uint8_t 
 
   /* Initialize "running" and "init" state machine variables. */
   if (to_init) {
-    printf("IQS323 to be initialized!\n");
+    Serial.printf("IQS323 to be initialized!\n");
     iqs323_state.state = IQS323_STATE_START;
     iqs323_state.init_state = IQS323_INIT_VERIFY_PRODUCT;
   }
   else {
-    printf("IQS323 skipped initialization!\n");
+    Serial.printf("IQS323 skipped initialization!\n");
     iqs323_state.state = IQS323_STATE_RUN;
     iqs323_state.init_state = IQS323_INIT_DONE;
   }
@@ -112,7 +112,7 @@ bool IQS323::init(void)
   uint16_t prod_num;
   uint8_t ver_maj, ver_min;
 
-  printf("IQS323 INIT State: %d\n", iqs323_state.init_state);
+  Serial.printf("IQS323 INIT State: %d\n", iqs323_state.init_state);
 
   bool comm_requested = false;
 
@@ -372,7 +372,7 @@ bool IQS323::getRDYStatus(void)
   */
 void IQS323::queueValueUpdates(void)
 {
-  printf("Queue value updates...\n");
+  Serial.printf("Queue value updates...\n");
   uint8_t transferBytes[18];	// The array which will hold the bytes to be transferred.
 
 	/* Read the info flags. */
@@ -483,12 +483,12 @@ uint16_t IQS323::getProductNum(bool stopOrRestart)
   uint8_t prodNumHigh = 0;        // Temporary storage for the Counts high byte.
   uint16_t prodNumReturn = 0;     // The 16bit return value.
 
-  printf("Reading Product Number from register 0x%02X...\n", IQS323_MM_PROD_NUM);
+  Serial.printf("Reading Product Number from register 0x%02X...\n", IQS323_MM_PROD_NUM);
 
 	/* Read the Device info from the IQS323. */
 	readRandomBytes(IQS323_MM_PROD_NUM, 2, transferBytes, stopOrRestart);
 
-  printf("\tProduct Number: %02X %02X\n", transferBytes[0], transferBytes[1]);
+  Serial.printf("\tProduct Number: %02X %02X\n", transferBytes[0], transferBytes[1]);
 
   /* Construct the 16bit return value. */
   prodNumLow = transferBytes[0];
@@ -601,13 +601,13 @@ void IQS323::SW_Reset(bool stopOrRestart)
 {
   uint8_t transferByte[2]; // Array to store the bytes transferred.
 
-  printf("Reading random bytes...\n");
+  Serial.printf("Reading random bytes...\n");
   readRandomBytes(IQS323_MM_SYSTEM_CONTROL, 2, transferByte, STOP);
   /* Set the the SW_RESET_BIT in the SYSTEM_CONTROL register */
   transferByte[0] = setBit(transferByte[0], IQS323_SW_RESET_BIT);
   /* Write the new byte to the required device. */
 
-  printf("Writing random bytes...\n");
+  Serial.printf("Writing random bytes...\n");
   writeRandomBytes(IQS323_MM_SYSTEM_CONTROL, 2, transferByte, stopOrRestart);
 }
 

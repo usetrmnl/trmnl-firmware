@@ -7,6 +7,7 @@
 #include <Preferences.h>
 #include "WifiCaptive.h"
 #include "logo_small.h"
+#include "logo_medium.h"
 
 extern "C" {
   #include "esp_timer.h"   // esp_timer_get_time()
@@ -44,6 +45,56 @@ void savePassedTest(){
   preferencesQA.begin("qa", false);
   preferencesQA.putBool("testPassed", true);
   preferencesQA.end();
+}
+
+bool checkIfAlreadyShipped(){
+  preferencesQA.begin("qa", true);
+  bool status = preferencesQA.getBool("ship_done", false);
+  preferencesQA.end();
+  return status;
+}
+
+bool saveShipmentDone(){
+  preferencesQA.begin("qa", false);
+  preferencesQA.putBool("ship_done", true);
+  preferencesQA.putBool("ship_started", false);  // Clear started flag
+  preferencesQA.end();
+  return true;
+}
+
+bool checkIfShipmentStarted(){
+  preferencesQA.begin("qa", true);
+  bool status = preferencesQA.getBool("ship_started", false);
+  preferencesQA.end();
+  return status;
+}
+
+bool saveShipmentStarted(){
+  preferencesQA.begin("qa", false);
+  preferencesQA.putBool("ship_started", true);
+  preferencesQA.end();
+  return true;
+}
+
+bool enableShipmentMode() {
+  Serial.begin(115200);
+  display_init();
+
+  Serial.println("Waiting for USB plug-off to enter shipment mode...");
+
+  while (check_usb_power()) {
+    Serial.println("USB power still detected, waiting...");
+    delay(5000);
+  }
+
+  display_show_msg(const_cast<uint8_t *>(logo_medium),SHIPPING_MODE);
+
+  // Save that we've started shipment mode (in case battery dies during shipping)
+  saveShipmentStarted();
+
+  enter_shipment_sleep();
+
+  return true;
 }
 
 float measureTemperatureAverage() {
