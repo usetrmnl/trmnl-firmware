@@ -1280,7 +1280,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         bbep.setCursor((bbep.width() - rect.w)/2, 430);
         bbep.println(string1);
 
-        const char string2[] = "Plug in the dock to get started.";
+        const char string2[] = "Attach the dock and a USB-C to get started.";
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w)/2, 500);
         bbep.print(string2);
