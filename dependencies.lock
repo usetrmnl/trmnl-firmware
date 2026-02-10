@@ -13,7 +13,7 @@ dependencies:
   esp-serial-flasher:
     dependencies: []
     source:
-      path: C:\Users\dimat\Documents\GitHub\trmnl-firmware\components\esp-serial-flasher
+      path: /Users/laurencebank/Projects/trmnl-firmware/components/esp-serial-flasher
       type: local
     version: 1.11.0
   espressif/cbor:
@@ -262,7 +262,7 @@ dependencies:
       type: service
     version: 1.0.3
   espressif/libsodium:
-    component_hash: 25b968723c584a2742ca36cebe5a7ef049c6767e059f7b1e1eec69946019025d
+    component_hash: 6ee084dee7a4d664498274870aa65391c9ec9d38dcdb34d2ad2b8518726f8b5e
     dependencies:
     - name: idf
       require: private
@@ -270,7 +270,7 @@ dependencies:
     source:
       registry_url: https://components.espressif.com/
       type: service
-    version: 1.0.20~2
+    version: 1.0.20~3
   espressif/mdns:
     component_hash: 29e47564b1a7ee778135e17fbbf2a2773f71c97ebabfe626c8eda7c958a7ad16
     dependencies:
@@ -355,7 +355,7 @@ dependencies:
       type: idf
     version: 5.3.2
   joltwallet/littlefs:
-    component_hash: 1808d73e99168f6f3c26dd31799a248484762b3a320ec4962dec11a145f4277f
+    component_hash: dcea25bcef2de023f089f5f01e8d8c46ad1b8ffef75861ad5ffb4098555839df
     dependencies:
     - name: idf
       require: private
@@ -363,7 +363,7 @@ dependencies:
     source:
       registry_url: https://components.espressif.com/
       type: service
-    version: 1.20.3
+    version: 1.20.4
 direct_dependencies:
 - chmorgan/esp-libhelix-mp3
 - espressif/cbor
@@ -387,6 +387,6 @@ direct_dependencies:
 - espressif/usb_host_cp210x_vcp
 - idf
 - joltwallet/littlefs
-manifest_hash: 4f1d5a1fc6d0a1ebad7739fe35aed21074ab048ce64263ec265e6b0030868876
+manifest_hash: f4c70b5ee18ea17ddc769a2613d3dc6a172b4cac19dc1232f5465465aea7585a
 target: esp32s3
 version: 2.0.0

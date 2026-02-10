@@ -337,7 +337,7 @@ void display_reset(void)
         bbep.refresh(REFRESH_FULL, true); // incompatible panel
     }
 #else
-    bbep.fullUpdate();
+    bbep.fullUpdate(CLEAR_WHITE);
 #endif
     Log_info("e-Paper Clear end");
     // DEV_Delay_ms(500);
@@ -718,14 +718,15 @@ int png_draw(PNGDRAW *pDraw)
         }
     } else if (pDraw->iBpp == 2) { // we need to convert the 2-bit data into 4-bits
         iPitch = bbep.width()/2;
+        d += pDraw->y * iPitch; // point to the correct line
         if (bbep.width() == pDraw->iWidth) { // normal orientation
             for (x=0; x<pDraw->iWidth; x+=4) {
                 src = *s++;
-                uc = (src & 0xc0); // first pixel
-                uc |= ((src & 0x30) >> 2);
+                uc = (src & 0xc0) | ((src & 0xc0) >> 2); // first pixel
+                uc |= ((src & 0x30) >> 2) | ((src & 0x30) >> 4);
                 *d++ = uc;
-                uc = (src & 0xc) << 4;
-                uc |= ((src & 0x3) << 2);
+                uc = ((src & 0xc) << 4) | ((src & 0xc) << 2);
+                uc |= ((src & 0x3) << 2) | (src & 0x3);
                 *d++ = uc;
             } // for x
         } else { // rotated
@@ -733,32 +734,32 @@ int png_draw(PNGDRAW *pDraw)
             d += (pDraw->y / 2);
             if (pDraw->y & 1) { // odd line (column)
                 for (x=0; x<pDraw->iWidth; x+=4) {
-                    uc = (d[0] & 0xf0) | ((s[0] >> 4) & 0x0c);
+                    uc = (d[0] & 0xf0) | ((s[0] >> 4) & 0x0c) | (s[0] >> 6);
                     *d = uc;
                     d -= iPitch;
-                    uc = (d[0] & 0xf0) | ((s[0] >> 2) & 0x0c);
+                    uc = (d[0] & 0xf0) | ((s[0] >> 2) & 0x0c) | ((s[0] >> 4) & 0x3);
                     *d = uc;
                     d -= iPitch;
-                    uc = (d[0] & 0xf0) | (s[0] & 0xc);
+                    uc = (d[0] & 0xf0) | (s[0] & 0xc) | ((s[0] >> 2) & 0x3);
                     *d = uc;
                     d -= iPitch;
-                    uc = (d[0] & 0xf0) | ((s[0] << 2) & 0x0c);
+                    uc = (d[0] & 0xf0) | ((s[0] << 2) & 0x0c) | (s[0] & 0x3);
                     *d = uc;
                     d -= iPitch;
                     s++;
                 } // for x
             } else {
                 for (x=0; x<pDraw->iWidth; x+=4) {
-                    uc = (d[0] & 0xf) | (s[0] & 0xc0);
+                    uc = (d[0] & 0xf) | (s[0] & 0xc0) | ((s[0] >> 2) & 0x30);
                     *d = uc;
                     d -= iPitch;
-                    uc = (d[0] & 0xf) | ((s[0] << 2) & 0xc0);
+                    uc = (d[0] & 0xf) | ((s[0] << 2) & 0xc0) | (s[0] & 0x30);
                     *d = uc;
                     d -= iPitch;
-                    uc = (d[0] & 0xf) | ((s[0] << 4) & 0xc0);
+                    uc = (d[0] & 0xf) | ((s[0] << 4) & 0xc0) | ((s[0] << 2) & 0x30);
                     *d = uc;
                     d -= iPitch;
-                    uc = (d[0] & 0xf) | ((s[0] << 6) & 0xc0);
+                    uc = (d[0] & 0xf) | ((s[0] << 6) & 0xc0 | ((s[0] << 4) & 0x30));
                     *d = uc;
                     d -= iPitch;
                     s++;
@@ -1171,12 +1172,11 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     if (bAlloc) {
         bbep.freeBuffer();
     }
-    iUpdateCount++;
 #else
     bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
-    iRefreshMode = (bWait) ? CLEAR_SLOW : CLEAR_SLOW; // DEBUG
-    bbep.fullUpdate(iRefreshMode, true);
+    bbep.fullUpdate(((iUpdateCount & 7) == 0) ? CLEAR_SLOW : CLEAR_WHITE, true);
 #endif
+    iUpdateCount++;
     Log_info("display_show_image end");
 }
 /**
@@ -1829,7 +1829,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     bbep.refresh(REFRESH_FULL, true);
     bbep.freeBuffer();
 #else
-    bbep.fullUpdate();
+    bbep.fullUpdate(CLEAR_WHITE);
 #endif
     Log_info("display_show_msg2 end");
 }
