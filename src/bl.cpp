@@ -580,6 +580,9 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   inputs.displayWidth = display_width();
   inputs.displayHeight = display_height();
   inputs.model = DEVICE_MODEL;
+  inputs.displayColors = DISPLAY_COLORS;
+  inputs.displayMeasuredColors = DISPLAY_MEASURED_COLORS;
+  inputs.board = DEVICE_BOARD;
   inputs.specialFunction = special_function;
 
   return inputs;
