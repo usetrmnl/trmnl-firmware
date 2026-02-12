@@ -41,6 +41,7 @@ bool submitLogToApi(LogApiInput &input, const char *api_url)
                     if(httpCode == HTTP_CODE_PERMANENT_REDIRECT || httpCode == HTTP_CODE_TEMPORARY_REDIRECT){
                       https.end();
                       https.begin(String(api_url) + https.getLocation());
+                      https.setReuse(false); // begin() resets reuse flag; keep-alive causes stale connections
                       https.addHeader("ID", WiFi.macAddress());
                       https.addHeader("Accept", "application/json, */*");
                       https.addHeader("Access-Token", input.api_key);
