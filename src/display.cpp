@@ -5,14 +5,14 @@
 #include <Preferences.h>
 #include <preferences_persistence.h>
 #include "DEV_Config.h"
-#ifdef BOARD_TRMNL_X
+#if defined( BOARD_TRMNL_X ) || defined (BOARD_TRMNL_X_EPDIY)
 #include "esp_sleep.h"
 #include "driver/gpio.h"
 #include "driver/rtc_io.h"
 #include "LittleFS.h"
 #define FS LittleFS
 #endif
-#ifndef BOARD_TRMNL_X
+#if !defined( BOARD_TRMNL_X ) && !defined( BOARD_TRMNL_X_EPDIY )
 #include <SPIFFS.h>
 #define FS SPIFFS
 #define BB_EPAPER
@@ -76,7 +76,12 @@ void display_init(void)
     Log_info("BB e-Paper init");
     bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
 #else
+#ifdef BOARD_TRMNL_X
     bbep.initPanel(BB_PANEL_TRMNL_X);
+#elif defined(BOARD_TRMNL_X_EPDIY)
+    bbep.initPanel(BB_PANEL_EPDIY_V7_16);
+    bbep.setPanelSize(1872, 1404, BB_PANEL_FLAG_MIRROR_X, -1100);
+#endif
     bbep.setPasses(3, 3);
 #endif
     Log_info("dev module end");
@@ -689,9 +694,9 @@ int png_draw(PNGDRAW *pDraw)
 #else // TRMNL_X version
 int png_draw(PNGDRAW *pDraw)
 {
-    int x;
+    int x, y = pDraw->y;
     uint8_t uc = 0;
-    uint8_t ucMask, src, *s, *d;
+    uint8_t ucMask, ucPixel, src, *s, *d;
     int iPitch;
 
     s = (uint8_t *)pDraw->pPixels;
@@ -700,13 +705,13 @@ int png_draw(PNGDRAW *pDraw)
     if (pDraw->iBpp == 1) {
         if (bbep.width() == pDraw->iWidth) { // normal orientation
             iPitch = (bbep.width() + 7)/8;
-            d += pDraw->y * iPitch; // point to the correct line
+            d += y * iPitch; // point to the correct line
             memcpy(d, s, (pDraw->iWidth+7)/8);
         } else { // rotated
             uint8_t ucPixel, ucMask, j;
             d += (bbep.height() - 1) * iPitch;
-            d += (pDraw->y / 8);
-            ucMask = 0x80 >> (pDraw->y & 7); // destination mask
+            d += (y / 8);
+            ucMask = 0x80 >> (y & 7); // destination mask
             for (x=0; x<pDraw->iWidth; x++) {
                 if ((x & 7) == 0) uc = *s++;
                 ucPixel = d[0] & ~ucMask; // unset old pixel
@@ -716,64 +721,32 @@ int png_draw(PNGDRAW *pDraw)
                 d -= iPitch;
             }
         }
-    } else if (pDraw->iBpp == 2) { // we need to convert the 2-bit data into 4-bits
-        iPitch = bbep.width()/2;
-        d += pDraw->y * iPitch; // point to the correct line
+    } else if (pDraw->iBpp == 2) {
+        iPitch = bbep.width()/4;
+        d += y * iPitch; // point to the correct line
         if (bbep.width() == pDraw->iWidth) { // normal orientation
-            for (x=0; x<pDraw->iWidth; x+=4) {
-                src = *s++;
-                uc = (src & 0xc0) | ((src & 0xc0) >> 2); // first pixel
-                uc |= ((src & 0x30) >> 2) | ((src & 0x30) >> 4);
-                *d++ = uc;
-                uc = ((src & 0xc) << 4) | ((src & 0xc) << 2);
-                uc |= ((src & 0x3) << 2) | (src & 0x3);
-                *d++ = uc;
-            } // for x
+            memcpy(d, s, (pDraw->iWidth+3)/4);
         } else { // rotated
             d += (bbep.height() - 1) * iPitch;
-            d += (pDraw->y / 2);
-            if (pDraw->y & 1) { // odd line (column)
-                for (x=0; x<pDraw->iWidth; x+=4) {
-                    uc = (d[0] & 0xf0) | ((s[0] >> 4) & 0x0c) | (s[0] >> 6);
-                    *d = uc;
-                    d -= iPitch;
-                    uc = (d[0] & 0xf0) | ((s[0] >> 2) & 0x0c) | ((s[0] >> 4) & 0x3);
-                    *d = uc;
-                    d -= iPitch;
-                    uc = (d[0] & 0xf0) | (s[0] & 0xc) | ((s[0] >> 2) & 0x3);
-                    *d = uc;
-                    d -= iPitch;
-                    uc = (d[0] & 0xf0) | ((s[0] << 2) & 0x0c) | (s[0] & 0x3);
-                    *d = uc;
-                    d -= iPitch;
-                    s++;
-                } // for x
-            } else {
-                for (x=0; x<pDraw->iWidth; x+=4) {
-                    uc = (d[0] & 0xf) | (s[0] & 0xc0) | ((s[0] >> 2) & 0x30);
-                    *d = uc;
-                    d -= iPitch;
-                    uc = (d[0] & 0xf) | ((s[0] << 2) & 0xc0) | (s[0] & 0x30);
-                    *d = uc;
-                    d -= iPitch;
-                    uc = (d[0] & 0xf) | ((s[0] << 4) & 0xc0) | ((s[0] << 2) & 0x30);
-                    *d = uc;
-                    d -= iPitch;
-                    uc = (d[0] & 0xf) | ((s[0] << 6) & 0xc0 | ((s[0] << 4) & 0x30));
-                    *d = uc;
-                    d -= iPitch;
-                    s++;
-                } // for x
-            }
-        }
+            d += (y / 4);
+            ucMask = 0xc0 >> ((y & 3)*2); // destination mask
+            for (x=0; x<pDraw->iWidth; x++) {
+                if ((x & 3) == 0) uc = *s++;
+                ucPixel = d[0] & ~ucMask; // unset old pixel
+                ucPixel |= (uc & 0xc0) >> ((y & 3)*2);
+                d[0] = ucPixel;
+                uc <<= 2;
+                d -= iPitch;
+            } // for x
+        } // rotated 90 degrees
     } else if (pDraw->iBpp == 4) { // 4-bit is the native format
         if (bbep.width() == pDraw->iWidth) { // normal orientation
-            d += pDraw->y * iPitch; // point to the correct line
+            d += y * iPitch; // point to the correct line
             memcpy(d, s, (pDraw->iWidth+1)/2);
         } else { // rotated
             d += (bbep.height() - 1) * iPitch;
-            d += (pDraw->y / 2);
-            if (pDraw->y & 1) { // odd line (column)
+            d += (y / 2);
+            if (y & 1) { // odd line (column)
                 for (x=0; x<pDraw->iWidth; x+=2) {
                     uc = (d[0] & 0xf0) | (s[0] >> 4);
                     *d = uc;
@@ -797,7 +770,7 @@ int png_draw(PNGDRAW *pDraw)
         }
     } else { // must be 8-bit grayscale
         if (bbep.width() == pDraw->iWidth) { // normal orientation
-            d += pDraw->y * iPitch; // point to the correct line
+            d += y * iPitch; // point to the correct line
             for (x=0; x<pDraw->iWidth; x+=2) {
                 uc = (s[0] & 0xf0) | (s[1] >> 4);
                 *d++ = uc;
@@ -805,8 +778,8 @@ int png_draw(PNGDRAW *pDraw)
             } // for x
         } else { // rotated
             d += (bbep.height() - 1) * iPitch;
-            d += (pDraw->y / 2);
-            if (pDraw->y & 1) { // odd line (column)
+            d += (y / 2);
+            if (y & 1) { // odd line (column)
                 for (x=0; x<pDraw->iWidth; x++) {
                     uc = (d[0] & 0xf0) | (s[0] >> 4);
                     *d = uc;
@@ -1065,7 +1038,17 @@ PNG *png = new PNG();
                 png->decode(&iPlane, 0); // decode it again to get plane 1 data
             }
 #else // FastEPD
-            bbep.setMode((png->getBpp() == 1) ? BB_MODE_1BPP : BB_MODE_4BPP);
+            switch (png->getBpp()) {
+                case 1:
+                    bbep.setMode(BB_MODE_1BPP);
+                break;
+                case 2:
+                    bbep.setMode(BB_MODE_2BPP);
+                break;
+                default:
+                    bbep.setMode(BB_MODE_4BPP);
+                break;
+            }
             png->decode(NULL, 0);
             png->close();
 #endif
@@ -1750,7 +1733,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 #endif
     }
 
-#ifdef BOARD_TRMNL_X
+#if defined( BOARD_TRMNL_X ) || defined( BOARD_TRMNL_X_EPDIY )
     bbep.setFont(Inter_18);
 #else
     bbep.setFont(nicoclean_8);
@@ -1813,7 +1796,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         UWORD y_start = 340;
         UWORD font_width = 18; // DEBUG
         Paint_DrawMultilineText(0, y_start, message.c_str(), width, font_width, BBEP_BLACK, BBEP_WHITE,
-#ifdef BOARD_TRMNL_X
+#if defined( BOARD_TRMNL_X ) || defined( BOARD_TRMNL_X_EPDIY )
         Inter_18, true);
 #else
         nicoclean_8, true);

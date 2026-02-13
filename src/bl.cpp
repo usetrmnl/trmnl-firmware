@@ -95,6 +95,12 @@ void config_gpio_for_lp();
 
 static unsigned long startup_time = 0;
 
+#ifdef BOARD_TRMNL_X_EPDIY
+// Create stub functions for the touchbar workaround
+void iqs323_task_i2c_lock(void) {}
+void iqs323_task_i2c_unlock(void) {}
+#endif // EPDIY
+
 void wait_for_serial() {
 #ifdef WAIT_FOR_SERIAL
   int idx = 0;
@@ -430,6 +436,7 @@ void bl_init(void)
   //   }
   // }
 
+#ifdef BOARD_TRMNL_X
   // Debug: Print all wakeup_stub_iqs_status structure fields
   Log_info("wakeup_stub_iqs_status.status: 0x%02X 0x%02X", wakeup_stub_iqs_status.status[0], wakeup_stub_iqs_status.status[1]);
   Log_info("wakeup_stub_iqs_status.gestures: 0x%02X 0x%02X", wakeup_stub_iqs_status.gestures[0], wakeup_stub_iqs_status.gestures[1]);
@@ -437,6 +444,7 @@ void bl_init(void)
   Log_info("wakeup_stub_iqs_status.ch0_cnts: 0x%02X 0x%02X 0x%02X 0x%02X", wakeup_stub_iqs_status.ch0_cnts[0], wakeup_stub_iqs_status.ch0_cnts[1], wakeup_stub_iqs_status.ch0_cnts[2], wakeup_stub_iqs_status.ch0_cnts[3]);
   Log_info("wakeup_stub_iqs_status.ch1_cnts: 0x%02X 0x%02X 0x%02X 0x%02X", wakeup_stub_iqs_status.ch1_cnts[0], wakeup_stub_iqs_status.ch1_cnts[1], wakeup_stub_iqs_status.ch1_cnts[2], wakeup_stub_iqs_status.ch1_cnts[3]);
   Log_info("wakeup_stub_iqs_status.ch2_cnts: 0x%02X 0x%02X 0x%02X 0x%02X", wakeup_stub_iqs_status.ch2_cnts[0], wakeup_stub_iqs_status.ch2_cnts[1], wakeup_stub_iqs_status.ch2_cnts[2], wakeup_stub_iqs_status.ch2_cnts[3]);
+#endif
 
 #if defined(BOARD_SEEED_XIAO_ESP32C3)
   delay(2000);
@@ -569,7 +577,7 @@ void bl_init(void)
   }
   Log_info("preferences end");
 
-#ifndef BOARD_TRMNL_X
+#if !defined( BOARD_TRMNL_X ) && !defined( BOARD_TRMNL_X_EPDIY)
   if (double_click)
   { // special function reading
     if (preferences.isKey(PREFERENCES_SF_KEY))
@@ -670,13 +678,14 @@ void bl_init(void)
   {
     Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
 
+#ifdef BOARD_TRMNL_X
     iqs323_task_i2c_lock();
 
     if (!otg_message) {
       display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false);
     }
-
     iqs323_task_i2c_unlock();
+#endif
 
     need_to_refresh_display = 1;
     preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);

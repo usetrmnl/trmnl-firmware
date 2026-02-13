@@ -18,22 +18,22 @@ void setup()
 
   bool isShipped = checkIfAlreadyShipped();
   if (!isShipped) {
-    bool shipmentStarted = checkIfShipmentStarted();
+//    bool shipmentStarted = checkIfShipmentStarted();
 
-    if (shipmentStarted && check_usb_power()) {
+//    if (shipmentStarted && check_usb_power()) {
       // Battery died during shipping, now powered by USB charger
       // Skip shipment mode and mark as complete
       saveShipmentDone();
-      ESP.restart();
-    }
-    else {
+//      ESP.restart();
+//    }
+//    else {
       // enableShipmentMode() will block until charger is connected
-      enableShipmentMode();
+//      enableShipmentMode();
 
       // Charger detected, save shipment status to preferences
-      saveShipmentDone();
-      ESP.restart();
-    }
+//      saveShipmentDone();
+//      ESP.restart();
+//    }
   }
 #endif
 //   esp_ota_mark_app_valid_cancel_rollback();

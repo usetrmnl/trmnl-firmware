@@ -2,7 +2,7 @@
 #include <Arduino.h>
 #include <trmnl_log.h>
 
-#ifdef BOARD_TRMNL_X
+#if defined (BOARD_TRMNL_X) || defined (BOARD_TRLML_X_EPDIY)
 #include <LittleFS.h>
 #define FS LittleFS
 #else
