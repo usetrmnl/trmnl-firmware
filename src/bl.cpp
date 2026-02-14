@@ -746,16 +746,12 @@ static https_request_err_e downloadAndShow()
             Log_error_submit("Receiving failed; file size too big: %d", counter);
             return HTTPS_IMAGE_FILE_TOO_BIG;
           }
-
-          buffer = (uint8_t *)malloc(counter);
-
+          buffer = (uint8_t *)payload.c_str();
           if (buffer == NULL)
           {
             Log_error_submit("Failed to allocate %d bytes for image buffer", counter);
             return HTTPS_OUT_OF_MEMORY;
           }
-
-          memcpy(buffer, payload.c_str(), counter);
           content_size = counter;
 
           if (counter >= 2 && buffer[0] == 'B' && buffer[1] == 'M')
@@ -789,7 +785,7 @@ static https_request_err_e downloadAndShow()
             writeImageToFile("/current.png", buffer, content_size);
             Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
             display_show_image(buffer, content_size, true);
-            free(buffer);
+            payload.remove(0);
             buffer = nullptr;
             png_res = PNG_NO_ERR; // DEBUG
           }
@@ -862,7 +858,7 @@ static https_request_err_e downloadAndShow()
             }
             Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
             display_show_image(buffer, content_size, true);
-            free(buffer);
+            payload.remove(0);
             buffer = nullptr;
 
             // Using filename from API response
