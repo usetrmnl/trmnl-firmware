@@ -739,11 +739,11 @@ static https_request_err_e downloadAndShow()
           if (counter && counter <= MAX_IMAGE_SIZE) {
             WiFiClient *stream = https.getStreamPtr();
             int iLen, iCount = 0;
-            long lTimeout = millis() + 15*1000; // allow 15 seconds max
+            long lTimeout = millis() + API_FIRST_RETRY*1000; // allow 15 seconds max download time
 
             buffer = (uint8_t *)malloc(counter);
             if (buffer) {
-              while (iCount < counter && millis() < lTimeout) {
+              while (iCount < counter && millis() < lTimeout && stream->connected()) {
                 iLen = stream->available();
                 if (iLen) {
                   stream->readBytes(&buffer[iCount], iLen);
