@@ -732,8 +732,30 @@ static https_request_err_e downloadAndShow()
           heap_caps_check_integrity_all(true);
 
           // getString() handles chunked transfer encoding automatically
-          String payload = https.getString();
-          counter = payload.length();
+          //String payload = https.getString();
+          //counter = payload.length();
+          buffer = nullptr;
+          counter = https.getSize();
+          if (counter && counter <= MAX_IMAGE_SIZE) {
+            WiFiClient *stream = https.getStreamPtr();
+            int iLen, iCount = 0;
+            long lTimeout = millis() + 15*1000; // allow 15 seconds max
+
+            buffer = (uint8_t *)malloc(counter);
+            if (buffer) {
+              while (iCount < counter && millis() < lTimeout) {
+                iLen = stream->available();
+                if (iLen) {
+                  stream->readBytes(&buffer[iCount], iLen);
+                  iCount += iLen;
+                } else {
+                  vTaskDelay(1); // yield to allow time for the data to arrive
+                }
+              }
+            } // if buffer
+            stream->stop(); // Important! If you don't do this, WiFi will have a memory exception later
+            Log.info("%s [%d]: %d bytes received in %d milliseconds\r\n", __FILE__, __LINE__, iCount, (int)(millis() - (lTimeout-15000)));
+          } // if payload size is non-zero
 
           if (counter == 0)
           {
@@ -746,12 +768,14 @@ static https_request_err_e downloadAndShow()
             Log_error_submit("Receiving failed; file size too big: %d", counter);
             return HTTPS_IMAGE_FILE_TOO_BIG;
           }
-          buffer = (uint8_t *)payload.c_str();
+
           if (buffer == NULL)
           {
             Log_error_submit("Failed to allocate %d bytes for image buffer", counter);
             return HTTPS_OUT_OF_MEMORY;
           }
+
+          //memcpy(buffer, payload.c_str(), counter);
           content_size = counter;
 
           if (counter >= 2 && buffer[0] == 'B' && buffer[1] == 'M')
@@ -785,7 +809,7 @@ static https_request_err_e downloadAndShow()
             writeImageToFile("/current.png", buffer, content_size);
             Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
             display_show_image(buffer, content_size, true);
-            payload.remove(0);
+            free(buffer);
             buffer = nullptr;
             png_res = PNG_NO_ERR; // DEBUG
           }
@@ -858,7 +882,7 @@ static https_request_err_e downloadAndShow()
             }
             Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
             display_show_image(buffer, content_size, true);
-            payload.remove(0);
+            free(buffer);
             buffer = nullptr;
 
             // Using filename from API response
