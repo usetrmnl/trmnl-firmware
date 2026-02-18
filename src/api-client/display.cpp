@@ -82,9 +82,13 @@ ApiDisplayResult fetchApiDisplay(ApiDisplayInputs &apiDisplayInputs)
         Log_info("Start location: %s", https->getLocation().c_str());
         int httpCode = https->GET();
         if(httpCode == HTTP_CODE_PERMANENT_REDIRECT ||httpCode == HTTP_CODE_TEMPORARY_REDIRECT){
+              String location = https->getLocation();
               https->end();
-              https->begin(API_BASE_URL + https->getLocation());
-              Log_info("Redirected to: %s", https->getLocation().c_str());
+              String redirectUrl = (location.startsWith("http://") || location.startsWith("https://"))
+                  ? location
+                  : (apiDisplayInputs.baseUrl + location);
+              https->begin(redirectUrl);
+              Log_info("Redirected to: %s", redirectUrl.c_str());
               https->setTimeout(15000);
               https->setConnectTimeout(15000);
               addHeaders(*https, apiDisplayInputs);

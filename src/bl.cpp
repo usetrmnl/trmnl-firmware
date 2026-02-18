@@ -687,9 +687,23 @@ static https_request_err_e downloadAndShow()
           int content_size = https.getSize();
           if(httpCode == HTTP_CODE_PERMANENT_REDIRECT ||
             httpCode == HTTP_CODE_TEMPORARY_REDIRECT){
+              String location = https.getLocation();
               https.end();
-              https.begin(API_BASE_URL +https.getLocation());
-              Log_info("Redirected to: %s", https.getLocation().c_str());
+              String redirectUrl;
+              if (location.startsWith("http://") || location.startsWith("https://")) {
+                redirectUrl = location;
+              } else {
+                // Extract origin from the original image URL for relative redirects
+                String origin = String(filename);
+                int schemeEnd = origin.indexOf("://");
+                if (schemeEnd != -1) {
+                  int pathStart = origin.indexOf('/', schemeEnd + 3);
+                  if (pathStart != -1) origin = origin.substring(0, pathStart);
+                }
+                redirectUrl = origin + location;
+              }
+              https.begin(redirectUrl);
+              Log_info("Redirected to: %s", redirectUrl.c_str());
               https.setTimeout(15000);
               https.setConnectTimeout(15000);
               httpCode = https.GET();
