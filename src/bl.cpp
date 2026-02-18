@@ -592,31 +592,6 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
  */
 static https_request_err_e downloadAndShow()
 {
-  IPAddress serverIP;
-  String apiHostname = preferences.getString(PREFERENCES_API_URL, API_BASE_URL);
-  apiHostname.replace("https://", "");
-  apiHostname.replace("http://", "");
-  apiHostname.replace("/", "");
-
-  int colon = apiHostname.indexOf(':');
-  if (colon != -1) {
-    apiHostname = apiHostname.substring(0, colon);
-  }
-
-  for (int attempt = 1; attempt <= 5; ++attempt)
-  {
-    if (WiFi.hostByName(apiHostname.c_str(), serverIP) == 1)
-    {
-      Log.info("%s [%d]: Hostname resolved to %s on attempt %d\r\n", __FILE__, __LINE__, serverIP.toString().c_str(), attempt);
-      break;
-    }
-    else
-    {
-      Log_error("Failed to resolve hostname on attempt %d", attempt);
-      delay(2000);
-    }
-  }
-
   auto apiDisplayInputs = loadApiDisplayInputs(preferences);
 
   apiDisplayResult = fetchApiDisplay(apiDisplayInputs);
