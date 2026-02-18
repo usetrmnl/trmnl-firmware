@@ -778,6 +778,11 @@ int png_draw(PNGDRAW *pDraw)
     uint8_t ucBppChanged = 0, ucInvert = 0;
     uint8_t uc, ucMask, src, *s, *d, *pTemp = bbep.getCache(); // get some scratch memory (not from the stack)
     int iPlane = *(int *)pDraw->pUser;
+    int iWidth;
+
+    iWidth = pDraw->iWidth;
+    if (pDraw->y >= bbep.height()) return 0; // stop decoding if we'll go past the bottom
+    if (iWidth > bbep.width()) iWidth = bbep.width(); // crop image width to display size if it's larger
 
     if (pDraw->iPixelType == PNG_PIXEL_INDEXED || pDraw->iBpp > 2) {
         if (pDraw->iBpp == 1) { // 1-bit output, just see which color is brighter
@@ -789,7 +794,7 @@ int png_draw(PNGDRAW *pDraw)
           }
         } else {
             // Reduce the source image to 1-bpp or 2-bpp
-            ReduceBpp((pDraw->pUser) ? 2:1, pDraw->iPixelType, pDraw->pPalette, pDraw->pPixels, pTemp, pDraw->iWidth, pDraw->iBpp);
+            ReduceBpp((pDraw->pUser) ? 2:1, pDraw->iPixelType, pDraw->pPalette, pDraw->pPixels, pTemp, iWidth, pDraw->iBpp);
             ucBppChanged = 1;
         }
     } else if (pDraw->iBpp == 2) {
@@ -801,9 +806,9 @@ int png_draw(PNGDRAW *pDraw)
         // 1-bit output, decode the single plane and write it
         if (iPlane == PNG_1_BIT_INVERTED) ucInvert = ~ucInvert; // to do PLANE_FALSE_DIFF
         if (iPlane == PNG_1_BIT_INVERTED && (bbep.capabilities() & BBEP_3COLOR)) { // write the red plane as 0's for this case
-            memset(d, 0, pDraw->iWidth/8);
+            memset(d, 0, iWidth/8);
         } else {
-            for (x=0; x<pDraw->iWidth; x+= 8) {
+            for (x=0; x<iWidth; x+= 8) {
                 d[0] = s[0] ^ ucInvert;
                 d++; s++;
             }
@@ -817,7 +822,7 @@ int png_draw(PNGDRAW *pDraw)
                 ucInvert = ~ucInvert; // the invert rule is backwards for grayscale data
             }
             src = ~src;
-            for (x=0; x<pDraw->iWidth; x++) {
+            for (x=0; x<iWidth; x++) {
                 uc <<= 1;
                 if (src & 0xc0) { // non-white -> black
                     uc |= 1; // high bit of source pair
@@ -833,7 +838,7 @@ int png_draw(PNGDRAW *pDraw)
             } // for x
         } else { // normal 0/1 split plane
             ucMask = (iPlane == PNG_2_BIT_0) ? 0x40 : 0x80; // lower or upper source bit
-            for (x=0; x<pDraw->iWidth; x++) {
+            for (x=0; x<iWidth; x++) {
                 uc <<= 1;
                 if (src & ucMask) {
                     uc |= 1; // high bit of source pair
@@ -849,7 +854,7 @@ int png_draw(PNGDRAW *pDraw)
             } // for x
         }
     }
-    bbep.writeData(pTemp, (pDraw->iWidth+7)/8);
+    bbep.writeData(pTemp, (iWidth+7)/8);
     return 1;
 } /* png_draw() */
 #else // TRMNL_X version
@@ -1192,11 +1197,7 @@ PNG *png = new PNG();
         if (png->getWidth() == bbep.height() && png->getHeight() == bbep.width()) {
             Log_info("Rotating canvas to portrait orientation");
         } else if (png->getWidth() > bbep.width() || png->getHeight() > bbep.height()) {
-            Log_error("PNG image is too large for display size (%dx%d)", png->getWidth(), png->getHeight());
-            rc = -1;
-        } else if (png->getBpp() > MAX_BIT_DEPTH) {
-            Log_error("Unsupported PNG bit depth (only 1 to %d-bpp supported), this file has %d-bpp", MAX_BIT_DEPTH, png->getBpp());
-            rc = -1;
+            Log_info("PNG image is larger than the display (%dx%d), it will be cropped", png->getWidth(), png->getHeight());
         }
         if (rc == PNG_SUCCESS) { // okay to decode
             Log_info("%s [%d]: Decoding %d-bpp png (current)\r\n", __FILE__, __LINE__, png->getBpp());
