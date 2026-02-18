@@ -55,6 +55,7 @@ bool status = false;          // need to download a new image
 bool update_firmware = false; // need to download a new firmware
 bool reset_firmware = false;  // need to reset credentials
 bool send_log = false;        // need to send logs
+bool api_server_healthy = true; // false when /api/display returns 5xx - skip log submission until server recovers
 bool double_click = false;
 bool log_retry = false;                                              // need to log connection retry
 esp_sleep_wakeup_cause_t wakeup_reason = ESP_SLEEP_WAKEUP_UNDEFINED; // wake-up reason
@@ -620,6 +621,8 @@ static https_request_err_e downloadAndShow()
   auto apiDisplayInputs = loadApiDisplayInputs(preferences);
 
   apiDisplayResult = fetchApiDisplay(apiDisplayInputs);
+
+  api_server_healthy = (apiDisplayResult.error == HTTPS_NO_ERR);
 
   if (apiDisplayResult.error != HTTPS_NO_ERR)
   {
@@ -2070,6 +2073,12 @@ static void submitStoredLogs(void)
   if (WiFi.isConnected() == false)
   {
     Log_info("WiFi not connected; not submitting stored logs.");
+    return;
+  }
+
+  if (!api_server_healthy)
+  {
+    Log_info("API server unhealthy; storing logs for next successful cycle.");
     return;
   }
   String log = storedLogs.gather_stored_logs();
