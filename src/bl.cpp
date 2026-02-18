@@ -746,8 +746,30 @@ static https_request_err_e downloadAndShow()
           heap_caps_check_integrity_all(true);
 
           // getString() handles chunked transfer encoding automatically
-          String payload = https.getString();
-          counter = payload.length();
+          //String payload = https.getString();
+          //counter = payload.length();
+          buffer = nullptr;
+          counter = https.getSize();
+          if (counter && counter <= MAX_IMAGE_SIZE) {
+            WiFiClient *stream = https.getStreamPtr();
+            int iLen, iCount = 0;
+            long lTimeout = millis() + API_FIRST_RETRY*1000; // allow 15 seconds max download time
+
+            buffer = (uint8_t *)malloc(counter);
+            if (buffer) {
+              while (iCount < counter && millis() < lTimeout && stream->connected()) {
+                iLen = stream->available();
+                if (iLen) {
+                  stream->readBytes(&buffer[iCount], iLen);
+                  iCount += iLen;
+                } else {
+                  vTaskDelay(1); // yield to allow time for the data to arrive
+                }
+              }
+            } // if buffer
+            stream->stop(); // Important! If you don't do this, WiFi will have a memory exception later
+            Log.info("%s [%d]: %d bytes received in %d milliseconds\r\n", __FILE__, __LINE__, iCount, (int)(millis() - (lTimeout-15000)));
+          } // if payload size is non-zero
 
           if (counter == 0)
           {
@@ -761,15 +783,13 @@ static https_request_err_e downloadAndShow()
             return HTTPS_IMAGE_FILE_TOO_BIG;
           }
 
-          buffer = (uint8_t *)malloc(counter);
-
           if (buffer == NULL)
           {
             Log_error_submit("Failed to allocate %d bytes for image buffer", counter);
             return HTTPS_OUT_OF_MEMORY;
           }
 
-          memcpy(buffer, payload.c_str(), counter);
+          //memcpy(buffer, payload.c_str(), counter);
           content_size = counter;
 
           if (counter >= 2 && buffer[0] == 'B' && buffer[1] == 'M')
