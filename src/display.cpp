@@ -29,6 +29,12 @@ BBEPAPER bbep(EP75R_800x480);
     {EP75YR_800x480, EP75YR_800x480}, // b = darker grays
 };
 BBEPAPER bbep(EP75YR_800x480);
+#elif defined(BOARD_SEEED_RETERMINAL_E1001)
+    {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, // default (for GEN2 panel)
+    {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, // a = uses built-in fast + 4-gray
+    {EP75_800x480_GEN2, EP75_800x480_4GRAY_V2}, // b = darker grays
+};
+BBEPAPER bbep(EP75_800x480_GEN2);
 #elif defined(BOARD_SEEED_RETERMINAL_E1002)
     {EP73_SPECTRA_800x480, EP73_SPECTRA_800x480}, // default (for original EPD)
     {EP73_SPECTRA_800x480, EP73_SPECTRA_800x480}, // a = uses built-in fast + 4-gray
@@ -87,6 +93,10 @@ uint32_t iTempProfile;
 static int i426Workaround = 0;
 static uint8_t *pDither;
 
+// E1001 4-gray mode handles its own refresh; this sentinel tells
+// display_show_image() to skip the normal bbep.refresh() call.
+#define REFRESH_ALREADY_DONE (-2)
+
 // Runtime control for light sleep (true = enabled, false = disabled)
 static bool g_light_sleep_enabled = true;
 
@@ -95,6 +105,16 @@ static bool g_light_sleep_enabled = true;
  * @param none
  * @return none
  */
+#if defined(BOARD_SEEED_RETERMINAL_E1001)
+// Helper for Seeed-style command with data bytes
+static void seeed_cmd(uint8_t cmd, const uint8_t *data, int len) {
+    bbep.writeCmd(cmd);
+    if (len > 0) {
+        bbep.writeData((uint8_t*)data, len);
+    }
+}
+#endif
+
 void display_init(void)
 {
     Log_info("dev module start");
@@ -102,7 +122,75 @@ void display_init(void)
     Log_info("Saved temperature profile: %d", iTempProfile);
 #ifdef BB_EPAPER
     bbep.setPanelType(dpList[iTempProfile].OneBit); // must be set BEFORE calling initio
+#if defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002)
+    // Disable SD card SPI to prevent bus contention (SD_ENABLE = GPIO16)
+    pinMode(16, OUTPUT);
+    digitalWrite(16, LOW);
+#endif
     bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
+
+#if defined(BOARD_SEEED_RETERMINAL_E1001)
+    // TODO: This custom init can be removed if bb_epaper adds native
+    // GDEY075T7/UC8179 support for the E1001 panel.
+    // Re-init with exact Seeed UC8179 sequence (from Seeed_GFX UC8179_Init.h)
+    Log_info("E1001: Applying Seeed-style init sequence");
+
+    // Hardware reset (Seeed style)
+    digitalWrite(EPD_RST_PIN, HIGH); delay(5);
+    digitalWrite(EPD_RST_PIN, LOW); delay(20);
+    digitalWrite(EPD_RST_PIN, HIGH); delay(150);
+
+    // Wait for BUSY HIGH
+    while (!digitalRead(EPD_BUSY_PIN)) { delay(10); }
+
+    // Seeed UC8179_Init.h sequence exactly
+    uint8_t pwr[] = {0x07, 0x07, 0x3f, 0x3f};
+    seeed_cmd(0x01, pwr, 4);  // POWER SETTING
+
+    uint8_t bst[] = {0x17, 0x17, 0x28, 0x17};
+    seeed_cmd(0x06, bst, 4);  // Booster Soft Start
+
+    seeed_cmd(0x04, NULL, 0); // POWER ON
+    delay(100);
+    while (!digitalRead(EPD_BUSY_PIN)) { delay(10); }
+
+    uint8_t psr[] = {0x1F};
+    seeed_cmd(0x00, psr, 1);  // PANEL SETTING
+
+    uint8_t tres[] = {0x03, 0x20, 0x01, 0xe0}; // 800x480
+    seeed_cmd(0x61, tres, 4); // RESOLUTION
+
+    uint8_t dsp[] = {0x00};
+    seeed_cmd(0x15, dsp, 1);  // Dual SPI off
+
+    uint8_t cdi[] = {0x21, 0x07};  // 0x21 matches bb_epaper
+    seeed_cmd(0x50, cdi, 2);  // VCOM AND DATA INTERVAL
+
+    uint8_t tcon[] = {0x22};
+    seeed_cmd(0x60, tcon, 1); // TCON SETTING
+
+    // Write white to OLD buffer (0x10) first - clears previous frame
+    seeed_cmd(0x10, NULL, 0);
+    uint8_t white_row[100];
+    memset(white_row, 0xFF, 100); // 0xFF = white with CDI 0x21
+    for (int y = 0; y < 480; y++) {
+        bbep.writeData(white_row, 100); // 800/8 = 100 bytes per row
+    }
+
+    // Write white to NEW buffer (0x13)
+    seeed_cmd(0x13, NULL, 0);
+    for (int y = 0; y < 480; y++) {
+        bbep.writeData(white_row, 100);
+    }
+
+    // Refresh (Seeed EPD_UPDATE)
+    seeed_cmd(0x12, NULL, 0);
+    delay(1);
+    while (!digitalRead(EPD_BUSY_PIN)) { delay(10); }
+
+    Log_info("E1001: Seeed-style init complete");
+#endif
+
 #else
     bbep.initPanel(BB_PANEL_EPDIY_V7_16); //, 26000000);
     bbep.setPanelSize(1872, 1404, BB_PANEL_FLAG_MIRROR_X);
@@ -1257,6 +1345,62 @@ PNG *png = new PNG();
                 bbep.setPanelType(dpList[iTempProfile].TwoBit);
                 rc = REFRESH_FULL; // 4gray mode must be full refresh
                 iUpdateCount = 0; // grayscale mode resets the partial update counter
+#ifdef BOARD_SEEED_RETERMINAL_E1001
+                // E1001/UC8179: Match Seeed_GFX sequence exactly:
+                // 1. Send gray init FIRST (before writing data)
+                // 2. Write OLD buffer (0x10) first
+                // 3. Write NEW buffer (0x13) second
+                // 4. Refresh just sends 0x12
+
+                // Send gray init sequence manually (Seeed EPD_INIT_GRAY)
+                // Includes hardware reset like Seeed does
+                {
+                    uint8_t data[4];
+                    // Hardware reset (matches Seeed EPD_INIT_GRAY)
+                    digitalWrite(EPD_RST_PIN, LOW);
+                    delay(10);
+                    digitalWrite(EPD_RST_PIN, HIGH);
+                    delay(10);
+                    bbep.wait();
+
+                    data[0] = 0x1F;
+                    bbep.writeCmd(0x00); bbep.writeData(data, 1);           // Panel Setting
+                    data[0] = 0x10; data[1] = 0x07;
+                    bbep.writeCmd(0x50); bbep.writeData(data, 2);           // CDI
+                    bbep.writeCmd(0x04);                                     // Power On
+                    delay(10);
+                    bbep.wait();
+                    data[0] = 0x27; data[1] = 0x27; data[2] = 0x20; data[3] = 0x17; // Phase C: 0x20 balances contrast vs Waveshare ref (0x18)
+                    bbep.writeCmd(0x06); bbep.writeData(data, 4);           // Booster
+                    data[0] = 0x02;
+                    bbep.writeCmd(0xE0); bbep.writeData(data, 1);           // Cascade
+                    data[0] = 0x5F;
+                    bbep.writeCmd(0xE5); bbep.writeData(data, 1);           // Force Temp
+                }
+
+                // Write OLD buffer (0x10/PLANE_1) first - matches Seeed order
+                Log_info("%s [%d]: decoding 4-gray OLD buffer (0x10)\r\n", __FILE__, __LINE__);
+                bbep.startWrite(PLANE_1);
+                iPlane = PNG_2_BIT_0;
+                png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
+                png->decode(&iPlane, 0);
+                png->close();
+
+                // Write NEW buffer (0x13/PLANE_0) second
+                Log_info("%s [%d]: decoding 4-gray NEW buffer (0x13)\r\n", __FILE__, __LINE__);
+                bbep.startWrite(PLANE_0);
+                iPlane = PNG_2_BIT_1;
+                png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
+                png->decode(&iPlane, 0);
+                png->close();
+
+                // Send refresh command (0x12) and wait - matches Seeed EPD_UPDATE
+                Log_info("%s [%d]: E1001 4-gray refresh (0x12)\r\n", __FILE__, __LINE__);
+                bbep.writeCmd(0x12);
+                delay(1);
+                bbep.wait();
+                rc = REFRESH_ALREADY_DONE;
+#else
                 bbep.startWrite(PLANE_0); // start writing image data to plane 0
                 iPlane = PNG_2_BIT_0;
                 Log_info("%s [%d]: decoding 4-gray plane 0\r\n", __FILE__, __LINE__);
@@ -1268,6 +1412,7 @@ PNG *png = new PNG();
                 png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
                 bbep.startWrite(PLANE_1); // start writing image data to plane 1
                 png->decode(&iPlane, 0); // decode it again to get plane 1 data
+#endif
             }
 #else // FastEPD
             bbep.setMode((png->getBpp() == 1) ? BB_MODE_1BPP : BB_MODE_4BPP);
@@ -1364,6 +1509,8 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
 #ifdef BB_EPAPER
 #ifdef BOARD_XTEINK_X4
         bbep.writePlane(PLANE_FALSE_DIFF);
+#elif defined(BOARD_SEEED_RETERMINAL_E1001)
+        bbep.writePlane(PLANE_DUPLICATE); // E1001 needs both OLD and NEW buffers written
 #else
         bbep.writePlane(); // send image data to the EPD
 #endif
@@ -1378,22 +1525,27 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
         Log_info("Saving new temperature profile (%d) to FLASH", iTempProfile);
         preferences.putUInt(PREFERENCES_TEMP_PROFILE, iTempProfile);
     }
-    if ((iUpdateCount & 7) == 0 || apiDisplayResult.response.maximum_compatibility == true) {
-        Log_info("%s [%d]: Forcing full refresh; desired refresh mode was: %d\r\n", __FILE__, __LINE__, iRefreshMode);
-        iRefreshMode = REFRESH_FULL; // force full refresh every 8 partials
-    }
-    int refresh_seconds = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
-    if (refresh_seconds >= 30*60 && iRefreshMode == REFRESH_PARTIAL) {
-        // For users who set updates 30 minutes or longer, use the "fast" update to prevent ghosting
-        Log_info("%s [%d]: Forcing fast refresh (not partial) since the TRMNL refresh_rate is set to > 30 min\n", __FILE__, __LINE__);
-        iRefreshMode = REFRESH_FAST;
-    }
-    if (bbep.capabilities() & (BBEP_4COLOR | BBEP_3COLOR | BBEP_7COLOR)) bWait = 1;
-    if (!bWait) iRefreshMode = REFRESH_PARTIAL; // fast update when showing loading screen
-    Log_info("%s [%d]: EPD refresh mode: %d\r\n", __FILE__, __LINE__, iRefreshMode);
-    bbep.refresh(iRefreshMode, bWait);
-    if (bbep.getPanelType() == EP426_800x480 && iRefreshMode == REFRESH_PARTIAL) {
-        i426Workaround = 1; // need to re-initialize the controller for another update before sleeping
+    // Check if refresh was already done (E1001 4-gray handles its own refresh)
+    if (iRefreshMode == REFRESH_ALREADY_DONE) {
+        Log_info("%s [%d]: Refresh already done, skipping bbep.refresh()\r\n", __FILE__, __LINE__);
+    } else {
+        if ((iUpdateCount & 7) == 0 || apiDisplayResult.response.maximum_compatibility == true) {
+            Log_info("%s [%d]: Forcing full refresh; desired refresh mode was: %d\r\n", __FILE__, __LINE__, iRefreshMode);
+            iRefreshMode = REFRESH_FULL; // force full refresh every 8 partials
+        }
+        int refresh_seconds = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
+        if (refresh_seconds >= 30*60 && iRefreshMode == REFRESH_PARTIAL) {
+            // For users who set updates 30 minutes or longer, use the "fast" update to prevent ghosting
+            Log_info("%s [%d]: Forcing fast refresh (not partial) since the TRMNL refresh_rate is set to > 30 min\n", __FILE__, __LINE__);
+            iRefreshMode = REFRESH_FAST;
+        }
+        if (bbep.capabilities() & (BBEP_4COLOR | BBEP_3COLOR | BBEP_7COLOR)) bWait = 1;
+        if (!bWait) iRefreshMode = REFRESH_PARTIAL; // fast update when showing loading screen
+        Log_info("%s [%d]: EPD refresh mode: %d\r\n", __FILE__, __LINE__, iRefreshMode);
+        bbep.refresh(iRefreshMode, bWait);
+        if (bbep.getPanelType() == EP426_800x480 && iRefreshMode == REFRESH_PARTIAL) {
+            i426Workaround = 1; // need to re-initialize the controller for another update before sleeping
+        }
     }
     if (bAlloc) {
         bbep.freeBuffer();
