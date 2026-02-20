@@ -66,7 +66,8 @@
   #define EPD_RST_PIN  10
   #define EPD_DC_PIN   5
   #define EPD_BUSY_PIN 4
-
+  #define SENSOR_SDA 21
+  #define SENSOR_SCL 20
 #elif defined(BOARD_XTEINK_X4)
   #define EPD_SCK_PIN  8
   #define EPD_MOSI_PIN 10

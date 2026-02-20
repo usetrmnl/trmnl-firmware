@@ -39,7 +39,12 @@
 #include "logo_medium.h"
 #include "loading.h"
 #include <wifi-helpers.h>
-
+#ifdef SENSOR_SDA
+#include <bb_scd41.h>
+SCD41 scd41;
+long lSampleTime;
+RTC_DATA_ATTR int lastCO2 = 0, lastTemp = 0, lastHumid = 0;
+#endif // SENSOR_SDA
 bool pref_clear = false;
 String new_filename = "";
 ApiDisplayResult apiDisplayResult;
@@ -119,6 +124,17 @@ void bl_init(void)
   Log_info("BL init success");
   pins_init();
   vBatt = readBatteryVoltage(); // Read the battery voltage BEFORE WiFi is turned on
+#ifdef SENSOR_SDA
+  // check if there is a SCD41 attached
+  if (scd41.init(SENSOR_SDA, SENSOR_SCL) == SCD41_SUCCESS) {
+    Log.info("%s [%d]: SCD41 sensor found!\r\n", __FILE__, __LINE__);
+    scd41.wakeup();
+    scd41.triggerSample();
+    lSampleTime = millis(); // measure the time - it needs 5 seconds to generate a sample
+  } else {
+    Log.info("%s [%d]: No sensor found on I2C bus %d/%d\r\n", __FILE__, __LINE__, SENSOR_SDA, SENSOR_SCL);
+  }
+#endif // SENSOR_SDA
 #if defined(BOARD_SEEED_XIAO_ESP32C3)
   delay(2000);
 
@@ -1895,6 +1911,25 @@ static void goToSleep(void)
   WiFi.mode(WIFI_OFF); 
   filesystem_deinit();
   uint32_t time_to_sleep = SLEEP_TIME_TO_SLEEP;
+
+#ifdef SENSOR_SDA
+  long l = (millis() - lSampleTime);
+  if (l < 5000) {
+    Log_info("%s [%d] waiting %d milliseconds for SCD41 to complete capture", __FILE__, __LINE__, (int)l);
+    delay(l); // The SCD41 needs a full 5 seconds to capture a sample before we shut down the sensor
+  }
+  if (scd41.getSample() == SCD41_SUCCESS) {
+      lastCO2 = scd41.co2();
+      lastTemp = scd41.temperature();
+      lastHumid = scd41.humidity();
+      Log.info("%s [%d]: Got SCD41 sample: CO2 = %dppm\r\n", __FILE__, __LINE__, lastCO2);
+  } else {
+      Log.info("%s [%d]: SCD41 sample failed\r\n", __FILE__, __LINE__);
+      lastCO2 = 0;
+  }
+  scd41.shutdown(); // conserve power since we completed getting a sample ready for the next TRMNL wakeup
+#endif // SENSOR_SDA
+
   if (preferences.isKey(PREFERENCES_SLEEP_TIME_KEY))
     time_to_sleep = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
   Log.info("%s [%d]: total awake time - %d ms\r\n", __FILE__, __LINE__, millis() - startup_time); 

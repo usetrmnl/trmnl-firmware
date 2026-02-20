@@ -5,6 +5,10 @@
 #include <config.h>
 #include <api_response_parsing.h>
 #include <http_client.h>
+#include <DEV_Config.h>
+#ifdef SENSOR_SDA
+extern RTC_DATA_ATTR int lastCO2, lastTemp, lastHumid;
+#endif // SENSOR_SDA
 
 void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
 {
@@ -38,6 +42,16 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
   https.addHeader("temperature-profile", "true");
   https.addHeader("Width", String(inputs.displayWidth));
   https.addHeader("Height", String(inputs.displayHeight));
+#ifdef SENSOR_SDA
+  if (lastCO2 != 0) { // valid data
+    https.addHeader("CO2", String(lastCO2));
+    https.addHeader("Temperature", String(((float)lastTemp)/10.0f));
+    https.addHeader("Humidity", String(lastHumid));
+    Log_info("%s [%d] Adding sensor data to api request: CO2: %d, Temp: %d.%dC, Humidity: %d%%", __FILE__, __LINE__, lastCO2, lastTemp/10, lastTemp % 10, lastHumid);
+  } else {
+    Log_info("%s [%d] SCD41 sensor data not available", __FILE__, __LINE__);
+  }
+#endif // SENSOR_SDA
 
   if (inputs.specialFunction != SF_NONE)
   {
