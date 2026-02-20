@@ -784,7 +784,7 @@ int png_draw(PNGDRAW *pDraw)
             uint32_t u32Gray0, u32Gray1;
             u32Gray0 = pDraw->pPalette[0] + (pDraw->pPalette[1]<<2) + pDraw->pPalette[2];
             u32Gray1 = pDraw->pPalette[3] + (pDraw->pPalette[4]<<2) + pDraw->pPalette[5];
-          if (u32Gray0 < u32Gray1) {
+          if (u32Gray1 < u32Gray0) {
             ucInvert = 0xff;
           }
         } else {
