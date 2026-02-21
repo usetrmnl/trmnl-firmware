@@ -109,7 +109,8 @@ void filesystem_purge_old_file(const char *name)
 uint32_t u32;
 time_t tt;
 File rootDir; 
-char *s;
+char *s, szTemp[32];
+bool bDel;
 
     time(&tt); // get the current epoch time
     rootDir = SPIFFS.open("/");
@@ -117,12 +118,18 @@ char *s;
         s = (char *)file.name();
         // The last 10 characters of the name are the epoch timestamp
         u32 = (uint32_t) atoi(&s[strlen(s)-10]);
+        bDel = false;
         if (memcmp(name, file.name(), 14) == 0) { // older version of the same file
             Log_info("Deleting older version of plugin image %s - %s", name, file.name());
-            SPIFFS.remove(file.name());
+            bDel = true;
         } else if ((uint32_t)tt - u32 > 60*60*24) { // More than 24h old
             Log_info("Deleting image older than 24h - %s", file.name());
-            SPIFFS.remove(file.name());
+            bDel = true;
+        }
+        if (bDel) { // to avoid double code
+            strcpy(szTemp, "/"); // needed on this file operation
+            strcat(szTemp, file.name());
+            SPIFFS.remove(szTemp);
         }
     }
     rootDir.close();

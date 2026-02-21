@@ -144,8 +144,7 @@ bool startQA(){
 
   // Disable light sleep before display operation to prevent workflow interruption
   display_set_light_sleep(false);
-  bbep.setLightSleep(false);
-
+  
   display_show_msg(const_cast<uint8_t *>(logo_small),QA_START);
 
   Log.info("QA Test started\n");
@@ -208,7 +207,6 @@ bool startQA(){
 
   // Re-enable light sleep after QA test completes
   display_set_light_sleep(true);
-  bbep.setLightSleep(true);
 
   savePassedTest();
     while (1){

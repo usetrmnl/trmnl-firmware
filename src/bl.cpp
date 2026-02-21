@@ -2163,7 +2163,7 @@ static void writeSpecialFunction(SPECIAL_FUNCTION function)
     Log.info("%s [%d]: SF saved. Reading...\r\n", __FILE__, __LINE__);
     if ((SPECIAL_FUNCTION)preferences.getUInt(PREFERENCES_SF_KEY, 0) == function)
     {
-      Log.info("%s [%d]: No needed to re-write\r\n", __FILE__, __LINE__);
+      Log.info("%s [%d]: No need to re-write\r\n", __FILE__, __LINE__);
     }
     else
     {
