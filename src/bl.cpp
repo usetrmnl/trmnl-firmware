@@ -43,7 +43,7 @@
 #include <bb_scd41.h>
 SCD41 scd41;
 long lSampleTime;
-RTC_DATA_ATTR int lastCO2 = 0, lastTemp = 0, lastHumid = 0;
+RTC_DATA_ATTR int lastCO2 = 0, lastTemp = 0, lastHumid = 0, lastTime = 0;
 #endif // SENSOR_SDA
 bool pref_clear = false;
 String new_filename = "";
@@ -128,9 +128,13 @@ void bl_init(void)
   // check if there is a SCD41 attached
   if (scd41.init(SENSOR_SDA, SENSOR_SCL) == SCD41_SUCCESS) {
     Log.info("%s [%d]: SCD41 sensor found!\r\n", __FILE__, __LINE__);
+//    scd41.start(SCD41_MODE_PERIODIC);
     scd41.wakeup();
-    scd41.triggerSample();
-    lSampleTime = millis(); // measure the time - it needs 5 seconds to generate a sample
+    // The SCD41 needs to be re-initialized after big Vcc variations from the last wakeup
+    // put it in a 'confused' state. If we don't re-initialize it, it won't generate more samples
+    scd41.sendCMD(SCD41_CMD_REINIT);
+    vTaskDelay(3); // allow time to reinitialize
+    scd41.triggerSample(); // trigger a 'one-shot' sample that takes about 5 seconds to complete
   } else {
     Log.info("%s [%d]: No sensor found on I2C bus %d/%d\r\n", __FILE__, __LINE__, SENSOR_SDA, SENSOR_SCL);
   }
@@ -1913,16 +1917,24 @@ static void goToSleep(void)
   uint32_t time_to_sleep = SLEEP_TIME_TO_SLEEP;
 
 #ifdef SENSOR_SDA
-  long l = (millis() - lSampleTime);
-  if (l < 5000) {
-    Log_info("%s [%d] waiting %d milliseconds for SCD41 to complete capture", __FILE__, __LINE__, (int)l);
-    delay(l); // The SCD41 needs a full 5 seconds to capture a sample before we shut down the sensor
-  }
-  if (scd41.getSample() == SCD41_SUCCESS) {
-      lastCO2 = scd41.co2();
-      lastTemp = scd41.temperature();
-      lastHumid = scd41.humidity();
-      Log.info("%s [%d]: Got SCD41 sample: CO2 = %dppm\r\n", __FILE__, __LINE__, lastCO2);
+//  long l = (millis() - lSampleTime);
+//  if (l < 5200) {
+//    l = 5200 - l;
+//    Log_info("%s [%d] waiting %d milliseconds for SCD41 to complete capture", __FILE__, __LINE__, (int)l);
+//    delay(l); // The SCD41 needs a full 5 seconds to capture a sample before we shut down the sensor
+//  }
+//    if (scd41.hasSample()) {
+//      Log_info("got scd41 sample in %d ms!", i * 100);
+//    } else {
+//      Log_info("no scd41 sample :(");
+//    }
+    if (scd41.getSample() == SCD41_SUCCESS) {
+        time((time_t *)&lastTime); // get the UTC epoch time that the same was captured
+        lastCO2 = scd41.co2();
+        lastTemp = scd41.temperature();
+        lastHumid = scd41.humidity();
+        Log.info("%s [%d]: Got SCD41 sample: CO2 = %dppm\r\n", __FILE__, __LINE__, lastCO2);
+        lSampleTime = millis(); // measure the time - it needs 5 seconds to generate a sample
   } else {
       Log.info("%s [%d]: SCD41 sample failed\r\n", __FILE__, __LINE__);
       lastCO2 = 0;

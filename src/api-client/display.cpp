@@ -7,7 +7,7 @@
 #include <http_client.h>
 #include <DEV_Config.h>
 #ifdef SENSOR_SDA
-extern RTC_DATA_ATTR int lastCO2, lastTemp, lastHumid;
+extern RTC_DATA_ATTR int lastCO2, lastTemp, lastHumid, lastTime;
 #endif // SENSOR_SDA
 
 void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
@@ -46,8 +46,8 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
   if (lastCO2 != 0) { // valid data
     char szTemp[256];
     // create the multi-value string to pass as a HTTP header
-    sprintf(szTemp, "make=Sensirion;model=SCD41;kind=carbon_dioxide;value=%d;unit=ppm,make=Sensirion;model=SCD41;kind=temperature;value=%f;unit=celcius,make=Sensirion;model=SCD41;kind=humidity;value=%d;unit=percent", lastCO2, (float)lastTemp / 10.0f, lastHumid);
-    https.addHeader("HTTP_SENSORS", szTemp);
+    sprintf(szTemp, "make=Sensirion;model=SCD41;kind=carbon_dioxide;value=%d;unit=parts_per_million;updated_at=%d,make=Sensirion;model=SCD41;kind=temperature;value=%f;unit=celsius;updated_at=%d,make=Sensirion;model=SCD41;kind=humidity;value=%d;unit=percent;updated_at=%d", lastCO2, lastTime, (float)lastTemp / 10.0f, lastTime, lastHumid, lastTime);
+    https.addHeader("SENSORS", szTemp);
     Log_info("%s [%d] Adding sensor data to api request: CO2: %d, Temp: %d.%dC, Humidity: %d%%", __FILE__, __LINE__, lastCO2, lastTemp/10, lastTemp % 10, lastHumid);
   } else {
     Log_info("%s [%d] SCD41 sensor data not available", __FILE__, __LINE__);
