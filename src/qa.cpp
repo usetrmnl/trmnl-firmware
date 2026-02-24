@@ -174,6 +174,8 @@ bool startQA(){
 
     Serial.print("WiFi credentials found, skipping QA\n");
     return true;
+  } else {
+    Serial.println("WiFi credentials not found, starting QA");
   }
 
   while(!stopRequested){

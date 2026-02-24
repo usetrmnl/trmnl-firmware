@@ -99,6 +99,7 @@ static unsigned long startup_time = 0;
 // Create stub functions for the touchbar workaround
 void iqs323_task_i2c_lock(void) {}
 void iqs323_task_i2c_unlock(void) {}
+bool otg_message = false;
 #endif // EPDIY
 
 void wait_for_serial() {
@@ -461,6 +462,11 @@ void bl_init(void)
                       wakeup_reason == ESP_SLEEP_WAKEUP_EXT0 ||
                       wakeup_reason == ESP_SLEEP_WAKEUP_EXT1);
 
+#ifdef BOARD_TRMNL_X_EPDIY
+   display_init();
+   filesystem_init();
+#endif // EPDIY
+
 #ifdef BOARD_TRMNL_X
   // Notify IQS323 task about wakeup type BEFORE starting the task
 
@@ -678,7 +684,7 @@ void bl_init(void)
   {
     Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
 
-#ifdef BOARD_TRMNL_X
+#if defined( BOARD_TRMNL_X ) || defined ( BOARD_TRMNL_X_EPDIY )
     iqs323_task_i2c_lock();
 
     if (!otg_message) {
@@ -2640,7 +2646,7 @@ static uint8_t *storedLogoOrDefault(int iType)
 //  {
 //    return buffer;
 //  }
-#ifdef BOARD_TRMNL_X
+#if defined( BOARD_TRMNL_X ) || defined( BOARD_TRMNL_X_EPDIY )
     return const_cast<uint8_t *>(logo_medium);
 #else
   if (iType == 0) {

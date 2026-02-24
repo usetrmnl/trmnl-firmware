@@ -78,12 +78,13 @@ void display_init(void)
 #else
 #ifdef BOARD_TRMNL_X
     bbep.initPanel(BB_PANEL_TRMNL_X);
-#elif defined(BOARD_TRMNL_X_EPDIY)
-    bbep.initPanel(BB_PANEL_EPDIY_V7_16);
-    bbep.setPanelSize(1872, 1404, BB_PANEL_FLAG_MIRROR_X, -1100);
-#endif
     bbep.setPasses(3, 3);
-#endif
+#elif defined(BOARD_TRMNL_X_EPDIY)
+    bbep.initPanel(BB_PANEL_LILYGO_T5PRO); // BB_PANEL_EPDIY_V7_16);
+    bbep.fillScreen(BBEP_WHITE);
+//    bbep.setPanelSize(1872, 1404, BB_PANEL_FLAG_MIRROR_X, -1100);
+#endif // X
+#endif // bb_epaper
     Log_info("dev module end");
 }
 
@@ -342,7 +343,7 @@ void display_reset(void)
         bbep.refresh(REFRESH_FULL, true); // incompatible panel
     }
 #else
-    bbep.fullUpdate(CLEAR_WHITE);
+    bbep.fullUpdate(CLEAR_EXTRA_WHITE);
 #endif
     Log_info("e-Paper Clear end");
     // DEV_Delay_ms(500);
@@ -699,11 +700,13 @@ int png_draw(PNGDRAW *pDraw)
     uint8_t ucMask, ucPixel, src, *s, *d;
     int iPitch;
 
+    if (y >= bbep.height()) return 0; // image is larger than the display, stop decoding it
+
     s = (uint8_t *)pDraw->pPixels;
     d = bbep.currentBuffer();
     iPitch = bbep.width()/2;
     if (pDraw->iBpp == 1) {
-        if (bbep.width() == pDraw->iWidth) { // normal orientation
+        if (bbep.width() >= pDraw->iWidth) { // normal orientation
             iPitch = (bbep.width() + 7)/8;
             d += y * iPitch; // point to the correct line
             memcpy(d, s, (pDraw->iWidth+7)/8);
@@ -1157,7 +1160,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     }
 #else
     bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
-    bbep.fullUpdate(((iUpdateCount & 7) == 0) ? CLEAR_SLOW : CLEAR_WHITE, true);
+    bbep.fullUpdate(((iUpdateCount & 7) == 0) ? CLEAR_SLOW : CLEAR_EXTRA_WHITE, true);
 #endif
     iUpdateCount++;
     Log_info("display_show_image end");
@@ -1812,7 +1815,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     bbep.refresh(REFRESH_FULL, true);
     bbep.freeBuffer();
 #else
-    bbep.fullUpdate(CLEAR_WHITE);
+    bbep.fullUpdate(CLEAR_EXTRA_WHITE);
 #endif
     Log_info("display_show_msg2 end");
 }
