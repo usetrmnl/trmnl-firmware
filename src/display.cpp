@@ -5,14 +5,14 @@
 #include <Preferences.h>
 #include <preferences_persistence.h>
 #include "DEV_Config.h"
-#if defined( BOARD_TRMNL_X ) || defined (BOARD_TRMNL_X_EPDIY)
+#if defined( BOARD_TRMNL_X ) || defined (BOARD_TRMNL_X_EPDIY) || defined( BOARD_TRMNL_X_LILYGO )
 #include "esp_sleep.h"
 #include "driver/gpio.h"
 #include "driver/rtc_io.h"
 #include "LittleFS.h"
 #define FS LittleFS
 #endif
-#if !defined( BOARD_TRMNL_X ) && !defined( BOARD_TRMNL_X_EPDIY )
+#if !defined( BOARD_TRMNL_X ) && !defined( BOARD_TRMNL_X_EPDIY ) && !defined( BOARD_TRMNL_X_LILYGO )
 #include <SPIFFS.h>
 #define FS SPIFFS
 #define BB_EPAPER
@@ -79,9 +79,8 @@ void display_init(void)
 #ifdef BOARD_TRMNL_X
     bbep.initPanel(BB_PANEL_TRMNL_X);
     bbep.setPasses(3, 3);
-#elif defined(BOARD_TRMNL_X_EPDIY)
+#elif defined(BOARD_TRMNL_X_LILYGO)
     bbep.initPanel(BB_PANEL_LILYGO_T5PRO); // BB_PANEL_EPDIY_V7_16);
-    bbep.fillScreen(BBEP_WHITE);
 //    bbep.setPanelSize(1872, 1404, BB_PANEL_FLAG_MIRROR_X, -1100);
 #endif // X
 #endif // bb_epaper
@@ -1736,7 +1735,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 #endif
     }
 
-#if defined( BOARD_TRMNL_X ) || defined( BOARD_TRMNL_X_EPDIY )
+#if defined( BOARD_TRMNL_X ) || defined( BOARD_TRMNL_X_EPDIY ) || defined( BOARD_TRMNL_X_LILYGO )
     bbep.setFont(Inter_18);
 #else
     bbep.setFont(nicoclean_8);
@@ -1775,12 +1774,12 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         string1 += fw_version;
         bbep.setCursor(40, 48); // place in upper left corner
         bbep.println(string1);
-        const char string2[] = "Connect your phone or computer to TRMNL WiFi network";
+        const char string2[] = "Connect your phone or computer to the TRMNL WiFi";
         bbep.getStringBox(string2, &rect);
 #ifdef __BB_EPAPER__
         bbep.setCursor((bbep.width() - rect.w) / 2, 386);
 #else
-        bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - rect.h*2);
+        bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 100 - rect.h);
 #endif
         bbep.println(string2);
         const char string3[] = "or scan the QR code for help";
@@ -1799,7 +1798,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         UWORD y_start = 340;
         UWORD font_width = 18; // DEBUG
         Paint_DrawMultilineText(0, y_start, message.c_str(), width, font_width, BBEP_BLACK, BBEP_WHITE,
-#if defined( BOARD_TRMNL_X ) || defined( BOARD_TRMNL_X_EPDIY )
+#if defined( BOARD_TRMNL_X ) || defined( BOARD_TRMNL_X_EPDIY ) || defined( BOARD_TRMNL_X_LILYGO )
         Inter_18, true);
 #else
         nicoclean_8, true);

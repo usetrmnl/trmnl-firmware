@@ -73,6 +73,12 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #elif defined(BOARD_TRMNL_X_EPDIY)
 #define PIN_INTERRUPT 0
 #define DEVICE_MODEL "x"
+#elif defined(BOARD_TRMNL_X_LILYGO)
+// touch interrupt
+#define PIN_INTERRUPT 0
+// to-do: this has a BQ27220 power management chip that can read the battery voltage
+#define FAKE_BATTERY_VOLTAGE
+#define DEVICE_MODEL "LilyGo"
 #elif defined(BOARD_ESP32_C5_DEVKITC_1)
 #define PIN_INTERRUPT 28
 #define DEVICE_MODEL "gen-2"

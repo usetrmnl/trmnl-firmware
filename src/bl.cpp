@@ -95,7 +95,7 @@ void config_gpio_for_lp();
 
 static unsigned long startup_time = 0;
 
-#ifdef BOARD_TRMNL_X_EPDIY
+#if defined( BOARD_TRMNL_X_EPDIY ) || defined( BOARD_TRMNL_X_LILYGO )
 // Create stub functions for the touchbar workaround
 void iqs323_task_i2c_lock(void) {}
 void iqs323_task_i2c_unlock(void) {}
@@ -462,7 +462,7 @@ void bl_init(void)
                       wakeup_reason == ESP_SLEEP_WAKEUP_EXT0 ||
                       wakeup_reason == ESP_SLEEP_WAKEUP_EXT1);
 
-#ifdef BOARD_TRMNL_X_EPDIY
+#if defined( BOARD_TRMNL_X_EPDIY ) || defined( BOARD_TRMNL_X_LILYGO )
    display_init();
    filesystem_init();
 #endif // EPDIY
@@ -583,7 +583,7 @@ void bl_init(void)
   }
   Log_info("preferences end");
 
-#if !defined( BOARD_TRMNL_X ) && !defined( BOARD_TRMNL_X_EPDIY)
+#if !defined( BOARD_TRMNL_X ) && !defined( BOARD_TRMNL_X_EPDIY) && !defined( BOARD_TRMNL_X_LILYGO )
   if (double_click)
   { // special function reading
     if (preferences.isKey(PREFERENCES_SF_KEY))
@@ -684,7 +684,7 @@ void bl_init(void)
   {
     Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
 
-#if defined( BOARD_TRMNL_X ) || defined ( BOARD_TRMNL_X_EPDIY )
+#if defined( BOARD_TRMNL_X ) || defined ( BOARD_TRMNL_X_EPDIY ) || defined( BOARD_TRMNL_X_LILYGO )
     iqs323_task_i2c_lock();
 
     if (!otg_message) {
@@ -2646,7 +2646,7 @@ static uint8_t *storedLogoOrDefault(int iType)
 //  {
 //    return buffer;
 //  }
-#if defined( BOARD_TRMNL_X ) || defined( BOARD_TRMNL_X_EPDIY )
+#if defined( BOARD_TRMNL_X ) || defined( BOARD_TRMNL_X_EPDIY ) || defined( BOARD_TRMNL_X_LILYGO )
     return const_cast<uint8_t *>(logo_medium);
 #else
   if (iType == 0) {
