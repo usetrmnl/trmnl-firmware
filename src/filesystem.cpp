@@ -34,6 +34,41 @@ void filesystem_deinit(void)
 }
 
 /**
+ * @brief Function to read a file into a newly allocated buffer
+ * @param name filename
+ * @param out_buffer pointer to pointer of the output buffer
+ * @return filesize in bytes or 0 if failed
+ */
+size_t filesystem_read_and_allocate(const char *name, uint8_t **out_buffer)
+{
+    uint8_t *buffer;
+    size_t size;
+
+    if (SPIFFS.exists(name)) {
+        Log_info("file %s exists", name);
+        File file = SPIFFS.open(name, FILE_READ);
+        if (file) {
+            size = file.size();
+            buffer = (uint8_t *)malloc(size);
+            if (!buffer) {
+                Log_error("Failed to allocate %d bytes", (int)size);
+                return 0;
+            }
+            file.readBytes((char *)buffer, size);
+            *out_buffer = buffer;
+            file.close();
+            return size;
+        } else {
+            Log_error("File %s open error", name);
+            return 0;
+        }
+    } else {
+        Log_info("file %s doesn\'t exist", name);
+    }
+    return 0;
+} /* filesystem_read_and_allocate() */
+
+/**
  * @brief Function to read data from file
  * @param name filename
  * @param out_buffer pointer to output buffer
@@ -64,6 +99,44 @@ bool filesystem_read_from_file(const char *name, uint8_t *out_buffer, size_t siz
 }
 
 /**
+ * @brief Function to delete old versions of plugin images (by comparing the timestamp)
+ *        It also deletes files that are older than 24h to keep SPIFFS from filling up
+ * @param name filename
+ * @return nothing
+ */
+void filesystem_purge_old_file(const char *name)
+{
+uint32_t u32;
+time_t tt;
+File rootDir; 
+char *s, szTemp[32];
+bool bDel;
+
+    time(&tt); // get the current epoch time
+    rootDir = SPIFFS.open("/");
+    while (File file = rootDir.openNextFile()) {
+        s = (char *)file.name();
+        // The last 10 characters of the name are the epoch timestamp
+        u32 = (uint32_t) atoi(&s[strlen(s)-10]);
+        bDel = false;
+        if (memcmp(name, file.name(), 14) == 0) { // older version of the same file
+            Log_info("Deleting older version of plugin image %s - %s", name, file.name());
+            bDel = true;
+        } else if ((uint32_t)tt - u32 > 60*60*24) { // More than 24h old
+            Log_info("Deleting image older than 24h - %s", file.name());
+            bDel = true;
+        }
+        if (bDel) { // to avoid double code
+            strcpy(szTemp, "/"); // needed on this file operation
+            strcat(szTemp, file.name());
+            SPIFFS.remove(szTemp);
+        }
+    }
+    rootDir.close();
+
+} /* filesystem_purge_old_file() */
+
+/**
  * @brief Function to write data to file
  * @param name filename
  * @param in_buffer pointer to input buffer
@@ -84,10 +157,10 @@ size_t filesystem_write_to_file(const char *name, uint8_t *in_buffer, size_t siz
     }
     else
     {
-        Log_info("file %s not exists.", name);
+        Log_info("file %s doesn't exist.", name);
     }
-    delay(100);
-    File file = SPIFFS.open(name, FILE_WRITE);
+//    delay(100);
+    File file = SPIFFS.open(name, FILE_WRITE, true);
     if (file)
     {
         // Write the buffer in chunks
