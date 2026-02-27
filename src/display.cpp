@@ -1277,6 +1277,8 @@ PNG *png = new PNG();
             png->close();
 #endif
         }
+    } else {
+        Log_error("%s [%d]: png->openRAM() returned %d", __FILE__, __LINE__, rc);
     }
     free(png); // free the decoder instance
     return rc;
