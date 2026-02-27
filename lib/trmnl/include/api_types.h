@@ -59,6 +59,9 @@ struct ApiDisplayInputs
   int displayWidth;
   int displayHeight;
   SPECIAL_FUNCTION specialFunction;
+  String displayColors;
+  String displayMeasuredColors;
+  String board;
 };
 
 typedef struct
