@@ -733,10 +733,11 @@ static https_request_err_e downloadAndShow()
           Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, https.getSize());
 
           uint32_t counter = 0;
-
+          String payload;
+          long lStartTime = millis();
           if (content_size <= 0)
           {
-            Log.warning("%s [%d]: Content-Length not provided (size: %d)\r\n", __FILE__, __LINE__, content_size);
+            Log.warning("%s [%d]: Content-Length not provided, using getString()\r\n", __FILE__, __LINE__);
           }
 
           bool isPNG = https.header("Content-Type") == "image/png";
@@ -745,31 +746,34 @@ static https_request_err_e downloadAndShow()
           Log.info("%s [%d]: Starting a download at: %d\r\n", __FILE__, __LINE__, getTime());
           heap_caps_check_integrity_all(true);
 
-          // getString() handles chunked transfer encoding automatically
-          //String payload = https.getString();
-          //counter = payload.length();
           buffer = nullptr;
-          counter = https.getSize();
-          if (counter && counter <= MAX_IMAGE_SIZE) {
-            WiFiClient *stream = https.getStreamPtr();
-            int iLen, iCount = 0;
-            long lTimeout = millis() + API_FIRST_RETRY*1000; // allow 15 seconds max download time
+          if (content_size <= 0) {
+          // getString() handles lack of content size and chunked transfer encoding automatically
+            payload = https.getString();
+            counter = payload.length();
+            buffer = (uint8_t *)payload.c_str();
+          } else {
+            counter = https.getSize();
+            if (counter && counter <= MAX_IMAGE_SIZE) {
+              WiFiClient *stream = https.getStreamPtr();
+              int iLen, iCount = 0;
 
-            buffer = (uint8_t *)malloc(counter);
-            if (buffer) {
-              while (iCount < counter && millis() < lTimeout && stream->connected()) {
-                iLen = stream->available();
-                if (iLen) {
-                  stream->readBytes(&buffer[iCount], iLen);
-                  iCount += iLen;
-                } else {
-                  vTaskDelay(1); // yield to allow time for the data to arrive
+              buffer = (uint8_t *)malloc(counter);
+              if (buffer) {
+                while (iCount < counter && millis() < (lStartTime + API_FIRST_RETRY*1000) && stream->connected()) {
+                  iLen = stream->available();
+                  if (iLen) {
+                    stream->readBytes(&buffer[iCount], iLen);
+                    iCount += iLen;
+                  } else {
+                    vTaskDelay(1); // yield to allow time for the data to arrive
+                  }
                 }
-              }
-            } // if buffer
-            stream->stop(); // Important! If you don't do this, WiFi will have a memory exception later
-            Log.info("%s [%d]: %d bytes received in %d milliseconds\r\n", __FILE__, __LINE__, iCount, (int)(millis() - (lTimeout-15000)));
+              } // if buffer
+              stream->stop(); // Important! If you don't do this, WiFi will have a memory exception later
+            }
           } // if payload size is non-zero
+          Log.info("%s [%d]: %d bytes received in %d milliseconds\r\n", __FILE__, __LINE__, counter, (int)(millis() - lStartTime));
 
           if (counter == 0)
           {
@@ -823,7 +827,7 @@ static https_request_err_e downloadAndShow()
             writeImageToFile("/current.png", buffer, content_size);
             Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
             display_show_image(buffer, content_size, true);
-            free(buffer);
+            //free(buffer); // N.B. - don't free it because it might be a String payload, not an allocated block
             buffer = nullptr;
             png_res = PNG_NO_ERR; // DEBUG
           }
