@@ -1257,8 +1257,7 @@ PNG *png = new PNG();
                 } // temp profile needs the second plane written
             } else { // 2-bpp (or greater, but reduced to 2-bpp)
                 bbep.setPanelType(dpList[iTempProfile].TwoBit);
-                rc = REFRESH_FULL; // 4gray mode must be full refresh
-                iUpdateCount = 0; // grayscale mode resets the partial update counter
+                rc = REFRESH_FAST; // 4gray mode supports FAST and FULL refresh
                 bbep.startWrite(PLANE_0); // start writing image data to plane 0
                 iPlane = PNG_2_BIT_0;
                 Log_info("%s [%d]: decoding 4-gray plane 0\r\n", __FILE__, __LINE__);
