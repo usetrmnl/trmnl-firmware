@@ -5,8 +5,30 @@
 #include <config.h>
 #include <api_response_parsing.h>
 #include <http_client.h>
+#include <api-client/time.h>
+#include <device_identity.h>
+#include <auth_signature.h>
 
-void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
+// Pre-computed Ed25519 auth headers (computed before withHttp to avoid nesting)
+struct Ed25519Headers {
+  bool present;
+  String publicKey;
+  String signature;
+  String timestamp;
+};
+
+static void addEd25519HeadersToRequest(HTTPClient &https, const Ed25519Headers &auth)
+{
+  if (auth.present)
+  {
+    https.addHeader("X-Public-Key", auth.publicKey);
+    https.addHeader("X-Signature", auth.signature);
+    https.addHeader("X-Timestamp", auth.timestamp);
+    Log_info("Added Ed25519 auth headers");
+  }
+}
+
+void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs, const Ed25519Headers &auth)
 {
   Log_info("Added headers:\n\r"
            "ID: %s\n\r"
@@ -44,14 +66,51 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
     Log_info("Add special function: true (%d)", inputs.specialFunction);
     https.addHeader("special_function", "true");
   }
+
+  addEd25519HeadersToRequest(https, auth);
+}
+
+// Pre-compute Ed25519 auth headers BEFORE opening the main HTTP connection
+static Ed25519Headers computeEd25519Headers(ApiDisplayInputs &inputs)
+{
+  if (inputs.authMode != PREFERENCES_AUTH_MODE_ED25519 ||
+      inputs.identity == nullptr ||
+      !inputs.identity->initialized)
+  {
+    return {.present = false};
+  }
+
+  Log_info("Pre-computing Ed25519 authentication");
+  auto timeResult = fetchServerTime(inputs.baseUrl);
+  if (!timeResult.success)
+  {
+    Log_error("Failed to fetch server time: %s", timeResult.error.c_str());
+    return {.present = false};
+  }
+
+  auto sig = computeAuthSignature(*inputs.identity, timeResult.timestamp_ms);
+  if (!sig.valid)
+  {
+    Log_error("Failed to compute Ed25519 signature");
+    return {.present = false};
+  }
+
+  return {
+    .present = true,
+    .publicKey = publicKeyToHex(*inputs.identity),
+    .signature = signatureToHex(sig),
+    .timestamp = timestampToString(sig.timestamp_ms),
+  };
 }
 
 ApiDisplayResult fetchApiDisplay(ApiDisplayInputs &apiDisplayInputs)
 {
+  // Pre-compute auth headers BEFORE withHttp to avoid nested HTTP connections
+  auto ed25519Auth = computeEd25519Headers(apiDisplayInputs);
 
   return withHttp(
       apiDisplayInputs.baseUrl + "/api/display",
-      [&apiDisplayInputs](HTTPClient *https, HttpError error) -> ApiDisplayResult
+      [&apiDisplayInputs, &ed25519Auth](HTTPClient *https, HttpError error) -> ApiDisplayResult
       {
         if (error == HttpError::HTTPCLIENT_WIFICLIENT_ERROR)
         {
@@ -75,7 +134,7 @@ ApiDisplayResult fetchApiDisplay(ApiDisplayInputs &apiDisplayInputs)
         https->setTimeout(15000);
         https->setConnectTimeout(15000);
 
-        addHeaders(*https, apiDisplayInputs);
+        addHeaders(*https, apiDisplayInputs, ed25519Auth);
 
         delay(5);
 
@@ -91,7 +150,7 @@ ApiDisplayResult fetchApiDisplay(ApiDisplayInputs &apiDisplayInputs)
               Log_info("Redirected to: %s", redirectUrl.c_str());
               https->setTimeout(15000);
               https->setConnectTimeout(15000);
-              addHeaders(*https, apiDisplayInputs);
+              addHeaders(*https, apiDisplayInputs, ed25519Auth);
               httpCode = https->GET();
             }
 

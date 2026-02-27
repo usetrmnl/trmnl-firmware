@@ -19,6 +19,7 @@ struct ApiSetupResponse
   String friendly_id;
   String image_url;
   String message;
+  String auth_mode;  // "api_key" or "ed25519"
 };
 
 enum class ApiDisplayOutcome
@@ -45,6 +46,9 @@ struct ApiDisplayResponse
   String action;
 };
 
+// Forward declaration for auth support
+struct DeviceIdentity;
+
 struct ApiDisplayInputs
 {
   String baseUrl;
@@ -59,6 +63,9 @@ struct ApiDisplayInputs
   int displayWidth;
   int displayHeight;
   SPECIAL_FUNCTION specialFunction;
+  // Ed25519 authentication (optional)
+  String authMode;                    // "api_key" or "ed25519"
+  const DeviceIdentity *identity;     // Device identity for Ed25519 auth (can be nullptr)
 };
 
 typedef struct
