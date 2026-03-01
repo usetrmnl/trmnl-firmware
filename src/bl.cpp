@@ -41,9 +41,13 @@
 #include <wifi-helpers.h>
 #ifdef SENSOR_SDA
 #include <bb_scd41.h>
+#include <bb_temperature.h>
 SCD41 scd41;
+BBTemp bbt;
+bool bCO2 = false;
+int iSensorType = -1;
 long lSampleTime;
-RTC_DATA_ATTR int lastCO2 = 0, lastTemp = 0, lastHumid = 0, lastTime = 0;
+RTC_DATA_ATTR int lastCO2 = 0, lastTemp = 0, lastHumid = 0, lastPressure = 0, lastType = -1, lastTime = 0;
 #endif // SENSOR_SDA
 bool pref_clear = false;
 String new_filename = "";
@@ -125,8 +129,9 @@ void bl_init(void)
   pins_init();
   vBatt = readBatteryVoltage(); // Read the battery voltage BEFORE WiFi is turned on
 #ifdef SENSOR_SDA
-  // check if there is a SCD41 attached
+  // check if there is a SCD41 or supported temperature sensor attached
   if (scd41.init(SENSOR_SDA, SENSOR_SCL) == SCD41_SUCCESS) {
+    bCO2 = true;
     Log.info("%s [%d]: SCD41 sensor found!\r\n", __FILE__, __LINE__);
 //    scd41.start(SCD41_MODE_PERIODIC);
     scd41.wakeup();
@@ -135,6 +140,10 @@ void bl_init(void)
     scd41.sendCMD(SCD41_CMD_REINIT);
     vTaskDelay(3); // allow time to reinitialize
     scd41.triggerSample(); // trigger a 'one-shot' sample that takes about 5 seconds to complete
+  } else if (bbt.init(SENSOR_SDA, SENSOR_SCL) == BBT_SUCCESS) {
+    iSensorType = bbt.type();
+    Log.info("%s [%d]: supported sensor found! (%d)\r\n", __FILE__, __LINE__, iSensorType);
+    bbt.start(); // start the sensor
   } else {
     Log.info("%s [%d]: No sensor found on I2C bus %d/%d\r\n", __FILE__, __LINE__, SENSOR_SDA, SENSOR_SCL);
   }
@@ -1913,17 +1922,7 @@ static void goToSleep(void)
   uint32_t time_to_sleep = SLEEP_TIME_TO_SLEEP;
 
 #ifdef SENSOR_SDA
-//  long l = (millis() - lSampleTime);
-//  if (l < 5200) {
-//    l = 5200 - l;
-//    Log_info("%s [%d] waiting %d milliseconds for SCD41 to complete capture", __FILE__, __LINE__, (int)l);
-//    delay(l); // The SCD41 needs a full 5 seconds to capture a sample before we shut down the sensor
-//  }
-//    if (scd41.hasSample()) {
-//      Log_info("got scd41 sample in %d ms!", i * 100);
-//    } else {
-//      Log_info("no scd41 sample :(");
-//    }
+  if (bCO2) {
     if (scd41.getSample() == SCD41_SUCCESS) {
         time((time_t *)&lastTime); // get the UTC epoch time that the same was captured
         lastCO2 = scd41.co2();
@@ -1931,11 +1930,26 @@ static void goToSleep(void)
         lastHumid = scd41.humidity();
         Log.info("%s [%d]: Got SCD41 sample: CO2 = %dppm\r\n", __FILE__, __LINE__, lastCO2);
         lSampleTime = millis(); // measure the time - it needs 5 seconds to generate a sample
-  } else {
-      Log.info("%s [%d]: SCD41 sample failed\r\n", __FILE__, __LINE__);
-      lastCO2 = 0;
+    } else {
+        Log.info("%s [%d]: SCD41 sample failed\r\n", __FILE__, __LINE__);
+        lastCO2 = 0;
+    }
+    scd41.shutdown(); // conserve power since we completed getting a sample ready for the next TRMNL wakeup
+  } else if (iSensorType >= 0) {
+      BBT_SAMPLE bbts;
+      if (bbt.getSample(&bbts) == BBT_SUCCESS) {
+        time((time_t *)&lastTime); // get the UTC epoch time that the same was captured
+        lastTemp = bbts.temperature;
+        lastHumid = bbts.humidity;
+        lastPressure = bbts.pressure;
+        lastType = iSensorType;
+        Log.info("%s [%d]: Got bb_temperature sample: Temp = %d.%dC\r\n", __FILE__, __LINE__, lastTemp/10, lastTemp % 10);
+      } else {
+        lastType = -1;
+        Log.info("%s [%d]: bb_temperature sample failed\r\n", __FILE__, __LINE__);
+      }
+      bbt.stop(); // turn off the sensor to conserve power
   }
-  scd41.shutdown(); // conserve power since we completed getting a sample ready for the next TRMNL wakeup
 #endif // SENSOR_SDA
 
   if (preferences.isKey(PREFERENCES_SLEEP_TIME_KEY))

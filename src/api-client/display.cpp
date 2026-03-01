@@ -7,7 +7,9 @@
 #include <http_client.h>
 #include <DEV_Config.h>
 #ifdef SENSOR_SDA
-extern RTC_DATA_ATTR int lastCO2, lastTemp, lastHumid, lastTime;
+extern RTC_DATA_ATTR int lastCO2, lastTemp, lastHumid, lastPressure, lastType, lastTime;
+const char *szDevices[] = {"None", "AHT20", "BMP180", "BME280", "BMP388", "SHT3X", "HDC1080", "HTS221", "MCP9808"};
+const char *szMakers[] = {"None", "ASAIR", "Bosch", "Bosch", "Bosch", "Sensirion", "TI", "STMicro","MicroChip"};
 #endif // SENSOR_SDA
 
 void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
@@ -48,9 +50,22 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
     // create the multi-value string to pass as a HTTP header
     sprintf(szTemp, "make=Sensirion;model=SCD41;kind=carbon_dioxide;value=%d;unit=parts_per_million;created_at=%d,make=Sensirion;model=SCD41;kind=temperature;value=%f;unit=celsius;created_at=%d,make=Sensirion;model=SCD41;kind=humidity;value=%d;unit=percent;created_at=%d", lastCO2, lastTime, (float)lastTemp / 10.0f, lastTime, lastHumid, lastTime);
     https.addHeader("SENSORS", szTemp);
-    Log_info("%s [%d] Adding sensor data to api request: CO2: %d, Temp: %d.%dC, Humidity: %d%%", __FILE__, __LINE__, lastCO2, lastTemp/10, lastTemp % 10, lastHumid);
+    Log_info("%s [%d] Adding SCD41 data to api request: CO2: %d, Temp: %d.%dC, Humidity: %d%%", __FILE__, __LINE__, lastCO2, lastTemp/10, lastTemp % 10, lastHumid);
+  } else if (lastType >= 0 && lastTemp != 0) {
+    char szTemp[320], szPart[128];
+    Log_info("%s [%d] Adding bb_temperature data to api request: pressure: %d, Temp: %d.%dC, Humidity: %d%%", __FILE__, __LINE__, lastPressure, lastTemp/10, lastTemp % 10, lastHumid);
+    sprintf(szTemp, "make=%s;model=%s;kind=temperature;value=%f;unit=celsius;created_at=%d",szMakers[lastType], szDevices[lastType], (float)lastTemp / 10.0f, lastTime);
+    if (lastHumid) { // add humidity
+      sprintf(szPart, ",make=%s;model=%s;kind=humidity;value=%d;unit=percent;created_at=%d",szMakers[lastType], szDevices[lastType], lastHumid, lastTime);
+      strcat(szTemp, szPart);
+    }
+    if (lastPressure) {
+      sprintf(szPart, ",make=%s;model=%s;kind=pressure;value=%d;unit=hectopascal;created_at=%d",szMakers[lastType], szDevices[lastType], lastPressure, lastTime);
+      strcat(szTemp, szPart);
+    }
+    https.addHeader("SENSORS", szTemp);
   } else {
-    Log_info("%s [%d] SCD41 sensor data not available", __FILE__, __LINE__);
+    Log_info("%s [%d] Sensor data not available", __FILE__, __LINE__);
   }
 #endif // SENSOR_SDA
 
