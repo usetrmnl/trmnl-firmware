@@ -1276,7 +1276,7 @@ static https_request_err_e downloadAndShow()
               Log.info("%s [%d]: New filename saved\r\n", __FILE__, __LINE__);
             else
               Log.error("%s [%d]: New image name saving error!", __FILE__, __LINE__);
-
+   
             if (result != HTTPS_PLUGIN_NOT_ATTACHED)
               result = HTTPS_SUCCESS;
           }
@@ -2359,6 +2359,7 @@ static void goToSleep(void)
 
 void config_gpio_for_lp() {
 
+#ifdef BOARD_TRMNL_X
   // XCL
   pinMode(GPIO_NUM_4, INPUT);
 
@@ -2410,6 +2411,7 @@ void config_gpio_for_lp() {
   pinMode(GPIO_NUM_44, INPUT); // RXD
   pinMode(GPIO_NUM_1, INPUT); // CTS
   pinMode(GPIO_NUM_2, INPUT); // RTS
+#endif // BOARD_TRMNL_X
 }
 
 // Not sure if WiFiClientSecure checks the validity date of the certificate.

@@ -2,7 +2,9 @@
 #include "hal/gpio_ll.h"
 #include "esp_rom_gpio.h"
 #include "esp_rom_sys.h"
+#ifndef ARDUINO_ESP32C5_DEV
 #include "soc/rtc_cntl_reg.h"
+#endif
 #include "esp_wake_stub.h"
 
 static int sda_pin = 0;
@@ -11,7 +13,9 @@ static gpio_dev_t *gpio_dev;
 
 static inline void wake_stub_feed_rtc_wdt(void)
 {
+#ifndef ARDUINO_ESP32C5_DEV
     REG_WRITE(RTC_CNTL_WDTFEED_REG, RTC_CNTL_WDT_FEED);
+#endif
 }
 
 // Use ROM delay for more accurate timing
