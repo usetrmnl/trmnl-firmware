@@ -47,7 +47,7 @@ BBTemp bbt;
 bool bCO2 = false;
 int iSensorType = -1;
 long lSampleTime;
-RTC_DATA_ATTR int lastCO2 = 0, lastTemp = 0, lastHumid = 0, lastPressure = 0, lastType = -1, lastTime = 0;
+RTC_DATA_ATTR int lastCO2 = 0, lastSCDTemp = 0, lastTemp = 0, lastSCDHumid = 0, lastHumid = 0, lastPressure = 0, lastType = -1, lastTime = 0;
 #endif // SENSOR_SDA
 bool pref_clear = false;
 String new_filename = "";
@@ -140,11 +140,13 @@ void bl_init(void)
     scd41.sendCMD(SCD41_CMD_REINIT);
     vTaskDelay(3); // allow time to reinitialize
     scd41.triggerSample(); // trigger a 'one-shot' sample that takes about 5 seconds to complete
-  } else if (bbt.init(SENSOR_SDA, SENSOR_SCL) == BBT_SUCCESS) {
+  }
+  if (bbt.init(SENSOR_SDA, SENSOR_SCL) == BBT_SUCCESS) {
     iSensorType = bbt.type();
     Log.info("%s [%d]: supported sensor found! (%d)\r\n", __FILE__, __LINE__, iSensorType);
     bbt.start(); // start the sensor
-  } else {
+  }
+  if (!bCO2 && iSensorType < 0) {
     Log.info("%s [%d]: No sensor found on I2C bus %d/%d\r\n", __FILE__, __LINE__, SENSOR_SDA, SENSOR_SCL);
   }
 #endif // SENSOR_SDA
@@ -1926,8 +1928,8 @@ static void goToSleep(void)
     if (scd41.getSample() == SCD41_SUCCESS) {
         time((time_t *)&lastTime); // get the UTC epoch time that the same was captured
         lastCO2 = scd41.co2();
-        lastTemp = scd41.temperature();
-        lastHumid = scd41.humidity();
+        lastSCDTemp = scd41.temperature();
+        lastSCDHumid = scd41.humidity();
         Log.info("%s [%d]: Got SCD41 sample: CO2 = %dppm\r\n", __FILE__, __LINE__, lastCO2);
         lSampleTime = millis(); // measure the time - it needs 5 seconds to generate a sample
     } else {
@@ -1935,7 +1937,8 @@ static void goToSleep(void)
         lastCO2 = 0;
     }
     scd41.shutdown(); // conserve power since we completed getting a sample ready for the next TRMNL wakeup
-  } else if (iSensorType >= 0) {
+  }
+  if (iSensorType >= 0) {
       BBT_SAMPLE bbts;
       if (bbt.getSample(&bbts) == BBT_SUCCESS) {
         time((time_t *)&lastTime); // get the UTC epoch time that the same was captured
