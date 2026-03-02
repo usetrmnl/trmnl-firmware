@@ -5,14 +5,14 @@
 #include <Preferences.h>
 #include <preferences_persistence.h>
 #include "DEV_Config.h"
-#if defined( BOARD_TRMNL_X ) || defined (BOARD_TRMNL_X_EPDIY) || defined( BOARD_TRMNL_X_LILYGO )
+#if defined( BOARD_TRMNL_X ) || defined (BOARD_TRMNL_X_EPDIY) || defined( BOARD_TRMNL_X_SENSORIAC5 ) || defined( BOARD_TRMNL_X_LILYGO ) || defined( BOARD_TRMNL_X_PAPERS3 )
 #include "esp_sleep.h"
 #include "driver/gpio.h"
 #include "driver/rtc_io.h"
 #include "LittleFS.h"
 #define FS LittleFS
 #endif
-#if !defined( BOARD_TRMNL_X ) && !defined( BOARD_TRMNL_X_EPDIY ) && !defined( BOARD_TRMNL_X_LILYGO )
+#if !defined( BOARD_TRMNL_X ) && !defined( BOARD_TRMNL_X_EPDIY ) && !defined( BOARD_TRMNL_X_SENSORIAC5 ) && !defined( BOARD_TRMNL_X_LILYGO ) && !defined( BOARD_TRMNL_X_PAPERS3 )
 #include <SPIFFS.h>
 #define FS SPIFFS
 #define BB_EPAPER
@@ -79,6 +79,10 @@ void display_init(void)
 #ifdef BOARD_TRMNL_X
     bbep.initPanel(BB_PANEL_TRMNL_X);
     bbep.setPasses(3, 3);
+#elif defined( BOARD_TRMNL_X_SENSORIAC5 )
+    bbep.initPanel(BB_PANEL_SENSORIA_C5);
+#elif defined(BOARD_TRMNL_X_PAPERS3)
+    bbep.initPanel(BB_PANEL_M5PAPERS3);
 #elif defined(BOARD_TRMNL_X_LILYGO)
     bbep.initPanel(BB_PANEL_LILYGO_T5PRO); // BB_PANEL_EPDIY_V7_16);
 //    bbep.setPanelSize(1872, 1404, BB_PANEL_FLAG_MIRROR_X, -1100);
@@ -1735,7 +1739,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 #endif
     }
 
-#if defined( BOARD_TRMNL_X ) || defined( BOARD_TRMNL_X_EPDIY ) || defined( BOARD_TRMNL_X_LILYGO )
+#if defined( BOARD_TRMNL_X ) || defined( BOARD_TRMNL_X_EPDIY ) || defined( BOARD_TRMNL_X_SENSORIAC5 ) || defined( BOARD_TRMNL_X_LILYGO ) || defined( BOARD_TRMNL_X_PAPERS3 )
     bbep.setFont(Inter_18);
 #else
     bbep.setFont(nicoclean_8);
@@ -1798,7 +1802,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         UWORD y_start = 340;
         UWORD font_width = 18; // DEBUG
         Paint_DrawMultilineText(0, y_start, message.c_str(), width, font_width, BBEP_BLACK, BBEP_WHITE,
-#if defined( BOARD_TRMNL_X ) || defined( BOARD_TRMNL_X_EPDIY ) || defined( BOARD_TRMNL_X_LILYGO )
+#if defined( BOARD_TRMNL_X ) || defined( BOARD_TRMNL_X_EPDIY ) || defined( BOARD_TRMNL_X_SENSORIAC5 ) || defined( BOARD_TRMNL_X_LILYGO ) || defined( BOARD_TRMNL_X_PAPERS3 )
         Inter_18, true);
 #else
         nicoclean_8, true);

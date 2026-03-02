@@ -104,9 +104,11 @@
    #define EPD_BUSY_PIN 4
 #elif defined(BOARD_TRMNL_X)
    #define FAKE_BATTERY_VOLTAGE
+#elif defined(BOARD_TRMNL_X_SENSORIAC5)
+#define FAKE_BATTERY_VOLTAGE
 #elif defined(BOARD_TRMNL_X_EPDIY)
    #define FAKE_BATTERY_VOLTAGE
-#elif defined(BOARD_TRMNL_X_LILYGO)
+#elif defined(BOARD_TRMNL_X_LILYGO) || defined(BOARD_TRMNL_X_PAPERS3)
    // no pins here
 #elif defined(BOARD_ESP32_C5_DEVKITC_1)
    #define EPD_SCK_PIN  6
