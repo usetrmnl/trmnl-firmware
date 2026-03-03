@@ -104,7 +104,7 @@
    #define EPD_BUSY_PIN 4
 #elif defined(BOARD_TRMNL_X)
    #define FAKE_BATTERY_VOLTAGE
-#elif defined(BOARD_TRMNL_X_SENSORIAC5)
+#elif defined(BOARD_TRMNL_X_SENSORIAC5) || defined(BOARD_TRMNL_X_SENSORIAS3)
 #define FAKE_BATTERY_VOLTAGE
 #elif defined(BOARD_TRMNL_X_EPDIY)
    #define FAKE_BATTERY_VOLTAGE

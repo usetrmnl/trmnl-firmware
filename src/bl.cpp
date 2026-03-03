@@ -95,7 +95,7 @@ void config_gpio_for_lp();
 
 static unsigned long startup_time = 0;
 
-#if defined( BOARD_TRMNL_X_EPDIY ) || defined( BOARD_TRMNL_X_SENSORIAC5 ) || defined( BOARD_TRMNL_X_LILYGO ) || defined( BOARD_TRMNL_X_PAPERS3 )
+#if defined( BOARD_TRMNL_X_EPDIY ) || defined( BOARD_TRMNL_X_SENSORIAS3 ) || defined( BOARD_TRMNL_X_SENSORIAC5 ) || defined( BOARD_TRMNL_X_LILYGO ) || defined( BOARD_TRMNL_X_PAPERS3 )
 // Create stub functions for the touchbar workaround
 void iqs323_task_i2c_lock(void) {}
 void iqs323_task_i2c_unlock(void) {}
@@ -462,7 +462,7 @@ void bl_init(void)
                       wakeup_reason == ESP_SLEEP_WAKEUP_EXT0 ||
                       wakeup_reason == ESP_SLEEP_WAKEUP_EXT1);
 
-#if defined( BOARD_TRMNL_X_EPDIY ) || defined( BOARD_TRMNL_X_SENSORIAC5 ) || defined( BOARD_TRMNL_X_LILYGO ) || defined( BOARD_TRMNL_X_PAPERS3 )
+#if defined( BOARD_TRMNL_X_EPDIY ) || defined( BOARD_TRMNL_X_SENSORIAS3 ) || defined( BOARD_TRMNL_X_SENSORIAC5 ) || defined( BOARD_TRMNL_X_LILYGO ) || defined( BOARD_TRMNL_X_PAPERS3 )
    display_init();
    filesystem_init();
 #endif // EPDIY
@@ -583,7 +583,7 @@ void bl_init(void)
   }
   Log_info("preferences end");
 
-#if !defined( BOARD_TRMNL_X ) && !defined( BOARD_TRMNL_X_EPDIY) && !defined( BOARD_TRMNL_X_LILYGO ) && !defined( BOARD_TRMNL_X_SENSORIAC5 )
+#if !defined( BOARD_TRMNL_X ) && !defined( BOARD_TRMNL_X_EPDIY) && !defined( BOARD_TRMNL_X_LILYGO ) && !defined( BOARD_TRMNL_X_SENSORIAC5 ) && !defined( BOARD_TRMNL_X_SENSORIAS3 ) 
   if (double_click)
   { // special function reading
     if (preferences.isKey(PREFERENCES_SF_KEY))
@@ -684,7 +684,7 @@ void bl_init(void)
   {
     Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
 
-#if defined( BOARD_TRMNL_X ) || defined ( BOARD_TRMNL_X_EPDIY ) || defined( BOARD_TRMNL_X_LILYGO ) || defined( BOARD_TRMNL_X_SENSORIAC5 )
+#if defined( BOARD_TRMNL_X ) || defined ( BOARD_TRMNL_X_EPDIY ) || defined( BOARD_TRMNL_X_LILYGO ) || defined( BOARD_TRMNL_X_SENSORIAC5 ) || defined( BOARD_TRMNL_X_SENSORIAS3 ) 
     iqs323_task_i2c_lock();
 
     if (!otg_message) {
@@ -2648,7 +2648,7 @@ static uint8_t *storedLogoOrDefault(int iType)
 //  {
 //    return buffer;
 //  }
-#if defined( BOARD_TRMNL_X ) || defined( BOARD_TRMNL_X_EPDIY ) || defined(BOARD_TRMNL_X_SENSORIAC5) || defined( BOARD_TRMNL_X_LILYGO ) || defined( BOARD_TRMNL_X_PAPERS3 )
+#if defined( BOARD_TRMNL_X ) || defined( BOARD_TRMNL_X_EPDIY ) || defined(BOARD_TRMNL_X_SENSORIAC5) || defined( BOARD_TRMNL_X_SENSORIAS3 ) || defined( BOARD_TRMNL_X_LILYGO ) || defined( BOARD_TRMNL_X_PAPERS3 )
     return const_cast<uint8_t *>(logo_medium);
 #else
   if (iType == 0) {
