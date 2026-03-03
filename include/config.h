@@ -35,6 +35,13 @@
 #define PREFERENCES_CONNECT_API_RETRY_COUNT "retry_count"
 #define PREFERENCES_CONNECT_WIFI_RETRY_COUNT "wifi_retry"
 
+// Ed25519 authentication keys
+#define PREFERENCES_ED25519_PUBLIC_KEY "ed_pub"
+#define PREFERENCES_ED25519_PRIVATE_KEY "ed_priv"
+#define PREFERENCES_AUTH_MODE "auth_mode"
+#define PREFERENCES_AUTH_MODE_DEFAULT "api_key"
+#define PREFERENCES_AUTH_MODE_ED25519 "ed25519"
+
 #define WIFI_CONNECTION_RSSI (-100)
 
 #define DISPLAY_BMP_IMAGE_SIZE 48062 // in bytes - 62 bytes - header; 48000 bytes - bitmap (480*800 1bpp) / 8
