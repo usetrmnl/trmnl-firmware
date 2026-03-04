@@ -75,6 +75,8 @@ extern ApiDisplayResult apiDisplayResult;
 static uint8_t *pDither;
 uint32_t iTempProfile;
 static int i426Workaround = 0;
+// Runtime control for light sleep (true = enabled, false = disabled)
+static bool g_light_sleep_enabled = true;
 /**
  * @brief Function to init the display
  * @param none
