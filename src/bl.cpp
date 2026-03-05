@@ -149,6 +149,41 @@ void bl_init(void)
   if (!bCO2 && iSensorType < 0) {
     Log.info("%s [%d]: No sensor found on I2C bus %d/%d\r\n", __FILE__, __LINE__, SENSOR_SDA, SENSOR_SCL);
   }
+  // wait for the sensor(s) to generate a sample
+  if (bCO2 || iSensorType >= 0) {
+    Log.info("%s [%d]: Light sleep for 5 seconds to allow sensor to generate a sample\r\n", __FILE__, __LINE__);
+    esp_sleep_enable_timer_wakeup(5000 * 1000L); // the SCD4x needs 5 seconds to get a sample
+    esp_light_sleep_start(); // use light sleep to save power
+  }
+  if (bCO2) {
+    if (scd41.getSample() == SCD41_SUCCESS) {
+        time((time_t *)&lastTime); // get the UTC epoch time that the same was captured
+        lastCO2 = scd41.co2();
+        lastSCDTemp = scd41.temperature();
+        lastSCDHumid = scd41.humidity();
+        Log.info("%s [%d]: Got SCD41 sample: CO2 = %dppm\r\n", __FILE__, __LINE__, lastCO2);
+        lSampleTime = millis(); // measure the time - it needs 5 seconds to generate a sample
+    } else {
+        Log.info("%s [%d]: SCD41 sample failed\r\n", __FILE__, __LINE__);
+        lastCO2 = 0;
+    }
+    scd41.shutdown(); // conserve power since we completed getting a sample ready for the next TRMNL wakeup
+  }
+  if (iSensorType >= 0) {
+      BBT_SAMPLE bbts;
+      if (bbt.getSample(&bbts) == BBT_SUCCESS) {
+        time((time_t *)&lastTime); // get the UTC epoch time that the same was captured
+        lastTemp = bbts.temperature;
+        lastHumid = bbts.humidity;
+        lastPressure = bbts.pressure;
+        lastType = iSensorType;
+        Log.info("%s [%d]: Got bb_temperature sample: Temp = %d.%dC\r\n", __FILE__, __LINE__, lastTemp/10, lastTemp % 10);
+      } else {
+        lastType = -1;
+        Log.info("%s [%d]: bb_temperature sample failed\r\n", __FILE__, __LINE__);
+      }
+      bbt.stop(); // turn off the sensor to conserve power
+  }
 #endif // SENSOR_SDA
 #if defined(BOARD_SEEED_XIAO_ESP32C3)
   delay(2000);
@@ -1922,38 +1957,6 @@ static void goToSleep(void)
   WiFi.mode(WIFI_OFF); 
   filesystem_deinit();
   uint32_t time_to_sleep = SLEEP_TIME_TO_SLEEP;
-
-#ifdef SENSOR_SDA
-  if (bCO2) {
-    if (scd41.getSample() == SCD41_SUCCESS) {
-        time((time_t *)&lastTime); // get the UTC epoch time that the same was captured
-        lastCO2 = scd41.co2();
-        lastSCDTemp = scd41.temperature();
-        lastSCDHumid = scd41.humidity();
-        Log.info("%s [%d]: Got SCD41 sample: CO2 = %dppm\r\n", __FILE__, __LINE__, lastCO2);
-        lSampleTime = millis(); // measure the time - it needs 5 seconds to generate a sample
-    } else {
-        Log.info("%s [%d]: SCD41 sample failed\r\n", __FILE__, __LINE__);
-        lastCO2 = 0;
-    }
-    scd41.shutdown(); // conserve power since we completed getting a sample ready for the next TRMNL wakeup
-  }
-  if (iSensorType >= 0) {
-      BBT_SAMPLE bbts;
-      if (bbt.getSample(&bbts) == BBT_SUCCESS) {
-        time((time_t *)&lastTime); // get the UTC epoch time that the same was captured
-        lastTemp = bbts.temperature;
-        lastHumid = bbts.humidity;
-        lastPressure = bbts.pressure;
-        lastType = iSensorType;
-        Log.info("%s [%d]: Got bb_temperature sample: Temp = %d.%dC\r\n", __FILE__, __LINE__, lastTemp/10, lastTemp % 10);
-      } else {
-        lastType = -1;
-        Log.info("%s [%d]: bb_temperature sample failed\r\n", __FILE__, __LINE__);
-      }
-      bbt.stop(); // turn off the sensor to conserve power
-  }
-#endif // SENSOR_SDA
 
   if (preferences.isKey(PREFERENCES_SLEEP_TIME_KEY))
     time_to_sleep = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
