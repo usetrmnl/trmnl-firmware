@@ -84,6 +84,11 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #define PIN_INTERRUPT 33
 #define DEVICE_MODEL "waveshare"
 #define FAKE_BATTERY_VOLTAGE
+#elif defined(BOARD_WAVESHARE_397)
+#define PIN_INTERRUPT 0
+#define DEVICE_MODEL "Waveshare_397"
+#define SENSOR_SDA 41
+#define SENSOR_SCL 42
 #elif defined(BOARD_SEEED_XIAO_ESP32C3)
 #define DEVICE_MODEL "seeed_esp32c3"
 #define PIN_INTERRUPT 9         //the boot button on the XIAO ESP32-C3, this button can't be used as wakeup  source though

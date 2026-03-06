@@ -8,8 +8,8 @@
 #include <DEV_Config.h>
 #ifdef SENSOR_SDA
 extern RTC_DATA_ATTR int lastCO2, lastSCDTemp, lastTemp, lastSCDHumid, lastHumid, lastPressure, lastType, lastTime;
-const char *szDevices[] = {"None", "AHT20", "BMP180", "BME280", "BMP388", "SHT3X", "HDC1080", "HTS221", "MCP9808"};
-const char *szMakers[] = {"None", "ASAIR", "Bosch", "Bosch", "Bosch", "Sensirion", "TI", "STMicro","MicroChip"};
+const char *szDevices[] = {"None", "AHT20", "BMP180", "BME280", "BMP388", "SHT3X", "HDC1080", "HTS221", "MCP9808","BME68x","SHTC3"};
+const char *szMakers[] = {"None", "ASAIR", "Bosch", "Bosch", "Bosch", "Sensirion", "TI", "STMicro","MicroChip","Bosch","Sensirion"};
 #endif // SENSOR_SDA
 
 void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
@@ -61,11 +61,11 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
     Log_info("%s [%d] Adding bb_temperature data to api request: pressure: %d, Temp: %d.%dC, Humidity: %d%%", __FILE__, __LINE__, lastPressure, lastTemp/10, lastTemp % 10, lastHumid);
     sprintf(szPart, "make=%s;model=%s;kind=temperature;value=%f;unit=celsius;created_at=%d",szMakers[lastType], szDevices[lastType], (float)lastTemp / 10.0f, lastTime);
     strcat(szTemp, szPart);
-    if (lastHumid) { // add humidity
+    if (lastHumid > 0) { // add humidity
       sprintf(szPart, ",make=%s;model=%s;kind=humidity;value=%d;unit=percent;created_at=%d",szMakers[lastType], szDevices[lastType], lastHumid, lastTime);
       strcat(szTemp, szPart);
     }
-    if (lastPressure) {
+    if (lastPressure > 0) {
       sprintf(szPart, ",make=%s;model=%s;kind=pressure;value=%d;unit=hectopascal;created_at=%d",szMakers[lastType], szDevices[lastType], lastPressure, lastTime);
       strcat(szTemp, szPart);
     }
