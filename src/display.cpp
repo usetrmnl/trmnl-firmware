@@ -1106,8 +1106,11 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
             bbep.allocBuffer(false);
             bAlloc = true;
 #endif
-            int x = (width - pBBB->width)/2;
-            int y = (height - pBBB->height)/2; // center it
+        //    int x = (width - pBBB->width)/2;
+        //    int y = (height - pBBB->height)/2; // center it
+        // place it in the lower right corner
+            int x = (width - pBBB->width);
+            int y = (height - pBBB->height);
             if (x > 0 || y > 0) // only clear if the image is smaller than the display
             {
                 bbep.fillScreen(BBEP_WHITE); 
