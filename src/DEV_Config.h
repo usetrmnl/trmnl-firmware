@@ -66,7 +66,8 @@
   #define EPD_RST_PIN  10
   #define EPD_DC_PIN   5
   #define EPD_BUSY_PIN 4
-
+  #define SENSOR_SDA 21
+  #define SENSOR_SCL 20
 #elif defined(BOARD_XTEINK_X4)
   #define EPD_SCK_PIN  8
   #define EPD_MOSI_PIN 10
@@ -84,6 +85,14 @@
    #define EPD_DC_PIN   27
    #define EPD_BUSY_PIN 25
 
+#elif defined(BOARD_WAVESHARE_397)
+   #define EPD_SCK_PIN  11
+   #define EPD_MOSI_PIN 12
+   #define EPD_CS_PIN   10
+   #define EPD_RST_PIN  46
+   #define EPD_DC_PIN   9
+   #define EPD_BUSY_PIN 3
+#define FAKE_BATTERY_VOLTAGE
 #elif defined(BOARD_SEEED_XIAO_ESP32C3)
    // Pin definition for Seeed XIAO ESP32C3 Board
    #define EPD_SCK_PIN  8
