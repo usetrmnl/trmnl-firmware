@@ -55,6 +55,8 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
   if (lastType >= 0 && lastTemp != 0) { // we have data from another bb_temperature supported sensor too; add it
     if (lastCO2 != 0) {
       strcat(szTemp, ","); // separate from CO2 data
+    } else {
+      szTemp[0] = 0;
     }
     Log_info("%s [%d] Adding bb_temperature data to api request: pressure: %d, Temp: %d.%dC, Humidity: %d%%", __FILE__, __LINE__, lastPressure, lastTemp/10, lastTemp % 10, lastHumid);
     sprintf(szPart, "make=%s;model=%s;kind=temperature;value=%f;unit=celsius;created_at=%d",szMakers[lastType], szDevices[lastType], (float)lastTemp / 10.0f, lastTime);
