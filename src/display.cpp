@@ -605,8 +605,10 @@ void ReduceBpp(int iDestBpp, int iPixelType, uint8_t *pPalette, uint8_t *pSrc, u
         } // switch on bpp
         if (iDestBpp == 1) {
             u8 |= (g >> 7); // B/W
-        } else { // generate 4 gray levels (2 bits)
+        } else if (iDestBpp == 2) { // generate 4 gray levels (2 bits)
             u8 |= (3 ^ (g >> 6)); // 4 gray levels (inverted relative to 1-bit)
+        } else { // must be 4-bpp output
+            u8 |= (g >> 4);
         }
         count -= iDestBpp;        
         if (count == 0) { // byte is full, move on
@@ -704,14 +706,20 @@ int png_draw(PNGDRAW *pDraw)
     int x, y = pDraw->y;
     uint8_t uc = 0;
     uint8_t ucMask, ucPixel, src, *s, *d;
-    int iPitch;
+    int iPitch, iBpp;
 
     if (y >= bbep.height()) return 0; // image is larger than the display, stop decoding it
-
-    s = (uint8_t *)pDraw->pPixels;
+    if (pDraw->iPixelType == PNG_PIXEL_INDEXED || pDraw->iBpp > 4) { // need to convert through the palette and/or reduce the bpp
+        s = bbep.previousBuffer(); // temp space we can use
+        iBpp = (pDraw->iBpp > 4) ? 4 : pDraw->iBpp;
+        ReduceBpp(iBpp, pDraw->iPixelType, pDraw->pPalette, pDraw->pPixels, s, pDraw->iWidth, pDraw->iBpp);
+    } else { // for grayscale images of 1/2/4-bpp we can directly use the pixels as-is
+        iBpp = pDraw->iBpp;
+        s = (uint8_t *)pDraw->pPixels;
+    }
     d = bbep.currentBuffer();
     iPitch = bbep.width()/2;
-    if (pDraw->iBpp == 1) {
+    if (iBpp == 1) {
         if (bbep.width() >= pDraw->iWidth) { // normal orientation
             iPitch = (bbep.width() + 7)/8;
             d += y * iPitch; // point to the correct line
@@ -730,7 +738,7 @@ int png_draw(PNGDRAW *pDraw)
                 d -= iPitch;
             }
         }
-    } else if (pDraw->iBpp == 2) {
+    } else if (iBpp == 2) {
         iPitch = bbep.width()/4;
         d += y * iPitch; // point to the correct line
         if (bbep.width() == pDraw->iWidth) { // normal orientation
@@ -748,7 +756,7 @@ int png_draw(PNGDRAW *pDraw)
                 d -= iPitch;
             } // for x
         } // rotated 90 degrees
-    } else if (pDraw->iBpp == 4) { // 4-bit is the native format
+    } else { // must be 4-bit, the native format
         if (bbep.width() == pDraw->iWidth) { // normal orientation
             d += y * iPitch; // point to the correct line
             memcpy(d, s, (pDraw->iWidth+1)/2);
@@ -774,33 +782,6 @@ int png_draw(PNGDRAW *pDraw)
                     *d = uc;
                     d -= iPitch;
                     s++;
-                } // for x
-            }
-        }
-    } else { // must be 8-bit grayscale
-        if (bbep.width() == pDraw->iWidth) { // normal orientation
-            d += y * iPitch; // point to the correct line
-            for (x=0; x<pDraw->iWidth; x+=2) {
-                uc = (s[0] & 0xf0) | (s[1] >> 4);
-                *d++ = uc;
-                s += 2;
-            } // for x
-        } else { // rotated
-            d += (bbep.height() - 1) * iPitch;
-            d += (y / 2);
-            if (y & 1) { // odd line (column)
-                for (x=0; x<pDraw->iWidth; x++) {
-                    uc = (d[0] & 0xf0) | (s[0] >> 4);
-                    *d = uc;
-                    s++;
-                    d -= iPitch;
-                } // for x
-            } else {
-                for (x=0; x<pDraw->iWidth; x++) {
-                    uc = (d[0] & 0xf) | (s[0] & 0xf0);
-                    *d = uc;
-                    s++;
-                    d -= iPitch;
                 } // for x
             }
         }
@@ -1058,6 +1039,7 @@ PNG *png = new PNG();
                     bbep.setMode(BB_MODE_4BPP);
                 break;
             }
+            Log_info("%s [%d]: FastEPD graphics mode set to: %d\n", __FILE__, __LINE__, bbep.getMode());
             png->decode(NULL, 0);
             png->close();
 #endif
