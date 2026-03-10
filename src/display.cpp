@@ -12,12 +12,12 @@
 #include "LittleFS.h"
 #define FS LittleFS
 #endif
+#define MAX_BIT_DEPTH 8
 #if !defined( BOARD_TRMNL_X ) && !defined( BOARD_TRMNL_X_EPDIY ) && !defined( BOARD_TRMNL_X_SENSORIAS3 ) && !defined( BOARD_TRMNL_X_SENSORIAC5 ) && !defined( BOARD_TRMNL_X_LILYGO ) && !defined( BOARD_TRMNL_X_PAPERS3 )
 #include <SPIFFS.h>
 #define FS SPIFFS
 #define BB_EPAPER
 #include "bb_epaper.h"
-#define MAX_BIT_DEPTH 2
 //#define ONE_BIT_PANEL EP426_800x480
 //#define TWO_BIT_PANEL EP426_800x480_4GRAY
 #define ONE_BIT_PANEL EP75_800x480
@@ -27,7 +27,6 @@ BBEPAPER bbep(ONE_BIT_PANEL);
 #else
 #include "FastEPD.h"
 FASTEPD bbep;
-#define MAX_BIT_DEPTH 8
 const uint8_t u8_graytable[] = {
 /* 0 */  2, 2, 2, 1, 1, 1, 1, 1, 1, 
 /* 1 */  2, 2, 1, 1, 1, 2, 2, 1, 1, 

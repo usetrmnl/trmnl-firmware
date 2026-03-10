@@ -1439,7 +1439,7 @@ void IQS323::force_I2C_communication(void)
   /* Ensure RDY is HIGH at the moment */
   if (gpio_get_level((gpio_num_t)iqs323_ready_pin))
   {
-    Serial.println("Forcing I2C communication...");
+   // Serial.println("Forcing I2C communication...");
     /* Select the device with the address "DEMO_IQS323_ADDR" and start
     communication. */
     Wire.beginTransmission(_deviceAddress);
@@ -1453,7 +1453,7 @@ void IQS323::force_I2C_communication(void)
     iqs323_deviceRDY = false;
     for (int i = 0; i < 100; i++) {
       if (!gpio_get_level((gpio_num_t)iqs323_ready_pin)) {
-        Serial.println("IQS323 ready for I2C communication after force i2c on iteration " + String(i));
+       // Serial.println("IQS323 ready for I2C communication after force i2c on iteration " + String(i));
         break;
       }
       delay(1);

@@ -425,6 +425,20 @@ void bl_init(void)
 {
   uint32_t init_time = esp_cpu_get_cycle_count() / esp_rom_get_cpu_ticks_per_us();
 
+#ifdef BOARD_TRMNL_X_SENSORIAS3
+  pinMode(21, OUTPUT); // power hold GPIO must be set high otherwise the board will power itself off
+  digitalWrite(21, OUTPUT);
+// Use the RV3032 RTC to hold the power on with a fake low temperature interrupt
+//Wire.begin(40,41);
+//Wire.beginTransmission(0x51); // RV3032 address
+//Wire.write(0x40); // low temperature threshold (integer part of 12-bit register)
+//Wire.write(40); // set to 40C so that it's always active
+//Wire.endTransmission();
+//Wire.beginTransmission(0x51); // RV3032 address
+//Wire.write(0x12); // control reg
+//Wire.write(0x5); // enable temperature low interrupt
+//Wire.endTransmission();
+#endif
   startup_time = millis();
 #ifdef DEV_FIRMWARE
   Serial.begin(115200);
@@ -446,11 +460,40 @@ void bl_init(void)
     scd41.sendCMD(SCD41_CMD_REINIT);
     vTaskDelay(3); // allow time to reinitialize
     scd41.triggerSample(); // trigger a 'one-shot' sample that takes about 5 seconds to complete
+    esp_sleep_enable_timer_wakeup(5000 * 1000L); // sleep for 5 seconds for sample to finish
+    esp_light_sleep_start();
+    if (scd41.getSample() == SCD41_SUCCESS) {
+        time((time_t *)&lastTime); // get the UTC epoch time that the same was captured
+        lastCO2 = scd41.co2();
+        lastSCDTemp = scd41.temperature();
+        lastSCDHumid = scd41.humidity();
+        Log.info("%s [%d]: Got SCD41 sample: CO2 = %dppm\r\n", __FILE__, __LINE__, lastCO2);
+        lSampleTime = millis(); // measure the time - it needs 5 seconds to generate a sample
+    } else {
+        Log.info("%s [%d]: SCD41 sample failed\r\n", __FILE__, __LINE__);
+        lastCO2 = 0;
+    }
+    scd41.shutdown(); // conserve power since we completed getting a sample ready for the next TRMNL wakeup
   }
   if (bbt.init(SENSOR_SDA, SENSOR_SCL) == BBT_SUCCESS) {
+    BBT_SAMPLE bbts;
     iSensorType = bbt.type();
     Log.info("%s [%d]: supported sensor found! (%d)\r\n", __FILE__, __LINE__, iSensorType);
     bbt.start(); // start the sensor
+    esp_sleep_enable_timer_wakeup(5000 * 1000L); // sleep for 5 seconds for sample to finish
+    esp_light_sleep_start();
+    if (bbt.getSample(&bbts) == BBT_SUCCESS) {
+        time((time_t *)&lastTime); // get the UTC epoch time that the same was captured
+        lastTemp = bbts.temperature;
+        lastHumid = bbts.humidity;
+        lastPressure = bbts.pressure;
+        lastType = iSensorType;
+        Log.info("%s [%d]: Got bb_temperature sample: Temp = %d.%dC\r\n", __FILE__, __LINE__, lastTemp/10, lastTemp % 10);
+    } else {
+        lastType = -1;
+        Log.info("%s [%d]: bb_temperature sample failed\r\n", __FILE__, __LINE__);
+    }
+    bbt.stop(); // turn off the sensor to conserve power
   }
   if (!bCO2 && iSensorType < 0) {
     Log.info("%s [%d]: No sensor found on I2C bus %d/%d\r\n", __FILE__, __LINE__, SENSOR_SDA, SENSOR_SCL);
@@ -1216,7 +1259,7 @@ static https_request_err_e downloadAndShow()
           // getString() handles chunked transfer encoding automatically
           String payload = https.getString();
           counter = payload.length();
-
+          Log.info("%s [%d]: Download completed at: %d\r\n", __FILE__, __LINE__, getTime());
           if (counter == 0)
           {
             Log_error_submit("Receiving failed. No data received");
@@ -1229,7 +1272,7 @@ static https_request_err_e downloadAndShow()
             return HTTPS_IMAGE_FILE_TOO_BIG;
           }
 
-          buffer = (uint8_t *)malloc(counter);
+          buffer = (uint8_t *)payload.c_str();
 
           if (buffer == NULL)
           {
@@ -1237,7 +1280,7 @@ static https_request_err_e downloadAndShow()
             return HTTPS_OUT_OF_MEMORY;
           }
 
-          memcpy(buffer, payload.c_str(), counter);
+         // memcpy(buffer, payload.c_str(), counter);
           content_size = counter;
 
           if (counter >= 2 && buffer[0] == 'B' && buffer[1] == 'M')
@@ -2357,44 +2400,20 @@ static void goToSleep(void)
   esp_set_deep_sleep_wake_stub(*wakeup_stub);
   display_sleep();
   config_tca95535_pins_for_lp();
+#endif
   config_gpio_for_lp();
   Log_info("Configured pins for low power");
-#endif
 
   filesystem_deinit();
   uint32_t time_to_sleep = SLEEP_TIME_TO_SLEEP;
   
-#ifdef SENSOR_SDA
-  if (bCO2) {
-    if (scd41.getSample() == SCD41_SUCCESS) {
-        time((time_t *)&lastTime); // get the UTC epoch time that the same was captured
-        lastCO2 = scd41.co2();
-        lastSCDTemp = scd41.temperature();
-        lastSCDHumid = scd41.humidity();
-        Log.info("%s [%d]: Got SCD41 sample: CO2 = %dppm\r\n", __FILE__, __LINE__, lastCO2);
-        lSampleTime = millis(); // measure the time - it needs 5 seconds to generate a sample
-    } else {
-        Log.info("%s [%d]: SCD41 sample failed\r\n", __FILE__, __LINE__);
-        lastCO2 = 0;
-    }
-    scd41.shutdown(); // conserve power since we completed getting a sample ready for the next TRMNL wakeup
-  }
-  if (iSensorType >= 0) {
-      BBT_SAMPLE bbts;
-      if (bbt.getSample(&bbts) == BBT_SUCCESS) {
-        time((time_t *)&lastTime); // get the UTC epoch time that the same was captured
-        lastTemp = bbts.temperature;
-        lastHumid = bbts.humidity;
-        lastPressure = bbts.pressure;
-        lastType = iSensorType;
-        Log.info("%s [%d]: Got bb_temperature sample: Temp = %d.%dC\r\n", __FILE__, __LINE__, lastTemp/10, lastTemp % 10);
-      } else {
-        lastType = -1;
-        Log.info("%s [%d]: bb_temperature sample failed\r\n", __FILE__, __LINE__);
-      }
-      bbt.stop(); // turn off the sensor to conserve power
-  }
-#endif // SENSOR_SDA
+#ifdef BOARD_TRMNL_X_SENSORIAS3
+// Need to keep the power hold GPIO enabled high or the battery gets cut off
+  Wire.end();
+  pinMode(40, INPUT);
+  pinMode(41, INPUT); // make sure I2C floats high
+  gpio_deep_sleep_hold_en();
+#endif
 
   if (preferences.isKey(PREFERENCES_SLEEP_TIME_KEY))
     time_to_sleep = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
@@ -2450,6 +2469,56 @@ void config_gpio_for_lp() {
   pinMode(GPIO_NUM_14, INPUT);
   pinMode(GPIO_NUM_21, INPUT);
   pinMode(GPIO_NUM_47, INPUT);
+
+  // EP_STV
+  pinMode(GPIO_NUM_48, INPUT);
+
+  // CKV
+  pinMode(GPIO_NUM_45, INPUT);
+
+  // BTN1
+  pinMode(GPIO_NUM_0, INPUT);
+
+  // I2C
+  pinMode(GPIO_NUM_39, INPUT); // SDA
+  pinMode(GPIO_NUM_40, INPUT); // SCL
+
+  // XSTL
+  pinMode(GPIO_NUM_41, INPUT);
+
+  // LEH
+  pinMode(GPIO_NUM_42, INPUT);
+
+  // UART0 
+  pinMode(GPIO_NUM_43, INPUT); // TXD
+  pinMode(GPIO_NUM_44, INPUT); // RXD
+  pinMode(GPIO_NUM_1, INPUT); // CTS
+  pinMode(GPIO_NUM_2, INPUT); // RTS
+#endif // BOARD_TRMNL_X
+#ifdef BOARD_TRMNL_X_SENSORIAS3
+  // XCL
+  pinMode(GPIO_NUM_4, INPUT);
+
+  // Data pins (d7 to d7)
+  pinMode(GPIO_NUM_5, INPUT);
+  pinMode(GPIO_NUM_6, INPUT);
+  pinMode(GPIO_NUM_7, INPUT);
+  pinMode(GPIO_NUM_15, INPUT);
+  pinMode(GPIO_NUM_16, INPUT);
+  pinMode(GPIO_NUM_17, INPUT);
+  pinMode(GPIO_NUM_18, INPUT);
+  pinMode(GPIO_NUM_8, INPUT);
+
+  pinMode(GPIO_NUM_9, INPUT); // OE
+  pinMode(GPIO_NUM_10, INPUT); // MODE
+  pinMode(GPIO_NUM_11, INPUT); // TPS_PWRUP
+  pinMode(GPIO_NUM_12, INPUT); // VCOM_CTRL
+  pinMode(GPIO_NUM_13, INPUT); // TPS_INT
+  pinMode(GPIO_NUM_14, INPUT); // TPS_WAKEUP
+
+  // D+ D-
+  // pinMode(GPIO_NUM_19, INPUT);
+  // pinMode(GPIO_NUM_20, INPUT);
 
   // EP_STV
   pinMode(GPIO_NUM_48, INPUT);
