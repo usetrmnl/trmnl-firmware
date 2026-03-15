@@ -73,6 +73,7 @@ MSG current_msg = NONE;
 SPECIAL_FUNCTION special_function = SF_NONE;
 RTC_DATA_ATTR uint8_t need_to_refresh_display = 1;
 RTC_DATA_ATTR bool otg_state = false;  // Track OTG state across deep sleep
+bool touchbar_tap_mode = true;  // false = "slide", true = "tap" (default)
 
 Preferences preferences;
 PreferencesPersistence preferencesPersistence(preferences);
@@ -163,8 +164,6 @@ static bool in_wifi_reset_confirmation = false;
 // Read gesture data directly without triggering other handlers
 void read_gesture_data_only()
 {
-  iqs323_task_i2c_lock();
-
   // Read slider coordinates
   uint16_t buffer = iqs323.sliderCoordinate();
   if (buffer != slider_position) {
@@ -179,8 +178,26 @@ void read_gesture_data_only()
       slider_event = gesture_buffer;
     }
   }
+}
 
-  iqs323_task_i2c_unlock();
+// Returns true if channel i has been held for HOLD_THRESHOLD_MS since wakeup stub.
+// Releases the I2C lock during the wait so the iqs323 task can update the memory map.
+static bool tap_mode_is_hold(uint8_t channel_index)
+{
+    const uint32_t HOLD_THRESHOLD_US = 600000;  // 600 ms
+    uint32_t ticks_per_us = esp_rom_get_cpu_ticks_per_us();
+
+    uint32_t elapsed_us = esp_cpu_get_cycle_count() / ticks_per_us - wakeup_time;
+    if (elapsed_us < HOLD_THRESHOLD_US) {
+        uint32_t remaining_ms = (HOLD_THRESHOLD_US - elapsed_us) / 1000;
+        iqs323_task_i2c_unlock();
+        delay(remaining_ms);
+        iqs323_task_i2c_lock();
+    }
+    // Force a live read so the cache reflects the current touch state.
+    // In event mode the device does not push release updates automatically.
+    iqs323.updateInfoFlags(STOP);
+    return iqs323.channel_touchState((iqs323_channel_e)channel_index);
 }
 
 // Check if user wants to confirm WiFi reset (middle button hold)
@@ -210,6 +227,46 @@ void handle_wifi_reset_confirmation()
   in_wifi_reset_confirmation = true;
 
   showMessageWithLogo(WIFI_RESET_CONFIRM);
+
+  if (touchbar_tap_mode) {
+    const uint32_t HOLD_MS = 600;
+    const uint32_t POLL_MS = 20;
+    unsigned long start_time = millis();
+
+    while (millis() - start_time < WIFI_RESET_CONFIRMATION_TIMEOUT_MS) {
+      delay(POLL_MS);
+      iqs323.updateInfoFlags(STOP);
+
+      // Outer buttons → cancel immediately
+      if (iqs323.channel_touchState(IQS323_CH0) || iqs323.channel_touchState(IQS323_CH2)) {
+        Log_info("WiFi reset cancelled by user - outer button in tap mode");
+        in_wifi_reset_confirmation = false;
+        return;
+      }
+
+      // Middle button touched → determine TAP vs HOLD
+      if (iqs323.channel_touchState(IQS323_CH1)) {
+        unsigned long touch_start = millis();
+        while (millis() - touch_start < HOLD_MS) {
+          delay(POLL_MS);
+          iqs323.updateInfoFlags(STOP);
+          if (!iqs323.channel_touchState(IQS323_CH1)) {
+            Log_info("WiFi reset cancelled by user - tap on middle button in tap mode");
+            in_wifi_reset_confirmation = false;
+            return;
+          }
+        }
+        Log_info("WiFi reset confirmed by user - holding middle button in tap mode");
+        in_wifi_reset_confirmation = false;
+        resetDeviceCredentials();
+        return;
+      }
+    }
+
+    Log_info("WiFi reset confirmation timeout - cancelling");
+    in_wifi_reset_confirmation = false;
+    return;
+  }
 
   unsigned long start_time = millis();
 
@@ -243,14 +300,14 @@ void handle_wifi_reset_confirmation()
 // Check if both left and right corners are being held
 bool check_wifi_reset_trigger()
 {
-  if (slider_event != IQS323_GESTURE_HOLD) {
-    return false;
+  bool left  = iqs323.channel_touchState(IQS323_CH0);
+  bool right = iqs323.channel_touchState(IQS323_CH2);
+  if (!left || !right) return false;
+
+  if (touchbar_tap_mode) {
+    return tap_mode_is_hold(0) && tap_mode_is_hold(2);  // both outer channels active
   }
-
-  bool left_held = iqs323.channel_touchState(IQS323_CH0);
-  bool right_held = iqs323.channel_touchState(IQS323_CH2);
-
-  return left_held && right_held;
+  return slider_event == IQS323_GESTURE_HOLD;
 }
 
 void check_channel_states(void)
@@ -263,35 +320,73 @@ void check_channel_states(void)
 
   /* Loop through all the active channels */
   for (uint8_t i = 0; i < 3; i++) {
-    /* Check if the touch state bit is set */
     if (iqs323.channel_touchState((iqs323_channel_e)(i))) {
-      if ((slider_event == IQS323_GESTURE_TAP || slider_event == IQS323_GESTURE_HOLD)) {
-        printf("CH: %d: Touch\n", i);
+      if (touchbar_tap_mode) {
+        // Tap mode
+        bool hold = tap_mode_is_hold(i);
         switch (i) {
         case 0:
-          Log_info("Back button pressed");
+          if (!hold) {
+            Log_info("Back button tapped");
+            int file_size = 0;
+            buffer = display_read_file("/last.png", &file_size);
+            if (buffer && file_size > 0) { display_show_image(buffer, file_size, false); goToSleep(); }
+          }
           break;
         case 1:
-          Log_info("Middle button pressed");
-          // Toggle OTG based on current state
-          if (otg_state) {
-            otg_turn_off();
-            showMessageWithLogo(OTG_TURNED_OFF);
-            otg_state = false;
+          if (hold) {
+            Log_info("Middle button held - OTG toggle");
+            if (otg_state) { 
+              otg_turn_off(); 
+              showMessageWithLogo(OTG_TURNED_OFF); otg_state = false; 
+            }
+            else { 
+              otg_turn_on();  
+              showMessageWithLogo(OTG_TURNED_ON);  
+              otg_state = true;
+            }
+            otg_message = true;
           }
-          else {
-            otg_turn_on();
-            showMessageWithLogo(OTG_TURNED_ON);
-            otg_state = true;
-          }
-          otg_message = true;
-          Log_info("Free heap after drawing message with logo: %u bytes, max heap chunk: %u", ESP.getFreeHeap(), ESP.getMaxAllocHeap());
+          // No action - update on tap
           break;
         case 2:
-          Log_info("Next button pressed");
+          if (!hold) {
+            Log_info("Next button tapped");
+            int file_size = 0;
+            buffer = display_read_file("/current.png", &file_size);
+            if (buffer && file_size > 0) { display_show_image(buffer, file_size, false); goToSleep(); }
+          }
           break;
         }
         button_states[i] = IQS323_CH_TOUCH;
+      } else {
+        // Slide mode
+        if ((slider_event == IQS323_GESTURE_TAP || slider_event == IQS323_GESTURE_HOLD)) {
+          printf("CH: %d: Touch\n", i);
+          switch (i) {
+          case 0:
+            Log_info("Back button pressed");
+            break;
+          case 1:
+            Log_info("Middle button pressed");
+            if (otg_state) { 
+              otg_turn_off(); 
+              showMessageWithLogo(OTG_TURNED_OFF); otg_state = false; 
+            }
+            else { 
+              otg_turn_on();  
+              showMessageWithLogo(OTG_TURNED_ON);  
+              otg_state = true;
+            }
+            otg_message = true;
+            Log_info("Free heap after drawing message with logo: %u bytes, max heap chunk: %u", ESP.getFreeHeap(), ESP.getMaxAllocHeap());
+            break;
+          case 2:
+            Log_info("Next button pressed");
+            break;
+          }
+          button_states[i] = IQS323_CH_TOUCH;
+        }
       }
     }
   }
@@ -333,25 +428,29 @@ void read_gesture_event(void)
           break;
         case IQS323_GESTURE_SWIPE_NEGATIVE:
           Log_info("SLIDER: Swipe <-");
-          buffer = display_read_file("/last.png", &file_size);
-          if (!buffer || file_size == 0) {
-            Log_info("No previous image found");
-            break;
+          if (!touchbar_tap_mode) {
+            buffer = display_read_file("/last.png", &file_size);
+            if (!buffer || file_size == 0) {
+              Log_info("No previous image found");
+              break;
+            }
+            Log_info("Drawing previous plugin... File size: %d", file_size);
+            display_show_image(buffer, file_size, false);
+            goToSleep();
           }
-          Log_info("Drawing previous plugin... File size: %d", file_size);
-          display_show_image(buffer, file_size, false);
-          goToSleep();
           break;
         case IQS323_GESTURE_SWIPE_POSITIVE:
           Log_info("SLIDER: Swipe ->");
-          buffer = display_read_file("/current.png", &file_size);
-          if (!buffer || file_size == 0) {
-            Log_info("No previous image found");
-            break;
+          if (!touchbar_tap_mode) {
+            buffer = display_read_file("/current.png", &file_size);
+            if (!buffer || file_size == 0) {
+              Log_info("No previous image found");
+              break;
+            }
+            Log_info("Drawing current plugin... File size: %d", file_size);
+            display_show_image(buffer, file_size, false);
+            goToSleep();
           }
-          Log_info("Drawing current plugin... File size: %d", file_size);
-          display_show_image(buffer, file_size, false);
-          goToSleep();
           break;
         case IQS323_GESTURE_FLICK_NEGATIVE:
           Log_info("SLIDER: Flick <-");
@@ -392,6 +491,15 @@ void process_iqs323_data(void)
 
   /* Read gesture event if available */
   read_gesture_event();
+
+  iqs323_task_i2c_unlock();
+
+  if (!in_wifi_reset_confirmation && check_wifi_reset_trigger()) {
+    handle_wifi_reset_confirmation();
+    return;
+  }
+
+  iqs323_task_i2c_lock();
 
   /* Check channel touch states */
   check_channel_states();
@@ -555,7 +663,7 @@ void bl_init(void)
   if (gpio_wakeup) {
     Log_info("GPIO wakeup detected (%d) - using wake stub data", wakeup_reason);
     iqs323_task_notify_gpio_wakeup(true);
-  } 
+  }
   else {
     Log_info("Non-GPIO wakeup (%d)", wakeup_reason);
 
@@ -584,6 +692,29 @@ void bl_init(void)
       Log_info("Battery: %d%% | %dmV | %dmA | %dmAh", soc, volts, current, capacity);
     }
   }
+
+  Log_info("preferences start");
+  bool res = preferences.begin("data", false);
+  if (res)
+  {
+    Log_info("preferences init success (%d free entries)", preferences.freeEntries());
+    if (pref_clear)
+    {
+      res = preferences.clear(); // if needed to clear the saved data
+      if (res)
+        Log_info("preferences cleared success");
+      else
+        Log_fatal("preferences clearing error");
+    }
+  }
+  else
+  {
+    Log_fatal("preferences init failed");
+    ESP.restart();
+  }
+
+  touchbar_tap_mode = preferences.getBool(PREFERENCES_TOUCHBAR_MODE_KEY, true);
+  Log_info("Touchbar mode from preferences: %s", touchbar_tap_mode ? "Tap" : "Slide");
 
   // Start IQS323 task manager
   if (!iqs323_task_init(NULL)) {
@@ -635,27 +766,6 @@ void bl_init(void)
     Log_info("Non-GPIO wakeup (%d) -> didn't read buttons", wakeup_reason);
   }
 #endif
-
-  Log_info("preferences start");
-  bool res = preferences.begin("data", false);
-  if (res)
-  {
-    Log_info("preferences init success (%d free entries)", preferences.freeEntries());
-    if (pref_clear)
-    {
-      res = preferences.clear(); // if needed to clear the saved data
-      if (res)
-        Log_info("preferences cleared success");
-      else
-        Log_fatal("preferences clearing error");
-    }
-  }
-  else
-  {
-    Log_fatal("preferences init failed");
-    ESP.restart();
-  }
-  Log_info("preferences end");
 
 #if !defined( BOARD_TRMNL_X ) && !defined( BOARD_TRMNL_X_EPDIY) && !defined( BOARD_TRMNL_X_LILYGO ) && !defined( BOARD_TRMNL_X_SENSORIAC5 ) && !defined( BOARD_TRMNL_X_SENSORIAS3 ) 
   if (double_click)
@@ -1490,6 +1600,15 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
 {
   https_request_err_e result = HTTPS_NO_ERR;
   int file_size = 0;
+
+  // Set touchbar mode and persist to NVS
+  if (apiResponse.touchbar_mode.length() == 0 || touchbar_tap_mode == (apiResponse.touchbar_mode == "tap")) {
+    Log.info("%s [%d]: No need to update touchbar mode\r\n", __FILE__, __LINE__);
+  }
+  else {
+    touchbar_tap_mode = (apiResponse.touchbar_mode == "tap");
+    preferences.putBool(PREFERENCES_TOUCHBAR_MODE_KEY, touchbar_tap_mode);
+  }
 
   if (special_function == SF_NONE)
   {
@@ -2392,6 +2511,11 @@ static void goToSleep(void)
   if (!iqs323_task_prepare_sleep(5000)) {
     Log.warning("IQS323 sleep preparation timeout - proceeding anyway\n");
   }
+
+  // Configure gesture mode last so prepare_sleep's writeMM() cannot override it
+  iqs323_task_i2c_lock();
+  iqs323.setGestureConfig(touchbar_tap_mode, STOP);
+  iqs323_task_i2c_unlock();
 
   // Cleanup the task before entering deep sleep
   iqs323_task_deinit();

@@ -18,5 +18,6 @@ typedef struct {
 } iqs323_system_status_t;
 
 extern iqs323_system_status_t wakeup_stub_iqs_status;
+extern uint32_t wakeup_time;
 
 void wakeup_stub(void);

@@ -22,8 +22,8 @@
 #define S0_PATTERN_SETUP                         0x03
 #define S0_PATTERN_SELECT                        0x00
 #define S0_BIAS_CURRENT                          0x00
-#define S0_ATI_SETUP_0                           0x34
-#define S0_ATI_SETUP_1                           0x11
+#define S0_ATI_SETUP_0                           0x74
+#define S0_ATI_SETUP_1                           0x17
 #define S0_ATI_BASE_0                            0x64
 #define S0_ATI_BASE_1                            0x00
 #define S0_ATI_COARSE                            0x44
@@ -45,8 +45,8 @@
 #define S1_PATTERN_SETUP                         0x03
 #define S1_PATTERN_SELECT                        0x00
 #define S1_BIAS_CURRENT                          0x00
-#define S1_ATI_SETUP_0                           0xA4
-#define S1_ATI_SETUP_1                           0x0F
+#define S1_ATI_SETUP_0                           0xE4
+#define S1_ATI_SETUP_1                           0x15
 #define S1_ATI_BASE_0                            0x64
 #define S1_ATI_BASE_1                            0x00
 #define S1_ATI_COARSE                            0x47
@@ -68,8 +68,8 @@
 #define S2_PATTERN_SETUP                         0x03
 #define S2_PATTERN_SELECT                        0x00
 #define S2_BIAS_CURRENT                          0x00
-#define S2_ATI_SETUP_0                           0x34
-#define S2_ATI_SETUP_1                           0x11
+#define S2_ATI_SETUP_0                           0x74
+#define S2_ATI_SETUP_1                           0x17
 #define S2_ATI_BASE_0                            0x64
 #define S2_ATI_BASE_1                            0x00
 #define S2_ATI_COARSE                            0x44

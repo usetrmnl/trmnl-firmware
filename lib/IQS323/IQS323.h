@@ -209,6 +209,7 @@ public:
 
         void setEventMode(bool stopOrRestart);
         void clearEventMode(bool stopOrRestart);
+        void setGestureConfig(bool tap_mode, bool stopOrRestart);
 
         void updateInfoFlags(bool stopOrRestart);
         void setIQSMemoryMap(iqs323_system_status_t iqs_status);

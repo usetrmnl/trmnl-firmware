@@ -16,8 +16,8 @@ static const uint32_t s_max_count = 20;
 // wakeup_cause stored in RTC memory
 static uint32_t wakeup_cause;
 
-// wakeup_time from CPU start to wake stub
-static uint32_t wakeup_time;
+// wakeup_time from CPU start to wake stub (microseconds; externally visible for HOLD detection)
+uint32_t wakeup_time;
 
 iqs323_system_status_t wakeup_stub_iqs_status = {0};
 
@@ -63,7 +63,6 @@ void wakeup_stub(void) {
   wakeup_stub_iqs_status.ch2_cnts[1] = buf[15];
   wakeup_stub_iqs_status.ch2_cnts[2] = buf[16];
   wakeup_stub_iqs_status.ch2_cnts[3] = buf[17];
-  
 
   // Print the counter value and wakeup cause.
   ESP_RTC_LOGI("wake stub: wakeup count is %d, wakeup cause is %d, wakeup cost %ld us", s_count, wakeup_cause, wakeup_time);
