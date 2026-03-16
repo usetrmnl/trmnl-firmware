@@ -10,9 +10,11 @@ void addSetupHeaders(HTTPClient &https, ApiSetupInputs &inputs)
 {
   Log_info("Added headers:\n\r"
            "ID: %s\n\r"
-           "FW-Version: %s\r\n",
+           "FW-Version: %s\r\n"
+           "Model: %s\n\r",
            inputs.macAddress.c_str(),
-           inputs.firmwareVersion.c_str());
+           inputs.firmwareVersion.c_str(),
+           inputs.model.c_str());
 
   https.addHeader("ID", inputs.macAddress);
   https.addHeader("Content-Type", "application/json");

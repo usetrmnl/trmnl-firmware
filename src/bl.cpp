@@ -1573,6 +1573,7 @@ static bool performApiSetup()
   inputs.baseUrl = preferences.getString(PREFERENCES_API_URL, API_BASE_URL);
   inputs.macAddress = WiFi.macAddress();
   inputs.firmwareVersion = FW_VERSION_STRING;
+  inputs.model = String(DEVICE_MODEL);
 
   Log.info("%s [%d]: [HTTPS] begin /api/setup ...\r\n", __FILE__, __LINE__);
   Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
