@@ -2502,7 +2502,7 @@ static void goToSleep(void)
   // if (WiFi.status() == WL_CONNECTED) {
   //   WiFi.disconnect();
   // }
-  WiFi.mode(WIFI_OFF); 
+  // WiFi.mode(WIFI_OFF); 
 
 #if BOARD_TRMNL_X
   Log_info("Preparing IQS323 for sleep via task...");
