@@ -1946,7 +1946,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     case FRIENDLY_ID:
     {
         Log_info("friendly id case");
-        const char string1[] = "Please sign up at trmnl.com/signup";
+        const char string1[] = "Please sign up at trmnl.com/start";
         bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
         bbep.setCursor((bbep.width() - rect.w)/2, 400);
