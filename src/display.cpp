@@ -77,7 +77,7 @@ void display_init(void)
 #else
 #ifdef BOARD_TRMNL_X
     bbep.initPanel(BB_PANEL_TRMNL_X);
-    bbep.setPasses(3, 3);
+//    bbep.setPasses(3, 3);
 #elif defined( BOARD_TRMNL_X_SENSORIAS3 )
     bbep.initPanel(BB_PANEL_V7_RAW);
     bbep.setPanelSize(1280, 720, BB_PANEL_FLAG_MIRROR_X, -1600);
@@ -348,7 +348,7 @@ void display_reset(void)
         bbep.refresh(REFRESH_FULL, true); // incompatible panel
     }
 #else
-    bbep.fullUpdate(CLEAR_EXTRA_WHITE);
+    bbep.fullUpdate();
 #endif
     Log_info("e-Paper Clear end");
     // DEV_Delay_ms(500);
@@ -1150,7 +1150,12 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     }
 #else
     bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
-    bbep.fullUpdate(((iUpdateCount & 7) == 0) ? CLEAR_SLOW : CLEAR_EXTRA_WHITE, true);
+    if (bbep.getPreviousMode() == bbep.getMode() && (bbep.getMode() == BB_MODE_1BPP || bbep.getMode() == BB_MODE_2BPP)) {
+        Log_info("%s [%d]: Using partial update since the previous update is the same bit depth\n", __FILE__, __LINE__);
+        bbep.partialUpdate(false); // we have a previous image to diff against; use a non-flickering update
+    } else {
+        bbep.fullUpdate(((iUpdateCount & 7) == 0) ? CLEAR_SLOW : CLEAR_FAST, false);
+    }
 #endif
     iUpdateCount++;
     Log_info("display_show_image end");
@@ -1805,7 +1810,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     bbep.refresh(REFRESH_FULL, true);
     bbep.freeBuffer();
 #else
-    bbep.fullUpdate(CLEAR_EXTRA_WHITE);
+    bbep.fullUpdate();
 #endif
     Log_info("display_show_msg2 end");
 }

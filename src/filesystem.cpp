@@ -1,14 +1,7 @@
 #include <filesystem.h>
 #include <Arduino.h>
-#include <trmnl_log.h>
-
-#if defined (BOARD_TRMNL_X) || defined (BOARD_TRLML_X_EPDIY)
-#include <LittleFS.h>
-#define FS LittleFS
-#else
 #include <SPIFFS.h>
-#define FS SPIFFS
-#endif
+#include <trmnl_log.h>
 
 /**
  * @brief Function to init the filesystem
@@ -17,15 +10,15 @@
  */
 bool filesystem_init(void)
 {
-    if (!FS.begin(true))
+    if (!SPIFFS.begin(true))
     {
-        Log_fatal("Failed to mount filesystem");
+        Log_fatal("Failed to mount SPIFFS");
         ESP.restart();
         return false;
     }
     else
     {
-        Log_info("Filesystem mounted");
+        Log_info("SPIFFS mounted");
         return true;
     }
 }
@@ -37,8 +30,43 @@ bool filesystem_init(void)
  */
 void filesystem_deinit(void)
 {
-    FS.end();
+    SPIFFS.end();
 }
+
+/**
+ * @brief Function to read a file into a newly allocated buffer
+ * @param name filename
+ * @param out_buffer pointer to pointer of the output buffer
+ * @return filesize in bytes or 0 if failed
+ */
+size_t filesystem_read_and_allocate(const char *name, uint8_t **out_buffer)
+{
+    uint8_t *buffer;
+    size_t size;
+
+    if (SPIFFS.exists(name)) {
+        Log_info("file %s exists", name);
+        File file = SPIFFS.open(name, FILE_READ);
+        if (file) {
+            size = file.size();
+            buffer = (uint8_t *)malloc(size);
+            if (!buffer) {
+                Log_error("Failed to allocate %d bytes", (int)size);
+                return 0;
+            }
+            file.readBytes((char *)buffer, size);
+            *out_buffer = buffer;
+            file.close();
+            return size;
+        } else {
+            Log_error("File %s open error", name);
+            return 0;
+        }
+    } else {
+        Log_info("file %s doesn\'t exist", name);
+    }
+    return 0;
+} /* filesystem_read_and_allocate() */
 
 /**
  * @brief Function to read data from file
@@ -48,10 +76,10 @@ void filesystem_deinit(void)
  */
 bool filesystem_read_from_file(const char *name, uint8_t *out_buffer, size_t size)
 {
-    if (FS.exists(name))
+    if (SPIFFS.exists(name))
     {
         Log_info("file %s exists", name);
-        File file = FS.open(name, FILE_READ);
+        File file = SPIFFS.open(name, FILE_READ);
         if (file)
         {
             file.readBytes((char *)out_buffer, size);
@@ -71,6 +99,44 @@ bool filesystem_read_from_file(const char *name, uint8_t *out_buffer, size_t siz
 }
 
 /**
+ * @brief Function to delete old versions of plugin images (by comparing the timestamp)
+ *        It also deletes files that are older than 24h to keep SPIFFS from filling up
+ * @param name filename
+ * @return nothing
+ */
+void filesystem_purge_old_file(const char *name)
+{
+uint32_t u32;
+time_t tt;
+File rootDir; 
+char *s, szTemp[32];
+bool bDel;
+
+    time(&tt); // get the current epoch time
+    rootDir = SPIFFS.open("/");
+    while (File file = rootDir.openNextFile()) {
+        s = (char *)file.name();
+        // The last 10 characters of the name are the epoch timestamp
+        u32 = (uint32_t) atoi(&s[strlen(s)-10]);
+        bDel = false;
+        if (memcmp(name, file.name(), 14) == 0) { // older version of the same file
+            Log_info("Deleting older version of plugin image %s - %s", name, file.name());
+            bDel = true;
+        } else if ((uint32_t)tt - u32 > 60*60*24) { // More than 24h old
+            Log_info("Deleting image older than 24h - %s", file.name());
+            bDel = true;
+        }
+        if (bDel) { // to avoid double code
+            strcpy(szTemp, "/"); // needed on this file operation
+            strcat(szTemp, file.name());
+            SPIFFS.remove(szTemp);
+        }
+    }
+    rootDir.close();
+
+} /* filesystem_purge_old_file() */
+
+/**
  * @brief Function to write data to file
  * @param name filename
  * @param in_buffer pointer to input buffer
@@ -79,22 +145,22 @@ bool filesystem_read_from_file(const char *name, uint8_t *out_buffer, size_t siz
  */
 size_t filesystem_write_to_file(const char *name, uint8_t *in_buffer, size_t size)
 {
-    uint32_t FS_freeBytes = (FS.totalBytes() - FS.usedBytes());
-    Log_info("FS free space - %d, total -%d", FS_freeBytes, FS.totalBytes());
-    if (FS.exists(name))
+    uint32_t SPIFFS_freeBytes = (SPIFFS.totalBytes() - SPIFFS.usedBytes());
+    Log_info("SPIFFS free space - %d, total -%d", SPIFFS_freeBytes, SPIFFS.totalBytes());
+    if (SPIFFS.exists(name))
     {
         Log_info("file %s exists. Deleting...", name);
-        if (FS.remove(name))
+        if (SPIFFS.remove(name))
             Log_info("file %s deleted", name);
         else
             Log_info("file %s deleting failed", name);
     }
     else
     {
-        Log_info("file %s not exists.", name);
+        Log_info("file %s doesn't exist.", name);
     }
-    delay(100);
-    File file = FS.open(name, FILE_WRITE);
+//    delay(100);
+    File file = SPIFFS.open(name, FILE_WRITE, true);
     if (file)
     {
         // Write the buffer in chunks
@@ -109,14 +175,14 @@ size_t filesystem_write_to_file(const char *name, uint8_t *in_buffer, size_t siz
             {
                 file.close();
 
-                Log_info("Erasing FS...");
-                if (FS.format())
+                Log_info("Erasing SPIFFS...");
+                if (SPIFFS.format())
                 {
-                    Log_info("FS erased successfully.");
+                    Log_info("SPIFFS erased successfully.");
                 }
                 else
                 {
-                    Log_error("Error erasing FS.");
+                    Log_error("Error erasing SPIFFS.");
                 }
 
                 return bytesWritten;
@@ -141,14 +207,14 @@ size_t filesystem_write_to_file(const char *name, uint8_t *in_buffer, size_t siz
  */
 bool filesystem_file_exists(const char *name)
 {
-    if (FS.exists(name))
+    if (SPIFFS.exists(name))
     {
         Log_info("file %s exists.", name);
         return true;
     }
     else
     {
-        Log_info("file %s not exists.", name);
+        Log_info("file %s does not exist.", name);
         return false;
     }
 }
@@ -160,9 +226,9 @@ bool filesystem_file_exists(const char *name)
  */
 bool filesystem_file_delete(const char *name)
 {
-    if (FS.exists(name))
+    if (SPIFFS.exists(name))
     {
-        if (FS.remove(name))
+        if (SPIFFS.remove(name))
         {
             Log_info("file %s deleted", name);
             return true;
@@ -188,10 +254,10 @@ bool filesystem_file_delete(const char *name)
  */
 bool filesystem_file_rename(const char *old_name, const char *new_name)
 {
-    if (FS.exists(old_name))
+    if (SPIFFS.exists(old_name))
     {
         Log_info("file %s exists.", old_name);
-        bool res = FS.rename(old_name, new_name);
+        bool res = SPIFFS.rename(old_name, new_name);
         if (res)
         {
             Log_info("file %s renamed to %s.", old_name, new_name);
@@ -210,8 +276,8 @@ bool filesystem_file_rename(const char *old_name, const char *new_name)
 
 void list_files()
 {
-    Log_info("Filesystem Usage: %d/%d", FS.usedBytes(), FS.totalBytes());
-    File rootDir = FS.open("/");
+    Log_info("Filesystem Usage: %d/%d", SPIFFS.usedBytes(), SPIFFS.totalBytes());
+    File rootDir = SPIFFS.open("/");
 
     while (File file = rootDir.openNextFile())
     {
