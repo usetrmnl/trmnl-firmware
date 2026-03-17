@@ -33,6 +33,7 @@
 #include "http_client.h"
 #include <api-client/display.h>
 #include "driver/gpio.h"
+#include "esp_sntp.h"
 #include <nvs.h>
 #include <serialize_log.h>
 #include <preferences_persistence.h>
@@ -2692,10 +2693,34 @@ void config_gpio_for_lp() {
  */
 static bool setClock()
 {
+  int iDeltaTime;
+  Preferences prefs;
   bool sync_status = false;
   struct tm timeinfo;
 
-  configTime(0, 0, "time.google.com", "time.cloudflare.com");
+  prefs.begin("data");
+  uint32_t u32Epoch = prefs.getUInt("last_sync", 0); // Get the last time sync time
+  iDeltaTime = getTime() - u32Epoch; // Number of seconds since the last sync
+  Log.info("%s [%d]: epoch time: %d iDelta: %d\r\n", __FILE__, __LINE__, getTime(), iDeltaTime);
+  if (u32Epoch != 0 && iDeltaTime > 0 && iDeltaTime < 24*60*60) { // Less than 24h, no need to sync the time
+      Log.info("%s [%d]: Skipping time sync\r\n", __FILE__, __LINE__);
+      prefs.end();
+      return true;
+  }
+  String ntp = prefs.getString("ntp_server", "time.google.com");
+
+  Log.info("%s [%d]: Using NTP: %s, fallback: time.cloudflare.com\r\n", __FILE__, __LINE__, ntp.c_str());
+  configTime(0, 0, ntp.c_str(), "time.cloudflare.com");
+
+  for (int i = 0; i < SNTP_MAX_SERVERS; i++)
+  {
+    const char *srv = esp_sntp_getservername(i);
+    if (srv && strlen(srv) > 0)
+    {
+      Log.info("%s [%d]: SNTP server[%d]: %s\r\n", __FILE__, __LINE__, i, srv);
+    }
+  }
+
   Log.info("%s [%d]: Time synchronization...\r\n", __FILE__, __LINE__);
 
   // Wait for time to be set
@@ -2703,6 +2728,7 @@ static bool setClock()
   {
     sync_status = true;
     Log.info("%s [%d]: Time synchronization succeed!\r\n", __FILE__, __LINE__);
+    prefs.putUInt("last_sync", getTime()); // save epoch time of last sync
   }
   else
   {
@@ -2711,8 +2737,9 @@ static bool setClock()
 
   Log.info("%s [%d]: Current time - %s\r\n", __FILE__, __LINE__, asctime(&timeinfo));
 
+  prefs.end();
   return sync_status;
-}
+} /* setClock() */
 
 /**
  * @brief Function to read the battery voltage
