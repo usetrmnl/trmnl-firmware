@@ -34,6 +34,7 @@
 #include <api-client/display.h>
 #include "driver/gpio.h"
 #include "esp_ota_ops.h"
+#include "esp_sntp.h"
 #include <nvs.h>
 #include <serialize_log.h>
 #include <preferences_persistence.h>
@@ -101,8 +102,8 @@ static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, c
 static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiResponse);
 static void wifiErrorDeepSleep();
 static uint8_t *storedLogoOrDefault(int iType);
-static bool saveCurrentFileName(String &name);
 static bool checkCurrentFileName(String &newName);
+void fixFileName(const char *src, char *dest);
 static DeviceStatusStamp getDeviceStatusStamp();
 void log_nvs_usage();
 void config_gpio_for_lp();
@@ -774,6 +775,26 @@ void bl_init(void)
   Log_info("init time: %ld us", init_time);
 
 #else
+  Log_info("preferences start");
+  bool res = preferences.begin("data", false);
+  if (res)
+  {
+    Log_info("preferences init success (%d free entries)", preferences.freeEntries());
+    if (pref_clear)
+    {
+      res = preferences.clear(); // if needed to clear the saved data
+      if (res)
+        Log_info("preferences cleared success");
+      else
+        Log_fatal("preferences clearing error");
+    }
+  }
+  else
+  {
+    Log_fatal("preferences init failed");
+    ESP.restart();
+  }
+  
   if (gpio_wakeup)
   {
     Log_info("GPIO wakeup (%d)", wakeup_reason);
@@ -1364,6 +1385,18 @@ static https_request_err_e downloadAndShow()
 
   https_request_err_e result = handleApiDisplayResponse(apiDisplayResult.response);
 
+  if (!status && result == HTTPS_SUCCESS) { // this means we already have this image stored in SPIFFS
+      char szTemp[36];
+      fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
+      Log.info("%s [%d]: Reading %s from SPIFFS\r\n", __FILE__, __LINE__, szTemp);
+      size_t content_size = filesystem_read_and_allocate(szTemp, &buffer);
+      Log.info("%s [%d]: Decoding image...\r\n", __FILE__, __LINE__);
+      display_show_image(buffer, content_size, true);
+      free(buffer);
+      buffer = nullptr;
+      return result;
+  }
+
 #ifdef BOARD_TRMNL_X
   if (status && !update_firmware && !reset_firmware &&
       WifiCaptivePortal.getLastCredentials().is5GHz && g_modem)
@@ -1547,29 +1580,17 @@ static https_request_err_e downloadAndShow()
           Log.info("%s [%d]: Received successfully; WiFi off; WiFi off\r\n", __FILE__, __LINE__);
 
 
-          if (filesystem_file_exists("/current.bmp") || filesystem_file_exists("/current.png"))
-          {
-            filesystem_file_delete("/last.bmp");
-            filesystem_file_delete("/last.png");
-            filesystem_file_rename("/current.png", "/last.png");
-            filesystem_file_rename("/current.bmp", "/last.bmp");
-// Disable partial update (for now)
-//            if (filesystem_file_exists("/last.png")) {
-//                buffer_old = display_read_file("/last.png", &file_size_old);
-//                Log.info("%s [%d]: Reading last.png to use for partial update, size = %d\r\n", __FILE__, __LINE__, file_size_old);
-//            }
-          }
-
           bool image_reverse = false;
           if (isPNG || isJPEG)
           {
-            writeImageToFile("/current.png", buffer, content_size);
-            Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
+            char szTemp[36];
+            fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
+            Log.info("%s [%d]: Writing %s to SPIFFS\r\n", __FILE__, __LINE__, szTemp);
+            filesystem_purge_old_file(szTemp); // try to delete the old version or older than 24h
+            writeImageToFile(szTemp, buffer, content_size);            Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
             display_show_image(buffer, content_size, true);
-//            delay(100);
-//            free(buffer);
-//            buffer = nullptr;
-//            png_res = decodePNG("/current.png", decodedPng);
+            //free(buffer); don't free - it's a String payload
+            buffer = nullptr;
             png_res = PNG_NO_ERR; // DEBUG
           }
           else
@@ -1597,12 +1618,6 @@ static https_request_err_e downloadAndShow()
             // Print the extracted string
             Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
 
-            bool res = saveCurrentFileName(new_filename);
-            if (res)
-              Log.info("%s [%d]: New filename saved\r\n", __FILE__, __LINE__);
-            else
-              Log.error("%s [%d]: New image name saving error!", __FILE__, __LINE__);
-   
             if (result != HTTPS_PLUGIN_NOT_ATTACHED)
               result = HTTPS_SUCCESS;
           }
@@ -1648,12 +1663,6 @@ static https_request_err_e downloadAndShow()
             // Print the extracted string
             Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
 
-            bool res = saveCurrentFileName(new_filename);
-            if (res)
-              Log.info("%s [%d]: New filename saved\r\n", __FILE__, __LINE__);
-            else
-              Log.error("%s [%d]: New image name saving error!", __FILE__, __LINE__);
-
             if (result != HTTPS_PLUGIN_NOT_ATTACHED)
               result = HTTPS_SUCCESS;
           }
@@ -1684,7 +1693,10 @@ static https_request_err_e downloadAndShow()
 
           if (isPNG && png_res != PNG_NO_ERR)
           {
-            filesystem_file_delete("/current.png");
+            char szTemp[36];
+            fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
+            filesystem_file_delete(szTemp);
+
             Log_error_submit("error parsing image file - %s", error.c_str());
 
             return HTTPS_WRONG_IMAGE_FORMAT;
@@ -1835,12 +1847,12 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
           if (!checkCurrentFileName(new_filename))
           {
-            Log.info("%s [%d]: New image. Show it.\r\n", __FILE__, __LINE__);
+            Log.info("%s [%d]: New image. Download and show it.\r\n", __FILE__, __LINE__);
             status = true;
           }
           else
           {
-            Log.info("%s [%d]: Old image. No needed to show it.\r\n", __FILE__, __LINE__);
+            Log.info("%s [%d]: Old image. Read from FLASH and show it.\r\n", __FILE__, __LINE__);
             status = false;
             result = HTTPS_SUCCESS;
           }
@@ -2749,6 +2761,7 @@ static void checkAndPerformFirmwareUpdate(void)
  */
 static void goToSleep(void)
 {
+  Log.info("%s [%d]: go to sleep\r\n", __FILE__, __LINE__);
   submitStoredLogs();
   // if (WiFi.status() == WL_CONNECTED) {
   //   WiFi.disconnect();
@@ -2931,6 +2944,8 @@ void config_gpio_for_lp() {
  */
 static bool setClock()
 {
+  int iDeltaTime;
+  Preferences prefs;
   bool sync_status = false;
   struct tm timeinfo;
 
@@ -2957,6 +2972,29 @@ static bool setClock()
   }
 #endif
 
+  prefs.begin("data");
+  uint32_t u32Epoch = prefs.getUInt("last_sync", 0); // Get the last time sync time
+  iDeltaTime = getTime() - u32Epoch; // Number of seconds since the last sync
+  Log.info("%s [%d]: epoch time: %d iDelta: %d\r\n", __FILE__, __LINE__, getTime(), iDeltaTime);
+  if (u32Epoch != 0 && iDeltaTime > 0 && iDeltaTime < 24*60*60) { // Less than 24h, no need to sync the time
+      Log.info("%s [%d]: Skipping time sync\r\n", __FILE__, __LINE__);
+      prefs.end();
+      return true;
+  }
+  String ntp = prefs.getString("ntp_server", "time.google.com");
+
+  Log.info("%s [%d]: Using NTP: %s, fallback: time.cloudflare.com\r\n", __FILE__, __LINE__, ntp.c_str());
+  configTime(0, 0, ntp.c_str(), "time.cloudflare.com");
+
+  for (int i = 0; i < SNTP_MAX_SERVERS; i++)
+  {
+    const char *srv = esp_sntp_getservername(i);
+    if (srv && strlen(srv) > 0)
+    {
+      Log.info("%s [%d]: SNTP server[%d]: %s\r\n", __FILE__, __LINE__, i, srv);
+    }
+  }
+
   configTime(0, 0, "time.google.com", "time.cloudflare.com");
 
   // Wait for time to be set
@@ -2964,6 +3002,7 @@ static bool setClock()
   {
     sync_status = true;
     Log.info("%s [%d]: Time synchronization succeed!\r\n", __FILE__, __LINE__);
+    prefs.putUInt("last_sync", getTime()); // save epoch time of last sync
   }
   else
   {
@@ -2972,8 +3011,9 @@ static bool setClock()
 
   Log.info("%s [%d]: Current time - %s\r\n", __FILE__, __LINE__, asctime(&timeinfo));
 
+  prefs.end();
   return sync_status;
-}
+} /* setClock() */
 
 /**
  * @brief Function to read the battery voltage
@@ -3192,47 +3232,35 @@ static uint8_t *storedLogoOrDefault(int iType)
 #endif
 }
 
-static bool saveCurrentFileName(String &name)
+void fixFileName(const char *src, char *dest)
 {
-  if (!preferences.getString(PREFERENCES_FILENAME_KEY, "").equals(name))
-  {
-    Log.info("%s [%d]: New filename:  - %s\r\n", __FILE__, __LINE__, name.c_str());
-    size_t res = preferences.putString(PREFERENCES_FILENAME_KEY, name);
-    if (res > 0)
-    {
-      Log.info("%s [%d]: New filename saved in the preferences - %d\r\n", __FILE__, __LINE__, res);
-      return true;
-    }
-    else
-    {
-      Log.error("%s [%d]: New filename saving error!\r\n", __FILE__, __LINE__);
-      return false;
-    }
-  }
-  else
-  {
-    Log.info("%s [%d]: No needed to re-write\r\n", __FILE__, __LINE__);
-    return true;
-  }
-}
+int iLen;
 
+  // SPIFFS only allows 32 bytes for the name, so if it's too long, fix it
+  dest[0] = '/'; // SPIFFS requires files to start with the root dir
+  iLen = strlen(src);
+  if (iLen > 31) {
+    memcpy(&dest[1], src, 7); // first 7 chars are "plugin-" or "mashup-"
+    strcpy(&dest[8], &src[iLen-17]); // get the prefix name and unique id plus timestamp (e.g. mashup-066cc3-1771674964)
+  } else {
+    strncpy(&dest[1], src, 31); // use it as-is
+  }
+} /* fixFileName() */
+
+//
+// Abstract:
+// Compares the current filename returned from the API server
+// with files we previously stored in FLASH (SPIFFS)
+//
+// returns: true if the file exists
+//
 static bool checkCurrentFileName(String &newName)
 {
-  String currentFilename = preferences.getString(PREFERENCES_FILENAME_KEY, "");
+char szTemp[36];
 
-  Log.error("%s [%d]: Current filename: %s\r\n", __FILE__, __LINE__, currentFilename);
-
-  if (currentFilename.equals(newName))
-  {
-    Log.info("%s [%d]: Current filename equals to the new filename\r\n", __FILE__, __LINE__);
-    return true;
-  }
-  else
-  {
-    Log.error("%s [%d]: Current filename doesn't equal to the new filename\r\n", __FILE__, __LINE__);
-    return false;
-  }
-}
+  fixFileName(newName.c_str(), szTemp); // shorten the name (if needed) to fit the SPIFFS file length limit of 31 chars + 0 terminator
+  return filesystem_file_exists(szTemp);
+} /* checkCurrentFileName() */
 
 static void wifiErrorDeepSleep()
 {
