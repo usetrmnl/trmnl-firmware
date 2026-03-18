@@ -103,6 +103,7 @@ static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiRes
 static void wifiErrorDeepSleep();
 static uint8_t *storedLogoOrDefault(int iType);
 static bool checkCurrentFileName(String &newName);
+static bool saveCurrentFileName(String &name);
 void fixFileName(const char *src, char *dest);
 static DeviceStatusStamp getDeviceStatusStamp();
 void log_nvs_usage();
@@ -2949,6 +2950,16 @@ static bool setClock()
   bool sync_status = false;
   struct tm timeinfo;
 
+  prefs.begin("data");
+  uint32_t u32Epoch = prefs.getUInt("last_sync", 0); // Get the last time sync time
+  iDeltaTime = getTime() - u32Epoch; // Number of seconds since the last sync
+  Log.info("%s [%d]: epoch time: %d iDelta: %d\r\n", __FILE__, __LINE__, getTime(), iDeltaTime);
+  if (u32Epoch != 0 && iDeltaTime > 0 && iDeltaTime < 24*60*60) { // Less than 24h, no need to sync the time
+      Log.info("%s [%d]: Skipping time sync\r\n", __FILE__, __LINE__);
+      prefs.end();
+      return true;
+  }
+
   Log.info("%s [%d]: Time synchronization...\r\n", __FILE__, __LINE__);
 
 #ifdef BOARD_TRMNL_X
@@ -2962,6 +2973,7 @@ static bool setClock()
       getLocalTime(&timeinfo);
       sync_status = true;
       Log.info("%s [%d]: Time synchronization via modem succeed!\r\n", __FILE__, __LINE__);
+      prefs.putUInt("last_sync", getTime()); // save epoch time of last sync
     }
     else
     {
@@ -2972,15 +2984,6 @@ static bool setClock()
   }
 #endif
 
-  prefs.begin("data");
-  uint32_t u32Epoch = prefs.getUInt("last_sync", 0); // Get the last time sync time
-  iDeltaTime = getTime() - u32Epoch; // Number of seconds since the last sync
-  Log.info("%s [%d]: epoch time: %d iDelta: %d\r\n", __FILE__, __LINE__, getTime(), iDeltaTime);
-  if (u32Epoch != 0 && iDeltaTime > 0 && iDeltaTime < 24*60*60) { // Less than 24h, no need to sync the time
-      Log.info("%s [%d]: Skipping time sync\r\n", __FILE__, __LINE__);
-      prefs.end();
-      return true;
-  }
   String ntp = prefs.getString("ntp_server", "time.google.com");
 
   Log.info("%s [%d]: Using NTP: %s, fallback: time.cloudflare.com\r\n", __FILE__, __LINE__, ntp.c_str());
@@ -2994,8 +2997,6 @@ static bool setClock()
       Log.info("%s [%d]: SNTP server[%d]: %s\r\n", __FILE__, __LINE__, i, srv);
     }
   }
-
-  configTime(0, 0, "time.google.com", "time.cloudflare.com");
 
   // Wait for time to be set
   if (getLocalTime(&timeinfo))
@@ -3230,6 +3231,30 @@ static uint8_t *storedLogoOrDefault(int iType)
     return const_cast<uint8_t *>(loading);
   }
 #endif
+}
+
+static bool saveCurrentFileName(String &name)
+{
+  if (!preferences.getString(PREFERENCES_FILENAME_KEY, "").equals(name))
+  {
+    Log.info("%s [%d]: New filename:  - %s\r\n", __FILE__, __LINE__, name.c_str());
+    size_t res = preferences.putString(PREFERENCES_FILENAME_KEY, name);
+    if (res > 0)
+    {
+      Log.info("%s [%d]: New filename saved in the preferences - %d\r\n", __FILE__, __LINE__, res);
+      return true;
+    }
+    else
+    {
+      Log.error("%s [%d]: New filename saving error!\r\n", __FILE__, __LINE__);
+      return false;
+    }
+  }
+  else
+  {
+    Log.info("%s [%d]: No needed to re-write\r\n", __FILE__, __LINE__);
+    return true;
+  }
 }
 
 void fixFileName(const char *src, char *dest)
