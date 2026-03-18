@@ -249,6 +249,25 @@
       background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='bi bi-lock' viewBox='0 0 16 16'><path d='M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2m3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2M5 8h6a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1'/></svg>");
     }
 
+    .band-badge {
+      font-size: 10px;
+      font-weight: bold;
+      padding: 1px 4px;
+      border-radius: 3px;
+      margin-left: 5px;
+      vertical-align: middle;
+    }
+
+    .band-5ghz {
+      background-color: #F86527;
+      color: white;
+    }
+
+    .band-24ghz {
+      background-color: #adb5bd;
+      color: white;
+    }
+
     .loader {
       border: 6px solid #f3f3f3;
       border-radius: 50%;
@@ -446,17 +465,17 @@
           document.getElementById('other-networks-caption').style.display = 'block';
         }
         knownNetworks.forEach((item, row) => {
-          appendWifiToTable("table-saved", item.name, item.open, item.rssi, false);
+          appendWifiToTable("table-saved", item.name, item.open, item.rssi, false, item.band);
         });
         otherNetworks.forEach((item, row) => {
-          appendWifiToTable("table-others", item.name, item.open, item.rssi, true);
+          appendWifiToTable("table-others", item.name, item.open, item.rssi, true, item.band);
         });
       } else if (response && response.status == 202) {
         setTimeout(getInfo, 2000); // repeat in 2s
       }
     }
 
-    function appendWifiToTable(table, name, open, rssi, onClick) {
+    function appendWifiToTable(table, name, open, rssi, onClick, band) {
       var newRow = document.createElement('tr');
       if (onClick) {
         newRow.onclick = function () {
@@ -465,7 +484,14 @@
       }
       var th = document.createElement('th');
       var td = document.createElement('td');
-      th.textContent = name;
+      th.appendChild(document.createTextNode(name));
+      if (band) {
+        var badgeSpan = document.createElement('span');
+        badgeSpan.classList.add('band-badge');
+        badgeSpan.classList.add(band === '5GHz' ? 'band-5ghz' : 'band-24ghz');
+        badgeSpan.textContent = band === '5GHz' ? '5G' : '2.4G';
+        th.appendChild(badgeSpan);
+      }
       newRow.appendChild(th);
       // append wifi strength
       var wifiIco = document.createElement('i');
@@ -496,7 +522,8 @@
           sibling.classList.remove('selected');
         }
       });
-      var value = x.querySelector('th').textContent;
+      var thEl = x.querySelector('th');
+      var value = thEl.firstChild ? thEl.firstChild.textContent : thEl.textContent;
       if (value) {
         document.getElementById('ssid').value = value;
         var passwordTag = document.getElementById('password');

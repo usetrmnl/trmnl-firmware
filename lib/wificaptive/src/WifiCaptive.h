@@ -9,6 +9,8 @@
 #include "Preferences.h"
 #include "WifiCaptivePage.h"
 #include <ArduinoJson.h>
+#include <functional>
+#include <vector>
 #include "wifi-types.h"
 
 #define WIFI_SSID "TRMNL"
@@ -29,8 +31,16 @@
 
 #define WIFI_SSID_KEY(i) ("wifi_" + String(i) + "_ssid").c_str()
 #define WIFI_PSWD_KEY(i) ("wifi_" + String(i) + "_pswd").c_str()
+#define WIFI_5GHZ_KEY(i) ("wifi_" + String(i) + "_5g").c_str()
 
 #define WIFI_LAST_INDEX "wifi_last_index"
+
+struct ExternalNetwork {
+    String  ssid;
+    int32_t rssi;
+    bool    open;
+    bool    is5GHz;
+};
 
 class WifiCaptive
 {
@@ -44,6 +54,12 @@ private:
     std::function<void()> _resetcallback;
 
     WifiCredentials _savedWifis[WIFI_MAX_SAVED_CREDS];
+    int _lastIndex = 0;
+
+    std::vector<ExternalNetwork> _networks;
+
+    using ModemConnectCallback = std::function<bool(const String& ssid, const String& pass)>;
+    ModemConnectCallback _modemConnectCallback;
 
     void setUpDNSServer(DNSServer &dnsServer, const IPAddress &localIP);
     void readWifiCredentials();
@@ -77,6 +93,16 @@ public:
     /// @brief Connects to the saved SSID with the best signal strength
     /// @return True if successfully connected to saved SSID, false otherwise.
     bool autoConnect();
+
+    /// @brief Replaces the internal WiFi scan list with an externally provided one.
+    ///        Call before startPortal() so the portal shows these networks exclusively.
+    void setNetworks(const std::vector<ExternalNetwork>& nets);
+
+    /// @brief Returns the last successfully used WiFi credentials (including is5GHz flag).
+    WifiCredentials getLastCredentials();
+
+    /// @brief Registers a callback used to connect to 5 GHz networks via the modem.
+    void setModemConnectCallback(ModemConnectCallback cb);
 
     /// @brief Checks if there are saved WiFi credentials
     /// @return True if there are saved credentials, false otherwise.

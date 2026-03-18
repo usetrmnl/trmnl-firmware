@@ -74,49 +74,51 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
     auto scanGET = server.on("/scan", HTTP_GET, [callbacks](AsyncWebServerRequest *request)
                              {
 		String json = "{\"networks\":[";
-		int n = WiFi.scanComplete();
-		if (n == WIFI_SCAN_FAILED) {
-			WiFi.scanNetworks(true);
-			return request->send(202);
-		} else if(n == WIFI_SCAN_RUNNING){
-			return request->send(202);
-		} else {
-			// Data structure to store the highest RSSI for each SSID
-            // Warning: DO NOT USE true on this function in an async context!
-            std::vector<WifiNetwork> combinedNetworks = callbacks.getAnnotatedNetworks(false);
 
-            // Generate JSON response
-            size_t size = 0;
-            for (const auto &network : combinedNetworks)
-            {
-                String ssid = network.ssid;
-				String rssi = String(network.rssi);
-
-				// Escape invalid characters
-				ssid.replace("\\","\\\\");
-				ssid.replace("\"","\\\"");
-				json+= "{";
-				json+= "\"name\":\""+ssid+"\",";
-				json+= "\"rssi\":\""+rssi+"\",";
-				json+= "\"open\":"+String(network.open == WIFI_AUTH_OPEN ? "true,": "false,");
-                json+= "\"saved\":"+String(network.saved ? "true": "false");
-				json+= "}";
-
-				size += 1;
-
-				if (size != combinedNetworks.size())
-				{
-					json+= ",";
-				}
-            }
-
-            WiFi.scanDelete();
-			Serial.println(json);
-
-			if (WiFi.scanComplete() == -2){
+		if (!callbacks.isNetworkListReady()) {
+			if (WiFi.scanComplete() == WIFI_SCAN_FAILED) {
 				WiFi.scanNetworks(true);
 			}
+			return request->send(202);
 		}
+
+		// Data structure to store the highest RSSI for each SSID
+		// Warning: DO NOT USE true on getAnnotatedNetworks in an async context!
+		std::vector<WifiNetwork> combinedNetworks = callbacks.getAnnotatedNetworks(false);
+
+		// Generate JSON response
+		size_t size = 0;
+		for (const auto &network : combinedNetworks)
+		{
+			String ssid = network.ssid;
+			String rssi = String(network.rssi);
+
+			// Escape invalid characters
+			ssid.replace("\\","\\\\");
+			ssid.replace("\"","\\\"");
+			json+= "{";
+			json+= "\"name\":\""+ssid+"\",";
+			json+= "\"rssi\":\""+rssi+"\",";
+			json+= "\"open\":"+String(network.open == WIFI_AUTH_OPEN ? "true,": "false,");
+			json+= "\"saved\":"+String(network.saved ? "true,": "false,"  );
+			json+= "\"band\":\""+String(network.is5GHz ? "5GHz" : "2.4GHz")+"\"";
+			json+= "}";
+
+			size += 1;
+
+			if (size != combinedNetworks.size())
+			{
+				json+= ",";
+			}
+		}
+
+		WiFi.scanDelete();
+		Serial.println(json);
+
+		if (WiFi.scanComplete() == -2){
+			WiFi.scanNetworks(true);
+		}
+
 		json += "],";
 
         // Expose MAC pre-connect for easier setup debugging

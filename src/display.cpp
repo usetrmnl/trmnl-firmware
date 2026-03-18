@@ -1249,6 +1249,27 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         bbep.println(string1);
     break;
     }
+    case MODEM_FLASHING:
+    {
+        const char string1[] = "Flashing modem firmware...";
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - rect.w)/2, 430);
+        bbep.println(string1);
+    break;
+    }
+    case READY_TO_SHIP:
+    {
+        const char string1[] = "Device is ready to ship!";
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - rect.w)/2, 430);
+        bbep.println(string1);
+
+        const char string2[] = "Unplug the USB-C to enter shipping mode.";
+        bbep.getStringBox(string2, &rect);
+        bbep.setCursor((bbep.width() - rect.w)/2, 500);
+        bbep.print(string2);
+    break;
+    }
     case SHIPPING_MODE:
     {
         const char string1[] = "Welcome to TRMNL.";
@@ -1268,7 +1289,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w)/2, 430);
         bbep.println(string1);
-        const char string2[] = "Hold middle button to confirm, tap to cancel.";
+        const char string2[] = "Hold middle of touch bar to confirm, tap to cancel.";
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w)/2, -1);
         bbep.print(string2);
@@ -1300,7 +1321,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w)/2, bbep.height() - (rect.h*2)-140);
         bbep.println(string1);
+#ifndef BOARD_TRMNL_X
         const char string2[] = "Hold button on the back to reset WiFi, or scan QR Code for help.";
+#else
+        const char string2[] = "Hold left and right corner of touch bar to reset WiFi, or scan QR Code for help.";
+#endif
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.println(string2);
@@ -1363,7 +1388,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, 340);
         bbep.println(string1);
+#ifndef BOARD_TRMNL_X
         const char string2[] = "Short click the button on back,";
+#else
+        const char string2[] = "Tap the middle of touch bar,";
+#endif
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.println(string2);
@@ -1379,7 +1408,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, 340);
         bbep.println(string1);
+#ifndef BOARD_TRMNL_X
         const char string2[] = "Short click the button on back,";
+#else
+        const char string2[] = "Tap the middle of touch bar,";
+#endif
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.println(string2);
@@ -1399,7 +1432,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - (rect.h*3));
 #endif
         bbep.println(string1);
+#ifndef BOARD_TRMNL_X
         const char string2[] = "Short click the button on back,";
+#else
+        const char string2[] = "Tap the middle of touch bar,";
+#endif
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.println(string2);
@@ -1419,7 +1456,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - (rect.h*2));
 #endif
         bbep.println(string1);
+#ifndef BOARD_TRMNL_X
         const char string2[] = "Wait or reset by holding button on back.";
+#else
+        const char string2[] = "Wait or reset by holding left and right corner of touch bar.";
+#endif
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.print(string2);
@@ -1431,7 +1472,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, 400);
         bbep.println(string1);
+#ifndef BOARD_TRMNL_X
         const char string2[] = "Wait or reset by holding button on back.";
+#else
+        const char string2[] = "Wait or reset by holding left and right corner of touch bar.";
+#endif
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.print(string2);
@@ -1443,7 +1488,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, 400);
         bbep.println(string1);
+#ifndef BOARD_TRMNL_X
         const char string2[] = "Wait or reset by holding button on back.";
+#else
+        const char string2[] = "Wait or reset by holding left and right corner of touch bar.";
+#endif
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.print(string2);

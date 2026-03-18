@@ -64,22 +64,45 @@ bool WifiCaptive::startPortal()
             _api_server = api_server; },
         .getAnnotatedNetworks = [this](bool runScan)
         {
+            if (!_networks.empty())
+            {
+                std::vector<WifiNetwork> result;
+                for (auto& n : _networks)
+                {
+                    bool saved = false;
+                    for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
+                        if (_savedWifis[i].ssid == n.ssid) { saved = true; break; }
+                    result.push_back({n.ssid, n.rssi, n.open, saved, n.is5GHz});
+                }
+                return result;
+            }
             // Warning: DO NOT USE true on this function in an async context!
             std::vector<WifiNetwork> uniqueNetworks = getScannedUniqueNetworks(false);
             std::vector<WifiNetwork> combinedNetworks = combineNetworks(uniqueNetworks, _savedWifis);
-            return combinedNetworks; }};
+            return combinedNetworks;
+        },
+        .isNetworkListReady = [this]()
+        {
+            if (!_networks.empty()) return true;
+            int n = WiFi.scanComplete();
+            return n >= 0;
+        }};
 
     setUpWebserver(*_server, localIP, callbacks);
 
     // begin serving
     _server->begin();
 
-    // start async network scan
-    WiFi.scanNetworks(true);
+    // Start async WiFi scan only when no external network list is provided
+    if (_networks.empty())
+    {
+        WiFi.scanNetworks(true);
+    }
 
     readWifiCredentials();
 
     bool succesfullyConnected = false;
+    bool connected_via_modem = false;
     // wait until SSID is provided
     while (1)
     {
@@ -92,7 +115,24 @@ bool WifiCaptive::startPortal()
         else
         {
             WifiCredentials credentials = {_ssid, _password};
-            bool res = connect(credentials) == WL_CONNECTED;
+
+            // Detect 5 GHz from the external network list
+            bool is5GHz = false;
+            for (auto& n : _networks)
+                if (n.ssid == credentials.ssid) { is5GHz = n.is5GHz; break; }
+            credentials.is5GHz = is5GHz;
+
+            bool res = false;
+            if (is5GHz && _modemConnectCallback)
+            {
+                res = _modemConnectCallback(credentials.ssid, credentials.pswd);
+                if (res) connected_via_modem = true;
+            }
+            else
+            {
+                res = connect(credentials) == WL_CONNECTED;
+            }
+
             if (res)
             {
                 saveWifiCredentials(credentials);
@@ -117,14 +157,17 @@ bool WifiCaptive::startPortal()
     WiFi.softAPdisconnect(true);
     delay(1000);
 
-    auto status = WiFi.status();
-    if (status != WL_CONNECTED)
+    if (!connected_via_modem)
     {
-        Log_info("Not connected after AP disconnect");
-        WiFi.mode(WIFI_STA);
+        auto status = WiFi.status();
+        if (status != WL_CONNECTED)
+        {
+            Log_info("Not connected after AP disconnect");
+            WiFi.mode(WIFI_STA);
 
-        auto result = initiateConnectionAndWaitForOutcome({_ssid, _password});
-        status = result.status;
+            auto result = initiateConnectionAndWaitForOutcome({_ssid, _password});
+            status = result.status;
+        }
     }
 
     // stop dsn
@@ -150,12 +193,13 @@ void WifiCaptive::resetSettings()
     {
         preferences.remove(WIFI_SSID_KEY(i));
         preferences.remove(WIFI_PSWD_KEY(i));
+        preferences.remove(WIFI_5GHZ_KEY(i));
     }
     preferences.end();
 
     for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
     {
-        _savedWifis[i] = {"", ""};
+        _savedWifis[i] = {"", "", false};
     }
 
     WiFi.disconnect(true, true);
@@ -195,9 +239,15 @@ void WifiCaptive::readWifiCredentials()
 
     for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
     {
-        _savedWifis[i].ssid = preferences.getString(WIFI_SSID_KEY(i), "");
-        _savedWifis[i].pswd = preferences.getString(WIFI_PSWD_KEY(i), "");
+        _savedWifis[i].ssid   = preferences.getString(WIFI_SSID_KEY(i), "");
+        _savedWifis[i].pswd   = preferences.getString(WIFI_PSWD_KEY(i), "");
+        _savedWifis[i].is5GHz = preferences.getBool(WIFI_5GHZ_KEY(i), false);
     }
+
+    int idx = preferences.getInt(WIFI_LAST_INDEX, 0);
+    if (idx < 0 || idx >= WIFI_MAX_SAVED_CREDS || _savedWifis[idx].ssid.isEmpty())
+        idx = 0;
+    _lastIndex = idx;
 
     preferences.end();
 }
@@ -228,6 +278,7 @@ void WifiCaptive::saveWifiCredentials(const WifiCredentials credentials)
     {
         preferences.putString(WIFI_SSID_KEY(i), _savedWifis[i].ssid);
         preferences.putString(WIFI_PSWD_KEY(i), _savedWifis[i].pswd);
+        preferences.putBool(WIFI_5GHZ_KEY(i), _savedWifis[i].is5GHz);
     }
     preferences.putInt(WIFI_LAST_INDEX, 0);
     preferences.end();
@@ -538,6 +589,22 @@ bool checkForSavedCredentials()
     PreferenceType type = preferences.getType(WIFI_SSID_KEY(0));
     preferences.end();
     return type == PT_STR;
+}
+
+void WifiCaptive::setNetworks(const std::vector<ExternalNetwork>& nets)
+{
+    _networks = nets;
+}
+
+WifiCredentials WifiCaptive::getLastCredentials()
+{
+    readWifiCredentials();
+    return _savedWifis[_lastIndex];
+}
+
+void WifiCaptive::setModemConnectCallback(ModemConnectCallback cb)
+{
+    _modemConnectCallback = cb;
 }
 
 WifiCaptive WifiCaptivePortal;

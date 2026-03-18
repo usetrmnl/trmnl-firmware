@@ -4,6 +4,9 @@
 #include "qa.h"
 #include "display.h"
 #include "esp_sleep.h"
+#include "filesystem.h"
+#include "modem.h"
+#include "logo_medium.h"
 
 void setup()
 {
@@ -27,6 +30,23 @@ void setup()
       ESP.restart();
    }
    else {
+      display_init();
+      filesystem_init();
+
+      modem_reset_target();
+      delay(500);  // let modem reach bootloader
+
+      display_show_msg(const_cast<uint8_t *>(logo_medium),MODEM_FLASHING);
+
+      Modem modem(115200);
+      if (modem.flashFromFile("/system/factory_ESP32C5-4MB.bin")) {
+        Serial.println("[MODEM] Factory flash complete.");
+      } 
+      else {
+        Serial.println("[MODEM] Factory flash FAILED.");
+      }
+
+      display_show_msg(const_cast<uint8_t *>(logo_medium),READY_TO_SHIP);
       // enableShipmentMode() will block until charger is connected
       enableShipmentMode();
 

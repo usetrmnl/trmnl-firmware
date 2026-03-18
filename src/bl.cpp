@@ -33,6 +33,7 @@
 #include "http_client.h"
 #include <api-client/display.h>
 #include "driver/gpio.h"
+#include "esp_ota_ops.h"
 #include <nvs.h>
 #include <serialize_log.h>
 #include <preferences_persistence.h>
@@ -40,6 +41,7 @@
 #include "logo_medium.h"
 #include "loading.h"
 #include <wifi-helpers.h>
+#include <sys/time.h>
 #ifdef SENSOR_SDA
 #include <bb_scd41.h>
 #include <bb_temperature.h>
@@ -74,6 +76,7 @@ SPECIAL_FUNCTION special_function = SF_NONE;
 RTC_DATA_ATTR uint8_t need_to_refresh_display = 1;
 RTC_DATA_ATTR bool otg_state = false;  // Track OTG state across deep sleep
 bool touchbar_tap_mode = true;  // false = "slide", true = "tap" (default)
+
 
 Preferences preferences;
 PreferencesPersistence preferencesPersistence(preferences);
@@ -522,6 +525,9 @@ void process_iqs323_data(void)
 
 // ############################ Gas gauge #############################
 
+// File-scope modem pointer — set once during bl_init(), used by download helpers.
+static Modem* g_modem = nullptr;
+
 #endif
 
 /**
@@ -685,11 +691,39 @@ void bl_init(void)
       // Set battery capacity
       lipo.setCapacity(6000); // capacity in mAh
 
-      unsigned int soc = lipo.soc();
-      unsigned int volts = lipo.voltage();
-      unsigned int capacity = lipo.capacity();
-      int current = lipo.current(AVG);
-      Log_info("Battery: %d%% | %dmV | %dmA | %dmAh", soc, volts, current, capacity);
+      // Read battery stats from the BQ27427
+      unsigned int soc = lipo.soc();                   // Read state-of-charge (%)
+      unsigned int volts = lipo.voltage();             // Read battery voltage (mV)
+      int current = lipo.current(AVG);                 // Read average current (mA)
+      unsigned int fullCapacity = lipo.capacity(FULL); // Read full capacity (mAh)
+      unsigned int capacity = lipo.capacity(REMAIN);   // Read remaining capacity (mAh)
+      int power = lipo.power();                        // Read average power draw (mW)
+      int health = lipo.soh();                         // Read state-of-health (%)
+
+      // Assemble a string to print
+      String toPrint = "[" + String(millis() / 1000) + "] ";
+      toPrint += String(soc) + "% | ";
+      toPrint += String(volts) + " mV | ";
+      toPrint += String(current) + " mA | ";
+      toPrint += String(capacity) + " / ";
+      toPrint += String(fullCapacity) + " mAh | ";
+      toPrint += String(power) + " mW | ";
+      toPrint += String(health) + "%";
+
+      //fast charging allowed
+      if (lipo.chgFlag())
+          toPrint += " CHG";
+
+      //full charge detected
+      if (lipo.fcFlag())
+          toPrint += " FC";
+
+      //battery is discharging
+      if (lipo.dsgFlag())
+          toPrint += " DSG";
+
+      // Print the string
+      Serial.println(toPrint);
     }
   }
 
@@ -889,10 +923,29 @@ void bl_init(void)
   list_files();
   log_nvs_usage();
 
-  // DEBUG - test message display
-  // showMessageWithLogo(MSG_FORMAT_ERROR);
-  // display_show_msg(storedLogoOrDefault(1), WIFI_CONNECT, "ABCDEF", true, FW_VERSION_STRING, "Hello World!");
-  // wifiErrorDeepSleep();
+#ifdef BOARD_TRMNL_X
+  modem_reset_target();
+  delay(500);  // give modem time to boot before UART init
+  static Modem modemInstance(115200);
+  g_modem = &modemInstance;
+
+  // Only scan when no credentials are saved (i.e. captive portal will be shown).
+  if (!WifiCaptivePortal.isSaved())
+  {
+    Log_info("No saved credentials — scanning networks via modem...");
+    auto modemNets = g_modem->scanNetworks();
+    Log_info("Modem found %d network(s)", modemNets.size());
+    std::vector<ExternalNetwork> nets;
+    for (auto& n : modemNets)
+      nets.push_back({n.ssid, n.rssi, n.open, n.is5GHz});
+    WifiCaptivePortal.setNetworks(nets);
+
+    // Register callback so captive portal can connect 5 GHz networks via modem
+    WifiCaptivePortal.setModemConnectCallback([](const String& ssid, const String& pass) {
+      return g_modem->connectToNetwork(ssid, pass);
+    });
+  }
+#endif // BOARD_TRMNL_X
 
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
 
@@ -912,7 +965,21 @@ void bl_init(void)
   {
     // WiFi saved, connection
     Log.info("%s [%d]: WiFi saved\r\n", __FILE__, __LINE__);
+#ifdef BOARD_TRMNL_X
+    WifiCredentials lastCreds = WifiCaptivePortal.getLastCredentials();
+    int connection_res;
+    if (lastCreds.is5GHz && g_modem)
+    {
+      Log.info("%s [%d]: 5 GHz network saved — connecting via modem\r\n", __FILE__, __LINE__);
+      connection_res = g_modem->connectToNetwork(lastCreds.ssid, lastCreds.pswd) ? 1 : 0;
+    }
+    else
+    {
+      connection_res = WifiCaptivePortal.autoConnect();
+    }
+#else
     int connection_res = WifiCaptivePortal.autoConnect();
+#endif
 
     Log.info("%s [%d]: Connection result: %d, WiFI Status: %d\r\n", __FILE__, __LINE__, connection_res, WiFi.status());
 
@@ -1227,34 +1294,67 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
  */
 static https_request_err_e downloadAndShow()
 {
-  IPAddress serverIP;
-  String apiHostname = preferences.getString(PREFERENCES_API_URL, API_BASE_URL);
-  apiHostname.replace("https://", "");
-  apiHostname.replace("http://", "");
-  apiHostname.replace("/", "");
-
-  int colon = apiHostname.indexOf(':');
-  if (colon != -1) {
-    apiHostname = apiHostname.substring(0, colon);
-  }
-
-  for (int attempt = 1; attempt <= 5; ++attempt)
-  {
-    if (WiFi.hostByName(apiHostname.c_str(), serverIP) == 1)
-    {
-      Log.info("%s [%d]: Hostname resolved to %s on attempt %d\r\n", __FILE__, __LINE__, serverIP.toString().c_str(), attempt);
-      break;
-    }
-    else
-    {
-      Log_error("Failed to resolve hostname on attempt %d", attempt);
-      delay(2000);
-    }
-  }
-
   auto apiDisplayInputs = loadApiDisplayInputs(preferences);
 
-  apiDisplayResult = fetchApiDisplay(apiDisplayInputs);
+#ifdef BOARD_TRMNL_X
+  if (g_modem && WifiCaptivePortal.getLastCredentials().is5GHz)
+  {
+    Log_info("Fetching /api/display via modem (5 GHz path)");
+    String reqHeaders = "";
+    reqHeaders += "ID: "               + apiDisplayInputs.macAddress                + "\n";
+    reqHeaders += "Access-Token: "     + apiDisplayInputs.apiKey                    + "\n";
+    reqHeaders += "Refresh-Rate: "     + String(apiDisplayInputs.refreshRate)       + "\n";
+    reqHeaders += "Battery-Voltage: "  + String(apiDisplayInputs.batteryVoltage, 2) + "\n";
+    reqHeaders += "FW-Version: "       + apiDisplayInputs.firmwareVersion           + "\n";
+    reqHeaders += "Model: "            + apiDisplayInputs.model                     + "\n";
+    reqHeaders += "RSSI: "             + String(apiDisplayInputs.rssi)              + "\n";
+    reqHeaders += "Width: "            + String(apiDisplayInputs.displayWidth)      + "\n";
+    reqHeaders += "Height: "           + String(apiDisplayInputs.displayHeight);
+    if (apiDisplayInputs.specialFunction != SF_NONE)
+      reqHeaders += "\nspecial_function: true";
+
+    auto httpRes = g_modem->httpGet(apiDisplayInputs.baseUrl + "/api/display", "", 0, reqHeaders);
+    if (!httpRes.ok)
+    {
+      Log_error_submit("Modem /api/display request failed (%u bytes received)", httpRes.bytesReceived);
+      return HTTPS_REQUEST_FAILED;
+    }
+    auto apiResp = parseResponse_apiDisplay(httpRes.body);
+    if (apiResp.outcome == ApiDisplayOutcome::DeserializationError)
+    {
+      Log_error_submit("Modem /api/display JSON parse error: %s", apiResp.error_detail.c_str());
+      return HTTPS_JSON_PARSING_ERR;
+    }
+    apiDisplayResult = {HTTPS_NO_ERR, apiResp, ""};
+  }
+  else
+#endif // BOARD_TRMNL_X
+  {
+    // WiFi path: DNS resolution then HTTP
+    IPAddress serverIP;
+    String apiHostname = apiDisplayInputs.baseUrl;
+    apiHostname.replace("https://", "");
+    apiHostname.replace("http://", "");
+    apiHostname.replace("/", "");
+    int colon = apiHostname.indexOf(':');
+    if (colon != -1) apiHostname = apiHostname.substring(0, colon);
+
+    for (int attempt = 1; attempt <= 5; ++attempt)
+    {
+      if (WiFi.hostByName(apiHostname.c_str(), serverIP) == 1)
+      {
+        Log.info("%s [%d]: Hostname resolved to %s on attempt %d\r\n", __FILE__, __LINE__, serverIP.toString().c_str(), attempt);
+        break;
+      }
+      else
+      {
+        Log_error("Failed to resolve hostname on attempt %d", attempt);
+        delay(2000);
+      }
+    }
+
+    apiDisplayResult = fetchApiDisplay(apiDisplayInputs);
+  }
 
   if (apiDisplayResult.error != HTTPS_NO_ERR)
   {
@@ -1263,6 +1363,48 @@ static https_request_err_e downloadAndShow()
   }
 
   https_request_err_e result = handleApiDisplayResponse(apiDisplayResult.response);
+
+#ifdef BOARD_TRMNL_X
+  if (status && !update_firmware && !reset_firmware &&
+      WifiCaptivePortal.getLastCredentials().is5GHz && g_modem)
+  {
+    Log_info("Downloading image via modem (5 GHz path)");
+
+    // Rotate files before writing to /current.png
+    if (filesystem_file_exists("/current.bmp") || filesystem_file_exists("/current.png"))
+    {
+      filesystem_file_delete("/last.bmp");
+      filesystem_file_delete("/last.png");
+      filesystem_file_rename("/current.png", "/last.png");
+      filesystem_file_rename("/current.bmp", "/last.bmp");
+    }
+
+    auto httpRes = g_modem->httpGet(String(filename), "/current.png", 0);
+    if (!httpRes.ok)
+    {
+      Log_error_submit("Modem httpGet failed: %u bytes received", httpRes.bytesReceived);
+      return HTTPS_REQUEST_FAILED;
+    }
+
+    int fileSize = 0;
+    uint8_t* buf = display_read_file("/current.png", &fileSize);
+    if (!buf || fileSize == 0)
+    {
+      Log_error_submit("Modem: failed to read downloaded image from /current.png");
+      return HTTPS_WRONG_IMAGE_SIZE;
+    }
+
+    display_show_image(buf, fileSize, true);
+    free(buf);
+
+    new_filename = apiDisplayResult.response.filename;
+    saveCurrentFileName(new_filename);
+
+    if (result != HTTPS_PLUGIN_NOT_ATTACHED)
+      result = HTTPS_SUCCESS;
+    return result;
+  }
+#endif // BOARD_TRMNL_X
 
   withHttp(
       filename,
@@ -2192,8 +2334,36 @@ static bool performApiSetup()
   Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
   Log.info("%s [%d]: Device MAC address: %s\r\n", __FILE__, __LINE__, WiFi.macAddress().c_str());
 
-  // Call the API client
-  ApiSetupResult result = fetchApiSetup(inputs);
+  // Call the API client — modem path for 5 GHz, WiFi path otherwise
+  ApiSetupResult result;
+#ifdef BOARD_TRMNL_X
+  if (g_modem && WifiCaptivePortal.getLastCredentials().is5GHz)
+  {
+    Log_info("API setup via modem (5 GHz path)");
+    String reqHeaders = "";
+    reqHeaders += "ID: "         + inputs.macAddress      + "\n";
+    reqHeaders += "FW-Version: " + inputs.firmwareVersion + "\n";
+    reqHeaders += "Model: x";
+    auto httpRes = g_modem->httpGet(inputs.baseUrl + "/api/setup", "", 0, reqHeaders);
+    if (!httpRes.ok)
+    {
+      Log_error_submit("[MODEM] /api/setup request failed (%u bytes received)", httpRes.bytesReceived);
+      result = {HTTPS_RESPONSE_CODE_INVALID, {}, "Modem httpGet failed"};
+    }
+    else
+    {
+      auto apiResp = parseResponse_apiSetup(httpRes.body);
+      if (apiResp.outcome == ApiSetupOutcome::DeserializationError)
+        result = {HTTPS_JSON_PARSING_ERR, {}, "JSON deserialization error"};
+      else
+        result = {HTTPS_NO_ERR, apiResp, ""};
+    }
+  }
+  else
+#endif // BOARD_TRMNL_X
+  {
+    result = fetchApiSetup(inputs);
+  }
 
   // Handle connection errors
   if (result.error == HTTPS_UNABLE_TO_CONNECT)
@@ -2285,6 +2455,24 @@ static void downloadSetupImage()
 {
   status = false;
   Log.info("%s [%d]: filename - %s\r\n", __FILE__, __LINE__, filename);
+
+#ifdef BOARD_TRMNL_X
+  if (WifiCaptivePortal.getLastCredentials().is5GHz && g_modem)
+  {
+    Log_info("Downloading setup image via modem (5 GHz path)");
+    auto httpRes = g_modem->httpGet(String(filename), "/logo.bmp");
+    if (!httpRes.ok || httpRes.bytesReceived != DISPLAY_BMP_IMAGE_SIZE)
+    {
+      Log_error_submit("Modem logo download failed: ok=%d bytes=%u expected=%u",
+                       httpRes.ok, httpRes.bytesReceived, DISPLAY_BMP_IMAGE_SIZE);
+      return;
+    }
+    String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
+    display_show_msg(storedLogoOrDefault(0), FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
+    need_to_refresh_display = 0;
+    return;
+  }
+#endif // BOARD_TRMNL_X
 
   withHttp(filename, [&](HTTPClient *https, HttpError error) -> bool
            {
@@ -2435,6 +2623,69 @@ static void resetDeviceCredentials(void)
  */
 static void checkAndPerformFirmwareUpdate(void)
 {
+#ifdef BOARD_TRMNL_X
+  if (g_modem && WifiCaptivePortal.getLastCredentials().is5GHz)
+  {
+    Log.info("%s [%d]: Starting modem OTA download...\r\n", __FILE__, __LINE__);
+
+    const esp_partition_t* update_partition = esp_ota_get_next_update_partition(nullptr);
+    if (!update_partition) {
+      Log.fatal("%s [%d]: No OTA partition available\r\n", __FILE__, __LINE__);
+      showMessageWithLogo(FW_UPDATE_FAILED);
+      return;
+    }
+
+    esp_ota_handle_t ota_handle = 0;
+    esp_err_t err = esp_ota_begin(update_partition, OTA_SIZE_UNKNOWN, &ota_handle);
+    if (err != ESP_OK) {
+      Log.fatal("%s [%d]: esp_ota_begin failed: %s\r\n", __FILE__, __LINE__, esp_err_to_name(err));
+      showMessageWithLogo(FW_UPDATE_FAILED);
+      return;
+    }
+
+    showMessageWithLogo(FW_UPDATE);
+
+    bool write_ok = true;
+    auto result = g_modem->httpGet(
+      String(binUrl),
+      [&](const uint8_t* data, size_t len) -> bool {
+        esp_err_t e = esp_ota_write(ota_handle, data, len);
+        if (e != ESP_OK) {
+          Log.fatal("%s [%d]: esp_ota_write failed: %s\r\n", __FILE__, __LINE__, esp_err_to_name(e));
+          write_ok = false;
+          return false;
+        }
+        return true;
+      }
+    );
+
+    if (!result.ok || !write_ok) {
+      esp_ota_abort(ota_handle);
+      Log.fatal("%s [%d]: Modem OTA download failed\r\n", __FILE__, __LINE__);
+      showMessageWithLogo(FW_UPDATE_FAILED);
+      return;
+    }
+
+    err = esp_ota_end(ota_handle);
+    if (err != ESP_OK) {
+      Log.fatal("%s [%d]: esp_ota_end failed: %s\r\n", __FILE__, __LINE__, esp_err_to_name(err));
+      showMessageWithLogo(FW_UPDATE_FAILED);
+      return;
+    }
+
+    err = esp_ota_set_boot_partition(update_partition);
+    if (err != ESP_OK) {
+      Log.fatal("%s [%d]: esp_ota_set_boot_partition failed: %s\r\n", __FILE__, __LINE__, esp_err_to_name(err));
+      showMessageWithLogo(FW_UPDATE_FAILED);
+      return;
+    }
+
+    Log.info("%s [%d]: Modem OTA successful. Rebooting...\r\n", __FILE__, __LINE__);
+    showMessageWithLogo(FW_UPDATE_SUCCESS);
+    esp_restart();
+    return;
+  }
+#endif
 
   withHttp(binUrl, [&](HTTPClient *https, HttpError errorCode) -> bool
            {
@@ -2683,8 +2934,30 @@ static bool setClock()
   bool sync_status = false;
   struct tm timeinfo;
 
-  configTime(0, 0, "time.google.com", "time.cloudflare.com");
   Log.info("%s [%d]: Time synchronization...\r\n", __FILE__, __LINE__);
+
+#ifdef BOARD_TRMNL_X
+  if (g_modem && WifiCaptivePortal.getLastCredentials().is5GHz)
+  {
+    time_t t = g_modem->getSntpTime();
+    if (t > 0)
+    {
+      struct timeval tv = { t, 0 };
+      settimeofday(&tv, nullptr);
+      getLocalTime(&timeinfo);
+      sync_status = true;
+      Log.info("%s [%d]: Time synchronization via modem succeed!\r\n", __FILE__, __LINE__);
+    }
+    else
+    {
+      Log.info("%s [%d]: Time synchronization via modem failed...\r\n", __FILE__, __LINE__);
+    }
+    Log.info("%s [%d]: Current time - %s\r\n", __FILE__, __LINE__, asctime(&timeinfo));
+    return sync_status;
+  }
+#endif
+
+  configTime(0, 0, "time.google.com", "time.cloudflare.com");
 
   // Wait for time to be set
   if (getLocalTime(&timeinfo))

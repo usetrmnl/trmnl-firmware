@@ -78,7 +78,8 @@ bool saveShipmentStarted(){
 
 bool enableShipmentMode() {
   Serial.begin(115200);
-  display_init();
+  // should be already initialized
+  // display_init();
 
   Serial.println("Waiting for USB plug-off to enter shipment mode...");
 

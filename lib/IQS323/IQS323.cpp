@@ -691,12 +691,12 @@ void IQS323::clearEventMode(bool stopOrRestart)
 void IQS323::setGestureConfig(bool tap_mode, bool stopOrRestart)
 {
   uint8_t gesture_select = tap_mode ? 0x09 : 0x0B;
-  printf("Setting GESTURE_SELECT to 0x%02X for %s mode...\n", gesture_select, tap_mode ? "tap" : "slide");
+  // printf("Setting GESTURE_SELECT to 0x%02X for %s mode...\n", gesture_select, tap_mode ? "tap" : "slide");
   writeRandomBytes(0xA0, 1, &gesture_select, stopOrRestart);
 
   // EVENTS_ENABLE at 0xD3 byte 0: bit1=touch (0x02), bit2=gesture (0x04)
   // Slide: 0x04 (gesture events only), Tap: 0x02 (touch events only)
-  printf("Setting EVENTS_ENABLE to 0x%02X for %s mode...\n", tap_mode ? 0x02 : 0x04, tap_mode ? "tap" : "slide");
+  // printf("Setting EVENTS_ENABLE to 0x%02X for %s mode...\n", tap_mode ? 0x02 : 0x04, tap_mode ? "tap" : "slide");
   uint8_t events_enable = tap_mode ? 0x02 : 0x04;
   writeRandomBytes(0xD3, 1, &events_enable, stopOrRestart);
 }
