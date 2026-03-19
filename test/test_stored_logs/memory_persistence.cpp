@@ -87,6 +87,24 @@ size_t MemoryPersistence::writeBool(const char *key, const bool value)
   return sizeof(bool);
 }
 
+size_t MemoryPersistence::readBytes(const char *key, uint8_t *buffer, size_t maxLen)
+{
+  auto it = storage.find(key);
+  if (it != storage.end())
+  {
+    size_t len = std::min(it->second.length(), maxLen);
+    memcpy(buffer, it->second.data(), len);
+    return len;
+  }
+  return 0;
+}
+
+size_t MemoryPersistence::writeBytes(const char *key, const uint8_t *buffer, size_t len)
+{
+  storage[key] = std::string(reinterpret_cast<const char*>(buffer), len);
+  return len;
+}
+
 bool MemoryPersistence::clear()
 {
   storage.clear();

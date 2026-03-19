@@ -28,5 +28,6 @@ ApiSetupResponse parseResponse_apiSetup(String &payload)
   response.api_key = doc["api_key"] | "";
   response.friendly_id = doc["friendly_id"] | "";
   response.image_url = doc["image_url"] | "";
+  response.auth_mode = doc["auth_mode"] | "api_key";  // default to api_key for backward compat
   return response;
 }
