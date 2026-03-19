@@ -246,15 +246,9 @@ void bl_init(void)
 
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
   {
-    Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
-
-  
-    display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false);
-
-
+    Log.info("%s [%d]: Button wake-up, skip loading screen\r\n", __FILE__, __LINE__);
     need_to_refresh_display = 1;
     preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
-    Log.info("%s [%d]: Display TRMNL logo end\r\n", __FILE__, __LINE__);
     preferences.putString(PREFERENCES_FILENAME_KEY, "");
   }
 
