@@ -51,9 +51,10 @@ BBTemp bbt;
 bool bCO2 = false;
 int iSensorType = -1;
 long lSampleTime;
-RTC_DATA_ATTR int lastCO2 = 0, lastSCDTemp = 0, lastTemp = 0, lastSCDHumid = 0, lastHumid = 0, lastPressure = 0, lastType = -1, lastTime = 0;
+int lastCO2 = 0, lastSCDTemp = 0, lastTemp = 0, lastSCDHumid = 0, lastHumid = 0, lastPressure = 0, lastType = -1, lastTime = 0;
 #endif // SENSOR_SDA
 
+RTC_DATA_ATTR char szPrevFile[32] = {0}; // name of the last image displayed
 bool pref_clear = false;
 String new_filename = "";
 ApiDisplayResult apiDisplayResult;
@@ -108,7 +109,7 @@ void fixFileName(const char *src, char *dest);
 static DeviceStatusStamp getDeviceStatusStamp();
 void log_nvs_usage();
 void config_gpio_for_lp();
-
+int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious);
 static unsigned long startup_time = 0;
 
 #if defined( BOARD_TRMNL_X_EPDIY ) || defined( BOARD_TRMNL_X_SENSORIAS3 ) || defined( BOARD_TRMNL_X_SENSORIAC5 ) || defined( BOARD_TRMNL_X_LILYGO ) || defined( BOARD_TRMNL_X_PAPERS3 )
@@ -564,68 +565,6 @@ void bl_init(void)
   Log_info("BL init success");
   pins_init();
   vBatt = readBatteryVoltage(); // Read the battery voltage BEFORE WiFi is turned on
-#ifdef SENSOR_SDA
-  // check if there is a SCD41 or supported temperature sensor attached
-  if (scd41.init(SENSOR_SDA, SENSOR_SCL) == SCD41_SUCCESS) {
-    bCO2 = true;
-    Log.info("%s [%d]: SCD41 sensor found!\r\n", __FILE__, __LINE__);
-//    scd41.start(SCD41_MODE_PERIODIC);
-    scd41.wakeup();
-    // The SCD41 needs to be re-initialized after big Vcc variations from the last wakeup
-    // put it in a 'confused' state. If we don't re-initialize it, it won't generate more samples
-    scd41.sendCMD(SCD41_CMD_REINIT);
-    vTaskDelay(3); // allow time to reinitialize
-    scd41.triggerSample(); // trigger a 'one-shot' sample that takes about 5 seconds to complete
-    esp_sleep_enable_timer_wakeup(5000 * 1000L); // sleep for 5 seconds for sample to finish
-    esp_light_sleep_start();
-    if (scd41.getSample() == SCD41_SUCCESS) {
-        time((time_t *)&lastTime); // get the UTC epoch time that the same was captured
-        lastCO2 = scd41.co2();
-        lastSCDTemp = scd41.temperature();
-        lastSCDHumid = scd41.humidity();
-        Log.info("%s [%d]: Got SCD41 sample: CO2 = %dppm\r\n", __FILE__, __LINE__, lastCO2);
-        lSampleTime = millis(); // measure the time - it needs 5 seconds to generate a sample
-    } else {
-        Log.info("%s [%d]: SCD41 sample failed\r\n", __FILE__, __LINE__);
-        lastCO2 = 0;
-    }
-    scd41.shutdown(); // conserve power since we completed getting a sample ready for the next TRMNL wakeup
-  }
-  if (bbt.init(SENSOR_SDA, SENSOR_SCL) == BBT_SUCCESS) {
-    BBT_SAMPLE bbts;
-    iSensorType = bbt.type();
-    Log.info("%s [%d]: supported sensor found! (%d)\r\n", __FILE__, __LINE__, iSensorType);
-    bbt.start(); // start the sensor
-    esp_sleep_enable_timer_wakeup(5000 * 1000L); // sleep for 5 seconds for sample to finish
-    esp_light_sleep_start();
-    if (bbt.getSample(&bbts) == BBT_SUCCESS) {
-        time((time_t *)&lastTime); // get the UTC epoch time that the same was captured
-        lastTemp = bbts.temperature;
-        lastHumid = bbts.humidity;
-        lastPressure = bbts.pressure;
-        lastType = iSensorType;
-        Log.info("%s [%d]: Got bb_temperature sample: Temp = %d.%dC\r\n", __FILE__, __LINE__, lastTemp/10, lastTemp % 10);
-    } else {
-        lastType = -1;
-        Log.info("%s [%d]: bb_temperature sample failed\r\n", __FILE__, __LINE__);
-    }
-    bbt.stop(); // turn off the sensor to conserve power
-  }
-  if (!bCO2 && iSensorType < 0) {
-    Log.info("%s [%d]: No sensor found on I2C bus %d/%d\r\n", __FILE__, __LINE__, SENSOR_SDA, SENSOR_SCL);
-  }
-#endif // SENSOR_SDA
-  // Wire.begin(SENSOR_SDA_PIN, SENSOR_SCL_PIN, 100000);
-  // Wire.setTimeout(100);
-
-  // for (uint8_t addr = 1; addr < 127; addr++) {
-  //   Wire.beginTransmission(addr);
-  //   if (Wire.endTransmission() == 0) {
-  //     if (Serial) {
-  //       Serial.printf("Found I2C device: 0x%02X", addr);
-  //     }
-  //   }
-  // }
 
 #ifdef BOARD_TRMNL_X
   // Debug: Print all wakeup_stub_iqs_status structure fields
@@ -822,6 +761,58 @@ void bl_init(void)
     Log_info("Non-GPIO wakeup (%d) -> didn't read buttons", wakeup_reason);
   }
 #endif
+
+#ifdef SENSOR_SDA
+  // check if there is a SCD41 or supported temperature sensor attached
+  if (scd41.init(SENSOR_SDA, SENSOR_SCL) == SCD41_SUCCESS) {
+    bCO2 = true;
+    Log.info("%s [%d]: SCD41 sensor found!\r\n", __FILE__, __LINE__);
+//    scd41.start(SCD41_MODE_PERIODIC);
+    scd41.wakeup();
+    // The SCD41 needs to be re-initialized after big Vcc variations from the last wakeup
+    // put it in a 'confused' state. If we don't re-initialize it, it won't generate more samples
+    scd41.sendCMD(SCD41_CMD_REINIT);
+    vTaskDelay(3); // allow time to reinitialize
+    scd41.triggerSample(); // trigger a 'one-shot' sample that takes about 5 seconds to complete
+    esp_sleep_enable_timer_wakeup(5000 * 1000L); // sleep for 5 seconds for sample to finish
+    esp_light_sleep_start();
+    if (scd41.getSample() == SCD41_SUCCESS) {
+        time((time_t *)&lastTime); // get the UTC epoch time that the same was captured
+        lastCO2 = scd41.co2();
+        lastSCDTemp = scd41.temperature();
+        lastSCDHumid = scd41.humidity();
+        Log.info("%s [%d]: Got SCD41 sample: CO2 = %dppm\r\n", __FILE__, __LINE__, lastCO2);
+        lSampleTime = millis(); // measure the time - it needs 5 seconds to generate a sample
+    } else {
+        Log.info("%s [%d]: SCD41 sample failed\r\n", __FILE__, __LINE__);
+        lastCO2 = 0;
+    }
+    scd41.shutdown(); // conserve power since we completed getting a sample ready for the next TRMNL wakeup
+  }
+  if (bbt.init(SENSOR_SDA, SENSOR_SCL) == BBT_SUCCESS) {
+    BBT_SAMPLE bbts;
+    iSensorType = bbt.type();
+    Log.info("%s [%d]: supported sensor found! (%d)\r\n", __FILE__, __LINE__, iSensorType);
+    bbt.start(); // start the sensor
+    esp_sleep_enable_timer_wakeup(5000 * 1000L); // sleep for 5 seconds for sample to finish
+    esp_light_sleep_start();
+    if (bbt.getSample(&bbts) == BBT_SUCCESS) {
+        time((time_t *)&lastTime); // get the UTC epoch time that the same was captured
+        lastTemp = bbts.temperature;
+        lastHumid = bbts.humidity;
+        lastPressure = bbts.pressure;
+        lastType = iSensorType;
+        Log.info("%s [%d]: Got bb_temperature sample: Temp = %d.%dC\r\n", __FILE__, __LINE__, lastTemp/10, lastTemp % 10);
+    } else {
+        lastType = -1;
+        Log.info("%s [%d]: bb_temperature sample failed\r\n", __FILE__, __LINE__);
+    }
+    bbt.stop(); // turn off the sensor to conserve power
+  }
+  if (!bCO2 && iSensorType < 0) {
+    Log.info("%s [%d]: No sensor found on I2C bus %d/%d\r\n", __FILE__, __LINE__, SENSOR_SDA, SENSOR_SCL);
+  }
+#endif // SENSOR_SDA
 
 #if !defined( BOARD_TRMNL_X ) && !defined( BOARD_TRMNL_X_EPDIY) && !defined( BOARD_TRMNL_X_LILYGO ) && !defined( BOARD_TRMNL_X_SENSORIAC5 ) && !defined( BOARD_TRMNL_X_SENSORIAS3 ) 
   if (double_click)
@@ -1309,6 +1300,16 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   return inputs;
 }
 
+void load_prev_image(void)
+{
+  uint8_t *buffer;
+  size_t content_size = filesystem_read_and_allocate(szPrevFile, &buffer);
+  if (content_size > 0) {
+    // Decode it into the previous buffer
+    Log.info("%s [%d]: Decoding previous image (%s) into FastEPD previous buffer\r\n", __FILE__, __LINE__, szPrevFile);
+    png_to_epd(buffer, content_size, true);
+  }
+} /* load_prev_image() */
 /**
  * @brief Function to ping server and download and show the image if all is OK
  * @param url Server URL address
@@ -1388,6 +1389,10 @@ static https_request_err_e downloadAndShow()
 
   if (!status && result == HTTPS_SUCCESS) { // this means we already have this image stored in SPIFFS
       char szTemp[36];
+
+      if (szPrevFile[0]) {
+        load_prev_image(); // decode the older image into the previous buffer of FastEPD
+      }
       fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
       Log.info("%s [%d]: Reading %s from SPIFFS\r\n", __FILE__, __LINE__, szTemp);
       size_t content_size = filesystem_read_and_allocate(szTemp, &buffer);
@@ -1395,6 +1400,7 @@ static https_request_err_e downloadAndShow()
       display_show_image(buffer, content_size, true);
       free(buffer);
       buffer = nullptr;
+      strcpy(szPrevFile, szTemp); // current image becomes the previous image
       return result;
   }
 
@@ -1588,8 +1594,10 @@ static https_request_err_e downloadAndShow()
             fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
             Log.info("%s [%d]: Writing %s to SPIFFS\r\n", __FILE__, __LINE__, szTemp);
             filesystem_purge_old_file(szTemp); // try to delete the old version or older than 24h
-            writeImageToFile(szTemp, buffer, content_size);            Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
+            writeImageToFile(szTemp, buffer, content_size);
+            Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
             display_show_image(buffer, content_size, true);
+            strcpy(szPrevFile, szTemp); // this will be the next session's 'previous image'
             //free(buffer); don't free - it's a String payload
             buffer = nullptr;
             png_res = PNG_NO_ERR; // DEBUG

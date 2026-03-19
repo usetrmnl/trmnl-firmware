@@ -709,14 +709,29 @@ int png_draw(PNGDRAW *pDraw)
 
     if (y >= bbep.height()) return 0; // image is larger than the display, stop decoding it
     if (pDraw->iPixelType == PNG_PIXEL_INDEXED || pDraw->iBpp > 4) { // need to convert through the palette and/or reduce the bpp
-        s = bbep.previousBuffer(); // temp space we can use
+        s = bbep.tempBuffer(); // temp space we can use
         iBpp = (pDraw->iBpp > 4) ? 4 : pDraw->iBpp;
         ReduceBpp(iBpp, pDraw->iPixelType, pDraw->pPalette, pDraw->pPixels, s, pDraw->iWidth, pDraw->iBpp);
     } else { // for grayscale images of 1/2/4-bpp we can directly use the pixels as-is
         iBpp = pDraw->iBpp;
         s = (uint8_t *)pDraw->pPixels;
     }
-    d = bbep.currentBuffer();
+    if (pDraw->pUser) { // drawing previous image into previous buffer
+        d = bbep.previousBuffer();
+        switch (iBpp) { // if this matches the new image we can do a non-flickering update
+            case 1:
+                bbep.setPreviousMode(BB_MODE_1BPP);
+                break;
+            case 2:
+                bbep.setPreviousMode(BB_MODE_2BPP);
+                break;
+            default:
+                bbep.setPreviousMode(BB_MODE_4BPP);
+                break;
+        }
+    } else {
+        d = bbep.currentBuffer();
+    }
     iPitch = bbep.width()/2;
     if (iBpp == 1) {
         if (bbep.width() >= pDraw->iWidth) { // normal orientation
@@ -971,10 +986,14 @@ int iPlane = 0;
  * @return refresh mode based on image type and presence of old image
  */
 
-int png_to_epd(const uint8_t *pPNG, int iDataSize)
+int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious)
 {
 int iPlane, rc = -1;
 PNG *png = new PNG();
+
+#ifndef BB_EPAPER
+    if (bPrevious && bbep.getPreviousMode() != BB_MODE_NONE) return 0; // no need to decode previous image, we drew a msg/glyph
+#endif
 
     if (!png) return PNG_MEM_ERROR; // not enough memory for the decoder instance
     rc = png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
@@ -1039,7 +1058,7 @@ PNG *png = new PNG();
                 break;
             }
             Log_info("%s [%d]: FastEPD graphics mode set to: %d\n", __FILE__, __LINE__, bbep.getMode());
-            png->decode(NULL, 0);
+            png->decode((void *)bPrevious, 0);
             png->close();
 #endif
         }
@@ -1089,7 +1108,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     if (isPNG == true && data_size < MAX_IMAGE_SIZE)
     {
         Log_info("Drawing PNG");
-        iRefreshMode = png_to_epd(image_buffer, data_size);
+        iRefreshMode = png_to_epd(image_buffer, data_size, false);
     }
     else if (MOTOSHORT(image_buffer) == 0xffd8) {
         Log_info("Drawing JPEG");
@@ -1150,8 +1169,9 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     }
 #else
     bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
-    if (bbep.getPreviousMode() == bbep.getMode() && (bbep.getMode() == BB_MODE_1BPP || bbep.getMode() == BB_MODE_2BPP)) {
-        Log_info("%s [%d]: Using partial update since the previous update is the same bit depth\n", __FILE__, __LINE__);
+    if (bbep.getPreviousMode() != BB_MODE_NONE && (bbep.getMode() == BB_MODE_1BPP || bbep.getMode() == BB_MODE_2BPP)) {
+        Log_info("%s [%d]: Using partial update since we have a copy of the previous image\n", __FILE__, __LINE__);
+        bbep.setPasses(6,6);
         bbep.partialUpdate(false); // we have a previous image to diff against; use a non-flickering update
     } else {
         bbep.fullUpdate(((iUpdateCount & 7) == 0) ? CLEAR_SLOW : CLEAR_FAST, false);

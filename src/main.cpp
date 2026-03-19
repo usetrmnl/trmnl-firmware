@@ -17,7 +17,7 @@ void setup()
   //   startQA();
   // }
 
-#ifdef BOARD_TRMNL_X
+#ifdef BOARD_TRMNL_X_BOGUS
 
   bool isShipped = checkIfAlreadyShipped();
   if (!isShipped) {
