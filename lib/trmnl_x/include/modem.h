@@ -14,11 +14,13 @@ class Modem {
 private:
   HardwareSerial ModemSerial;
   uint32_t baudRate;
+  bool _initialized = false;
   String waitForResponse(const String& expected, unsigned long timeoutMs);
 
 public:
   Modem(uint32_t baudRate);
   ~Modem();
+  bool isInitialized() const { return _initialized; }
   bool sendCommand(const char* command);
   String readResponse(unsigned long timeout);
   bool flashFromFile(const char* filename);

@@ -335,7 +335,10 @@ void check_channel_states(void)
           if (!hold) {
             Log_info("Back button tapped");
             int file_size = 0;
-            buffer = display_read_file("/last.png", &file_size);
+            String lastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
+            if (lastPath.isEmpty()) { Log_info("No previous image saved"); break; }
+            Log_info("Reading previous image from %s", lastPath.c_str());
+            buffer = display_read_file(lastPath.c_str(), &file_size);
             if (buffer && file_size > 0) { display_show_image(buffer, file_size, false); goToSleep(); }
           }
           break;
@@ -359,7 +362,10 @@ void check_channel_states(void)
           if (!hold) {
             Log_info("Next button tapped");
             int file_size = 0;
-            buffer = display_read_file("/current.png", &file_size);
+            String curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
+            if (curPath.isEmpty()) { Log_info("No current image saved"); break; }
+            Log_info("Reading current image from %s", curPath.c_str());
+            buffer = display_read_file(curPath.c_str(), &file_size);
             if (buffer && file_size > 0) { display_show_image(buffer, file_size, false); goToSleep(); }
           }
           break;
@@ -435,7 +441,10 @@ void read_gesture_event(void)
         case IQS323_GESTURE_SWIPE_NEGATIVE:
           Log_info("SLIDER: Swipe <-");
           if (!touchbar_tap_mode) {
-            buffer = display_read_file("/last.png", &file_size);
+            String swipeLastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
+            if (swipeLastPath.isEmpty()) { Log_info("No previous image saved"); break; }
+            Log_info("Reading previous image from %s", swipeLastPath.c_str());
+            buffer = display_read_file(swipeLastPath.c_str(), &file_size);
             if (!buffer || file_size == 0) {
               Log_info("No previous image found");
               break;
@@ -448,9 +457,12 @@ void read_gesture_event(void)
         case IQS323_GESTURE_SWIPE_POSITIVE:
           Log_info("SLIDER: Swipe ->");
           if (!touchbar_tap_mode) {
-            buffer = display_read_file("/current.png", &file_size);
+            String swipeCurPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
+            if (swipeCurPath.isEmpty()) { Log_info("No current image saved"); break; }
+            Log_info("Reading current image from %s", swipeCurPath.c_str());
+            buffer = display_read_file(swipeCurPath.c_str(), &file_size);
             if (!buffer || file_size == 0) {
-              Log_info("No previous image found");
+              Log_info("No current image found");
               break;
             }
             Log_info("Drawing current plugin... File size: %d", file_size);
@@ -940,10 +952,15 @@ void bl_init(void)
   modem_reset_target();
   delay(500);  // give modem time to boot before UART init
   static Modem modemInstance(115200);
-  g_modem = &modemInstance;
+  if (modemInstance.isInitialized()) {
+    g_modem = &modemInstance;
+  } else {
+    Log_info("Modem init failed — falling back to 2.4 GHz mode");
+    g_modem = nullptr;
+  }
 
   // Only scan when no credentials are saved (i.e. captive portal will be shown).
-  if (!WifiCaptivePortal.isSaved())
+  if (g_modem && !WifiCaptivePortal.isSaved())
   {
     Log_info("No saved credentials — scanning networks via modem...");
     auto modemNets = g_modem->scanNetworks();
@@ -1401,6 +1418,11 @@ static https_request_err_e downloadAndShow()
       free(buffer);
       buffer = nullptr;
       strcpy(szPrevFile, szTemp); // current image becomes the previous image
+      // Rotate NVS path keys: last ← current ← szTemp
+      String _curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
+      if (!_curPath.isEmpty() && _curPath != String(szTemp))
+        preferences.putString(PREFERENCES_LAST_PATH_KEY, _curPath);
+      preferences.putString(PREFERENCES_CURRENT_PATH_KEY, String(szTemp));
       return result;
   }
 
@@ -1410,16 +1432,15 @@ static https_request_err_e downloadAndShow()
   {
     Log_info("Downloading image via modem (5 GHz path)");
 
-    // Rotate files before writing to /current.png
-    if (filesystem_file_exists("/current.bmp") || filesystem_file_exists("/current.png"))
-    {
-      filesystem_file_delete("/last.bmp");
-      filesystem_file_delete("/last.png");
-      filesystem_file_rename("/current.png", "/last.png");
-      filesystem_file_rename("/current.bmp", "/last.bmp");
-    }
+    char szTemp[36];
+    fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
+    Log_info("Modem: saving to %s", szTemp);
+    filesystem_purge_old_file(szTemp);
 
-    auto httpRes = g_modem->httpGet(String(filename), "/current.png", 0);
+    String _prevPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
+    if (!_prevPath.isEmpty()) preferences.putString(PREFERENCES_LAST_PATH_KEY, _prevPath);
+
+    auto httpRes = g_modem->httpGet(String(filename), szTemp, 0);
     if (!httpRes.ok)
     {
       Log_error_submit("Modem httpGet failed: %u bytes received", httpRes.bytesReceived);
@@ -1427,15 +1448,17 @@ static https_request_err_e downloadAndShow()
     }
 
     int fileSize = 0;
-    uint8_t* buf = display_read_file("/current.png", &fileSize);
+    uint8_t* buf = display_read_file(szTemp, &fileSize);
     if (!buf || fileSize == 0)
     {
-      Log_error_submit("Modem: failed to read downloaded image from /current.png");
+      Log_error_submit("Modem: failed to read downloaded image from %s", szTemp);
       return HTTPS_WRONG_IMAGE_SIZE;
     }
 
     display_show_image(buf, fileSize, true);
     free(buf);
+
+    preferences.putString(PREFERENCES_CURRENT_PATH_KEY, String(szTemp));
 
     new_filename = apiDisplayResult.response.filename;
     saveCurrentFileName(new_filename);
@@ -1594,10 +1617,12 @@ static https_request_err_e downloadAndShow()
             fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
             Log.info("%s [%d]: Writing %s to SPIFFS\r\n", __FILE__, __LINE__, szTemp);
             filesystem_purge_old_file(szTemp); // try to delete the old version or older than 24h
+            { String _prevPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
+              if (!_prevPath.isEmpty()) preferences.putString(PREFERENCES_LAST_PATH_KEY, _prevPath); }
             writeImageToFile(szTemp, buffer, content_size);
+            preferences.putString(PREFERENCES_CURRENT_PATH_KEY, String(szTemp));
             Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
             display_show_image(buffer, content_size, true);
-            strcpy(szPrevFile, szTemp); // this will be the next session's 'previous image'
             //free(buffer); don't free - it's a String payload
             buffer = nullptr;
             png_res = PNG_NO_ERR; // DEBUG
@@ -1623,6 +1648,7 @@ static https_request_err_e downloadAndShow()
 
             // Using filename from API response
             new_filename = apiDisplayResult.response.filename;
+            saveCurrentFileName(new_filename);
 
             // Print the extracted string
             Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
@@ -1659,15 +1685,16 @@ static https_request_err_e downloadAndShow()
           {
           case BMP_NO_ERR:
           {
-            if (!filesystem_file_exists("/current.png"))
-            {
-              writeImageToFile("/current.bmp", buffer, content_size);
-            }
+            { String _prevPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
+              if (!_prevPath.isEmpty()) preferences.putString(PREFERENCES_LAST_PATH_KEY, _prevPath); }
+            writeImageToFile("/current.bmp", buffer, content_size);
+            preferences.putString(PREFERENCES_CURRENT_PATH_KEY, "/current.bmp");
             Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
             display_show_image(buffer, content_size, true);
 
             // Using filename from API response
             new_filename = apiDisplayResult.response.filename;
+            saveCurrentFileName(new_filename);
 
             // Print the extracted string
             Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
@@ -2350,6 +2377,7 @@ static bool performApiSetup()
   inputs.baseUrl = preferences.getString(PREFERENCES_API_URL, API_BASE_URL);
   inputs.macAddress = WiFi.macAddress();
   inputs.firmwareVersion = FW_VERSION_STRING;
+  inputs.model = String(DEVICE_MODEL);
 
   Log.info("%s [%d]: [HTTPS] begin /api/setup ...\r\n", __FILE__, __LINE__);
   Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
@@ -2364,7 +2392,7 @@ static bool performApiSetup()
     String reqHeaders = "";
     reqHeaders += "ID: "         + inputs.macAddress      + "\n";
     reqHeaders += "FW-Version: " + inputs.firmwareVersion + "\n";
-    reqHeaders += "Model: x";
+    reqHeaders += "Model: "      + inputs.model           + "\n";
     auto httpRes = g_modem->httpGet(inputs.baseUrl + "/api/setup", "", 0, reqHeaders);
     if (!httpRes.ok)
     {

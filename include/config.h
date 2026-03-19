@@ -3,7 +3,7 @@
 
 #define FW_MAJOR_VERSION 1
 #define FW_MINOR_VERSION 7
-#define FW_PATCH_VERSION 0
+#define FW_PATCH_VERSION 6
 
 // Helper macros for stringification
 #define STRINGIFY(x) #x
@@ -30,6 +30,8 @@
 #define PREFERENCES_DEVICE_REGISTERED_KEY "plugin"
 #define PREFERENCES_SF_KEY "sf"
 #define PREFERENCES_FILENAME_KEY "filename"
+#define PREFERENCES_CURRENT_PATH_KEY "curr_path"
+#define PREFERENCES_LAST_PATH_KEY    "last_path"
 #define PREFERENCES_LAST_SLEEP_TIME "last_sleep"
 #define PREFERENCES_CONNECT_API_RETRY_COUNT "retry_count"
 #define PREFERENCES_CONNECT_WIFI_RETRY_COUNT "wifi_retry"

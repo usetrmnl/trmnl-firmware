@@ -30,8 +30,11 @@ void setup()
       ESP.restart();
    }
    else {
+      Serial.begin(115200);
       display_init();
       filesystem_init();
+
+      Serial.println("[MODEM] Resetting modem...");
 
       modem_reset_target();
       delay(500);  // let modem reach bootloader

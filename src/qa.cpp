@@ -77,7 +77,6 @@ bool saveShipmentStarted(){
 }
 
 bool enableShipmentMode() {
-  Serial.begin(115200);
   // should be already initialized
   // display_init();
 
@@ -85,7 +84,7 @@ bool enableShipmentMode() {
 
   while (check_usb_power()) {
     Serial.println("USB power still detected, waiting...");
-    delay(5000);
+    delay(2000);
   }
 
   display_show_msg(const_cast<uint8_t *>(logo_medium),SHIPPING_MODE);

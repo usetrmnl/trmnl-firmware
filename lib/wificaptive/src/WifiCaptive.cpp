@@ -33,8 +33,14 @@ bool WifiCaptive::startPortal()
     WiFi.softAPConfig(localIP, gatewayIP, subnetMask);
     delay(50);
 
+    uint64_t mac = ESP.getEfuseMac();
+    char macSuffix[7];
+    snprintf(macSuffix, sizeof(macSuffix), "%02X%02X%02X",
+        (uint8_t)(mac >> 24), (uint8_t)(mac >> 32), (uint8_t)(mac >> 40));
+    String SSID = String(WIFI_SSID) + "-" + String(macSuffix);
+
     // Start the soft access point with the given ssid, password, channel, max number of clients
-    WiFi.softAP(WIFI_SSID, WIFI_PASSWORD, WIFI_CHANNEL, 0, MAX_CLIENTS);
+    WiFi.softAP(SSID.c_str(), WIFI_PASSWORD, WIFI_CHANNEL, 0, MAX_CLIENTS);
     delay(50);
 
     // Disable AMPDU RX on the ESP32 WiFi to fix a bug on Android

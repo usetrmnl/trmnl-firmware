@@ -61,9 +61,10 @@ Modem::Modem(uint32_t baudRate) : ModemSerial(0) {
   // Confirm communication at new baud rate
   sendCommand("AT");
   if (waitForResponse("OK", 5000).isEmpty()) {
-    Serial.println("[MODEM] no response at 5 Mbps — something went wrong");
+    Serial.println("[MODEM] no response at 5 Mbps — falling back to 2.4 GHz mode");
   } else {
     Serial.println("[MODEM] running at 5 Mbps with RTS/CTS");
+    _initialized = true;
   }
 }
 
