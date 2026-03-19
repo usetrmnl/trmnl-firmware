@@ -1303,7 +1303,7 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
 void load_prev_image(void)
 {
   uint8_t *buffer;
-  size_t content_size = filesystem_read_and_allocate(szPrevFile, &buffer);
+  size_t content_size = 0; //filesystem_read_and_allocate(szPrevFile, &buffer);
   if (content_size > 0) {
     // Decode it into the previous buffer
     Log.info("%s [%d]: Decoding previous image (%s) into FastEPD previous buffer\r\n", __FILE__, __LINE__, szPrevFile);

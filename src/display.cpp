@@ -1169,13 +1169,13 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     }
 #else
     bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
-    if (bbep.getPreviousMode() != BB_MODE_NONE && (bbep.getMode() == BB_MODE_1BPP || bbep.getMode() == BB_MODE_2BPP)) {
-        Log_info("%s [%d]: Using partial update since we have a copy of the previous image\n", __FILE__, __LINE__);
-        bbep.setPasses(6,6);
-        bbep.partialUpdate(false); // we have a previous image to diff against; use a non-flickering update
-    } else {
+ //   if (bbep.getPreviousMode() != BB_MODE_NONE && (bbep.getMode() == BB_MODE_1BPP || bbep.getMode() == BB_MODE_2BPP)) {
+ //       Log_info("%s [%d]: Using partial update since we have a copy of the previous image\n", __FILE__, __LINE__);
+ //       bbep.setPasses(6,6);
+ //       bbep.partialUpdate(false); // we have a previous image to diff against; use a non-flickering update
+ //   } else {
         bbep.fullUpdate(((iUpdateCount & 7) == 0) ? CLEAR_SLOW : CLEAR_FAST, false);
-    }
+ //   }
 #endif
     iUpdateCount++;
     Log_info("display_show_image end");
