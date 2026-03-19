@@ -17,6 +17,12 @@ const DISPLAY_PROFILE dpList[4] = { // 1-bit and 2-bit display types for each pr
     {EP426_800x480, EP426_800x480_4GRAY}, // b = darker grays
 };
 BBEPAPER bbep(EP426_800x480);
+#elif defined(BOARD_WAVESHARE_397)
+    {EP397_800x480, EP397_800x480_4GRAY}, // default (for original EPD)
+    {EP397_800x480, EP397_800x480_4GRAY}, // a = uses built-in fast + 4-gray
+    {EP397_800x480, EP397_800x480_4GRAY}, // b = darker grays
+};
+BBEPAPER bbep(EP397_800x480);
 #elif defined(BOARD_XIAO_EPAPER_DISPLAY_3CLR)
     {EP75R_800x480, EP75R_800x480}, // default (for original EPD)
     {EP75R_800x480, EP75R_800x480}, // a = uses built-in fast + 4-gray
@@ -1397,7 +1403,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     Log_info("%s [%d]: EPD refresh mode: %d\r\n", __FILE__, __LINE__, iRefreshMode);
     bbep.setLightSleep(true);
     bbep.refresh(iRefreshMode, bWait);
-    if (bbep.getPanelType() == EP426_800x480 && iRefreshMode == REFRESH_PARTIAL) {
+    if ((bbep.getPanelType() == EP426_800x480 || bbep.getPanelType() == EP397_800x480) && iRefreshMode == REFRESH_PARTIAL) {
         i426Workaround = 1; // need to re-initialize the controller for another update before sleeping
     }
     if (bAlloc) {
