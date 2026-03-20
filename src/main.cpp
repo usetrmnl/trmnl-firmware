@@ -11,6 +11,8 @@
 void setup()
 {
 
+#ifndef NO_QA
+
   // bool testPassed = checkIfAlreadyPassed();
 
   // if (!testPassed) {
@@ -58,9 +60,10 @@ void setup()
       ESP.restart();
    }
   }
-#endif
-//   esp_ota_mark_app_valid_cancel_rollback();
+#endif // BOARD_TRMNL_X
+#endif // NO_QA
 
+//   esp_ota_mark_app_valid_cancel_rollback();
 
   bl_init();
 }
