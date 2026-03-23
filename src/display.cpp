@@ -177,7 +177,7 @@ void otg_turn_off()
 #define BAT_DET_PIN       7    // TCA9535 P0_7 in bbep pin numbering
 #define BAT_CHARGE_MS     2    // drive HIGH for 2 ms to charge RC network
 #define BAT_TIMEOUT_US    6000 // no battery if pin is still HIGH after this
-#define BAT_THRESHOLD_US  1100 // >1100 µs → 1 cell; ≤1100 µs → 2 cells
+#define BAT_THRESHOLD_US  750 // >750 µs → 1 cell; ≤750 µs → 2 cells
 
 static battery_count_t measure_battery_once()
 {
