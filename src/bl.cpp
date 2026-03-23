@@ -624,6 +624,48 @@ void bl_init(void)
     Log_info("Non-GPIO wakeup (%d)", wakeup_reason);
   }
 
+
+  Log_info("preferences start");
+  bool res = preferences.begin("data", false);
+  if (res)
+  {
+    Log_info("preferences init success (%d free entries)", preferences.freeEntries());
+    if (pref_clear)
+    {
+      res = preferences.clear(); // if needed to clear the saved data
+      if (res)
+        Log_info("preferences cleared success");
+      else
+        Log_fatal("preferences clearing error");
+    }
+  }
+  else
+  {
+    Log_fatal("preferences init failed");
+    ESP.restart();
+  }
+
+  touchbar_tap_mode = preferences.getBool(PREFERENCES_TOUCHBAR_MODE_KEY, true);
+  Log_info("Touchbar mode from preferences: %s", touchbar_tap_mode ? "Tap" : "Slide");
+
+  // Start IQS323 task manager
+  if (!iqs323_task_init(NULL)) {
+    Log_error("IQS323 Task: Failed to start - rebooting");
+    delay(1000);
+    ESP.restart();
+  }
+
+  // Wait for IQS323 initialization to complete
+  if (!iqs323_task_wait_ready(5000)) {
+    Log_error("IQS323 Task: Initialization timeout - rebooting");
+    delay(1000);
+    ESP.restart();
+  }
+
+  if (gpio_wakeup) {
+    process_iqs323_data();
+  }
+
   battery_count_t result = detect_battery_count();
   Log_info("BATTERY COUNT: %d", result);
 
@@ -707,47 +749,6 @@ void bl_init(void)
   }
   else {
     Log_info("No battery detected - skipping BQ27427 initialization");
-  }
-
-  Log_info("preferences start");
-  bool res = preferences.begin("data", false);
-  if (res)
-  {
-    Log_info("preferences init success (%d free entries)", preferences.freeEntries());
-    if (pref_clear)
-    {
-      res = preferences.clear(); // if needed to clear the saved data
-      if (res)
-        Log_info("preferences cleared success");
-      else
-        Log_fatal("preferences clearing error");
-    }
-  }
-  else
-  {
-    Log_fatal("preferences init failed");
-    ESP.restart();
-  }
-
-  touchbar_tap_mode = preferences.getBool(PREFERENCES_TOUCHBAR_MODE_KEY, true);
-  Log_info("Touchbar mode from preferences: %s", touchbar_tap_mode ? "Tap" : "Slide");
-
-  // Start IQS323 task manager
-  if (!iqs323_task_init(NULL)) {
-    Log_error("IQS323 Task: Failed to start - rebooting");
-    delay(1000);
-    ESP.restart();
-  }
-
-  // Wait for IQS323 initialization to complete
-  if (!iqs323_task_wait_ready(5000)) {
-    Log_error("IQS323 Task: Initialization timeout - rebooting");
-    delay(1000);
-    ESP.restart();
-  }
-
-  if (gpio_wakeup) {
-    process_iqs323_data();
   }
 
   // For future
