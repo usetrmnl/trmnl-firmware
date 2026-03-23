@@ -53,6 +53,7 @@ struct ApiDisplayInputs
   uint32_t refreshRate;
   String macAddress;
   float batteryVoltage;
+  int stateOfCharge;
   String firmwareVersion;
   String model;
   int rssi;

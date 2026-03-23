@@ -18,7 +18,11 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
            "Special function: %d\n\r"
            "Access-Token: %s\n\r"
            "Refresh_Rate: %s\n\r"
+#ifdef BOARD_TRMNL_X
+           "Percent-Charged: %s\n\r"
+#else
            "Battery-Voltage: %s\n\r"
+#endif // BOARD_TRMNL_X
            "FW-Version: %s\r\n"
            "Model: %s\r\n"
            "RSSI: %s\r\n",
@@ -35,7 +39,11 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
   https.addHeader("Content-Type", "application/json");
   https.addHeader("Access-Token", inputs.apiKey);
   https.addHeader("Refresh-Rate", String(inputs.refreshRate));
+#ifdef BOARD_TRMNL_X
+  https.addHeader("Percent-Charged", String(inputs.stateOfCharge));
+#else
   https.addHeader("Battery-Voltage", String(inputs.batteryVoltage));
+#endif // BOARD_TRMNL_X
   https.addHeader("FW-Version", inputs.firmwareVersion);
   https.addHeader("Model", String(inputs.model));
   https.addHeader("RSSI", String(inputs.rssi));

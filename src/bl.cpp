@@ -142,7 +142,7 @@ void wait_for_serial() {
 #include "iqs323_task.h"
 // ############################ IQS323 TASK #############################
 
-// ############################ SLIDER #############################
+// ############################ SLIDER ##################################
 #include "IQS323.h"
 
 void process_iqs323_data(void);
@@ -524,25 +524,22 @@ void process_iqs323_data(void)
 
   iqs323_task_i2c_unlock();
 }
-// ############################ SLIDER #############################
+// ############################ SLIDER ################################
 
-// ############################ ACCELERATOR #############################
+// ############################ ACCELERATOR ###########################
 #include "accelerometer.h"
-// ############################ ACCELERATOR #############################
+// ############################ ACCELERATOR ###########################
 
-// ############################ esp32c5 modem #############################
+// ############################ esp32c5 modem #########################
 #include "modem.h"
-// ############################ esp32c5 modem #############################
-
-// ############################ Gas gauge #############################
-
-#include "BQ27427.h"
-
-// ############################ Gas gauge #############################
 
 // File-scope modem pointer — set once during bl_init(), used by download helpers.
 static Modem* g_modem = nullptr;
+// ############################ esp32c5 modem #########################
 
+// ############################ Gas gauge #############################
+#include "BQ27427.h"
+// ############################ Gas gauge #############################
 #endif
 
 /**
@@ -625,59 +622,91 @@ void bl_init(void)
   }
   else {
     Log_info("Non-GPIO wakeup (%d)", wakeup_reason);
+  }
 
+  battery_count_t result = detect_battery_count();
+  Log_info("BATTERY COUNT: %d", result);
+
+  if (result != BATTERY_NONE) {
     BQ27427_reset();
     delay(300); // BQ27427 needs 250 ms to power up
 
-    // Wire.end();
-
-    if (!lipo.begin(SENSOR_SDA_PIN, SENSOR_SCL_PIN)) // begin() will return true if communication is successful
-    {
+    if (!lipo.begin(SENSOR_SDA_PIN, SENSOR_SCL_PIN)) {
     // If communication fails, print an error message and loop forever.
       Log_error("Error: Unable to communicate with BQ27427.");
       gpio_dump_io_configuration(stdout, (1ULL << 39));
       gpio_dump_io_configuration(stdout, (1ULL << 40));
     }
     else {
-      Log_info("Connected to BQ27427!");
+    Log_info("Connected to BQ27427!");
 
-      // Set battery capacity
-      lipo.setCapacity(6000); // capacity in mAh
-
-      // Read battery stats from the BQ27427
-      unsigned int soc = lipo.soc();                   // Read state-of-charge (%)
-      unsigned int volts = lipo.voltage();             // Read battery voltage (mV)
-      int current = lipo.current(AVG);                 // Read average current (mA)
-      unsigned int fullCapacity = lipo.capacity(FULL); // Read full capacity (mAh)
-      unsigned int capacity = lipo.capacity(REMAIN);   // Read remaining capacity (mAh)
-      int power = lipo.power();                        // Read average power draw (mW)
-      int health = lipo.soh();                         // Read state-of-health (%)
-
-      // Assemble a string to print
-      String toPrint = "[" + String(millis() / 1000) + "] ";
-      toPrint += String(soc) + "% | ";
-      toPrint += String(volts) + " mV | ";
-      toPrint += String(current) + " mA | ";
-      toPrint += String(capacity) + " / ";
-      toPrint += String(fullCapacity) + " mAh | ";
-      toPrint += String(power) + " mW | ";
-      toPrint += String(health) + "%";
-
-      //fast charging allowed
-      if (lipo.chgFlag())
-          toPrint += " CHG";
-
-      //full charge detected
-      if (lipo.fcFlag())
-          toPrint += " FC";
-
-      //battery is discharging
-      if (lipo.dsgFlag())
-          toPrint += " DSG";
-
-      // Print the string
-      Serial.println(toPrint);
+    if (result == BATTERY_ONE) {
+      Log_info("One battery detected");
+      lipo.configureOneCell();
     }
+    else if (result == BATTERY_TWO) {
+      Log_info("Two batteries detected");
+      lipo.configureTwoCell();
+    }
+
+    // After SOFT_RESET the BQ27427 enters INITIALIZATION (ITPOR=1).
+    // The IT algorithm needs an OCV measurement (battery at rest) to
+    // transition to NORMAL mode and produce accurate capacity values.
+    // Poll for up to 5 s; under active load it may not clear until rest.
+    {
+      unsigned long t0 = millis();
+      while ((lipo.flags() & BQ27427_FLAG_ITPOR) && (millis() - t0 < 5000)) {
+        delay(100);
+      }
+      if (lipo.flags() & BQ27427_FLAG_ITPOR) {
+        Log_info("BQ27427: ITPOR still set — device in INITIALIZATION, capacity values may be stale");
+      } else {
+        Log_info("BQ27427: ITPOR cleared — device in NORMAL mode");
+        lipo._initialized = true;
+      }
+    }
+
+    uint8_t energyScale = lipo.designEnergyScale();
+    unsigned int soc = lipo.soc();                               // State-of-charge (%) — use this for battery level display
+    unsigned int volts = lipo.voltage();                         // Battery voltage (mV)
+    int current = lipo.current(AVG);                            // Average current (mA)
+    unsigned int fullCapacity = lipo.capacity(FULL) * energyScale; // Full capacity (mAh) — valid only in NORMAL mode
+    unsigned int capacity = lipo.capacity(REMAIN) * energyScale;   // Remaining capacity (mAh) — valid only in NORMAL mode
+    int power = lipo.power();                                    // Average power draw (mW)
+    int health = lipo.soh();                                     // State-of-health (%)
+
+    // Assemble a string to print
+    String toPrint = "[" + String(millis() / 1000) + "] ";
+    toPrint += String(soc) + "% | ";
+    toPrint += String(volts) + " mV | ";
+    toPrint += String(current) + " mA | ";
+    toPrint += String(capacity) + " / ";
+    toPrint += String(fullCapacity) + " mAh | ";
+    toPrint += String(power) + " mW | ";
+    toPrint += String(health) + "%";
+
+    //fast charging allowed
+    if (lipo.chgFlag())
+        toPrint += " CHG";
+
+    //full charge detected
+    if (lipo.fcFlag())
+        toPrint += " FC";
+
+    //battery is discharging
+    if (lipo.dsgFlag())
+        toPrint += " DSG";
+
+    // ITPOR flag: device still in INITIALIZATION, capacity values may be stale
+    if (lipo.itporFlag())
+        toPrint += " INIT";
+
+    // Print the string
+    Serial.println(toPrint);
+  }
+  }
+  else {
+    Log_info("No battery detected - skipping BQ27427 initialization");
   }
 
   Log_info("preferences start");
@@ -1305,6 +1334,9 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   inputs.macAddress = WiFi.macAddress();
 
   inputs.batteryVoltage = vBatt; //readBatteryVoltage();
+  if (lipo._initialized) { // only report SoC if battery was detected and BQ27427 initialized successfully
+    inputs.stateOfCharge = lipo.soc();
+  }
 
   inputs.firmwareVersion = String(FW_VERSION_STRING);
 
@@ -1344,7 +1376,11 @@ static https_request_err_e downloadAndShow()
     reqHeaders += "ID: "               + apiDisplayInputs.macAddress                + "\n";
     reqHeaders += "Access-Token: "     + apiDisplayInputs.apiKey                    + "\n";
     reqHeaders += "Refresh-Rate: "     + String(apiDisplayInputs.refreshRate)       + "\n";
-    reqHeaders += "Battery-Voltage: "  + String(apiDisplayInputs.batteryVoltage, 2) + "\n";
+#ifdef BOARD_TRMNL_X
+    reqHeaders += "Percent-Charged: " + String(apiDisplayInputs.stateOfCharge) + "\n";
+#else
+    reqHeaders += "Battery-Voltage: " + String(apiDisplayInputs.batteryVoltage, 2) + "\n";
+#endif // BOARD_TRMNL_X
     reqHeaders += "FW-Version: "       + apiDisplayInputs.firmwareVersion           + "\n";
     reqHeaders += "Model: "            + apiDisplayInputs.model                     + "\n";
     reqHeaders += "RSSI: "             + String(apiDisplayInputs.rssi)              + "\n";
@@ -1413,6 +1449,11 @@ static https_request_err_e downloadAndShow()
       fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
       Log.info("%s [%d]: Reading %s from SPIFFS\r\n", __FILE__, __LINE__, szTemp);
       size_t content_size = filesystem_read_and_allocate(szTemp, &buffer);
+      if (!buffer || content_size == 0) {
+        filesystem_file_delete(szTemp);
+        Log_error_submit("Cached image is empty or unreadable: %s", szTemp);
+        return HTTPS_WRONG_IMAGE_SIZE;
+      }
       Log.info("%s [%d]: Decoding image...\r\n", __FILE__, __LINE__);
       display_show_image(buffer, content_size, true);
       free(buffer);
@@ -1451,6 +1492,7 @@ static https_request_err_e downloadAndShow()
     uint8_t* buf = display_read_file(szTemp, &fileSize);
     if (!buf || fileSize == 0)
     {
+      filesystem_file_delete(szTemp);
       Log_error_submit("Modem: failed to read downloaded image from %s", szTemp);
       return HTTPS_WRONG_IMAGE_SIZE;
     }
@@ -3062,6 +3104,18 @@ static float readBatteryVoltage(void)
 #ifdef FAKE_BATTERY_VOLTAGE
   Log.warning("%s [%d]: FAKE_BATTERY_VOLTAGE is defined. Returning 4.2V.\r\n", __FILE__, __LINE__);
   return 4.2f;
+#elif defined(BOARD_TRMNL_X)
+  if (lipo._initialized)
+  {
+    float voltage = lipo.voltage() / 1000.0; // Convert mV to V
+    Log.info("%s [%d]: Battery voltage reading from BQ27427: %.3f V\r\n", __FILE__, __LINE__, voltage);
+    return voltage;
+  }
+  else
+  {
+    Log.error("%s [%d]: BQ27427 not initialized. Cannot read battery voltage.\r\n", __FILE__, __LINE__);
+    return 4.2f;
+  }
 #else
   #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001)
     pinMode(PIN_VBAT_SWITCH, OUTPUT);

@@ -82,6 +82,9 @@ typedef enum {
 
 class BQ27427 {
 public:
+
+	bool _initialized = false;
+
 	//////////////////////////////
 	// Initialization Functions //
 	//////////////////////////////
@@ -121,10 +124,20 @@ public:
 	
 	/**
 	    Reads and returns the design energy of the connected battery
-		
+
 		@return design energy in milliWattHours (mWh)
 	*/
 	uint16_t designEnergy(void);
+
+	/**
+	    Reads the Design Energy Scale from IT Cfg subclass (class 80, block 2, byte 17).
+	    Raw capacity register values (FullChargeCapacity, RemainingCapacity) must be
+	    multiplied by this factor to obtain actual mAh. Typically 1 (single cell) or
+	    10 (two-cell pack using 1/10 scale storage).
+
+	    @return scale factor (1–255); returns 1 on read failure as a safe default.
+	*/
+	uint8_t designEnergyScale(void);
 
 	/**
 	    Configures the design energy of the connected battery.
@@ -466,11 +479,34 @@ public:
 
 	/**
 	    Issue a factory reset to the BQ27427
-		
+
 		@return true on success
-	*/	
+	*/
 	bool reset(void);
-	
+
+	/////////////////////////////////////
+	// Golden File Configuration (fw 2.02)
+	// Source: Gas Gauge Studio .gm.fs files
+	/////////////////////////////////////
+
+	/**
+	    Configures the BQ27427 data flash from the single-cell golden file.
+	    Source: 0427_2_02-bq27427_1-27-26.gm.fs
+	    Must be called after begin(). Data flash persists across power cycles.
+
+	    @return true if all blocks written and verified successfully.
+	*/
+	bool configureOneCell();
+
+	/**
+	    Configures the BQ27427 data flash from the 2-cell discharge golden file.
+	    Source: 0427_2_02-bq27427-2cell-disch.gm.fs
+	    Must be called after begin(). Data flash persists across power cycles.
+
+	    @return true if all blocks written and verified successfully.
+	*/
+	bool configureTwoCell();
+
 private:
 	uint8_t _deviceAddress;  // Stores the BQ27427's I2C address
 	bool _sealFlag; // Global to identify that IC was previously sealed
@@ -631,6 +667,11 @@ private:
 	*/
 	bool writeExtendedData(uint8_t classID, uint8_t offset, uint8_t * data, uint8_t len);
 	
+	// Golden file private helpers
+	bool goldenFileVerify(uint8_t reg, const uint8_t *expected, uint8_t len);
+	bool goldenFileWriteBlock(uint8_t classId, uint8_t blockNum, const uint8_t data[32], uint8_t checksum);
+	bool applyGoldenFile(bool twoCell);
+
 	/////////////////////////////////
 	// I2C Read and Write Routines //
 	/////////////////////////////////

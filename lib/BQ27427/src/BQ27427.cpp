@@ -69,6 +69,15 @@ uint16_t BQ27427::designEnergy(void)
 	return (readExtendedData(BQ27427_ID_STATE, 8) << 8 | readExtendedData(BQ27427_ID_STATE, 9));
 }
 
+// Read the Design Energy Scale from IT Cfg subclass (class 0x50, block 2, byte 17).
+// Raw capacity register values must be multiplied by this to get actual mAh.
+// Offset = block 2 * 32 + byte 17 = 81.
+uint8_t BQ27427::designEnergyScale(void)
+{
+	uint8_t scale = readExtendedData(BQ27427_ID_IT_CFG, 81);
+	return (scale > 0) ? scale : 1; // guard against 0 — treat as no scaling
+}
+
 // Configures the design energy of the connected battery.
 bool BQ27427::setDesignEnergy(uint16_t energy)
 {
@@ -878,6 +887,381 @@ uint16_t BQ27427::i2cWriteBytes(uint8_t subAddress, uint8_t * src, uint8_t count
 	Wire.endTransmission(true);
 	
 	return true;	
+}
+
+/*****************************************************************************
+ ******************* Golden File Configuration (fw 2.02) *********************
+ *****************************************************************************/
+// Command legend from the .gm.fs format:
+//   W: AA <reg> <bytes…>  →  i2cWriteBytes(reg, data, len)
+//   C: AA <reg> <bytes…>  →  goldenFileVerify(reg, expected, len)
+//   X: <ms>               →  delay(ms)
+
+// Read <len> bytes from <reg> and compare against <expected>.
+bool BQ27427::goldenFileVerify(uint8_t reg, const uint8_t *expected, uint8_t len)
+{
+	uint8_t buf[4] = {0};
+	i2cReadBytes(reg, buf, len);
+	for (uint8_t i = 0; i < len; i++)
+	{
+		if (buf[i] != expected[i])
+			return false;
+	}
+	return true;
+}
+
+// Write one 32-byte data block to extended data flash and verify its checksum.
+// Per BQ27427 TRM CONFIG UPDATE mode procedure:
+//   1. Write DataClass to 0x3E (separate 1-byte transaction)
+//   2. Write DataBlock to 0x3F (separate 1-byte transaction) + 5 ms for block to load
+//   3. Read 0x40-0x5F to transfer current block into device RAM
+//   4. Write new 32 bytes to 0x40-0x5F
+//   5. Write checksum to 0x60 — this commits the block to flash
+//   6. Delay 10 ms
+//   7. Re-select block (repeat steps 1-2) + verify checksum at 0x60
+bool BQ27427::goldenFileWriteBlock(uint8_t classId, uint8_t blockNum,
+                                   const uint8_t data[32], uint8_t checksum)
+{
+	uint8_t cid = classId, blk = blockNum;
+
+	// -- Select block --
+	i2cWriteBytes(BQ27427_EXTENDED_DATACLASS, &cid, 1);     // DataClass (0x3E)
+	delayMicroseconds(200);
+	i2cWriteBytes(BQ27427_EXTENDED_DATABLOCK, &blk, 1);     // DataBlock (0x3F)
+	delay(5);                                                 // allow block to load into RAM
+
+	// -- Read current block to ensure RAM is populated --
+	uint8_t dummy[32];
+	i2cReadBytes(BQ27427_EXTENDED_BLOCKDATA, dummy, 32);
+
+	// -- Write new block data --
+	i2cWriteBytes(BQ27427_EXTENDED_BLOCKDATA, const_cast<uint8_t *>(data), 32);
+
+	// -- Write checksum to commit --
+	i2cWriteBytes(BQ27427_EXTENDED_CHECKSUM, &checksum, 1);
+
+	delay(10);
+
+	// -- Re-select block for readback --
+	i2cWriteBytes(BQ27427_EXTENDED_DATACLASS, &cid, 1);
+	delayMicroseconds(200);
+	i2cWriteBytes(BQ27427_EXTENDED_DATABLOCK, &blk, 1);
+	delay(5);
+
+	// -- Verify checksum was accepted --
+	uint8_t readback = 0;
+	i2cReadBytes(BQ27427_EXTENDED_CHECKSUM, &readback, 1);
+	if (readback != checksum)
+	{
+		Serial.printf("BQ27427: block 0x%02X/%02X checksum mismatch: wrote 0x%02X, got 0x%02X\n",
+		              classId, blockNum, checksum, readback);
+		return false;
+	}
+	return true;
+}
+
+// Internal: applies the full golden-file I2C sequence.
+// twoCell=false → 0427_2_02-bq27427_1-27-26.gm.fs      (single cell)
+// twoCell=true  → 0427_2_02-bq27427-2cell-disch.gm.fs  (2-cell discharge)
+bool BQ27427::applyGoldenFile(bool twoCell)
+{
+	const char *tag = twoCell ? "2-cell" : "1-cell";
+
+	//------------------------------------------------------------------
+	// Verify device type (0x0427)
+	//   W: AA 00 01 00  →  C: AA 00 27 04
+	//------------------------------------------------------------------
+	{
+		uint8_t cmd[] = {0x01, 0x00};
+		i2cWriteBytes(0x00, cmd, 2);
+		const uint8_t exp[] = {0x27, 0x04};
+		if (!goldenFileVerify(0x00, exp, 2))
+		{
+			Serial.printf("BQ27427 golden file [%s]: device type mismatch — not a BQ27427\n", tag);
+			return false;
+		}
+	}
+
+	//------------------------------------------------------------------
+	// Check firmware version (2.02) — warning only, does not abort.
+	// The block data is valid regardless of firmware sub-version.
+	//   W: AA 00 02 00  →  C: AA 00 02 02
+	//------------------------------------------------------------------
+	{
+		uint8_t cmd[] = {0x02, 0x00};
+		i2cWriteBytes(0x00, cmd, 2);
+		const uint8_t exp[] = {0x02, 0x02};
+		if (!goldenFileVerify(0x00, exp, 2))
+			Serial.printf("BQ27427 golden file [%s]: WARNING — FW version != 2.02, continuing anyway\n", tag);
+		else
+			Serial.printf("BQ27427 golden file [%s]: FW version 2.02 confirmed\n", tag);
+	}
+
+	//------------------------------------------------------------------
+	// Unseal → Full Access
+	//   Standard Sealed→Unsealed keys for BQ27427 fw 2.02: 0x0414, 0x3672
+	//   Then Unsealed→Full Access: 0xFFFF, 0xFFFF
+	//   Also try the library default key (0x8000 × 2) in case the device
+	//   was already unsealed or the keys differ on this unit.
+	//   X: 1000
+	//------------------------------------------------------------------
+	{ uint8_t cmd[] = {0x14, 0x04}; i2cWriteBytes(0x00, cmd, 2); } // Unseal key 1 (0x0414)
+	{ uint8_t cmd[] = {0x72, 0x36}; i2cWriteBytes(0x00, cmd, 2); } // Unseal key 2 (0x3672)
+	{ uint8_t cmd[] = {0xFF, 0xFF}; i2cWriteBytes(0x00, cmd, 2); } // Full Access key (0xFFFF)
+	{ uint8_t cmd[] = {0xFF, 0xFF}; i2cWriteBytes(0x00, cmd, 2); } // Full Access key (again)
+	// Also send the library default unseal key (0x8000) in case fw uses different ROM keys
+	{ uint8_t cmd[] = {0x00, 0x80}; i2cWriteBytes(0x00, cmd, 2); }
+	{ uint8_t cmd[] = {0x00, 0x80}; i2cWriteBytes(0x00, cmd, 2); }
+	delay(1000);
+
+	//------------------------------------------------------------------
+	// Enter CONFIG UPDATE mode
+	//   W: AA 00 13 00
+	//   X: 1100
+	//------------------------------------------------------------------
+	{ uint8_t cmd[] = {0x13, 0x00}; i2cWriteBytes(0x00, cmd, 2); }
+	delay(1100);
+
+	//------------------------------------------------------------------
+	// Verify CONFIG UPDATE mode is active (FLAGS bit 4 = CFGUPMODE).
+	// If this bit is not set, the unseal/Full-Access sequence above did not
+	// succeed — all block writes would be silently ignored by the device.
+	//------------------------------------------------------------------
+	{
+		uint16_t f = readWord(BQ27427_COMMAND_FLAGS);
+		if (!(f & BQ27427_FLAG_CFGUPMODE))
+		{
+			Serial.printf("BQ27427 golden file [%s]: FAILED — CONFIG UPDATE mode not entered "
+			              "(FLAGS=0x%04X). Check security state.\n", tag, f);
+			return false;
+		}
+		Serial.printf("BQ27427 golden file [%s]: CONFIG UPDATE mode active (FLAGS=0x%04X)\n", tag, f);
+	}
+
+	//------------------------------------------------------------------
+	// Block 0x02/0x00 — Safety
+	//------------------------------------------------------------------
+	{
+		const uint8_t data[32] = {
+			0x02, 0x26, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+		};
+		if (!goldenFileWriteBlock(0x02, 0x00, data, 0xA5)) { Serial.printf("BQ27427 golden file [%s]: block 0x02/00 FAILED\n", tag); return false; }
+	}
+
+	//------------------------------------------------------------------
+	// Block 0x24/0x00 — Charge Termination
+	//------------------------------------------------------------------
+	{
+		const uint8_t data[32] = {
+			0x00, 0x19, 0x28, 0x63, 0x5F, 0xFF, 0x62, 0x00,
+			0x32, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+		};
+		if (!goldenFileWriteBlock(0x24, 0x00, data, 0x69)) { Serial.printf("BQ27427 golden file [%s]: block 0x24/00 FAILED\n", tag); return false; }
+	}
+
+	//------------------------------------------------------------------
+	// Block 0x31/0x00 — Discharge
+	//------------------------------------------------------------------
+	{
+		const uint8_t data[32] = {
+			0x0A, 0x0F, 0x02, 0x05, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+		};
+		if (!goldenFileWriteBlock(0x31, 0x00, data, 0xDF)) { Serial.printf("BQ27427 golden file [%s]: block 0x31/00 FAILED\n", tag); return false; }
+	}
+
+	//------------------------------------------------------------------
+	// Block 0x40/0x00 — Registers
+	//------------------------------------------------------------------
+	{
+		const uint8_t data[32] = {
+			0x64, 0x78, 0x0F, 0x9F, 0x23, 0x00, 0x00, 0x14,
+			0x04, 0x00, 0x09, 0x04, 0x27, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+		};
+		if (!goldenFileWriteBlock(0x40, 0x00, data, 0x06)) { Serial.printf("BQ27427 golden file [%s]: block 0x40/00 FAILED\n", tag); return false; }
+	}
+
+	//------------------------------------------------------------------
+	// Block 0x44/0x00 — Power
+	//------------------------------------------------------------------
+	{
+		const uint8_t data[32] = {
+			0x00, 0x32, 0x01, 0xC2, 0x30, 0x00, 0x03, 0x08,
+			0x98, 0x01, 0x00, 0x3C, 0x01, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+		};
+		if (!goldenFileWriteBlock(0x44, 0x00, data, 0xF9)) { Serial.printf("BQ27427 golden file [%s]: block 0x44/00 FAILED\n", tag); return false; }
+	}
+
+	//------------------------------------------------------------------
+	// Block 0x50/0x00 — IT Cfg (block 0)
+	//------------------------------------------------------------------
+	{
+		const uint8_t data[32] = {
+			0x01, 0xF4, 0x00, 0x1E, 0xC8, 0x14, 0x08, 0x00,
+			0x3C, 0x0E, 0x10, 0x00, 0x0A, 0x46, 0x05, 0x14,
+			0x05, 0x0F, 0x03, 0x20, 0x7F, 0xFF, 0x00, 0xF0,
+			0x46, 0x50, 0x18, 0x01, 0x90, 0x00, 0x64, 0x19
+		};
+		if (!goldenFileWriteBlock(0x50, 0x00, data, 0xE4)) { Serial.printf("BQ27427 golden file [%s]: block 0x50/00 FAILED\n", tag); return false; }
+	}
+
+	//------------------------------------------------------------------
+	// Block 0x50/0x01 — IT Cfg (block 1)
+	//------------------------------------------------------------------
+	{
+		const uint8_t data[32] = {
+			0xDC, 0x5C, 0x60, 0x00, 0x7D, 0x00, 0x04, 0x03,
+			0x19, 0x25, 0x0F, 0x14, 0x0A, 0x78, 0x60, 0x28,
+			0x01, 0xF4, 0x00, 0x00, 0x00, 0x00, 0x43, 0x80,
+			0x04, 0x01, 0x14, 0x00, 0x08, 0x0B, 0xB8, 0x01
+		};
+		if (!goldenFileWriteBlock(0x50, 0x01, data, 0xDB)) { Serial.printf("BQ27427 golden file [%s]: block 0x50/01 FAILED\n", tag); return false; }
+	}
+
+	//------------------------------------------------------------------
+	// Block 0x50/0x02 — IT Cfg (block 2)  *** differs: 1-cell vs 2-cell ***
+	//------------------------------------------------------------------
+	if (!twoCell)
+	{
+		// 0427_2_02-bq27427_1-27-26.gm.fs — single cell
+		const uint8_t data[32] = {
+			0x2C, 0x0A, 0x01, 0x0A, 0x00, 0x00, 0x00, 0xC8,
+			0x00, 0x64, 0x02, 0x00, 0x00, 0x00, 0x00, 0x07,
+			0xD0, 0x01, 0x03, 0x5A, 0x14, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+		};
+		if (!goldenFileWriteBlock(0x50, 0x02, data, 0x47)) { Serial.printf("BQ27427 golden file [%s]: block 0x50/02 FAILED\n", tag); return false; }
+	}
+	else
+	{
+		// 0427_2_02-bq27427-2cell-disch.gm.fs — 2-cell discharge
+		// Byte [17]: 0x0A instead of 0x01
+		const uint8_t data[32] = {
+			0x2C, 0x0A, 0x01, 0x0A, 0x00, 0x00, 0x00, 0xC8,
+			0x00, 0x64, 0x02, 0x00, 0x00, 0x00, 0x00, 0x07,
+			0xD0, 0x0A, 0x03, 0x5A, 0x14, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+		};
+		if (!goldenFileWriteBlock(0x50, 0x02, data, 0x3E)) { Serial.printf("BQ27427 golden file [%s]: block 0x50/02 FAILED\n", tag); return false; }
+	}
+
+	//------------------------------------------------------------------
+	// Block 0x51/0x00 — Current Thresholds
+	//------------------------------------------------------------------
+	{
+		const uint8_t data[32] = {
+			0x01, 0xC2, 0x00, 0x64, 0x00, 0x64, 0x00, 0x3C,
+			0x3C, 0x01, 0xB3, 0xB3, 0x01, 0x90, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+		};
+		if (!goldenFileWriteBlock(0x51, 0x00, data, 0x04)) { Serial.printf("BQ27427 golden file [%s]: block 0x51/00 FAILED\n", tag); return false; }
+	}
+
+	//------------------------------------------------------------------
+	// Block 0x52/0x00 — State  *** differs: 1-cell vs 2-cell ***
+	//------------------------------------------------------------------
+	if (!twoCell)
+	{
+		// 0427_2_02-bq27427_1-27-26.gm.fs — single cell
+		// DesignCapacity = 0x1770 (6000 mAh), TaperCurrent = 0x00C8 (200 mA)
+		const uint8_t data[32] = {
+			0x40, 0x00, 0x00, 0x00, 0x00, 0x81, 0x17, 0x70,
+			0x5A, 0x3C, 0x0B, 0xB8, 0x00, 0xC8, 0x00, 0x32,
+			0x00, 0x14, 0x03, 0xE8, 0x01, 0x00, 0xC8, 0x00,
+			0x0A, 0xFF, 0xCE, 0xFF, 0xCE, 0x00, 0x01, 0x00
+		};
+		if (!goldenFileWriteBlock(0x52, 0x00, data, 0xF7)) { Serial.printf("BQ27427 golden file [%s]: block 0x52/00 FAILED\n", tag); return false; }
+	}
+	else
+	{
+		// 0427_2_02-bq27427-2cell-disch.gm.fs — 2-cell discharge
+		// DesignCapacity = 0x04B0 (1200 mAh), TaperCurrent = 0x0190 (400 mA)
+		const uint8_t data[32] = {
+			0x40, 0x00, 0x03, 0x00, 0x00, 0x81, 0x04, 0xB0,
+			0x12, 0x0C, 0x0B, 0xB8, 0x00, 0xC8, 0x00, 0x32,
+			0x00, 0x14, 0x03, 0xE8, 0x01, 0x01, 0x90, 0x00,
+			0x0A, 0xFF, 0xF6, 0xFF, 0x9D, 0x00, 0x01, 0x00
+		};
+		if (!goldenFileWriteBlock(0x52, 0x00, data, 0x7F)) { Serial.printf("BQ27427 golden file [%s]: block 0x52/00 FAILED\n", tag); return false; }
+	}
+
+	//------------------------------------------------------------------
+	// Block 0x59/0x00 — R_a RAM
+	//------------------------------------------------------------------
+	{
+		const uint8_t data[32] = {
+			0x00, 0x4E, 0x00, 0x23, 0x00, 0x27, 0x00, 0x2D,
+			0x00, 0x2A, 0x00, 0x24, 0x00, 0x27, 0x00, 0x24,
+			0x00, 0x23, 0x00, 0x25, 0x00, 0x26, 0x00, 0x28,
+			0x00, 0x2E, 0x00, 0x36, 0x00, 0x2E, 0x00, 0x00
+		};
+		if (!goldenFileWriteBlock(0x59, 0x00, data, 0x79)) { Serial.printf("BQ27427 golden file [%s]: block 0x59/00 FAILED\n", tag); return false; }
+	}
+
+	//------------------------------------------------------------------
+	// Block 0x6D/0x00 — Chem Data
+	//------------------------------------------------------------------
+	{
+		const uint8_t data[32] = {
+			0x09, 0x22, 0x0E, 0xE3, 0x0E, 0xA6, 0x10, 0xF4,
+			0x10, 0x9A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+		};
+		if (!goldenFileWriteBlock(0x6D, 0x00, data, 0x81)) { Serial.printf("BQ27427 golden file [%s]: block 0x6D/00 FAILED\n", tag); return false; }
+	}
+
+	//------------------------------------------------------------------
+	// Block 0x70/0x00 — Codes (Sealed-to-Full-Access keys: 0x8000, 0x8000)
+	//------------------------------------------------------------------
+	{
+		const uint8_t data[32] = {
+			0x80, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+		};
+		if (!goldenFileWriteBlock(0x70, 0x00, data, 0xFF)) { Serial.printf("BQ27427 golden file [%s]: block 0x70/00 FAILED\n", tag); return false; }
+	}
+
+	//------------------------------------------------------------------
+	// Exit CONFIG UPDATE mode  (Control: STATUS then SOFT_RESET)
+	//   W: AA 00 00 00
+	//   W: AA 00 42 00
+	//   X: 2000
+	//------------------------------------------------------------------
+	{ uint8_t cmd[] = {0x00, 0x00}; i2cWriteBytes(0x00, cmd, 2); }
+	{ uint8_t cmd[] = {0x42, 0x00}; i2cWriteBytes(0x00, cmd, 2); }
+	delay(2000);
+
+	Serial.printf("BQ27427 golden file [%s]: all blocks written OK\n", tag);
+	return true;
+}
+
+// Configure BQ27427 for a single LiPo cell.
+// Source: 0427_2_02-bq27427_1-27-26.gm.fs
+bool BQ27427::configureOneCell()
+{
+	return applyGoldenFile(false);
+}
+
+// Configure BQ27427 for two cells in discharge configuration.
+// Source: 0427_2_02-bq27427-2cell-disch.gm.fs
+bool BQ27427::configureTwoCell()
+{
+	return applyGoldenFile(true);
 }
 
 BQ27427 lipo; // Use lipo.[] to interact with the library in an Arduino sketch

@@ -660,7 +660,9 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, const String& saveToFil
         if (toFile) {
           writeBuf[writeBufIdx++] = b;
           if (writeBufIdx >= (int)sizeof(writeBuf)) {
-            outFile.write(writeBuf, writeBufIdx);
+            if (outFile.write(writeBuf, writeBufIdx) != (size_t)writeBufIdx) {
+              error = true; break;
+            }
             writeBufIdx = 0;
           }
           // Capture first 512 bytes for error diagnostics (e.g. HTTP error body)
@@ -674,7 +676,9 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, const String& saveToFil
 
         if (--chunkRemaining == 0) {
           if (toFile && writeBufIdx > 0) {
-            outFile.write(writeBuf, writeBufIdx);
+            if (outFile.write(writeBuf, writeBufIdx) != (size_t)writeBufIdx) {
+              error = true; break;
+            }
             writeBufIdx = 0;
           }
           state    = ParseState::SCAN;
@@ -686,7 +690,10 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, const String& saveToFil
     }
   }
 
-  if (toFile) outFile.close();
+  if (toFile) {
+    outFile.close();
+    if (!done || error) FS.remove(saveToFile.c_str());
+  }
 
   // Debug: print raw modem response and exit reason
   Serial.printf("[HTTP] raw(%u, %s): ", rawDbgLen,

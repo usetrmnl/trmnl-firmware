@@ -56,9 +56,19 @@ size_t filesystem_read_and_allocate(const char *name, uint8_t **out_buffer)
         File file = FS.open(name, FILE_READ);
         if (file) {
             size = file.size();
+            if (size == 0) {
+                Log_error("File %s is empty", name);
+                file.close();
+                return 0;
+            }
+#ifdef CONFIG_SPIRAM
+            buffer = (uint8_t *)ps_malloc(size);
+#else
             buffer = (uint8_t *)malloc(size);
+#endif
             if (!buffer) {
                 Log_error("Failed to allocate %d bytes", (int)size);
+                file.close();
                 return 0;
             }
             file.readBytes((char *)buffer, size);
@@ -122,11 +132,24 @@ bool bDel;
     time(&tt); // get the current epoch time
     rootDir = FS.open("/");
     while (File file = rootDir.openNextFile()) {
+        Log_info("Checking file \"%s\" for deletion", file.name());
+
+        if (file.isDirectory()) {
+            Log_info("Skipping directory \"%s\"", file.name());
+            file.close();
+            continue;
+        }
+
         s = (char *)file.name();
         // The last 10 characters of the name are the epoch timestamp
         u32 = (uint32_t) atoi(&s[strlen(s)-10]);
         bDel = false;
-        if (memcmp(name, file.name(), 14) == 0) { // older version of the same file
+
+        strcpy(szTemp, "/"); // needed on this file operation
+        strcat(szTemp, file.name());
+
+        Log_info("Comparing name %s with %s, timestamp %u, current time %u", name, file.name(), u32, (uint32_t)tt);
+        if (memcmp(name, szTemp, 14) == 0) { // older version of the same file
             Log_info("Deleting older version of plugin image %s - %s", name, file.name());
             bDel = true;
         } else if ((uint32_t)tt - u32 > 60*60*24) { // More than 24h old
@@ -134,8 +157,8 @@ bool bDel;
             bDel = true;
         }
         if (bDel) { // to avoid double code
-            strcpy(szTemp, "/"); // needed on this file operation
-            strcat(szTemp, file.name());
+            Log_info("Deleting file %s", szTemp);
+            file.close();
             FS.remove(szTemp);
         }
     }
