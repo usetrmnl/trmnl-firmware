@@ -7,7 +7,7 @@
 #include <preferences_persistence.h>
 #include "DEV_Config.h"
 #define MAX_BIT_DEPTH 8
-#ifndef BOARD_TRMNL_X
+#if !defined(BOARD_TRMNL_X) && !defined(BOARD_INKPLATE_10)
 #define BB_EPAPER
 #include "bb_epaper.h"
 const DISPLAY_PROFILE dpList[4] = { // 1-bit and 2-bit display types for each profile
@@ -73,6 +73,12 @@ const uint8_t u8_graytable[] = {
 /* 15 */  2, 2, 2, 2, 2, 2, 2, 2
 };
 #endif
+#ifndef BBEP_RED
+#define BBEP_RED BBEP_BLACK
+#endif
+#ifndef BBEP_YELLOW
+#define BBEP_YELLOW BBEP_WHITE
+#endif
 // Counts the number of partial updates to know when to do a full update
 RTC_DATA_ATTR int iUpdateCount = 0;
 #include "Group5.h"
@@ -95,6 +101,9 @@ static uint8_t *pDither;
 
 // Runtime control for light sleep (true = enabled, false = disabled)
 static bool g_light_sleep_enabled = true;
+#ifndef BB_EPAPER
+static bool g_fastepd_ready = false;
+#endif
 
 /**
  * @brief Function to init the display
@@ -110,8 +119,19 @@ void display_init(void)
     bbep.setPanelType(dpList[iTempProfile].OneBit); // must be set BEFORE calling initio
     bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
 #else
-    bbep.initPanel(BB_PANEL_EPDIY_V7_16); //, 26000000);
-    bbep.setPanelSize(1872, 1404, BB_PANEL_FLAG_MIRROR_X);
+    int rc = 0;
+#if defined(BOARD_INKPLATE_10)
+    rc = bbep.initPanel(BB_PANEL_INKPLATE10);
+#else
+    rc = bbep.initPanel(BB_PANEL_EPDIY_V7_16); //, 26000000);
+    if (rc == 0) {
+        rc = bbep.setPanelSize(1872, 1404, BB_PANEL_FLAG_MIRROR_X);
+    }
+#endif
+    g_fastepd_ready = (rc == 0);
+    if (!g_fastepd_ready) {
+        Log_error("FastEPD init failed rc=%d", rc);
+    }
 #endif
     Log_info("dev module end");
 }
@@ -123,7 +143,10 @@ void display_init(void)
  */
 void display_set_light_sleep(uint8_t enabled)
 {
+    g_light_sleep_enabled = enabled;
+#ifdef BB_EPAPER
     bbep.setLightSleep(enabled);
+#endif
 }
 
 /**
@@ -152,10 +175,17 @@ void display_sleep(uint32_t u32Millis)
  */
 void display_reset(void)
 {
+#ifndef BB_EPAPER
+    if (!g_fastepd_ready) {
+        Log_error("display_reset skipped: FastEPD not initialized");
+        return;
+    }
+#endif
     Log_info("e-Paper Clear start");
     bbep.fillScreen(BBEP_WHITE);
-    bbep.setLightSleep(true);
+    g_light_sleep_enabled = true;
 #ifdef BB_EPAPER
+    bbep.setLightSleep(true);
     if (!apiDisplayResult.response.maximum_compatibility) {
         bbep.refresh(REFRESH_FAST, true);
     } else {
@@ -1289,6 +1319,56 @@ PNG *png = new PNG();
     free(png); // free the decoder instance
     return rc;
 } /* png_to_epd() */
+
+#ifndef BB_EPAPER
+static bool draw_fast_epd_bmp(const uint8_t *image_buffer, int data_size)
+{
+    if (data_size < 62 || image_buffer[0] != 'B' || image_buffer[1] != 'M') {
+        return false;
+    }
+
+    const uint32_t dataOffset = *(uint32_t *)&image_buffer[10];
+    const int32_t width = *(int32_t *)&image_buffer[18];
+    const int32_t rawHeight = *(int32_t *)&image_buffer[22];
+    const uint16_t bitsPerPixel = *(uint16_t *)&image_buffer[28];
+    const uint32_t compressionMethod = *(uint32_t *)&image_buffer[30];
+
+    if (width <= 0 || rawHeight == 0 || bitsPerPixel != 1 || compressionMethod != 0 || dataOffset >= (uint32_t)data_size) {
+        return false;
+    }
+
+    const int32_t height = (rawHeight < 0) ? -rawHeight : rawHeight;
+    const bool topDown = rawHeight < 0;
+    const int srcRowBytes = ((width + 31) / 32) * 4;
+    if (dataOffset + (srcRowBytes * height) > (uint32_t)data_size) {
+        return false;
+    }
+
+    const int drawWidth = min((int)bbep.width(), (int)width);
+    const int drawHeight = min((int)bbep.height(), (int)height);
+    const int xOffset = max(0, ((int)bbep.width() - (int)width) / 2);
+    const int yOffset = max(0, ((int)bbep.height() - (int)height) / 2);
+    const int destPitch = (bbep.width() + 7) / 8;
+    uint8_t *dest = bbep.currentBuffer();
+
+    bbep.setMode(BB_MODE_1BPP);
+    bbep.fillScreen(BBEP_WHITE);
+
+    for (int y = 0; y < drawHeight; y++) {
+        const int srcY = topDown ? y : (height - 1 - y);
+        const uint8_t *srcRow = image_buffer + dataOffset + (srcY * srcRowBytes);
+        uint8_t *destRow = dest + ((y + yOffset) * destPitch);
+
+        for (int x = 0; x < drawWidth && (x + xOffset) < bbep.width(); x++) {
+            if ((srcRow[x / 8] & (0x80 >> (x & 7))) == 0) {
+                destRow[(x + xOffset) / 8] &= ~(0x80 >> ((x + xOffset) & 7));
+            }
+        }
+    }
+
+    return true;
+}
+#endif
 /**
  * @brief Function to show the image on the display
  * @param image_buffer pointer to the uint8_t image buffer
@@ -1298,6 +1378,12 @@ PNG *png = new PNG();
 void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
 
 {
+#ifndef BB_EPAPER
+    if (!g_fastepd_ready) {
+        Log_error("display_show_image skipped: FastEPD not initialized");
+        return;
+    }
+#endif
     bool isPNG = data_size >= 4 && MOTOLONG(image_buffer) == (int32_t)0x89504e47;
     auto width = display_width();
     auto height = display_height();
@@ -1312,7 +1398,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
    // Log_info("Paint_NewImage %d", reverse);
     Log_info("display_show_image start");
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
-#ifdef FUTURE
+    #ifdef FUTURE
     if (reverse)
     {
         d32 = (uint32_t *)image_buffer; // get framebuffer as a 32-bit pointer
@@ -1365,10 +1451,15 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
         }
         else
         {
+#ifdef BB_EPAPER
          // This work-around is due to a lack of RAM; the correct method would be to use loadBMP()
             flip_image(image_buffer+62, bbep.width(), bbep.height(), false); // fix bottom-up bitmap images
-#ifdef BB_EPAPER
             bbep.setBuffer(image_buffer+62); // uncompressed 1-bpp bitmap
+#else
+            if (!draw_fast_epd_bmp(image_buffer, data_size)) {
+                Log_error("Unsupported BMP image for FastEPD path");
+                return;
+            }
 #endif
         }
 #ifdef BB_EPAPER
@@ -1411,7 +1502,9 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     }
     iUpdateCount++;
 #else
+#if defined(BOARD_TRMNL_X)
     bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
+#endif
     bbep.fullUpdate();
 #endif
     Log_info("display_show_image end");
@@ -1481,7 +1574,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
 #endif
     }
 
-#ifdef BOARD_TRMNL_X
+#if defined(BOARD_TRMNL_X) || defined(BOARD_INKPLATE_10)
     bbep.setFont(Inter_18);
 #else
     bbep.setFont(nicoclean_8);
@@ -1941,7 +2034,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 #endif
     }
 
-#ifdef BOARD_TRMNL_X
+#if defined(BOARD_TRMNL_X) || defined(BOARD_INKPLATE_10)
     bbep.setFont(Inter_18);
 #else
     bbep.setFont(nicoclean_8);
@@ -2004,7 +2097,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         UWORD y_start = 340;
         UWORD font_width = 18; // DEBUG
         Paint_DrawMultilineText(0, y_start, message.c_str(), width, font_width, BBEP_BLACK, BBEP_WHITE,
-#ifdef BOARD_TRMNL_X
+#if defined(BOARD_TRMNL_X) || defined(BOARD_INKPLATE_10)
         Inter_18, true);
 #else
         nicoclean_8, true);
