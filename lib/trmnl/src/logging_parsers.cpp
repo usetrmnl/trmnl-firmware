@@ -40,13 +40,21 @@ static const WakeupReasonNode wakeupReasonMap[] = {
 
 bool parseWakeupReasonToStr(char *buffer, size_t buffer_size, esp_sleep_source_t wakeup_reason)
 {
+  if (buffer == nullptr || buffer_size == 0)
+  {
+    return false;
+  }
+
   for (const WakeupReasonNode &entry : wakeupReasonMap)
   {
     if (wakeup_reason == entry.value)
     {
       strncpy(buffer, entry.name, buffer_size);
+      buffer[buffer_size - 1] = '\0';
       return true;
     }
   }
+
+  buffer[0] = '\0';
   return false;
 }
