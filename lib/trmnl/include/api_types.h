@@ -53,7 +53,16 @@ struct ApiDisplayInputs
   uint32_t refreshRate;
   String macAddress;
   float batteryVoltage;
+#ifdef BOARD_TRMNL_X
+  int batteryCount;
+  int batteryCharging;
+  int batteryCurrent;
+  int currentBatteryCapacity;
+  int maxBatteryCapacity;
+  int batteryTemperature;
   int stateOfCharge;
+  int stateOfHealth;
+#endif
   String firmwareVersion;
   String model;
   int rssi;

@@ -19,10 +19,16 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
            "Access-Token: %s\n\r"
            "Refresh_Rate: %s\n\r"
 #ifdef BOARD_TRMNL_X
-           "Percent-Charged: %s\n\r"
-#else
+           "Battery-Charging: %s\n\r"
+           "Battery-Count: %s\n\r"
            "Battery-Voltage: %s\n\r"
+           "Percent-Charged: %s\n\r"
+           "Battery-Health: %s\n\r"
+           "Battery-Current: %s\n\r"
+           "Battery-Temp: %s\n\r"
+           "Battery-Capacity: %s\n\r"
 #endif // BOARD_TRMNL_X
+           "Battery-Voltage: %s\n\r"
            "FW-Version: %s\r\n"
            "Model: %s\r\n"
            "RSSI: %s\r\n",
@@ -39,9 +45,15 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
   https.addHeader("Content-Type", "application/json");
   https.addHeader("Access-Token", inputs.apiKey);
   https.addHeader("Refresh-Rate", String(inputs.refreshRate));
+  https.addHeader("Battery-Voltage", String(inputs.batteryVoltage, 2));
 #ifdef BOARD_TRMNL_X
+  https.addHeader("Battery-Count", String(inputs.batteryCount));
+  https.addHeader("Battery-Charging", String(inputs.batteryCharging));
   https.addHeader("Percent-Charged", String(inputs.stateOfCharge));
-#else
+  https.addHeader("Battery-Health", String(inputs.stateOfHealth));
+  https.addHeader("Battery-Current", String(inputs.batteryCurrent));
+  https.addHeader("Battery-Temp", String(inputs.batteryTemperature));
+  https.addHeader("Battery-Capacity", String(inputs.currentBatteryCapacity) + "/" + String(inputs.maxBatteryCapacity));
   https.addHeader("Battery-Voltage", String(inputs.batteryVoltage));
 #endif // BOARD_TRMNL_X
   https.addHeader("FW-Version", inputs.firmwareVersion);

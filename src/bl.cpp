@@ -539,6 +539,8 @@ static Modem* g_modem = nullptr;
 
 // ############################ Gas gauge #############################
 #include "BQ27427.h"
+battery_count_t battery_count = BATTERY_NONE;
+bool battery_charging = false;
 // ############################ Gas gauge #############################
 #endif
 
@@ -887,10 +889,12 @@ void bl_init(void)
     preferences.putString(PREFERENCES_FILENAME_KEY, "");
   }
 
-    battery_count_t result = detect_battery_count();
-  Log_info("BATTERY COUNT: %d", result);
+  battery_count = detect_battery_count();
+  battery_charging = is_charging();
+  Log_info("BATTERY COUNT: %d", battery_count);
+  Log_info("BATTERY CHARGING: %s", battery_charging ? "YES" : "NO");
 
-  if (result != BATTERY_NONE) {
+  if (battery_count != BATTERY_NONE) {
     BQ27427_reset();
     delay(300); // BQ27427 needs 250 ms to power up
 
@@ -903,11 +907,11 @@ void bl_init(void)
     else {
     Log_info("Connected to BQ27427!");
 
-    if (result == BATTERY_ONE) {
+    if (battery_count == BATTERY_ONE) {
       Log_info("One battery detected");
       lipo.configureOneCell();
     }
-    else if (result == BATTERY_TWO) {
+    else if (battery_count == BATTERY_TWO) {
       Log_info("Two batteries detected");
       lipo.configureTwoCell();
     }
@@ -933,19 +937,19 @@ void bl_init(void)
     unsigned int soc = lipo.soc();                               // State-of-charge (%) — use this for battery level display
     unsigned int volts = lipo.voltage();                         // Battery voltage (mV)
     int current = lipo.current(AVG);                            // Average current (mA)
+    float temperature = float((lipo.temperature(BATTERY)) - 2732) / 10.0;         // Temperature (C)
     unsigned int fullCapacity = lipo.capacity(FULL) * energyScale; // Full capacity (mAh) — valid only in NORMAL mode
     unsigned int capacity = lipo.capacity(REMAIN) * energyScale;   // Remaining capacity (mAh) — valid only in NORMAL mode
-    int power = lipo.power();                                    // Average power draw (mW)
     int health = lipo.soh();                                     // State-of-health (%)
 
     // Assemble a string to print
     String toPrint = "[" + String(millis() / 1000) + "] ";
     toPrint += String(soc) + "% | ";
+    toPrint += String(temperature, 1) + " C | ";
     toPrint += String(volts) + " mV | ";
     toPrint += String(current) + " mA | ";
     toPrint += String(capacity) + " / ";
     toPrint += String(fullCapacity) + " mAh | ";
-    toPrint += String(power) + " mW | ";
     toPrint += String(health) + "%";
 
     //fast charging allowed
@@ -966,6 +970,17 @@ void bl_init(void)
 
     // Print the string
     Serial.println(toPrint);
+
+    if (lipo.fcFlag()) {
+      Log_info("BATTERY IS FULL");
+      // full, charger connected but not drawing current
+    } else if (lipo.chgFlag()) {
+      Log_info("BATTERY IS CHARGING");
+      // actively charging
+    } else if (lipo.dsgFlag()) {
+      Log_info("BATTERY IS DISCHARGING");
+      // discharging
+    }
   }
   }
   else {
@@ -1335,8 +1350,23 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   inputs.macAddress = WiFi.macAddress();
 
   inputs.batteryVoltage = vBatt; //readBatteryVoltage();
+  inputs.batteryCount = battery_count;
+  inputs.batteryCharging = battery_charging; // 1 charging, 0 not charging
   if (lipo._initialized) { // only report SoC if battery was detected and BQ27427 initialized successfully
     inputs.stateOfCharge = lipo.soc();
+    inputs.stateOfHealth = lipo.soh();
+    inputs.batteryCurrent = lipo.current(AVG);
+    inputs.batteryTemperature = lipo.temperature(BATTERY) * 10 - 273; // convert from K to C
+    inputs.currentBatteryCapacity = lipo.capacity(REMAIN) * lipo.designEnergyScale();
+    inputs.maxBatteryCapacity = lipo.capacity(FULL) * lipo.designEnergyScale();
+  }
+  else {
+    inputs.stateOfCharge = -1;
+    inputs.stateOfHealth = -1;
+    inputs.batteryCurrent = -1;
+    inputs.batteryTemperature = -1;
+    inputs.currentBatteryCapacity = -1;
+    inputs.maxBatteryCapacity = -1;
   }
 
   inputs.firmwareVersion = String(FW_VERSION_STRING);
@@ -1377,9 +1407,15 @@ static https_request_err_e downloadAndShow()
     reqHeaders += "ID: "               + apiDisplayInputs.macAddress                + "\n";
     reqHeaders += "Access-Token: "     + apiDisplayInputs.apiKey                    + "\n";
     reqHeaders += "Refresh-Rate: "     + String(apiDisplayInputs.refreshRate)       + "\n";
+    reqHeaders += "Battery-Voltage: " + String(apiDisplayInputs.batteryVoltage, 2) + "\n";
 #ifdef BOARD_TRMNL_X
+    reqHeaders += "Battery-Count: "   + String(apiDisplayInputs.batteryCount)     + "\n";
+    reqHeaders += "Battery-Charging: " + String(apiDisplayInputs.batteryCharging) + "\n";
     reqHeaders += "Percent-Charged: " + String(apiDisplayInputs.stateOfCharge) + "\n";
-#else
+    reqHeaders += "Battery-Health: "  + String(apiDisplayInputs.stateOfHealth) + "\n";
+    reqHeaders += "Battery-Current: " + String(apiDisplayInputs.batteryCurrent) + "\n";
+    reqHeaders += "Battery-Temp: "    + String(apiDisplayInputs.batteryTemperature) + "\n";
+    reqHeaders += "Battery-Capacity: " + String(apiDisplayInputs.currentBatteryCapacity) + "/" + String(apiDisplayInputs.maxBatteryCapacity) + "\n";
     reqHeaders += "Battery-Voltage: " + String(apiDisplayInputs.batteryVoltage, 2) + "\n";
 #endif // BOARD_TRMNL_X
     reqHeaders += "FW-Version: "       + apiDisplayInputs.firmwareVersion           + "\n";
@@ -3115,7 +3151,7 @@ static float readBatteryVoltage(void)
   else
   {
     Log.error("%s [%d]: BQ27427 not initialized. Cannot read battery voltage.\r\n", __FILE__, __LINE__);
-    return 4.2f;
+    return -1.0;
   }
 #else
   #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001)

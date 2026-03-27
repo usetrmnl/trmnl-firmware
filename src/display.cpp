@@ -174,6 +174,9 @@ void otg_turn_off()
     Log_info("OTG turned off");
 }
 
+#define BQ25616_PG_PIN    0    // TCA9535 P0_0 — open-drain, LOW = VBUS OK
+#define BQ25616_STAT_PIN  2    // TCA9535 P0_2 — open-drain, LOW = charging in progress
+
 #define BAT_DET_PIN       7    // TCA9535 P0_7 in bbep pin numbering
 #define BAT_CHARGE_MS     2    // drive HIGH for 2 ms to charge RC network
 #define BAT_TIMEOUT_US    6000 // no battery if pin is still HIGH after this
@@ -334,10 +337,16 @@ void enter_shipment_sleep()
 
 bool check_usb_power()
 {
-    bbep.ioPinMode(0, INPUT);
-    uint8_t pin_state = bbep.ioRead(0);
+    bbep.ioPinMode(BQ25616_PG_PIN, INPUT);
+    return (bbep.ioRead(BQ25616_PG_PIN) == 0);
+}
 
-    return (pin_state == 0);
+// Returns true while BQ25616 is actively charging (STAT LOW).
+// HIGH = charge complete or charge disabled; blinking = fault (reads as HIGH).
+bool is_charging()
+{
+    bbep.ioPinMode(BQ25616_STAT_PIN, INPUT);
+    return (bbep.ioRead(BQ25616_STAT_PIN) == 0);
 }
 
 
