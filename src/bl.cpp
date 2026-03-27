@@ -1416,7 +1416,6 @@ static https_request_err_e downloadAndShow()
     reqHeaders += "Battery-Current: " + String(apiDisplayInputs.batteryCurrent) + "\n";
     reqHeaders += "Battery-Temp: "    + String(apiDisplayInputs.batteryTemperature) + "\n";
     reqHeaders += "Battery-Capacity: " + String(apiDisplayInputs.currentBatteryCapacity) + "/" + String(apiDisplayInputs.maxBatteryCapacity) + "\n";
-    reqHeaders += "Battery-Voltage: " + String(apiDisplayInputs.batteryVoltage, 2) + "\n";
 #endif // BOARD_TRMNL_X
     reqHeaders += "FW-Version: "       + apiDisplayInputs.firmwareVersion           + "\n";
     reqHeaders += "Model: "            + apiDisplayInputs.model                     + "\n";

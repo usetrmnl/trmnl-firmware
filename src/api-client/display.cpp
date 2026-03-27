@@ -54,7 +54,6 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
   https.addHeader("Battery-Current", String(inputs.batteryCurrent));
   https.addHeader("Battery-Temp", String(inputs.batteryTemperature));
   https.addHeader("Battery-Capacity", String(inputs.currentBatteryCapacity) + "/" + String(inputs.maxBatteryCapacity));
-  https.addHeader("Battery-Voltage", String(inputs.batteryVoltage));
 #endif // BOARD_TRMNL_X
   https.addHeader("FW-Version", inputs.firmwareVersion);
   https.addHeader("Model", String(inputs.model));
