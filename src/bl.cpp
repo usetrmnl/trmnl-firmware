@@ -1349,7 +1349,7 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
 
   inputs.macAddress = WiFi.macAddress();
 
-  inputs.batteryVoltage = vBatt; //readBatteryVoltage();
+  inputs.batteryVoltage = readBatteryVoltage(); //readBatteryVoltage();
   inputs.batteryCount = battery_count;
   inputs.batteryCharging = battery_charging; // 1 charging, 0 not charging
   if (lipo._initialized) { // only report SoC if battery was detected and BQ27427 initialized successfully
