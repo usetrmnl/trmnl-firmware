@@ -59,7 +59,7 @@ struct ApiDisplayInputs
   int batteryCurrent;
   int currentBatteryCapacity;
   int maxBatteryCapacity;
-  int batteryTemperature;
+  float batteryTemperature;
   int stateOfCharge;
   int stateOfHealth;
 #endif

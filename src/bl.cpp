@@ -1356,7 +1356,7 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
     inputs.stateOfCharge = lipo.soc();
     inputs.stateOfHealth = lipo.soh();
     inputs.batteryCurrent = lipo.current(AVG);
-    inputs.batteryTemperature = lipo.temperature(BATTERY) * 10 - 273; // convert from K to C
+    inputs.batteryTemperature = float((lipo.temperature(BATTERY)) - 2732) / 10.0; // convert from K to C
     inputs.currentBatteryCapacity = lipo.capacity(REMAIN) * lipo.designEnergyScale();
     inputs.maxBatteryCapacity = lipo.capacity(FULL) * lipo.designEnergyScale();
   }
