@@ -2183,7 +2183,8 @@ static void writeImageToFile(const char *name, uint8_t *in_buffer, size_t size)
   size_t res = filesystem_write_to_file(name, in_buffer, size);
   if (res != size)
   {
-    Log_error_submit("File writing ERROR. Result - %d", res);
+    Log.info("%s [%d]: file %s writing error - %d bytes attempted, res = %d\r\n", __FILE__, __LINE__, name, size, res);
+//   Log_error_submit("File writing ERROR. Result - %d", res);
   }
   else
   {
