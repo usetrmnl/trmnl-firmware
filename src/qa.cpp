@@ -7,8 +7,7 @@
 #include <Preferences.h>
 #include "WifiCaptive.h"
 #include "logo_small.h"
-#include "bb_epaper.h"
-extern BBEPAPER bbep;
+#include "logo_medium.h"
 
 extern "C" {
   #include "esp_timer.h"   // esp_timer_get_time()
@@ -47,6 +46,57 @@ void savePassedTest(){
   preferencesQA.putBool("testPassed", true);
   preferencesQA.end();
 }
+
+bool checkIfAlreadyShipped(){
+  preferencesQA.begin("qa", true);
+  bool status = preferencesQA.getBool("ship_done", false);
+  preferencesQA.end();
+  return status;
+}
+
+bool saveShipmentDone(){
+  preferencesQA.begin("qa", false);
+  preferencesQA.putBool("ship_done", true);
+  preferencesQA.putBool("ship_started", false);  // Clear started flag
+  preferencesQA.end();
+  return true;
+}
+
+bool checkIfShipmentStarted(){
+  preferencesQA.begin("qa", true);
+  bool status = preferencesQA.getBool("ship_started", false);
+  preferencesQA.end();
+  return status;
+}
+
+bool saveShipmentStarted(){
+  preferencesQA.begin("qa", false);
+  preferencesQA.putBool("ship_started", true);
+  preferencesQA.end();
+  return true;
+}
+#ifdef BOARD_TRMNL_X
+bool enableShipmentMode() {
+  // should be already initialized
+  // display_init();
+
+  Serial.println("Waiting for USB plug-off to enter shipment mode...");
+
+  while (check_usb_power()) {
+    Serial.println("USB power still detected, waiting...");
+    delay(2000);
+  }
+
+  display_show_msg(const_cast<uint8_t *>(logo_medium),SHIPPING_MODE);
+
+  // Save that we've started shipment mode (in case battery dies during shipping)
+  saveShipmentStarted();
+
+  enter_shipment_sleep();
+
+  return true;
+}
+#endif // BOARD_TRMNL_X
 
 float measureTemperatureAverage() {
   float sum = 0;
