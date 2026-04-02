@@ -437,7 +437,9 @@ void modem_reset_target(void) {
  */
 void display_set_light_sleep(uint8_t enabled)
 {
+#ifdef BB_EPAPER
     bbep.setLightSleep(enabled);
+#endif
 }
 
 /**
@@ -468,8 +470,8 @@ void display_reset(void)
 {
     Log_info("e-Paper Clear start");
     bbep.fillScreen(BBEP_WHITE);
-    bbep.setLightSleep(true);
 #ifdef BB_EPAPER
+    bbep.setLightSleep(true);
     if (!apiDisplayResult.response.maximum_compatibility) {
         bbep.refresh(REFRESH_FAST, true);
     } else {
@@ -757,6 +759,7 @@ enum {
     PNG_2_BIT_BOTH,
     PNG_2_BIT_INVERTED,
 };
+#ifdef BB_EPAPER
 //
 // Match the given pixel to black (00), white (01), or red (1x)
 //
@@ -822,6 +825,8 @@ unsigned char GetBWYRPixel(int r, int g, int b)
     }
     return ucOut;
 } /* GetBWYRPixel() */
+#endif // BB_EPAPER
+
 #ifdef BOARD_SEEED_RETERMINAL_E1002
 //
 // bb_epaper colors to map to Spectra6 colors
@@ -1804,7 +1809,6 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
 
     switch (message_type)
     {
-#ifdef BOARD_X_CLASS
     case OTG_TURNED_ON:
     {
         const char string1[] = "OTG turned on!";
@@ -1867,7 +1871,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         bbep.print(string2);
     break;
     }
-#endif // BOARD_X_CLASS
+
     case WIFI_CONNECT:
     {
         const char string1[] = "Connect to TRMNL WiFi";

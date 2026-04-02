@@ -32,6 +32,7 @@
 #include <api-client/display.h>
 #include "driver/gpio.h"
 #include "esp_sntp.h"
+#include "esp_flash.h"
 #include <nvs.h>
 #include <serialize_log.h>
 #include <preferences_persistence.h>
