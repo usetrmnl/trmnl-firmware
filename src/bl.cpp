@@ -604,6 +604,16 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
 
   inputs.baseUrl = preferences.getString(PREFERENCES_API_URL, API_BASE_URL);
 
+  char wakeupReasonString[32] = {0};
+  if (parseWakeupReasonToStr(wakeupReasonString, sizeof(wakeupReasonString), (esp_sleep_source_t)wakeup_reason))
+  {
+    inputs.updateSource = String(wakeupReasonString);
+  }
+  else
+  {
+    inputs.updateSource = "unknown";
+  }
+
   if (preferences.isKey(PREFERENCES_API_KEY))
   {
     inputs.apiKey = preferences.getString(PREFERENCES_API_KEY, PREFERENCES_API_KEY_DEFAULT);

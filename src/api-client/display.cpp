@@ -17,6 +17,7 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
   Log_info("Added headers:\n\r"
            "ID: %s\n\r"
            "Special function: %d\n\r"
+           "Update-Source: %s\n\r"
            "Access-Token: %s\n\r"
            "Refresh_Rate: %s\n\r"
            "Battery-Voltage: %s\n\r"
@@ -26,6 +27,7 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
            "temperature-profile:true\r\n",
            inputs.macAddress.c_str(),
            inputs.specialFunction,
+           inputs.updateSource.c_str(),
            inputs.apiKey.c_str(),
            String(inputs.refreshRate).c_str(),
            String(inputs.batteryVoltage).c_str(),
@@ -35,6 +37,7 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
 
   https.addHeader("ID", inputs.macAddress);
   https.addHeader("Content-Type", "application/json");
+  https.addHeader("Update-Source", inputs.updateSource);
   https.addHeader("Access-Token", inputs.apiKey);
   https.addHeader("Refresh-Rate", String(inputs.refreshRate));
   https.addHeader("Battery-Voltage", String(inputs.batteryVoltage));

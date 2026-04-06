@@ -50,6 +50,7 @@ struct ApiDisplayInputs
   String baseUrl;
   String apiKey;
   String friendlyId;
+  String updateSource;
   uint32_t refreshRate;
   String macAddress;
   float batteryVoltage;
