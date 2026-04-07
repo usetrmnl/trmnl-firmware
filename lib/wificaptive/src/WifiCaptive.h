@@ -42,6 +42,13 @@
 
 #define WIFI_LAST_INDEX "wifi_last_index"
 
+struct ExternalNetwork {
+    String  ssid;
+    int32_t rssi;
+    bool    open;
+    bool    is5GHz;
+};
+
 class WifiCaptive
 {
 private:
@@ -55,6 +62,12 @@ private:
     std::function<void()> _resetcallback;
 
     WifiCredentials _savedWifis[WIFI_MAX_SAVED_CREDS];
+    int _lastIndex = 0;
+
+    std::vector<ExternalNetwork> _networks;
+
+    using ModemConnectCallback = std::function<bool(const String& ssid, const String& pass)>;
+    ModemConnectCallback _modemConnectCallback;
 
     void setUpDNSServer(DNSServer &dnsServer, const IPAddress &localIP);
     void readWifiCredentials();
@@ -63,9 +76,9 @@ private:
     int readLastUsedWifiIndex();
     void saveApiServer(String url);
     bool tryConnectWithRetries(const WifiCredentials creds, int last_used_index);
-    std::vector<WifiCredentials> matchNetworks(std::vector<Network> &scanResults, WifiCredentials wifiCredentials[]);
-    std::vector<Network> getScannedUniqueNetworks(bool runScan);
-    std::vector<Network> combineNetworks(std::vector<Network> &scanResults, WifiCredentials wifiCredentials[]);
+    std::vector<WifiCredentials> matchNetworks(std::vector<WifiNetwork> &scanResults, WifiCredentials wifiCredentials[]);
+    std::vector<WifiNetwork> getScannedUniqueNetworks(bool runScan);
+    std::vector<WifiNetwork> combineNetworks(std::vector<WifiNetwork> &scanResults, WifiCredentials wifiCredentials[]);
 
 public:
     wl_status_t connect(const WifiCredentials credentials);
@@ -88,6 +101,16 @@ public:
     /// @brief Connects to the saved SSID with the best signal strength
     /// @return True if successfully connected to saved SSID, false otherwise.
     bool autoConnect();
+
+    /// @brief Replaces the internal WiFi scan list with an externally provided one.
+    ///        Call before startPortal() so the portal shows these networks exclusively.
+    void setNetworks(const std::vector<ExternalNetwork>& nets);
+
+    /// @brief Returns the last successfully used WiFi credentials (including is5GHz flag).
+    WifiCredentials getLastCredentials();
+
+    /// @brief Registers a callback used to connect to 5 GHz networks via the modem.
+    void setModemConnectCallback(ModemConnectCallback cb);
 
     /// @brief Checks if there are saved WiFi credentials
     /// @return True if there are saved credentials, false otherwise.

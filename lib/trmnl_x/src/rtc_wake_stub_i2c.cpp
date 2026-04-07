@@ -1,3 +1,4 @@
+#ifdef BOARD_TRMNL_X
 #include "rtc_wake_stub_i2c.h"
 #include "hal/gpio_ll.h"
 #include "esp_rom_gpio.h"
@@ -223,3 +224,4 @@ void wake_stub_i2c_read(uint8_t addr7, uint8_t reg, uint8_t *out, size_t len)
     
     i2c_stop();
 }
+#endif // BOARD_TRMNL_X

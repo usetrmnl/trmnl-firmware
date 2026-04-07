@@ -1,3 +1,4 @@
+#ifdef BOARD_TRMNL_X
 
 #include <Arduino.h>
 #include <functional>
@@ -948,3 +949,4 @@ time_t Modem::getSntpTime() {
   Serial.printf("[MODEM] SNTP UTC time: %lu\n", (unsigned long)ts);
   return ts;
 }
+#endif // BOARD_TRMNL_X

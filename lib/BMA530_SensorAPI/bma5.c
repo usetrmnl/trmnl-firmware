@@ -1165,8 +1165,8 @@ int8_t bma5_get_fifo_fill_level(uint16_t *fifo_fill_level, struct bma5_dev *dev)
     uint8_t reg_value;
 
     /* Temporary variables to carry values of components */
-    uint8_t fifo_fill_level_7_0;
-    uint8_t fifo_fill_level_10_8;
+    uint8_t fifo_fill_level_7_0 = 0;
+    uint8_t fifo_fill_level_10_8 = 0;
 
     if (NULL == fifo_fill_level)
     {
@@ -1205,7 +1205,7 @@ int8_t bma5_get_fifo_wm(uint16_t *fifo_wm, struct bma5_dev *dev)
     uint8_t reg_value;
 
     /* Temporary variables to carry values of components */
-    uint8_t fifo_watermark_level_7_0;
+    uint8_t fifo_watermark_level_7_0 = 0;
     uint8_t fifo_watermark_level_10_8;
 
     if (NULL == fifo_wm)

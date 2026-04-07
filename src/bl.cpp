@@ -31,6 +31,7 @@
 #include "http_client.h"
 #include <api-client/display.h>
 #include "driver/gpio.h"
+#include "esp_ota_ops.h"
 #include "esp_sntp.h"
 #include "esp_flash.h"
 #include <nvs.h>
@@ -48,7 +49,7 @@ BBTemp bbt;
 bool bCO2 = false;
 int iSensorType = -1;
 long lSampleTime;
-RTC_DATA_ATTR int lastCO2 = 0, lastSCDTemp = 0, lastTemp = 0, lastSCDHumid = 0, lastHumid = 0, lastPressure = 0, lastType = -1, lastTime = 0;
+int lastCO2 = 0, lastSCDTemp = 0, lastTemp = 0, lastSCDHumid = 0, lastHumid = 0, lastPressure = 0, lastType = -1, lastTime = 0;
 #endif // SENSOR_SDA
 bool pref_clear = false;
 String new_filename = "";
@@ -71,6 +72,9 @@ esp_sleep_wakeup_cause_t wakeup_reason = ESP_SLEEP_WAKEUP_UNDEFINED; // wake-up 
 MSG current_msg = NONE;
 SPECIAL_FUNCTION special_function = SF_NONE;
 RTC_DATA_ATTR uint8_t need_to_refresh_display = 1;
+RTC_DATA_ATTR bool otg_state = false;  // Track OTG state across deep sleep
+RTC_DATA_ATTR char szPrevFile[36];
+bool touchbar_tap_mode = true;  // false = "slide", true = "tap" (default)
 
 Preferences preferences;
 PreferencesPersistence preferencesPersistence(preferences);
@@ -99,8 +103,17 @@ static bool checkCurrentFileName(String &newName);
 static DeviceStatusStamp getDeviceStatusStamp();
 void log_nvs_usage();
 void fixFileName(const char *src, char *dest);
+void config_gpio_for_lp();
+int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious);
 
 static unsigned long startup_time = 0;
+
+#ifndef BOARD_TRMNL_X
+// Create stub functions for the touchbar workaround
+void iqs323_task_i2c_lock(void) {}
+void iqs323_task_i2c_unlock(void) {}
+bool otg_message = false;
+#endif // !BOARD_TRMNL_X
 
 void wait_for_serial() {
 #ifdef WAIT_FOR_SERIAL
@@ -115,6 +128,412 @@ void wait_for_serial() {
   Log_info("## Waited for serial.. %d ms", idx * 100);
 #endif
 }
+#ifdef BOARD_TRMNL_X
+// ############################ WAKEUP STUB #############################
+#include "rtc_wake_stub_trmnl_x.h"
+// ############################ WAKEUP STUB #############################
+
+// ############################ IQS323 TASK #############################
+#include "iqs323_task.h"
+// ############################ IQS323 TASK #############################
+
+// ############################ SLIDER ##################################
+#include "IQS323.h"
+
+void process_iqs323_data(void);
+
+IQS323 iqs323;
+#define IQS323_I2C_ADDRESS 0x44
+// Sensor states
+iqs323_ch_states button_states[3];
+uint16_t slider_position = 65535;
+iqs323_gesture_events slider_event = IQS323_GESTURE_NONE;
+bool otg_message = false;
+
+#define SENSOR_SDA_PIN 39
+#define SENSOR_SCL_PIN 40
+#define SENSOR_READY_PIN GPIO_NUM_3
+
+// WiFi reset confirmation constants
+#define WIFI_RESET_CONFIRMATION_TIMEOUT_MS 15000
+#define WIFI_RESET_POLL_INTERVAL_MS 100
+
+// Static flag to prevent re-entry during confirmation
+static bool in_wifi_reset_confirmation = false;
+
+// Read gesture data directly without triggering other handlers
+void read_gesture_data_only()
+{
+  // Read slider coordinates
+  uint16_t buffer = iqs323.sliderCoordinate();
+  if (buffer != slider_position) {
+    slider_position = buffer;
+  }
+
+  // Read gesture event
+  bool gesture_event = iqs323.getSliderEvent();
+  if (gesture_event) {
+    iqs323_gesture_events gesture_buffer = iqs323.getGestureType();
+    if (gesture_buffer != IQS323_GESTURE_NONE) {
+      slider_event = gesture_buffer;
+    }
+  }
+}
+// Returns true if channel i has been held for HOLD_THRESHOLD_MS since wakeup stub.
+// Releases the I2C lock during the wait so the iqs323 task can update the memory map.
+static bool tap_mode_is_hold(uint8_t channel_index)
+{
+    const uint32_t HOLD_THRESHOLD_US = 600000;  // 600 ms
+    uint32_t ticks_per_us = esp_rom_get_cpu_ticks_per_us();
+
+    uint32_t elapsed_us = esp_cpu_get_cycle_count() / ticks_per_us - wakeup_time;
+    if (elapsed_us < HOLD_THRESHOLD_US) {
+        uint32_t remaining_ms = (HOLD_THRESHOLD_US - elapsed_us) / 1000;
+        iqs323_task_i2c_unlock();
+        delay(remaining_ms);
+        iqs323_task_i2c_lock();
+    }
+    // Force a live read so the cache reflects the current touch state.
+    // In event mode the device does not push release updates automatically.
+    iqs323.updateInfoFlags(STOP);
+    return iqs323.channel_touchState((iqs323_channel_e)channel_index);
+}
+
+// Check if user wants to confirm WiFi reset (middle button hold)
+bool check_wifi_reset_confirm()
+{
+  if (slider_event == IQS323_GESTURE_HOLD && iqs323.channel_touchState(IQS323_CH1)) {
+    Log_info("WiFi reset confirmed by user - holding middle button");
+    return true;
+  }
+  return false;
+}
+
+// Check if user wants to cancel WiFi reset (any tap)
+bool check_wifi_reset_cancel()
+{
+  if (slider_event == IQS323_GESTURE_TAP) {
+    Log_info("WiFi reset cancelled by user - tap detected");
+    return true;
+  }
+  return false;
+}
+
+// Handle WiFi reset confirmation flow
+void handle_wifi_reset_confirmation()
+{
+  Log_info("Entering WiFi reset confirmation mode");
+  in_wifi_reset_confirmation = true;
+
+  showMessageWithLogo(WIFI_RESET_CONFIRM);
+
+  if (touchbar_tap_mode) {
+    const uint32_t HOLD_MS = 600;
+    const uint32_t POLL_MS = 20;
+    unsigned long start_time = millis();
+
+    while (millis() - start_time < WIFI_RESET_CONFIRMATION_TIMEOUT_MS) {
+      delay(POLL_MS);
+      iqs323.updateInfoFlags(STOP);
+
+      // Outer buttons → cancel immediately
+      if (iqs323.channel_touchState(IQS323_CH0) || iqs323.channel_touchState(IQS323_CH2)) {
+        Log_info("WiFi reset cancelled by user - outer button in tap mode");
+        in_wifi_reset_confirmation = false;
+        return;
+      }
+
+      // Middle button touched → determine TAP vs HOLD
+      if (iqs323.channel_touchState(IQS323_CH1)) {
+        unsigned long touch_start = millis();
+        while (millis() - touch_start < HOLD_MS) {
+          delay(POLL_MS);
+          iqs323.updateInfoFlags(STOP);
+          if (!iqs323.channel_touchState(IQS323_CH1)) {
+            Log_info("WiFi reset cancelled by user - tap on middle button in tap mode");
+            in_wifi_reset_confirmation = false;
+            return;
+          }
+        }
+        Log_info("WiFi reset confirmed by user - holding middle button in tap mode");
+        in_wifi_reset_confirmation = false;
+        resetDeviceCredentials();
+        return;
+      }
+    }
+
+    Log_info("WiFi reset confirmation timeout - cancelling");
+    in_wifi_reset_confirmation = false;
+    return;
+  }
+
+  unsigned long start_time = millis();
+
+  // Poll for user input until timeout or action
+  while (millis() - start_time < WIFI_RESET_CONFIRMATION_TIMEOUT_MS) {
+    delay(WIFI_RESET_POLL_INTERVAL_MS);
+    read_gesture_data_only();  // Read gesture without triggering handlers
+
+    if (check_wifi_reset_confirm()) {
+      in_wifi_reset_confirmation = false;
+      resetDeviceCredentials();
+      return;
+    }
+
+    if (check_wifi_reset_cancel()) {
+      in_wifi_reset_confirmation = false;
+      return;
+    }
+    // Clear event after checking (if finger removed)
+    if (slider_position == 65535) {
+      slider_event = IQS323_GESTURE_NONE;
+    }
+  }
+
+  // Timeout - cancel reset
+  Log_info("WiFi reset confirmation timeout - cancelling");
+  in_wifi_reset_confirmation = false;
+}
+
+// Check if both left and right corners are being held
+bool check_wifi_reset_trigger()
+{
+  bool left  = iqs323.channel_touchState(IQS323_CH0);
+  bool right = iqs323.channel_touchState(IQS323_CH2);
+  if (!left || !right) return false;
+
+  if (touchbar_tap_mode) {
+    return tap_mode_is_hold(0) && tap_mode_is_hold(2);  // both outer channels active
+  }
+  return slider_event == IQS323_GESTURE_HOLD;
+}
+
+void check_channel_states(void)
+{
+  // Don't check for WiFi reset trigger if already in confirmation mode
+  if (!in_wifi_reset_confirmation && check_wifi_reset_trigger()) {
+    handle_wifi_reset_confirmation();
+    return;
+  }
+
+  /* Loop through all the active channels */
+  for (uint8_t i = 0; i < 3; i++) {
+    if (iqs323.channel_touchState((iqs323_channel_e)(i))) {
+      if (touchbar_tap_mode) {
+        // Tap mode
+        bool hold = tap_mode_is_hold(i);
+        switch (i) {
+        case 0:
+          if (!hold) {
+            Log_info("Back button tapped");
+            int file_size = 0;
+            String lastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
+            if (lastPath.isEmpty()) { Log_info("No previous image saved"); break; }
+            Log_info("Reading previous image from %s", lastPath.c_str());
+            buffer = display_read_file(lastPath.c_str(), &file_size);
+            if (buffer && file_size > 0) { display_show_image(buffer, file_size, false); goToSleep(); }
+          }
+          break;
+        case 1:
+          if (hold) {
+            Log_info("Middle button held - OTG toggle");
+            if (otg_state) {
+              otg_turn_off();
+              showMessageWithLogo(OTG_TURNED_OFF); otg_state = false;
+            }
+            else {
+              otg_turn_on(); 
+              showMessageWithLogo(OTG_TURNED_ON);
+              otg_state = true;
+            }
+            otg_message = true;
+          }
+          // No action - update on tap
+          break;
+        case 2:
+          if (!hold) {
+            Log_info("Next button tapped");
+            int file_size = 0;
+            String curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
+            if (curPath.isEmpty()) { Log_info("No current image saved"); break; }
+            Log_info("Reading current image from %s", curPath.c_str());
+            buffer = display_read_file(curPath.c_str(), &file_size);
+            if (buffer && file_size > 0) { display_show_image(buffer, file_size, false); goToSleep(); }
+          }
+          break;
+        }
+        button_states[i] = IQS323_CH_TOUCH;
+      } else {
+        // Slide mode
+        if ((slider_event == IQS323_GESTURE_TAP || slider_event == IQS323_GESTURE_HOLD)) {
+          printf("CH: %d: Touch\n", i);
+          switch (i) {
+          case 0:
+            Log_info("Back button pressed");
+            break;
+          case 1:
+            Log_info("Middle button pressed");
+            if (otg_state) {
+              otg_turn_off();
+              showMessageWithLogo(OTG_TURNED_OFF); otg_state = false;
+            }
+            else {
+              otg_turn_on(); 
+              showMessageWithLogo(OTG_TURNED_ON);
+              otg_state = true;
+            }
+            otg_message = true;
+            Log_info("Free heap after drawing message with logo: %u bytes, max heap chunk: %u", ESP.getFreeHeap(), ESP.getMaxAllocHeap());
+            break;
+          case 2:
+            Log_info("Next button pressed");
+            break;
+          }
+          button_states[i] = IQS323_CH_TOUCH;
+        }
+      }
+    }
+  }
+}
+
+void read_slider_coordinates(void)
+{
+  /* read slider coordinates from memory */
+  uint16_t buffer = iqs323.sliderCoordinate();
+
+  if(buffer != slider_position)
+  {
+    slider_position = buffer;
+  }
+}
+
+/* Function to process Slider gesture events */
+void read_gesture_event(void)
+{
+  /* Read slider bit to check if a slider event occurred */
+  bool gesture_event = iqs323.getSliderEvent();
+  printf("Gesture event: %d\n", gesture_event);
+  if (gesture_event)
+  {
+    /* returns slider event that occurred (tap, swipe or flick) by reading event bits from MM */
+    iqs323_gesture_events gesture_buffer = iqs323.getGestureType();
+    printf("Gesture type: %d\n", gesture_buffer);
+    if(gesture_buffer != IQS323_GESTURE_NONE)
+    {
+      slider_event = gesture_buffer;
+      int file_size = 0;
+      switch (slider_event)
+      {
+        case IQS323_GESTURE_UNKNOWN:
+          Log_info("SLIDER: UNKNOWN (something went wrong?)");
+          break;
+        case IQS323_GESTURE_TAP:
+          Log_info("SLIDER: Tap");
+          break;
+        case IQS323_GESTURE_SWIPE_NEGATIVE:
+          Log_info("SLIDER: Swipe <-");
+          if (!touchbar_tap_mode) {
+            String swipeLastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
+            if (swipeLastPath.isEmpty()) { Log_info("No previous image saved"); break; }
+            Log_info("Reading previous image from %s", swipeLastPath.c_str());
+            buffer = display_read_file(swipeLastPath.c_str(), &file_size);
+            if (!buffer || file_size == 0) {
+              Log_info("No previous image found");
+              break;
+            }
+            Log_info("Drawing previous plugin... File size: %d", file_size);
+            display_show_image(buffer, file_size, false);
+            goToSleep();
+          }
+          break;
+        case IQS323_GESTURE_SWIPE_POSITIVE:
+          Log_info("SLIDER: Swipe ->");
+          if (!touchbar_tap_mode) {
+            String swipeCurPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
+            if (swipeCurPath.isEmpty()) { Log_info("No current image saved"); break; }
+            Log_info("Reading current image from %s", swipeCurPath.c_str());
+            buffer = display_read_file(swipeCurPath.c_str(), &file_size);
+            if (!buffer || file_size == 0) {
+              Log_info("No current image found");
+              break;
+            }
+            Log_info("Drawing current plugin... File size: %d", file_size);
+            display_show_image(buffer, file_size, false);
+            goToSleep();
+          }
+          break;
+        case IQS323_GESTURE_FLICK_NEGATIVE:
+          Log_info("SLIDER: Flick <-");
+          break;
+        case IQS323_GESTURE_FLICK_POSITIVE:
+          Log_info("SLIDER: Flick ->");
+          break;
+        case IQS323_GESTURE_HOLD:
+          Log_info("SLIDER: Hold");
+          break;
+        case IQS323_GESTURE_NONE:
+          Log_info("SLIDER: None");
+          break;
+      }
+
+      /* Clear event if a finger is removed from slider after the event was processed */
+      if (slider_position == 65535)
+      {
+        slider_event = IQS323_GESTURE_NONE;
+      }
+    }
+  }
+}
+void process_iqs323_data(void)
+{
+  /* Read slider coordinates from memory */
+  uint16_t buffer = iqs323.sliderCoordinate();
+
+  if(buffer != slider_position)
+  {
+    slider_position = buffer;
+  }
+
+  Log_info("Slider position: %d", slider_position);
+
+  iqs323_task_i2c_lock();
+
+  /* Read gesture event if available */
+  read_gesture_event();
+
+  iqs323_task_i2c_unlock();
+
+  if (!in_wifi_reset_confirmation && check_wifi_reset_trigger()) {
+    handle_wifi_reset_confirmation();
+    return;
+  }
+
+  iqs323_task_i2c_lock();
+
+  /* Check channel touch states */
+  check_channel_states();
+
+  iqs323_task_i2c_unlock();
+}
+// ############################ SLIDER ################################
+
+// ############################ ACCELERATOR ###########################
+#include "accelerometer.h"
+// ############################ ACCELERATOR ###########################
+
+// ############################ esp32c5 modem #########################
+#include "modem.h"
+
+// File-scope modem pointer — set once during bl_init(), used by download helpers.
+static Modem* g_modem = nullptr;
+// ############################ esp32c5 modem #########################
+
+// ############################ Gas gauge #############################
+#include "BQ27427.h"
+battery_count_t battery_count = BATTERY_NONE;
+bool battery_charging = false;
+// ############################ Gas gauge #############################
+#endif
 
 /**
  * @brief Function to init business logic module
@@ -123,9 +542,15 @@ void wait_for_serial() {
  */
 void bl_init(void)
 {
+#ifdef BOARD_TRMNL_X
+  uint32_t init_time = esp_cpu_get_cycle_count() / esp_rom_get_cpu_ticks_per_us();
+#endif // BOARD_TRMNL_X
   startup_time = millis();
+#ifdef DEV_FIRMWARE
   Serial.begin(115200);
+  wait_for_serial();
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
+#endif
   Log_info("BL init success");
   pins_init();
   vBatt = readBatteryVoltage(); // Read the battery voltage BEFORE WiFi is turned on
@@ -186,6 +611,16 @@ void bl_init(void)
       bbt.stop(); // turn off the sensor to conserve power
   }
 #endif // SENSOR_SDA
+#ifdef BOARD_TRMNL_X
+  // Debug: Print all wakeup_stub_iqs_status structure fields
+  Log_info("wakeup_stub_iqs_status.status: 0x%02X 0x%02X", wakeup_stub_iqs_status.status[0], wakeup_stub_iqs_status.status[1]);
+  Log_info("wakeup_stub_iqs_status.gestures: 0x%02X 0x%02X", wakeup_stub_iqs_status.gestures[0], wakeup_stub_iqs_status.gestures[1]);
+  Log_info("wakeup_stub_iqs_status.slider_cords: 0x%02X 0x%02X", wakeup_stub_iqs_status.slider_cords[0], wakeup_stub_iqs_status.slider_cords[1]);
+  Log_info("wakeup_stub_iqs_status.ch0_cnts: 0x%02X 0x%02X 0x%02X 0x%02X", wakeup_stub_iqs_status.ch0_cnts[0], wakeup_stub_iqs_status.ch0_cnts[1], wakeup_stub_iqs_status.ch0_cnts[2], wakeup_stub_iqs_status.ch0_cnts[3]);
+  Log_info("wakeup_stub_iqs_status.ch1_cnts: 0x%02X 0x%02X 0x%02X 0x%02X", wakeup_stub_iqs_status.ch1_cnts[0], wakeup_stub_iqs_status.ch1_cnts[1], wakeup_stub_iqs_status.ch1_cnts[2], wakeup_stub_iqs_status.ch1_cnts[3]);
+  Log_info("wakeup_stub_iqs_status.ch2_cnts: 0x%02X 0x%02X 0x%02X 0x%02X", wakeup_stub_iqs_status.ch2_cnts[0], wakeup_stub_iqs_status.ch2_cnts[1], wakeup_stub_iqs_status.ch2_cnts[2], wakeup_stub_iqs_status.ch2_cnts[3]);
+#endif
+
 #if defined(BOARD_SEEED_XIAO_ESP32C3)
   delay(2000);
 
@@ -197,8 +632,12 @@ void bl_init(void)
 #endif
 
   wakeup_reason = esp_sleep_get_wakeup_cause();
+  bool gpio_wakeup = (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO ||
+                      wakeup_reason == ESP_SLEEP_WAKEUP_EXT0 ||
+                      wakeup_reason == ESP_SLEEP_WAKEUP_EXT1);
 
-  if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO || wakeup_reason == ESP_SLEEP_WAKEUP_EXT0 || wakeup_reason == ESP_SLEEP_WAKEUP_EXT1)
+  #ifndef BOARD_TRMNL_X
+  if (gpio_wakeup)
   {
     Log_info("GPIO wakeup detected (%d)", wakeup_reason);
     auto button = read_button_presses();
@@ -226,6 +665,24 @@ void bl_init(void)
     wait_for_serial();
     Log_info("Non-GPIO wakeup (%d) -> didn't read buttons", wakeup_reason);
   }
+#else // BOARD_TRMNL_X
+  // Notify IQS323 task about wakeup type BEFORE starting the task
+
+  Log.info("%s [%d]: Display init\r\n", __FILE__, __LINE__);
+  iqs323_task_i2c_lock();
+  display_init();
+  iqs323_task_i2c_unlock();
+  filesystem_init();
+
+  Wire.setClock(100000);
+
+  if (gpio_wakeup) {
+    Log_info("GPIO wakeup detected (%d) - using wake stub data", wakeup_reason);
+    iqs323_task_notify_gpio_wakeup(true);
+  } else {
+    Log_info("Non-GPIO wakeup (%d)", wakeup_reason);
+  }
+#endif // BOARD_TRMNL_X
 
   Log_info("preferences start");
   bool res = preferences.begin("data", false);
@@ -247,6 +704,33 @@ void bl_init(void)
     ESP.restart();
   }
   Log_info("preferences end");
+#ifdef BOARD_TRMNL_X
+  touchbar_tap_mode = preferences.getBool(PREFERENCES_TOUCHBAR_MODE_KEY, true);
+  Log_info("Touchbar mode from preferences: %s", touchbar_tap_mode ? "Tap" : "Slide");
+
+  // Start IQS323 task manager
+  if (!iqs323_task_init(NULL)) {
+    Log_error("IQS323 Task: Failed to start - rebooting");
+    delay(1000);
+    ESP.restart();
+  }
+
+  // Wait for IQS323 initialization to complete
+  if (!iqs323_task_wait_ready(5000)) {
+    Log_error("IQS323 Task: Initialization timeout - rebooting");
+    delay(1000);
+    ESP.restart();
+  }
+
+  if (gpio_wakeup) {
+    process_iqs323_data();
+  }
+
+  // For future
+  // iqs323_task_set_data_callback(process_iqs323_data);
+
+  Log_info("init time: %ld us", init_time);
+#else // BOARD_TRMNL_X
 
   if (double_click)
   { // special function reading
@@ -310,6 +794,42 @@ void bl_init(void)
 
   // Mount SPIFFS
   filesystem_init();
+#endif // !BOARD_TRMNL_X
+
+// #ifdef BOARD_TRMNL_X
+
+//   int8_t rslt;
+//   // I2C already initialized by IQS323 - do not call Wire.begin() again as it corrupts the bus on ESP32S3
+//   Serial.printf("Using I2C bus already initialized (SDA: %d, SCL: %d)\n\n", SENSOR_SDA_PIN, SENSOR_SCL_PIN);
+
+//   struct bma5_dev bma530_dev;
+
+//   rslt = bma530_init_device(&bma530_dev);
+//   if (rslt != BMA5_OK) {
+//     Serial.println("Failed to initialize BMA530!");
+//   }
+
+//   rslt = bma530_configure_low_power_mode(&bma530_dev);
+//   if (rslt != BMA5_OK) {
+//     Serial.println("Failed to configure BMA530 low power mode!");
+//   }
+
+//   rslt = bma530_configure_orientation(&bma530_dev);
+//   if (rslt != BMA5_OK) {
+//     Serial.println("Failed to configure BMA530 orientation!");
+//   }
+
+//   // Configure INT1 pin
+//   rslt = bma530_configure_int1(&bma530_dev);
+//   if (rslt != BMA5_OK) {
+//       Serial.println("Failed to configure BMA530 INT1!");
+//   }
+
+//   config_bma530_interrupt();
+
+//   pinMode(TCA9535_INT, INPUT);
+
+// #endif
 
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
   {
@@ -324,6 +844,104 @@ void bl_init(void)
     Log.info("%s [%d]: Display TRMNL logo end\r\n", __FILE__, __LINE__);
     preferences.putString(PREFERENCES_FILENAME_KEY, "");
   }
+#ifdef BOARD_TRMNL_X
+  battery_count = detect_battery_count();
+  battery_charging = is_charging();
+  Log_info("BATTERY COUNT: %d", battery_count);
+  Log_info("BATTERY CHARGING: %s", battery_charging ? "YES" : "NO");
+
+  if (battery_count != BATTERY_NONE) {
+    BQ27427_reset();
+    delay(300); // BQ27427 needs 250 ms to power up
+
+    if (!lipo.begin(SENSOR_SDA_PIN, SENSOR_SCL_PIN)) {
+    // If communication fails, print an error message and loop forever.
+      Log_error("Error: Unable to communicate with BQ27427.");
+      gpio_dump_io_configuration(stdout, (1ULL << 39));
+      gpio_dump_io_configuration(stdout, (1ULL << 40));
+    }
+    else {
+    Log_info("Connected to BQ27427!");
+
+    if (battery_count == BATTERY_ONE) {
+      Log_info("One battery detected");
+      lipo.configureOneCell();
+    }
+    else if (battery_count == BATTERY_TWO) {
+      Log_info("Two batteries detected");
+      lipo.configureTwoCell();
+    }
+
+    // After SOFT_RESET the BQ27427 enters INITIALIZATION (ITPOR=1).
+    // The IT algorithm needs an OCV measurement (battery at rest) to
+    // transition to NORMAL mode and produce accurate capacity values.
+    // Poll for up to 5 s; under active load it may not clear until rest.
+    {
+      unsigned long t0 = millis();
+      while ((lipo.flags() & BQ27427_FLAG_ITPOR) && (millis() - t0 < 5000)) {
+        delay(100);
+      }
+      if (lipo.flags() & BQ27427_FLAG_ITPOR) {
+        Log_info("BQ27427: ITPOR still set — device in INITIALIZATION, capacity values may be stale");
+      } else {
+        Log_info("BQ27427: ITPOR cleared — device in NORMAL mode");
+        lipo._initialized = true;
+      }
+    }
+
+    uint8_t energyScale = lipo.designEnergyScale();
+    unsigned int soc = lipo.soc();                               // State-of-charge (%) — use this for battery level display
+    unsigned int volts = lipo.voltage();                         // Battery voltage (mV)
+    int current = lipo.current(AVG);                            // Average current (mA)
+    float temperature = float((lipo.temperature(BATTERY)) - 2732) / 10.0;         // Temperature (C)
+    unsigned int fullCapacity = lipo.capacity(FULL) * energyScale; // Full capacity (mAh) — valid only in NORMAL mode
+    unsigned int capacity = lipo.capacity(REMAIN) * energyScale;   // Remaining capacity (mAh) — valid only in NORMAL mode
+    int health = lipo.soh();                                     // State-of-health (%)
+
+    // Assemble a string to print
+    String toPrint = "[" + String(millis() / 1000) + "] ";
+    toPrint += String(soc) + "% | ";
+    toPrint += String(temperature, 1) + " C | ";
+    toPrint += String(volts) + " mV | ";
+    toPrint += String(current) + " mA | ";
+    toPrint += String(capacity) + " / ";
+    toPrint += String(fullCapacity) + " mAh | ";
+    toPrint += String(health) + "%";
+    //fast charging allowed
+    if (lipo.chgFlag())
+        toPrint += " CHG";
+
+    //full charge detected
+    if (lipo.fcFlag())
+        toPrint += " FC";
+
+    //battery is discharging
+    if (lipo.dsgFlag())
+        toPrint += " DSG";
+
+    // ITPOR flag: device still in INITIALIZATION, capacity values may be stale
+    if (lipo.itporFlag())
+        toPrint += " INIT";
+
+    // Print the string
+    Serial.println(toPrint);
+
+    if (lipo.fcFlag()) {
+      Log_info("BATTERY IS FULL");
+      // full, charger connected but not drawing current
+    } else if (lipo.chgFlag()) {
+      Log_info("BATTERY IS CHARGING");
+      // actively charging
+    } else if (lipo.dsgFlag()) {
+      Log_info("BATTERY IS DISCHARGING");
+      // discharging
+    }
+  }
+  }
+  else {
+    Log_info("No battery detected - skipping BQ27427 initialization");
+  }
+#endif // BOARD_TRMNL_X
 
   Log_info("Firmware version %s", FW_VERSION_STRING);
   Log_info("Arduino version %d.%d.%d", ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH);
@@ -335,6 +953,34 @@ void bl_init(void)
   // showMessageWithLogo(MSG_FORMAT_ERROR);
   // display_show_msg(storedLogoOrDefault(1), WIFI_CONNECT, "ABCDEF", true, FW_VERSION_STRING, "Hello World!");
   // wifiErrorDeepSleep();
+#ifdef BOARD_TRMNL_X
+  modem_reset_target();
+  delay(500);  // give modem time to boot before UART init
+  static Modem modemInstance(115200);
+  if (modemInstance.isInitialized()) {
+    g_modem = &modemInstance;
+  } else {
+    Log_info("Modem init failed — falling back to 2.4 GHz mode");
+    g_modem = nullptr;
+  } 
+    
+  // Only scan when no credentials are saved (i.e. captive portal will be shown). 
+  if (g_modem && !WifiCaptivePortal.isSaved())
+  {
+    Log_info("No saved credentials — scanning networks via modem...");
+    auto modemNets = g_modem->scanNetworks();
+    Log_info("Modem found %d network(s)", modemNets.size());
+    std::vector<ExternalNetwork> nets;
+    for (auto& n : modemNets)
+      nets.push_back({n.ssid, n.rssi, n.open, n.is5GHz});
+    WifiCaptivePortal.setNetworks(nets);
+
+    // Register callback so captive portal can connect 5 GHz networks via modem
+    WifiCaptivePortal.setModemConnectCallback([](const String& ssid, const String& pass) {
+      return g_modem->connectToNetwork(ssid, pass);
+    });
+  }
+#endif // BOARD_TRMNL_X
 
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
 
@@ -352,7 +998,21 @@ void bl_init(void)
   {
     // WiFi saved, connection
     Log.info("%s [%d]: WiFi saved\r\n", __FILE__, __LINE__);
+#ifdef BOARD_TRMNL_X
+    WifiCredentials lastCreds = WifiCaptivePortal.getLastCredentials();
+    int connection_res;
+    if (lastCreds.is5GHz && g_modem)
+    {
+      Log.info("%s [%d]: 5 GHz network saved — connecting via modem\r\n", __FILE__, __LINE__);
+      connection_res = g_modem->connectToNetwork(lastCreds.ssid, lastCreds.pswd) ? 1 : 0;
+    }
+    else
+    {
+      connection_res = WifiCaptivePortal.autoConnect();
+    }
+#else
     int connection_res = WifiCaptivePortal.autoConnect();
+#endif // BOARD_TRMNL_X
 
     Log.info("%s [%d]: Connection result: %d, WiFI Status: %d\r\n", __FILE__, __LINE__, connection_res, WiFi.status());
 
@@ -439,7 +1099,9 @@ void bl_init(void)
 
   if (request_result == HTTPS_IMAGE_FILE_TOO_BIG)
   {
+    iqs323_task_i2c_lock();
     showMessageWithLogo(MSG_TOO_BIG);
+    iqs323_task_i2c_unlock();
   }
 
   if (!preferences.isKey(PREFERENCES_CONNECT_API_RETRY_COUNT))
@@ -450,6 +1112,7 @@ void bl_init(void)
   if (request_result != HTTPS_SUCCESS && request_result != HTTPS_NO_ERR && request_result != HTTPS_NO_REGISTER && request_result != HTTPS_RESET && request_result != HTTPS_PLUGIN_NOT_ATTACHED)
   {
     uint8_t retries = preferences.getInt(PREFERENCES_CONNECT_API_RETRY_COUNT);
+    iqs323_task_i2c_lock();
 
     switch (retries)
     {
@@ -483,6 +1146,7 @@ void bl_init(void)
       preferences.putInt(PREFERENCES_CONNECT_API_RETRY_COUNT, ++retries);
       break;
     }
+    iqs323_task_i2c_unlock();
   }
 
   else
@@ -583,6 +1247,7 @@ void bl_init(void)
   }
 
   // display go to sleep
+  Log_info("%s [%d]: BL done, going to sleep...", __FILE__, __LINE__);
   display_sleep();
   if (!update_firmware)
     goToSleep();
@@ -650,6 +1315,26 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   inputs.macAddress = WiFi.macAddress();
 
   inputs.batteryVoltage = vBatt; //readBatteryVoltage();
+#ifdef BOARD_TRMNL_X
+  inputs.batteryCount = battery_count;
+  inputs.batteryCharging = battery_charging; // 1 charging, 0 not charging
+  if (lipo._initialized) { // only report SoC if battery was detected and BQ27427 initialized successfully
+    inputs.stateOfCharge = lipo.soc();
+    inputs.stateOfHealth = lipo.soh();
+    inputs.batteryCurrent = lipo.current(AVG);
+    inputs.batteryTemperature = float((lipo.temperature(BATTERY)) - 2732) / 10.0; // convert from K to C
+    inputs.currentBatteryCapacity = lipo.capacity(REMAIN) * lipo.designEnergyScale();
+    inputs.maxBatteryCapacity = lipo.capacity(FULL) * lipo.designEnergyScale();
+  }
+  else {
+    inputs.stateOfCharge = -1;
+    inputs.stateOfHealth = -1;
+    inputs.batteryCurrent = -1;
+    inputs.batteryTemperature = -1;
+    inputs.currentBatteryCapacity = -1;
+    inputs.maxBatteryCapacity = -1;
+  }
+#endif // BOARD_TRMNL_X
 
   inputs.firmwareVersion = String(FW_VERSION_STRING);
 
@@ -662,6 +1347,17 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   return inputs;
 }
 
+void load_prev_image(void)
+{
+  uint8_t *buffer;
+  size_t content_size = 0; //filesystem_read_and_allocate(szPrevFile, &buffer);
+  if (content_size > 0) {
+    // Decode it into the previous buffer
+    Log.info("%s [%d]: Decoding previous image (%s) into FastEPD previous buffer\r\n", __FILE__, __LINE__, szPrevFile);
+    png_to_epd(buffer, content_size, true);
+  }
+} /* load_prev_image() */
+
 /**
  * @brief Function to ping server and download and show the image if all is OK
  * @param url Server URL address
@@ -669,6 +1365,48 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
  */
 static https_request_err_e downloadAndShow()
 {
+  auto apiDisplayInputs = loadApiDisplayInputs(preferences);
+
+  #ifdef BOARD_TRMNL_X
+  if (g_modem && WifiCaptivePortal.getLastCredentials().is5GHz)
+  {
+    Log_info("Fetching /api/display via modem (5 GHz path)");
+    String reqHeaders = "";
+    reqHeaders += "ID: "               + apiDisplayInputs.macAddress                + "\n";
+    reqHeaders += "Access-Token: "     + apiDisplayInputs.apiKey                    + "\n";
+    reqHeaders += "Refresh-Rate: "     + String(apiDisplayInputs.refreshRate)       + "\n";
+    reqHeaders += "Battery-Voltage: " + String(apiDisplayInputs.batteryVoltage, 2) + "\n";
+    reqHeaders += "Battery-Count: "   + String(apiDisplayInputs.batteryCount)     + "\n";
+    reqHeaders += "Battery-Charging: " + String(apiDisplayInputs.batteryCharging) + "\n";
+    reqHeaders += "Percent-Charged: " + String(apiDisplayInputs.stateOfCharge) + "\n";
+    reqHeaders += "Battery-Health: "  + String(apiDisplayInputs.stateOfHealth) + "\n";
+    reqHeaders += "Battery-Current: " + String(apiDisplayInputs.batteryCurrent) + "\n";
+    reqHeaders += "Battery-Temp: "    + String(apiDisplayInputs.batteryTemperature) + "\n";
+    reqHeaders += "Battery-Capacity: " + String(apiDisplayInputs.currentBatteryCapacity) + "/" + String(apiDisplayInputs.maxBatteryCapacity) + "\n";
+    reqHeaders += "FW-Version: "       + apiDisplayInputs.firmwareVersion           + "\n";
+    reqHeaders += "Model: "            + apiDisplayInputs.model                     + "\n";
+    reqHeaders += "RSSI: "             + String(apiDisplayInputs.rssi)              + "\n";
+    reqHeaders += "Width: "            + String(apiDisplayInputs.displayWidth)      + "\n";
+    reqHeaders += "Height: "           + String(apiDisplayInputs.displayHeight);
+    if (apiDisplayInputs.specialFunction != SF_NONE)
+      reqHeaders += "\nspecial_function: true";
+
+    auto httpRes = g_modem->httpGet(apiDisplayInputs.baseUrl + "/api/display", "", 0, reqHeaders);
+    if (!httpRes.ok)
+    {
+      Log_error_submit("Modem /api/display request failed (%u bytes received)", httpRes.bytesReceived);
+      return HTTPS_REQUEST_FAILED;
+    }
+    auto apiResp = parseResponse_apiDisplay(httpRes.body);
+    if (apiResp.outcome == ApiDisplayOutcome::DeserializationError)
+    {
+      Log_error_submit("Modem /api/display JSON parse error: %s", apiResp.error_detail.c_str());
+      return HTTPS_JSON_PARSING_ERR;
+    }
+    apiDisplayResult = {HTTPS_NO_ERR, apiResp, ""};
+  }
+#else // BOARD_TRMNL_X
+
   IPAddress serverIP;
   String apiHostname = preferences.getString(PREFERENCES_API_URL, API_BASE_URL);
   apiHostname.replace("https://", "");
@@ -694,9 +1432,9 @@ static https_request_err_e downloadAndShow()
     }
   }
 
-  auto apiDisplayInputs = loadApiDisplayInputs(preferences);
 
   apiDisplayResult = fetchApiDisplay(apiDisplayInputs);
+#endif // !BOARD_TRMNL_X
 
   if (apiDisplayResult.error != HTTPS_NO_ERR)
   {
@@ -708,15 +1446,76 @@ static https_request_err_e downloadAndShow()
 
   if (!status && result == HTTPS_SUCCESS) { // this means we already have this image stored in SPIFFS
       char szTemp[36];
+#ifdef BOARD_X_CLASS
+      if (szPrevFile[0]) {
+        load_prev_image(); // decode the older image into the previous buffer of FastEPD
+      }
+#endif // BOARD_X_CLASS
       fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
-      Log.info("%s [%d]: Reading %s from SPIFFS\r\n", __FILE__, __LINE__, szTemp);
+      Log.info("%s [%d]: Reading %s from FLASH\r\n", __FILE__, __LINE__, szTemp);
       size_t content_size = filesystem_read_and_allocate(szTemp, &buffer);
+      if (!buffer || content_size == 0) {
+        filesystem_file_delete(szTemp);
+        Log_error_submit("Cached image is empty or unreadable: %s", szTemp);
+        return HTTPS_WRONG_IMAGE_SIZE;
+      }
       Log.info("%s [%d]: Decoding image...\r\n", __FILE__, __LINE__);
       display_show_image(buffer, content_size, true);
       free(buffer);
       buffer = nullptr;
+      strcpy(szPrevFile, szTemp); // current image becomes the previous image
+      // Rotate NVS path keys: last ← current ← szTemp
+      String _curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
+      if (!_curPath.isEmpty() && _curPath != String(szTemp))
+        preferences.putString(PREFERENCES_LAST_PATH_KEY, _curPath);
+      preferences.putString(PREFERENCES_CURRENT_PATH_KEY, String(szTemp));
       return result;
   }
+
+  #ifdef BOARD_TRMNL_X
+// Special logic (TRMNL-X only) to download and disply the image if using a 5GHz AP
+  if (status && !update_firmware && !reset_firmware &&
+      WifiCaptivePortal.getLastCredentials().is5GHz && g_modem)
+  {
+    Log_info("Downloading image via modem (5 GHz path)");
+
+    char szTemp[36];
+    fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
+    Log_info("Modem: saving to %s", szTemp);
+    filesystem_purge_old_file(szTemp);
+
+    String _prevPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
+    if (!_prevPath.isEmpty()) preferences.putString(PREFERENCES_LAST_PATH_KEY, _prevPath);
+
+    auto httpRes = g_modem->httpGet(String(filename), szTemp, 0);
+    if (!httpRes.ok)
+    {
+      Log_error_submit("Modem httpGet failed: %u bytes received", httpRes.bytesReceived);
+      return HTTPS_REQUEST_FAILED;
+    }
+
+    int fileSize = 0;
+    uint8_t* buf = display_read_file(szTemp, &fileSize);
+    if (!buf || fileSize == 0)
+    {
+      filesystem_file_delete(szTemp);
+      Log_error_submit("Modem: failed to read downloaded image from %s", szTemp);
+      return HTTPS_WRONG_IMAGE_SIZE;
+    }
+
+    display_show_image(buf, fileSize, true);
+    free(buf);
+
+    preferences.putString(PREFERENCES_CURRENT_PATH_KEY, String(szTemp));
+
+//    new_filename = apiDisplayResult.response.filename;
+//    saveCurrentFileName(new_filename);
+
+    if (result != HTTPS_PLUGIN_NOT_ATTACHED)
+      result = HTTPS_SUCCESS;
+    return result;
+  }
+#endif // BOARD_TRMNL_X
 
   withHttp(
       filename,
@@ -741,7 +1540,7 @@ static https_request_err_e downloadAndShow()
           https.addHeader("ID", apiDisplayInputs.macAddress);
           https.addHeader("Access-Token", apiDisplayInputs.apiKey);
         }
-        
+
         if (status && !update_firmware && !reset_firmware)
         {
           status = false;
@@ -1072,6 +1871,17 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
 {
   https_request_err_e result = HTTPS_NO_ERR;
   int file_size = 0;
+
+#ifdef BOARD_TRMNL_X
+  // Set touchbar mode and persist to NVS
+  if (apiResponse.touchbar_mode.length() == 0 || touchbar_tap_mode == (apiResponse.touchbar_mode == "tap")) {
+    Log.info("%s [%d]: No need to update touchbar mode\r\n", __FILE__, __LINE__);
+  }
+  else {
+    touchbar_tap_mode = (apiResponse.touchbar_mode == "tap");
+    preferences.putBool(PREFERENCES_TOUCHBAR_MODE_KEY, touchbar_tap_mode);
+  }
+#endif // BOARD_TRMNL_X
 
   if (special_function == SF_NONE)
   {
@@ -1656,9 +2466,36 @@ static bool performApiSetup()
   Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
   Log.info("%s [%d]: Device MAC address: %s\r\n", __FILE__, __LINE__, WiFi.macAddress().c_str());
 
+  ApiSetupResult result;
   // Call the API client
-  ApiSetupResult result = fetchApiSetup(inputs);
-
+#ifdef BOARD_TRMNL_X
+  if (g_modem && WifiCaptivePortal.getLastCredentials().is5GHz)
+  {
+    Log_info("API setup via modem (5 GHz path)");
+    String reqHeaders = "";
+    reqHeaders += "ID: "         + inputs.macAddress      + "\n";
+    reqHeaders += "FW-Version: " + inputs.firmwareVersion + "\n";
+    reqHeaders += "Model: "      + inputs.model           + "\n";
+    auto httpRes = g_modem->httpGet(inputs.baseUrl + "/api/setup", "", 0, reqHeaders);
+    if (!httpRes.ok)
+    {
+      Log_error_submit("[MODEM] /api/setup request failed (%u bytes received)", httpRes.bytesReceived);
+      result = {HTTPS_RESPONSE_CODE_INVALID, {}, "Modem httpGet failed"};
+    }
+    else
+    {
+      auto apiResp = parseResponse_apiSetup(httpRes.body);
+      if (apiResp.outcome == ApiSetupOutcome::DeserializationError)
+        result = {HTTPS_JSON_PARSING_ERR, {}, "JSON deserialization error"};
+      else
+        result = {HTTPS_NO_ERR, apiResp, ""};
+    }
+  }
+  else
+#endif // BOARD_TRMNL_X
+  {
+    result = fetchApiSetup(inputs);
+  }
   // Handle connection errors
   if (result.error == HTTPS_UNABLE_TO_CONNECT)
   {
@@ -1749,6 +2586,24 @@ static void downloadSetupImage()
 {
   status = false;
   Log.info("%s [%d]: filename - %s\r\n", __FILE__, __LINE__, filename);
+
+  #ifdef BOARD_TRMNL_X
+  if (WifiCaptivePortal.getLastCredentials().is5GHz && g_modem)
+  {
+    Log_info("Downloading setup image via modem (5 GHz path)");
+    auto httpRes = g_modem->httpGet(String(filename), "/logo.bmp");
+    if (!httpRes.ok || httpRes.bytesReceived != DISPLAY_BMP_IMAGE_SIZE)
+    {
+      Log_error_submit("Modem logo download failed: ok=%d bytes=%u expected=%u",
+                       httpRes.ok, httpRes.bytesReceived, DISPLAY_BMP_IMAGE_SIZE);
+      return;
+    }
+    String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
+    display_show_msg(storedLogoOrDefault(0), FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
+    need_to_refresh_display = 0;
+    return;
+  }
+#endif // BOARD_TRMNL_X
 
   withHttp(filename, [&](HTTPClient *https, HttpError error) -> bool
            {
@@ -1899,6 +2754,69 @@ static void resetDeviceCredentials(void)
  */
 static void checkAndPerformFirmwareUpdate(void)
 {
+#ifdef BOARD_TRMNL_X
+  if (g_modem && WifiCaptivePortal.getLastCredentials().is5GHz)
+  {
+    Log.info("%s [%d]: Starting modem OTA download...\r\n", __FILE__, __LINE__);
+
+    const esp_partition_t* update_partition = esp_ota_get_next_update_partition(nullptr);
+    if (!update_partition) {
+      Log.fatal("%s [%d]: No OTA partition available\r\n", __FILE__, __LINE__);
+      showMessageWithLogo(FW_UPDATE_FAILED);
+      return;
+    }
+
+    esp_ota_handle_t ota_handle = 0;
+    esp_err_t err = esp_ota_begin(update_partition, OTA_SIZE_UNKNOWN, &ota_handle);
+    if (err != ESP_OK) {
+      Log.fatal("%s [%d]: esp_ota_begin failed: %s\r\n", __FILE__, __LINE__, esp_err_to_name(err));
+      showMessageWithLogo(FW_UPDATE_FAILED);
+      return;
+    }
+
+    showMessageWithLogo(FW_UPDATE);
+
+    bool write_ok = true;
+    auto result = g_modem->httpGet(
+      String(binUrl),
+      [&](const uint8_t* data, size_t len) -> bool {
+        esp_err_t e = esp_ota_write(ota_handle, data, len);
+        if (e != ESP_OK) {
+          Log.fatal("%s [%d]: esp_ota_write failed: %s\r\n", __FILE__, __LINE__, esp_err_to_name(e));
+          write_ok = false;
+          return false;
+        }
+        return true;
+      }
+    );
+
+    if (!result.ok || !write_ok) {
+      esp_ota_abort(ota_handle);
+      Log.fatal("%s [%d]: Modem OTA download failed\r\n", __FILE__, __LINE__);
+      showMessageWithLogo(FW_UPDATE_FAILED);
+      return;
+    }
+
+    err = esp_ota_end(ota_handle);
+    if (err != ESP_OK) {
+      Log.fatal("%s [%d]: esp_ota_end failed: %s\r\n", __FILE__, __LINE__, esp_err_to_name(err));
+      showMessageWithLogo(FW_UPDATE_FAILED);
+      return;
+    }
+
+    err = esp_ota_set_boot_partition(update_partition);
+    if (err != ESP_OK) {
+      Log.fatal("%s [%d]: esp_ota_set_boot_partition failed: %s\r\n", __FILE__, __LINE__, esp_err_to_name(err));
+      showMessageWithLogo(FW_UPDATE_FAILED);
+      return;
+    }
+
+    Log.info("%s [%d]: Modem OTA successful. Rebooting...\r\n", __FILE__, __LINE__);
+    showMessageWithLogo(FW_UPDATE_SUCCESS);
+    esp_restart();
+    return;
+  }
+#endif
 
   withHttp(binUrl, [&](HTTPClient *https, HttpError errorCode) -> bool
            {
@@ -1962,11 +2880,36 @@ static void checkAndPerformFirmwareUpdate(void)
  */
 static void goToSleep(void)
 {
+  Log.info("%s [%d]: go to sleep\r\n", __FILE__, __LINE__);
   submitStoredLogs();
   if (WiFi.status() == WL_CONNECTED) {
     WiFi.disconnect();
   }
   WiFi.mode(WIFI_OFF); 
+
+#if BOARD_TRMNL_X
+  Log_info("Preparing IQS323 for sleep via task...");
+
+  // Use task manager for sleep preparation (sets event mode, checks I2C health)
+  if (!iqs323_task_prepare_sleep(5000)) {
+    Log.warning("IQS323 sleep preparation timeout - proceeding anyway\n");
+  }
+
+  // Configure gesture mode last so prepare_sleep's writeMM() cannot override it
+  iqs323_task_i2c_lock();
+  iqs323.setGestureConfig(touchbar_tap_mode, STOP);
+  iqs323_task_i2c_unlock();
+
+  // Cleanup the task before entering deep sleep
+  iqs323_task_deinit();
+  Log_info("IQS323 is ready for sleep.");
+
+  esp_set_deep_sleep_wake_stub(*wakeup_stub);
+  display_sleep();
+  config_tca95535_pins_for_lp();
+  config_gpio_for_lp();
+#endif
+
   filesystem_deinit();
   uint32_t time_to_sleep = SLEEP_TIME_TO_SLEEP;
 
@@ -1995,6 +2938,63 @@ static void goToSleep(void)
   esp_deep_sleep_start();
 }
 
+void config_gpio_for_lp() {
+
+#ifdef BOARD_TRMNL_X
+  // XCL
+  pinMode(GPIO_NUM_4, INPUT);
+
+  // Data pins (d8 to d15)
+  pinMode(GPIO_NUM_5, INPUT);
+  pinMode(GPIO_NUM_6, INPUT);
+  pinMode(GPIO_NUM_7, INPUT);
+  pinMode(GPIO_NUM_15, INPUT);
+  pinMode(GPIO_NUM_16, INPUT);
+  pinMode(GPIO_NUM_17, INPUT);
+  pinMode(GPIO_NUM_18, INPUT);
+  pinMode(GPIO_NUM_8, INPUT);
+
+  // D+ D-
+  // pinMode(GPIO_NUM_19, INPUT);
+  // pinMode(GPIO_NUM_20, INPUT);
+
+  // Data pins (d0 to d7)
+  pinMode(GPIO_NUM_9, INPUT);
+  pinMode(GPIO_NUM_10, INPUT);
+  pinMode(GPIO_NUM_11, INPUT);
+  pinMode(GPIO_NUM_12, INPUT);
+  pinMode(GPIO_NUM_13, INPUT);
+  pinMode(GPIO_NUM_14, INPUT);
+  pinMode(GPIO_NUM_21, INPUT);
+  pinMode(GPIO_NUM_47, INPUT);
+
+  // EP_STV
+  pinMode(GPIO_NUM_48, INPUT);
+
+  // CKV
+  pinMode(GPIO_NUM_45, INPUT);
+
+  // BTN1
+  pinMode(GPIO_NUM_0, INPUT);
+
+  // I2C
+  pinMode(GPIO_NUM_39, INPUT); // SDA
+  pinMode(GPIO_NUM_40, INPUT); // SCL
+
+  // XSTL
+  pinMode(GPIO_NUM_41, INPUT);
+
+  // LEH
+  pinMode(GPIO_NUM_42, INPUT);
+
+  // UART0
+  pinMode(GPIO_NUM_43, INPUT); // TXD
+  pinMode(GPIO_NUM_44, INPUT); // RXD
+  pinMode(GPIO_NUM_1, INPUT); // CTS
+  pinMode(GPIO_NUM_2, INPUT); // RTS
+#endif // BOARD_TRMNL_X
+} /* config_gpio_for_lp() */
+
 // Not sure if WiFiClientSecure checks the validity date of the certificate.
 // Setting clock just to be sure...
 /**
@@ -2021,6 +3021,29 @@ static bool setClock()
   String ntp = prefs.getString("ntp_server", "time.google.com");
 
   Log.info("%s [%d]: Using NTP: %s, fallback: time.cloudflare.com\r\n", __FILE__, __LINE__, ntp.c_str());
+  #ifdef BOARD_TRMNL_X
+  if (g_modem && WifiCaptivePortal.getLastCredentials().is5GHz)
+  {
+    time_t t = g_modem->getSntpTime();
+    if (t > 0)
+    {
+      struct timeval tv = { t, 0 };
+      settimeofday(&tv, nullptr);
+      getLocalTime(&timeinfo);
+      sync_status = true;
+      Log.info("%s [%d]: Time synchronization via modem succeed!\r\n", __FILE__, __LINE__);
+      prefs.putUInt("last_sync", getTime()); // save epoch time of last sync
+    }
+    else
+    {
+      Log.info("%s [%d]: Time synchronization via modem failed...\r\n", __FILE__, __LINE__);
+    }
+    Log.info("%s [%d]: Current time - %s\r\n", __FILE__, __LINE__, asctime(&timeinfo));
+    prefs.end();
+    return sync_status;
+  }
+#endif
+
   configTime(0, 0, ntp.c_str(), "time.cloudflare.com");
   
   for (int i = 0; i < SNTP_MAX_SERVERS; i++)
@@ -2062,6 +3085,18 @@ static float readBatteryVoltage(void)
 #ifdef FAKE_BATTERY_VOLTAGE
   Log.warning("%s [%d]: FAKE_BATTERY_VOLTAGE is defined. Returning 4.2V.\r\n", __FILE__, __LINE__);
   return 4.2f;
+#elif defined(BOARD_TRMNL_X)
+  if (lipo._initialized)
+  {
+    float voltage = lipo.voltage() / 1000.0; // Convert mV to V
+    Log.info("%s [%d]: Battery voltage reading from BQ27427: %.3f V\r\n", __FILE__, __LINE__, voltage);
+    return voltage;
+  }
+  else
+  {
+    Log.error("%s [%d]: BQ27427 not initialized. Cannot read battery voltage.\r\n", __FILE__, __LINE__);
+    return -1.0;
+  }
 #else
   #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002)
     pinMode(PIN_VBAT_SWITCH, OUTPUT);
@@ -2281,7 +3316,7 @@ static uint8_t *storedLogoOrDefault(int iType)
       }
    }
   }
-#ifdef BOARD_TRMNL_X
+#ifdef BOARD_X_CLASS
     return const_cast<uint8_t *>(logo_medium);
 #else
   if (iType == 0) {

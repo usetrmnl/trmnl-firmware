@@ -1,3 +1,5 @@
+#ifdef BOARD_TRMNL_X
+
 #include <Arduino.h>
 
 #include "Wire.h"
@@ -364,3 +366,4 @@ void bma530_process_orientation(struct bma5_dev *dev) {
 }
 
 // ############################ ACCELEROMETER #############################
+#endif // BOARD_TRMNL_X

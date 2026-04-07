@@ -1,3 +1,4 @@
+#ifdef BOARD_TRMNL_X
 #include "iqs323_task.h"
 #include "IQS323.h"
 #include "rtc_wake_stub_trmnl_x.h"
@@ -632,3 +633,4 @@ static bool iqs323_hardware_reset(void)
     Serial.println("IQS323 Task: Hardware reset failed - device not responding");
     return false;
 }
+#endif // BOARD_TRMNL_X

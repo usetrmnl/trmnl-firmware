@@ -1,3 +1,4 @@
+#ifdef BOARD_TRMNL_X
 #include "rtc_wake_stub_trmnl_x.h"
 
 #include <inttypes.h>
@@ -74,3 +75,4 @@ void wakeup_stub(void) {
   // booting the firmware.
   return;
 }
+#endif // BOARD_TRMNL_X

@@ -13,7 +13,7 @@ struct WifiOperationCallbacks
 {
     std::function<void()> resetSettings;
     std::function<void(const WifiCredentials, const String)> setConnectionCredentials;
-    std::function<std::vector<Network>(bool)> getAnnotatedNetworks;
+    std::function<std::vector<WifiNetwork>(bool)> getAnnotatedNetworks;
 };
 
 void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperationCallbacks callbacks);

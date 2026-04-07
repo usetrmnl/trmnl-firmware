@@ -20,15 +20,17 @@ struct WifiCredentials
     String subnet;      // e.g., "255.255.255.0" (optional - defaults to 255.255.255.0)
     String dns1;        // optional - defaults to gateway
     String dns2;        // optional - defaults to 8.8.8.8
+    bool is5GHz = false;
 };
 
-struct Network
+struct WifiNetwork
 {
     String ssid;
     int32_t rssi;
     bool open;
     bool saved;
     bool enterprise;
+    bool is5GHz = false;
 };
 
 struct WifiEventData
