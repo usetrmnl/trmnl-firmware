@@ -21,7 +21,6 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
 #ifdef BOARD_TRMNL_X
            "Battery-Charging: %s\n\r"
            "Battery-Count: %s\n\r"
-           "Battery-Voltage: %s\n\r"
            "Percent-Charged: %s\n\r"
            "Battery-Health: %s\n\r"
            "Battery-Current: %s\n\r"
@@ -36,10 +35,19 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
            inputs.specialFunction,
            inputs.apiKey.c_str(),
            String(inputs.refreshRate).c_str(),
+#ifdef BOARD_TRMNL_X
+           String(inputs.batteryCharging).c_str(),
+           String(inputs.batteryCount).c_str(),
+           String(inputs.stateOfCharge).c_str(),
+           String(inputs.stateOfHealth).c_str(),
+           String(inputs.batteryCurrent).c_str(),
+           String(inputs.batteryTemperature).c_str(),
+           (String(inputs.currentBatteryCapacity) + "/" + String(inputs.maxBatteryCapacity)).c_str(),
+#endif // BOARD_TRMNL_X
            String(inputs.batteryVoltage).c_str(),
            inputs.firmwareVersion.c_str(),
            inputs.model.c_str(),
-           String(inputs.rssi));
+           String(inputs.rssi).c_str());
 
   https.addHeader("ID", inputs.macAddress);
   https.addHeader("Content-Type", "application/json");

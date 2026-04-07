@@ -25,18 +25,20 @@ static void handle_store_submit(LogLevel level, const char *clean_message, const
 
 void log_impl(LogLevel level, LogMode mode, const char* file, int line, const char* format, ...) {
     const int MAX_USER_MESSAGE = 512;
-    
+
     va_list args;
     va_start(args, format);
-    
-    // Format user message with truncation
-    char* user_message = (char*)alloca(MAX_USER_MESSAGE);
+
+    // Format user message with truncation (heap to avoid stack overflow in deep call chains)
+    char* user_message = (char*)malloc(MAX_USER_MESSAGE);
+    if (!user_message) { va_end(args); return; }
     format_message_truncated(user_message, MAX_USER_MESSAGE, format, args);
     va_end(args);
-    
+
     // Measure exact length needed for serial buffer
     int serial_len = snprintf(nullptr, 0, "%s [%d]: %s", file, line, user_message) + 1;
-    char* serial_buffer = (char*)alloca(serial_len);
+    char* serial_buffer = (char*)malloc(serial_len);
+    if (!serial_buffer) { free(user_message); return; }
     snprintf(serial_buffer, serial_len, "%s [%d]: %s", file, line, user_message);
     
     switch (level) {
@@ -53,9 +55,11 @@ void log_impl(LogLevel level, LogMode mode, const char* file, int line, const ch
         Log.fatalln(serial_buffer);
         break;
     }
+    free(serial_buffer);
 
     if (mode != LOG_SERIAL_ONLY)
     {
         handle_store_submit(level, user_message, file, line, mode);
     }
+    free(user_message);
 }
