@@ -7,7 +7,11 @@
 #include <esp_wifi.h>          //Used for mpdu_rx_disable android workaround
 #include <AsyncJson.h>
 #include "Preferences.h"
+#ifdef BOARD_TRMNL_X
+#include "WifiCaptivePage_x.h"
+#else
 #include "WifiCaptivePage.h"
+#endif // BOARD_TRMNL_X
 #include <ArduinoJson.h>
 #include "wifi-types.h"
 
@@ -29,6 +33,7 @@
 
 #define WIFI_SSID_KEY(i) ("wifi_" + String(i) + "_ssid").c_str()
 #define WIFI_PSWD_KEY(i) ("wifi_" + String(i) + "_pswd").c_str()
+#define WIFI_5GHZ_KEY(i) ("wifi_" + String(i) + "_5g").c_str()
 #define WIFI_ENT_KEY(i) ("wifi_" + String(i) + "_ent").c_str()
 #define WIFI_USERNAME_KEY(i) ("wifi_" + String(i) + "_username").c_str()
 #define WIFI_IDENTITY_KEY(i) ("wifi_" + String(i) + "_identity").c_str()
