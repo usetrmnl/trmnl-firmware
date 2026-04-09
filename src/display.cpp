@@ -844,10 +844,14 @@ int png_draw(PNGDRAW *pDraw)
                 }
             } // for x
         } else { // normal 0/1 split plane
-            ucMask = (iPlane == PNG_2_BIT_0) ? 0x40 : 0x80; // lower or upper source bit
+            const uint8_t ucTranslate[4] = {0, 2, 1, 3}; // translate grays to odd order of native 4-gray mode on 7.5" panel
+            const uint8_t ucNoTranslate[4] = {0, 1, 2, 3}; // for other 2-bit panels
+            uint8_t ucPT = bbep.getPanelType();
+            const uint8_t *pTranslate = (ucPT == EP75_800x480_4GRAY || ucPT == EP75_800x480_4GRAY_GEN2) ? ucTranslate : ucNoTranslate;
+            ucMask = (iPlane == PNG_2_BIT_0) ? 0x1 : 0x2; // lower or upper source bit
             for (x=0; x<iWidth; x++) {
                 uc <<= 1;
-                if (src & ucMask) {
+                if (pTranslate[src>>6] & ucMask) {
                     uc |= 1; // high bit of source pair
                 }
                 src <<= 2;
@@ -1262,6 +1266,7 @@ PNG *png = new PNG();
                     png->decode(&iPlane, 0);
                 } // temp profile needs the second plane written
             } else { // 2-bpp (or greater, but reduced to 2-bpp)
+                Log_info("%s [%d]: Using temp profile %d\r\n", __FILE__, __LINE__, iTempProfile);
                 bbep.setPanelType(dpList[iTempProfile].TwoBit);
                 rc = REFRESH_FULL; // 4gray mode must be full refresh
                 iUpdateCount = 0; // grayscale mode resets the partial update counter
@@ -1383,11 +1388,6 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     }
     Log_info("Display refresh start");
 #ifdef BB_EPAPER
-    if (iTempProfile != apiDisplayResult.response.temp_profile) {
-        iTempProfile = apiDisplayResult.response.temp_profile;
-        Log_info("Saving new temperature profile (%d) to FLASH", iTempProfile);
-        preferences.putUInt(PREFERENCES_TEMP_PROFILE, iTempProfile);
-    }
     if ((iUpdateCount & 7) == 0 || apiDisplayResult.response.maximum_compatibility == true) {
         Log_info("%s [%d]: Forcing full refresh; desired refresh mode was: %d\r\n", __FILE__, __LINE__, iRefreshMode);
         iRefreshMode = REFRESH_FULL; // force full refresh every 8 partials
@@ -1399,7 +1399,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
         iRefreshMode = REFRESH_FAST;
     }
     if (bbep.capabilities() & (BBEP_4COLOR | BBEP_3COLOR | BBEP_7COLOR)) bWait = 1;
-    if (!bWait) iRefreshMode = REFRESH_PARTIAL; // fast update when showing loading screen
+    if (!bWait) iRefreshMode = REFRESH_FAST; // fast update when showing loading screen
     Log_info("%s [%d]: EPD refresh mode: %d\r\n", __FILE__, __LINE__, iRefreshMode);
     bbep.setLightSleep(true);
     bbep.refresh(iRefreshMode, bWait);
