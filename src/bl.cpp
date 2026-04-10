@@ -134,6 +134,7 @@ void wait_for_serial() {
 }
 
 #ifdef BOARD_TRMNL_X
+#include <qa.h> // For device turn off feature
 // ############################ WAKEUP STUB #############################
 #include "rtc_wake_stub_trmnl_x.h"
 // ############################ WAKEUP STUB #############################
@@ -164,8 +165,14 @@ bool otg_message = false;
 #define WIFI_RESET_CONFIRMATION_TIMEOUT_MS 15000
 #define WIFI_RESET_POLL_INTERVAL_MS 100
 
-// Static flag to prevent re-entry during confirmation
+// Static flag to prevent re-entry during WiFi reset confirmation
 static bool in_wifi_reset_confirmation = false;
+// Static flag to prevent re-entry during power-off confirmation
+static bool in_power_off_confirmation = false;
+// Cooldown timestamp after cancel to prevent immediate re-trigger
+static uint32_t s_power_off_cooldown_until = 0;
+// Tracks first detection of both corners held so wakeup_time can be reset once
+static bool s_corners_detected = false;
 
 // Read gesture data directly without triggering other handlers
 void read_gesture_data_only()
@@ -301,6 +308,82 @@ void handle_wifi_reset_confirmation()
   // Timeout - cancel reset
   Log_info("WiFi reset confirmation timeout - cancelling");
   in_wifi_reset_confirmation = false;
+}
+
+void handle_power_off_confirmation()
+{
+  Log_info("Entering power-off confirmation mode");
+  in_power_off_confirmation = true;
+
+  showMessageWithLogo(POWER_OFF_CONFIRM);
+
+  if (touchbar_tap_mode) {
+    const uint32_t HOLD_MS = 600;
+    const uint32_t POLL_MS = 20;
+    unsigned long start_time = millis();
+
+    while (millis() - start_time < WIFI_RESET_CONFIRMATION_TIMEOUT_MS) {
+      delay(POLL_MS);
+      iqs323.updateInfoFlags(STOP);
+
+      // Outer buttons → cancel
+      if (iqs323.channel_touchState(IQS323_CH0) || iqs323.channel_touchState(IQS323_CH2)) {
+        Log_info("Power-off cancelled - outer button");
+        in_power_off_confirmation = false;
+        return;
+      }
+
+      // Middle button → distinguish tap vs hold
+      if (iqs323.channel_touchState(IQS323_CH1)) {
+        unsigned long touch_start = millis();
+        while (millis() - touch_start < HOLD_MS) {
+          delay(POLL_MS);
+          iqs323.updateInfoFlags(STOP);
+          if (!iqs323.channel_touchState(IQS323_CH1)) {
+            Log_info("Power-off cancelled - tap on middle button");
+            in_power_off_confirmation = false;
+            return;
+          }
+        }
+        Log_info("Power-off confirmed - entering shipment mode");
+        in_power_off_confirmation = false;
+        clearShipmentStatus();
+        ESP.restart();
+        return;
+      }
+    }
+
+    Log_info("Power-off confirmation timeout - cancelling");
+    in_power_off_confirmation = false;
+    return;
+  }
+
+  // Slide mode
+  unsigned long start_time = millis();
+  while (millis() - start_time < WIFI_RESET_CONFIRMATION_TIMEOUT_MS) {
+    delay(WIFI_RESET_POLL_INTERVAL_MS);
+    read_gesture_data_only();
+
+    if (check_wifi_reset_confirm()) {  // middle button hold
+      Log_info("Power-off confirmed (slide mode) - entering shipment mode");
+      in_power_off_confirmation = false;
+      clearShipmentStatus();
+      ESP.restart();
+      return;
+    }
+
+    if (check_wifi_reset_cancel()) {
+      in_power_off_confirmation = false;
+      return;
+    }
+
+    if (slider_position == 65535) {
+      slider_event = IQS323_GESTURE_NONE;
+    }
+  }
+
+  Log_info("Power-off confirmation timeout - cancelling");
+  in_power_off_confirmation = false;
 }
 
 // Check if both left and right corners are being held
@@ -1087,6 +1170,35 @@ void bl_init(void)
     Log_info("FW version %s", FW_VERSION_STRING);
 
     showMessageWithLogo(WIFI_CONNECT, "", false, FW_VERSION_STRING, "");
+#ifdef BOARD_TRMNL_X
+    WifiCaptivePortal.setPortalTickCallback([]() {
+      if (in_power_off_confirmation) return;
+      if (millis() < s_power_off_cooldown_until) return;
+      iqs323_task_i2c_lock();
+      iqs323.updateInfoFlags(STOP);
+      bool left  = iqs323.channel_touchState(IQS323_CH0);
+      bool right = iqs323.channel_touchState(IQS323_CH2);
+      if (left && right) {
+        if (!s_corners_detected) {
+          // Reset wakeup_time so tap_mode_is_hold() waits 600 ms from this point
+          wakeup_time = esp_cpu_get_cycle_count() / esp_rom_get_cpu_ticks_per_us();
+          s_corners_detected = true;
+        }
+        if (check_wifi_reset_trigger()) {
+          s_corners_detected = false;
+          handle_power_off_confirmation();
+          // Only reached on cancel — confirmed path calls ESP.restart()
+          s_power_off_cooldown_until = millis() + 2000;
+          iqs323_task_i2c_unlock();
+          showMessageWithLogo(WIFI_CONNECT, "", false, FW_VERSION_STRING, "");
+          return;
+        }
+      } else {
+        s_corners_detected = false;
+      }
+      iqs323_task_i2c_unlock();
+    });
+#endif
     WifiCaptivePortal.setResetSettingsCallback(resetDeviceCredentials);
     res = WifiCaptivePortal.startPortal();
     if (!res)
@@ -2672,13 +2784,27 @@ static void downloadSetupImage()
     WiFiClient *stream = https->getStreamPtr();
 
     uint32_t counter = 0;
+#ifdef BOARD_TRMNL_X
+    int contentSize = https->getSize();
+    buffer = (uint8_t *)malloc(contentSize > 0 ? contentSize : 1);
+    if (buffer == nullptr)
+    {
+      Log_error_submit("Failed to allocate buffer for setup image (%d bytes)", contentSize);
+      return false;
+    }
+    if (stream->available() && contentSize > 0)
+    {
+      counter = downloadStream(stream, contentSize, buffer);
+    }
+#else
     // Read and save BMP data to buffer
     buffer = (uint8_t *)malloc(https->getSize());
     if (stream->available() && https->getSize() == DISPLAY_BMP_IMAGE_SIZE)
     {
       counter = downloadStream(stream, DISPLAY_BMP_IMAGE_SIZE, buffer);
     }
-    
+#endif
+
     if (counter == DISPLAY_BMP_IMAGE_SIZE)
     {
       Log.info("%s [%d]: Received successfully\r\n", __FILE__, __LINE__);
@@ -2690,6 +2816,22 @@ static void downloadSetupImage()
       display_show_msg(storedLogoOrDefault(0), FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
       need_to_refresh_display = 0;
     }
+#ifdef BOARD_TRMNL_X
+    else if (counter >= 4 && buffer[0] == 0x89 && buffer[1] == 'P' && buffer[2] == 'N' && buffer[3] == 'G')
+    {
+      Log.info("%s [%d]: Received PNG setup logo (%d bytes)\r\n", __FILE__, __LINE__, counter);
+      display_show_image(buffer, counter, true);
+      need_to_refresh_display = 0;
+      free(buffer);
+      buffer = nullptr;
+    }
+    else
+    {
+      free(buffer);
+      buffer = nullptr;
+      Log_error_submit("Setup image: unexpected format or size. Read: %d bytes (expected BMP %d)", counter, DISPLAY_BMP_IMAGE_SIZE);
+    }
+#else
     else
     {
       free(buffer);
@@ -2704,6 +2846,7 @@ static void downloadSetupImage()
       }
       Log_error_submit("Receiving failed. Read: %d", counter);
     }
+#endif
     
     return true; });
 }

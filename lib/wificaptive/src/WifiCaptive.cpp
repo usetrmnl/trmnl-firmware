@@ -114,6 +114,8 @@ bool WifiCaptive::startPortal()
     {
         _dnsServer->processNextRequest();
 
+        if (_tickCallback) _tickCallback();
+
         if (_ssid == "")
         {
             delay(DNS_INTERVAL);
@@ -230,6 +232,11 @@ wl_status_t WifiCaptive::connect(const WifiCredentials credentials)
 void WifiCaptive::setResetSettingsCallback(std::function<void()> func)
 {
     _resetcallback = func;
+}
+
+void WifiCaptive::setPortalTickCallback(std::function<void()> func)
+{
+    _tickCallback = func;
 }
 
 bool WifiCaptive::isSaved()

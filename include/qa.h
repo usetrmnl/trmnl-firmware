@@ -16,8 +16,14 @@ bool checkIfAlreadyShipped();
 
 bool saveShipmentDone();
 
+bool clearShipmentStatus();
+
 bool checkIfShipmentStarted();
 
 bool saveShipmentStarted();
+
+bool checkIfModemFlashed();
+
+bool saveModemFlashed();
 
 bool enableShipmentMode();

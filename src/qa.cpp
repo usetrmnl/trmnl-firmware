@@ -62,6 +62,14 @@ bool saveShipmentDone(){
   return true;
 }
 
+bool clearShipmentStatus(){
+  preferencesQA.begin("qa", false);
+  preferencesQA.putBool("ship_done", false);
+  preferencesQA.putBool("ship_started", false);
+  preferencesQA.end();
+  return true;
+}
+
 bool checkIfShipmentStarted(){
   preferencesQA.begin("qa", true);
   bool status = preferencesQA.getBool("ship_started", false);
@@ -76,15 +84,32 @@ bool saveShipmentStarted(){
   return true;
 }
 
+bool checkIfModemFlashed(){
+  preferencesQA.begin("qa", true);
+  bool status = preferencesQA.getBool("modem_flashed", false);
+  preferencesQA.end();
+  return status;
+}
+
+bool saveModemFlashed(){
+  preferencesQA.begin("qa", false);
+  preferencesQA.putBool("modem_flashed", true);
+  preferencesQA.end();
+  return true;
+}
+
 bool enableShipmentMode() {
   // should be already initialized
   // display_init();
 
   Serial.println("Waiting for USB plug-off to enter shipment mode...");
 
-  while (check_usb_power()) {
-    Serial.println("USB power still detected, waiting...");
-    delay(2000);
+  if (check_usb_power()) {
+    display_show_msg(const_cast<uint8_t *>(logo_medium),READY_TO_SHIP);
+    while (check_usb_power()) {
+      Serial.println("USB power still detected, waiting...");
+      delay(2000);
+    }
   }
 
   display_show_msg(const_cast<uint8_t *>(logo_medium),SHIPPING_MODE);
