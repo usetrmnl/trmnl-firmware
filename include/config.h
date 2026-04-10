@@ -80,6 +80,9 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #elif defined(BOARD_TRMNL_X)
 #define PIN_INTERRUPT 0
 #define DEVICE_MODEL "x"
+#elif defined(BOARD_INKPLATE_10)
+#define PIN_INTERRUPT 36
+#define DEVICE_MODEL "inkplate10"
 #elif defined(BOARD_WAVESHARE_ESP32_DRIVER)
 #define PIN_INTERRUPT 33
 #define DEVICE_MODEL "waveshare"
@@ -119,6 +122,8 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 
 #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002)
 #define PIN_BATTERY 1
+#elif defined(BOARD_INKPLATE_10)
+#define PIN_BATTERY 35
 #elif defined(BOARD_XTEINK_X4)
 #define PIN_BATTERY 0
 #else
