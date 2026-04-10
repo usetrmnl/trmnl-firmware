@@ -2820,10 +2820,14 @@ static void downloadSetupImage()
     else if (counter >= 4 && buffer[0] == 0x89 && buffer[1] == 'P' && buffer[2] == 'N' && buffer[3] == 'G')
     {
       Log.info("%s [%d]: Received PNG setup logo (%d bytes)\r\n", __FILE__, __LINE__, counter);
-      display_show_image(buffer, counter, true);
-      need_to_refresh_display = 0;
+      writeImageToFile("/logo.png", buffer, counter);
       free(buffer);
       buffer = nullptr;
+
+      // show the image
+      String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
+      display_show_msg(storedLogoOrDefault(0), FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
+      need_to_refresh_display = 0;
     }
     else
     {
