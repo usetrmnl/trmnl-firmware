@@ -2,8 +2,8 @@
 #define CONFIG_H
 
 #define FW_MAJOR_VERSION 1
-#define FW_MINOR_VERSION 8
-#define FW_PATCH_VERSION 0
+#define FW_MINOR_VERSION 7
+#define FW_PATCH_VERSION 8
 
 // Helper macros for stringification
 #define STRINGIFY(x) #x
@@ -80,6 +80,9 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #elif defined(BOARD_TRMNL_X)
 #define PIN_INTERRUPT 0
 #define DEVICE_MODEL "x"
+#elif defined(BOARD_LILYGO_T5S3_PRO)
+#define PIN_INTERRUPT 48        // Boot button on LilyGo T5S3 Pro
+#define DEVICE_MODEL "lilygo_t5s3_pro"
 #elif defined(BOARD_WAVESHARE_ESP32_DRIVER)
 #define PIN_INTERRUPT 33
 #define DEVICE_MODEL "waveshare"

@@ -124,6 +124,11 @@
 #elif defined(BOARD_TRMNL_X)
    #define FAKE_BATTERY_VOLTAGE
 
+#elif defined(BOARD_LILYGO_T5S3_PRO)
+   // LilyGo T5S3 Pro uses FastEPD library (no manual pin configuration needed)
+   // FastEPD handles all pin assignments internally via BB_PANEL_EPDIY_V7
+   #define FAKE_BATTERY_VOLTAGE
+
 #elif defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002)
    // Pin definition for reTerminal E1001 & E1002
    #define EPD_SCK_PIN  7
