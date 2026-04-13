@@ -1498,7 +1498,11 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
             int y = (height - pBBB->height)/2;
             if (x > 0 || y > 0) // only clear if the image is smaller than the display
             {
+#ifdef BB_EPAPER
+                if (!bbep.getBuffer()) {
+#else
                 if (!bbep.currentBuffer()) {
+#endif
                     Log_error("[DISPLAY-FAIL] TAG: embedded-logo - FATAL: pCurrent is NULL before fillScreen!");
                     return;
                 }
@@ -1521,6 +1525,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
                      image_buffer[4], image_buffer[5], image_buffer[6], image_buffer[7]);
             Log_info("Color params: FG=BBEP_WHITE(%d), BG=BBEP_BLACK(%d)", BBEP_WHITE, BBEP_BLACK);
 
+#ifdef BOARD_LILYGO_T5S3_PRO
             uint8_t *buf = bbep.currentBuffer();
             // Calculate buffer offset for draw position (x,y) with 180° rotation
             // Using same calculation as bbepSetPixelFast16Clr_180
@@ -1537,6 +1542,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
                      buf[offset+4], buf[offset+5], buf[offset+6], buf[offset+7],
                      buf[offset+8], buf[offset+9], buf[offset+10], buf[offset+11],
                      buf[offset+12], buf[offset+13], buf[offset+14], buf[offset+15]);
+#endif
 
             // Use 4-bit pixel values for T5S3 Pro (4BPP mode), symbolic constants for others (1BPP mode)
 #ifdef BOARD_LILYGO_T5S3_PRO
@@ -1547,6 +1553,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
 #endif
             Log_info("loadG5Image() returned: %d", rc);
 
+#ifdef BOARD_LILYGO_T5S3_PRO
             // DIAGNOSTIC: Check buffer after loadG5Image
             Log_info("Buffer AFTER loadG5Image (at offset %d): %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X",
                      offset,
@@ -1554,6 +1561,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
                      buf[offset+4], buf[offset+5], buf[offset+6], buf[offset+7],
                      buf[offset+8], buf[offset+9], buf[offset+10], buf[offset+11],
                      buf[offset+12], buf[offset+13], buf[offset+14], buf[offset+15]);
+#endif
         }
         else
         {
