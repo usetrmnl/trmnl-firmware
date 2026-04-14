@@ -13,6 +13,19 @@ const char *szMakers[] = {"None", "ASAIR", "Bosch", "Bosch", "Bosch", "Sensirion
 
 void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
 {
+#if defined( FAKE_BATTERY_VOLTAGE ) && defined (BOARD_TRMNL_X)
+// Create fake values that satisfy the server
+  inputs.batteryCharging = 0;
+  inputs.batteryCount = 1;
+  inputs.stateOfCharge = 75;
+  inputs.stateOfHealth = 75;
+  inputs.batteryCurrent = 3000;
+  inputs.batteryTemperature = 25;
+  inputs.currentBatteryCapacity = 3000;
+  inputs.maxBatteryCapacity = 4000;
+  inputs.batteryVoltage = 4.2f;
+#endif // FAKE_BATTERY_VOLTAGE
+
   Log_info("Added headers:\n\r"
            "ID: %s\n\r"
            "Special function: %d\n\r"

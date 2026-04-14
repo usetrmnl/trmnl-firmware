@@ -10,6 +10,7 @@
 #include "driver/gpio.h"
 #include "driver/rtc_io.h"
 #include "LittleFS.h"
+#include "battery_small.h"
 #define FS LittleFS
 #endif
 #define MAX_BIT_DEPTH 8
@@ -1205,6 +1206,12 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
                 bbep.fillScreen(BBEP_WHITE); 
             }     
             bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
+#ifdef BOARD_TRMNL_X
+            // Show charging indicator if it's charging
+            if (is_charging()) {
+                bbep.loadG5Image(battery_small, 40, bbep.height() - 120, BBEP_WHITE, BBEP_BLACK);
+            }
+#endif // BOARD_TRMNL_X
         } 
         else 
         {
