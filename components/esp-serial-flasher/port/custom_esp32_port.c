@@ -31,11 +31,7 @@ esp_loader_error_t loader_port_esp32_init(const loader_esp32_config_t *config)
             .parity    = UART_PARITY_DISABLE,
             .stop_bits = UART_STOP_BITS_1,
             .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
-#ifdef UART_SCLK_DEFAULT
             .source_clk = UART_SCLK_DEFAULT,
-#else
-            .source_clk = UART_SCLK_XTAL,
-#endif
         };
 
         int rx_buffer_size = config->rx_buffer_size ? config->rx_buffer_size : 400;

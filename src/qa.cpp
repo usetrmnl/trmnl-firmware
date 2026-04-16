@@ -75,7 +75,22 @@ bool saveShipmentStarted(){
   preferencesQA.end();
   return true;
 }
+
 #ifdef BOARD_TRMNL_X
+bool checkIfModemFlashed(){
+  preferencesQA.begin("qa", true);
+  bool status = preferencesQA.getBool("modem_flashed", false);
+  preferencesQA.end();
+  return status;
+}
+
+bool saveModemFlashed(){
+  preferencesQA.begin("qa", false);
+  preferencesQA.putBool("modem_flashed", true);
+  preferencesQA.end();
+  return true;
+}
+
 bool enableShipmentMode() {
   // should be already initialized
   // display_init();

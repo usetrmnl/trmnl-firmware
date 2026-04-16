@@ -18,34 +18,40 @@ void setup()
   bool isShipped = checkIfAlreadyShipped();
   if (!isShipped) {
    bool shipmentStarted = checkIfShipmentStarted();
+   
+   display_init();
 
    if (shipmentStarted && check_usb_power()) {
-      // Battery died during shipping, now powered by USB charger
-      // Skip shipment mode and mark as complete
+      // USB connected (e.g. battery died in transit and USB revived the device)
+      enter_shipment_sleep();
       saveShipmentDone();
       ESP.restart();
    }
    else {
-      Serial.begin(115200);
-      display_init();
       filesystem_init();
 
-      Serial.println("[MODEM] Resetting modem...");
+      Serial.begin(115200);
+      bool modemFlashed = checkIfModemFlashed();
 
-      modem_reset_target();
-      delay(500);  // let modem reach bootloader
+      if (!modemFlashed) {
+        Serial.println("[MODEM] Resetting modem...");
+        modem_reset_target();
+        delay(500);  // let modem reach bootloader
 
-      display_show_msg(const_cast<uint8_t *>(logo_medium),MODEM_FLASHING);
+        display_show_msg(const_cast<uint8_t *>(logo_medium),MODEM_FLASHING);
 
-      Modem modem(115200);
-      if (modem.flashFromFile("/system/factory_ESP32C5-4MB.bin")) {
-        Serial.println("[MODEM] Factory flash complete.");
+        Modem modem(115200);
+        if (modem.flashFromFile("/system/factory_ESP32C5-4MB.bin")) {
+          Serial.println("[MODEM] Factory flash complete.");
+          saveModemFlashed();
+        }
+        else {
+          Serial.println("[MODEM] Factory flash FAILED.");
+        }
       }
       else {
-        Serial.println("[MODEM] Factory flash FAILED.");
+        Serial.println("[MODEM] Already flashed, skipping...");
       }
-
-      display_show_msg(const_cast<uint8_t *>(logo_medium),READY_TO_SHIP);
       // enableShipmentMode() will block until charger is connected
       enableShipmentMode();
 
