@@ -65,6 +65,7 @@ private:
     WifiCredentials _enterprise_credentials;
 
     std::function<void()> _resetcallback;
+    std::function<void()> _tickCallback = nullptr;
 
     WifiCredentials _savedWifis[WIFI_MAX_SAVED_CREDS];
     int _lastIndex = 0;
@@ -116,6 +117,10 @@ public:
 
     /// @brief Registers a callback used to connect to 5 GHz networks via the modem.
     void setModemConnectCallback(ModemConnectCallback cb);
+
+    /// @brief Sets a callback invoked every portal loop iteration (approx. every 60 ms).
+    ///        Use to poll hardware (e.g., touchbar) while the portal is blocking.
+    void setPortalTickCallback(std::function<void()> func);
 
     /// @brief Checks if there are saved WiFi credentials
     /// @return True if there are saved credentials, false otherwise.

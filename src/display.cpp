@@ -374,6 +374,7 @@ void enter_shipment_sleep()
     }
 
     gpio_wakeup_disable((gpio_num_t)TCA9535_INT);
+    gpio_set_intr_type((gpio_num_t)TCA9535_INT, GPIO_INTR_DISABLE);
     Serial.println("=== Exited shipment mode successfully ===");
     Serial.flush();
 }
@@ -1862,6 +1863,19 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     case WIFI_RESET_CONFIRM:
     {
         const char string1[] = "Are you sure you want to reset WiFi settings?";
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - rect.w)/2, 430);
+        bbep.println(string1);
+        const char string2[] = "Hold middle of touch bar to confirm, tap to cancel.";
+        bbep.getStringBox(string2, &rect);
+        bbep.setCursor((bbep.width() - rect.w)/2, -1);
+        bbep.print(string2);
+    break;
+    }
+    
+    case POWER_OFF_CONFIRM:
+    {
+        const char string1[] = "Turn off device?";
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w)/2, 430);
         bbep.println(string1);
