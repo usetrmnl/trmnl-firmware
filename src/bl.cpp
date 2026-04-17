@@ -191,7 +191,7 @@ void read_gesture_data_only()
 // Releases the I2C lock during the wait so the iqs323 task can update the memory map.
 static bool tap_mode_is_hold(uint8_t channel_index)
 {
-    const uint32_t HOLD_THRESHOLD_US = 600000;  // 600 ms
+    const uint32_t HOLD_THRESHOLD_US = 2000000;  // 2000 ms
     uint32_t ticks_per_us = esp_rom_get_cpu_ticks_per_us();
 
     uint32_t elapsed_us = esp_cpu_get_cycle_count() / ticks_per_us - wakeup_time;
@@ -1482,7 +1482,7 @@ static https_request_err_e downloadAndShow()
 {
   auto apiDisplayInputs = loadApiDisplayInputs(preferences);
 
-  #ifdef BOARD_TRMNL_X
+#ifdef BOARD_TRMNL_X
   if (g_modem && WifiCaptivePortal.getLastCredentials().is5GHz)
   {
     Log_info("Fetching /api/display via modem (5 GHz path)");
@@ -1520,37 +1520,36 @@ static https_request_err_e downloadAndShow()
     }
     apiDisplayResult = {HTTPS_NO_ERR, apiResp, ""};
   }
-#else // BOARD_TRMNL_X
-
-  IPAddress serverIP;
-  String apiHostname = preferences.getString(PREFERENCES_API_URL, API_BASE_URL);
-  apiHostname.replace("https://", "");
-  apiHostname.replace("http://", "");
-  apiHostname.replace("/", "");
-
-  int colon = apiHostname.indexOf(':');
-  if (colon != -1) {
-    apiHostname = apiHostname.substring(0, colon);
-  }
-
-  for (int attempt = 1; attempt <= 5; ++attempt)
+  else 
+#endif // BOARD_TRMNL_X  
   {
-    if (WiFi.hostByName(apiHostname.c_str(), serverIP) == 1)
-    {
-      Log.info("%s [%d]: Hostname resolved to %s on attempt %d\r\n", __FILE__, __LINE__, serverIP.toString().c_str(), attempt);
-      break;
+    IPAddress serverIP;
+    String apiHostname = preferences.getString(PREFERENCES_API_URL, API_BASE_URL);
+    apiHostname.replace("https://", "");
+    apiHostname.replace("http://", "");
+    apiHostname.replace("/", "");
+
+    int colon = apiHostname.indexOf(':');
+    if (colon != -1) {
+      apiHostname = apiHostname.substring(0, colon);
     }
-    else
+
+    for (int attempt = 1; attempt <= 5; ++attempt)
     {
-      Log_error("Failed to resolve hostname on attempt %d", attempt);
-      delay(2000);
+      if (WiFi.hostByName(apiHostname.c_str(), serverIP) == 1)
+      {
+        Log.info("%s [%d]: Hostname resolved to %s on attempt %d\r\n", __FILE__, __LINE__, serverIP.toString().c_str(), attempt);
+        break;
+      }
+      else
+      {
+        Log_error("Failed to resolve hostname on attempt %d", attempt);
+        delay(2000);
+      }
     }
+
+    apiDisplayResult = fetchApiDisplay(apiDisplayInputs);
   }
-
-
-#endif // !BOARD_TRMNL_X
-
-  apiDisplayResult = fetchApiDisplay(apiDisplayInputs);
 
   if (apiDisplayResult.error != HTTPS_NO_ERR)
   {
