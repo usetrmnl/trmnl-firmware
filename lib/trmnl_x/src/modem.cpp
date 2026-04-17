@@ -411,15 +411,16 @@ std::vector<Modem::ModemNetwork> Modem::scanNetworks() {
 
     // Dedup: keep highest RSSI per SSID
     bool found = false;
+    bool is5GHz = channel >= 36;
     for (auto& net : results) {
-      if (net.ssid == ssid) {
+      if (net.ssid == ssid && net.is5GHz == is5GHz) { // only compare RSSI of the same band
         if (rssi > net.rssi) net.rssi = rssi;
         found = true;
         break;
       }
     }
     if (!found) {
-      results.push_back({ssid, rssi, ecn == 0, channel >= 36});
+      results.push_back({ssid, rssi, ecn == 0, is5GHz});
     }
     pos = close;
   }
