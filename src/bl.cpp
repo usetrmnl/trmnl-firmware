@@ -1383,6 +1383,8 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
 
   inputs.baseUrl = preferences.getString(PREFERENCES_API_URL, API_BASE_URL);
 
+  Log.info("%s [%d]: baseUrl from preferences: %s\r\n", __FILE__, __LINE__, inputs.baseUrl.c_str());
+
   char wakeupReasonString[32] = {0};
   if (parseWakeupReasonToStr(wakeupReasonString, sizeof(wakeupReasonString), (esp_sleep_source_t)wakeup_reason))
   {
@@ -1546,8 +1548,9 @@ static https_request_err_e downloadAndShow()
   }
 
 
-  apiDisplayResult = fetchApiDisplay(apiDisplayInputs);
 #endif // !BOARD_TRMNL_X
+
+  apiDisplayResult = fetchApiDisplay(apiDisplayInputs);
 
   if (apiDisplayResult.error != HTTPS_NO_ERR)
   {
@@ -3030,10 +3033,14 @@ static void goToSleep(void)
 {
   Log.info("%s [%d]: go to sleep\r\n", __FILE__, __LINE__);
   submitStoredLogs();
+
+// DEBUG - workaround to prevent crash in the WiFi stack of unknown origin
+#ifndef BOARD_TRMNL_X
   if (WiFi.status() == WL_CONNECTED) {
     WiFi.disconnect();
   }
   WiFi.mode(WIFI_OFF); 
+#endif
 
 #if BOARD_TRMNL_X
   Log_info("Preparing IQS323 for sleep via task...");
