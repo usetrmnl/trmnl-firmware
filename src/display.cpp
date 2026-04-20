@@ -62,22 +62,22 @@ uint8_t u8SpectraPal[512]; // RGB333 mapped to closest Spectra6 color
 #include "FastEPD.h"
 FASTEPD bbep;
 const uint8_t u8_graytable[] = {
-/* 0 */  2, 2, 2, 1, 1, 1, 1, 1, 1, 
-/* 1 */  2, 2, 1, 1, 1, 2, 2, 1, 1, 
-/* 2 */  2, 2, 2, 2, 1, 2, 2, 1, 1, 
+/* 0 */  0, 0, 0, 0, 0, 0, 1, 1, 1, 
+/* 1 */  0, 0, 1, 1, 1, 2, 2, 1, 1, 
+/* 2 */  0, 0, 0, 0, 1, 2, 2, 1, 1,
 /* 3 */  1, 1, 2, 2, 1, 1, 1, 1, 2, 
-/* 4 */  2, 2, 2, 1, 2, 1, 1, 1, 2, 
+/* 4 */  0, 0, 0, 1, 2, 1, 1, 1, 2, 
 /* 5 */  1, 2, 2, 2, 2, 1, 1, 1, 2, 
-/* 6 */  2, 2, 1, 1, 2, 2, 1, 1, 2, 
-/* 7 */  2, 1, 1, 2, 1, 1, 2, 1, 2, 
-/* 8 */  2, 1, 1, 1, 2, 1, 2, 1, 2, 
-/* 9 */  2, 1, 1, 1, 1, 2, 2, 1, 2, 
+/* 6 */  0, 0, 1, 1, 2, 2, 1, 1, 2, 
+/* 7 */  0, 1, 1, 2, 1, 1, 2, 1, 2, 
+/* 8 */  0, 1, 1, 1, 2, 1, 2, 1, 2, 
+/* 9 */  0, 1, 1, 1, 1, 2, 2, 1, 2, 
 /* 10 */  1, 1, 1, 2, 1, 1, 1, 2, 2, 
-/* 11 */  2, 2, 1, 2, 1, 1, 1, 2, 2, 
-/* 12 */  2, 2, 2, 1, 2, 1, 1, 2, 2, 
-/* 13 */  2, 2, 2, 2, 1, 2, 1, 2, 2, 
-/* 14 */  2, 1, 1, 1, 2, 2, 2, 2, 2, 
-/* 15 */  2, 2, 2, 2, 2, 2, 2, 2, 2
+/* 11 */  0, 0, 1, 2, 1, 1, 1, 2, 2, 
+/* 12 */  0, 0, 0, 1, 2, 1, 1, 2, 2, 
+/* 13 */  0, 0, 0, 0, 1, 2, 1, 2, 2, 
+/* 14 */  0, 1, 1, 1, 2, 2, 2, 2, 2, 
+/* 15 */  0, 0, 0, 0, 0, 0, 0, 0, 2
 };
 #endif
 // Counts the number of partial updates to know when to do a full update
@@ -120,7 +120,7 @@ void display_init(void)
 #else
 #ifdef BOARD_TRMNL_X
     bbep.initPanel(BB_PANEL_TRMNL_X);
-//    bbep.setPasses(3, 3);
+    bbep.setPasses(3, 3);
 #elif defined( BOARD_TRMNL_X_SENSORIAS3 )
     bbep.initPanel(BB_PANEL_V7_RAW);
     bbep.setPanelSize(1280, 720, BB_PANEL_FLAG_MIRROR_X, -1600);
@@ -1712,7 +1712,10 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
         bbep.freeBuffer();
     }
 #else
-    bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
+ {
+    int rc = bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
+    Log_info("%s [%d]: setCustomMatrix returned %d\r\n", __FILE__, __LINE__, rc);
+
  //   if (bbep.getPreviousMode() != BB_MODE_NONE && (bbep.getMode() == BB_MODE_1BPP || bbep.getMode() == BB_MODE_2BPP)) {
  //       Log_info("%s [%d]: Using partial update since we have a copy of the previous image\n", __FILE__, __LINE__);
  //       bbep.setPasses(6,6);
@@ -1720,6 +1723,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
  //   } else {
         bbep.fullUpdate(((iUpdateCount & 7) == 0) ? CLEAR_SLOW : CLEAR_FAST, false);
  //   }
+ }
 #endif
     iUpdateCount++;
     Log_info("display_show_image end");
@@ -1872,7 +1876,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         bbep.print(string2);
     break;
     }
-    
+
     case POWER_OFF_CONFIRM:
     {
         const char string1[] = "Turn off device?";
