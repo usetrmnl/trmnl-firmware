@@ -2,8 +2,8 @@
 #define CONFIG_H
 
 #define FW_MAJOR_VERSION 1
-#define FW_MINOR_VERSION 7
-#define FW_PATCH_VERSION 9
+#define FW_MINOR_VERSION 8
+#define FW_PATCH_VERSION 1
 
 // Helper macros for stringification
 #define STRINGIFY(x) #x
