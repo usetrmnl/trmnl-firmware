@@ -1703,7 +1703,11 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     if (bbep.capabilities() & (BBEP_4COLOR | BBEP_3COLOR | BBEP_7COLOR)) bWait = 1;
     if (!bWait) iRefreshMode = REFRESH_PARTIAL; // fast update when showing loading screen
     Log_info("%s [%d]: EPD refresh mode: %d\r\n", __FILE__, __LINE__, iRefreshMode);
+#ifdef DO_NOT_LIGHT_SLEEP
+    bbep.setLightSleep(false);
+#else
     bbep.setLightSleep(true);
+#endif
     bbep.refresh(iRefreshMode, bWait);
     if ((bbep.getPanelType() == EP426_800x480 || bbep.getPanelType() == EP397_800x480) && iRefreshMode == REFRESH_PARTIAL) {
         i426Workaround = 1; // need to re-initialize the controller for another update before sleeping

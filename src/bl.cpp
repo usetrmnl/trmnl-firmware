@@ -2103,7 +2103,6 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
       {
         Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, rate);
         preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, rate);
-        Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
       }
 
       if (reset_firmware)
