@@ -1820,7 +1820,10 @@ static https_request_err_e downloadAndShow()
             writeImageToFile(szTemp, buffer, content_size);
             Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
             display_show_image(buffer, content_size, true);
-            //free(buffer); // N.B. - don't free it because it might be a String payload, not an allocated block
+            if (payload.length() != content_size) { // we allocated this buffer
+                Log.info("%s [%d]: Freeing the image payload we allocated\r\n", __FILE__, __LINE__, szTemp);
+                free(buffer);
+            }
             buffer = nullptr;
             png_res = PNG_NO_ERR; // DEBUG
           }
