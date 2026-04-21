@@ -70,7 +70,7 @@ esp_sleep_wakeup_cause_t wakeup_reason = ESP_SLEEP_WAKEUP_UNDEFINED; // wake-up 
 MSG current_msg = NONE;
 SPECIAL_FUNCTION special_function = SF_NONE;
 RTC_DATA_ATTR uint8_t need_to_refresh_display = 1;
-
+RTC_DATA_ATTR char szPrevName[36] = {0};
 Preferences preferences;
 PreferencesPersistence preferencesPersistence(preferences);
 StoredLogs storedLogs(LOG_MAX_NOTES_NUMBER / 2, LOG_MAX_NOTES_NUMBER / 2, PREFERENCES_LOG_KEY, PREFERENCES_LOG_BUFFER_HEAD_KEY, preferencesPersistence);
@@ -316,7 +316,9 @@ void bl_init(void)
 
   
     display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false);
-
+    // Force the display to show the current playlist image after the loading screen
+    // (even if it hasn't changed)
+    szPrevName[0] = 0;
 
     need_to_refresh_display = 1;
     preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
@@ -708,6 +710,13 @@ static https_request_err_e downloadAndShow()
   if (!status && result == HTTPS_SUCCESS) { // this means we already have this image stored in SPIFFS
       char szTemp[36];
       fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
+      if (strcmp(szTemp, szPrevName) == 0) {
+        // We just displayed the same image, don't refresh the display
+        Log.info("%s [%d]: The image hasn't changed since the last wakeup, don't refresh the display.\r\n", __FILE__, __LINE__);
+        buffer = nullptr;
+        return result;
+      }
+      strcpy(szPrevName, szTemp); // save the filename to compare on the next wakeup
       Log.info("%s [%d]: Reading %s from SPIFFS\r\n", __FILE__, __LINE__, szTemp);
       size_t content_size = filesystem_read_and_allocate(szTemp, &buffer);
       Log.info("%s [%d]: Decoding image...\r\n", __FILE__, __LINE__);
