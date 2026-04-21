@@ -189,9 +189,9 @@ void read_gesture_data_only()
 }
 // Returns true if channel i has been held for HOLD_THRESHOLD_MS since wakeup stub.
 // Releases the I2C lock during the wait so the iqs323 task can update the memory map.
-static bool tap_mode_is_hold(uint8_t channel_index)
+static bool tap_mode_is_hold(uint8_t channel_index, time_t hold_threshold_ms = 600)
 {
-    const uint32_t HOLD_THRESHOLD_US = 2000000;  // 2000 ms
+    const uint32_t HOLD_THRESHOLD_US = hold_threshold_ms * 1000;  // Convert ms to us
     uint32_t ticks_per_us = esp_rom_get_cpu_ticks_per_us();
 
     uint32_t elapsed_us = esp_cpu_get_cycle_count() / ticks_per_us - wakeup_time;
@@ -405,7 +405,7 @@ void check_channel_states(void)
     if (iqs323.channel_touchState((iqs323_channel_e)(i))) {
       if (touchbar_tap_mode) {
         // Tap mode
-        bool hold = tap_mode_is_hold(i);
+        bool hold = tap_mode_is_hold(i, 2000);  // 2 second hold for tap mode actions
         switch (i) {
         case 0:
           if (!hold) {
@@ -919,9 +919,9 @@ void bl_init(void)
   {
     Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
 
-  
+    if (!otg_message) {
     display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false);
-
+    }
 
     need_to_refresh_display = 1;
     preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
