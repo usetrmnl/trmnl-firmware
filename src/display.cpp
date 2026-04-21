@@ -1,4 +1,7 @@
 #include <Arduino.h>
+#include <Wire.h>
+#include <esp_task_wdt.h>
+#include <esp_log.h>
 #include <display.h>
 #include <PNGdec.h>
 #include <JPEGDEC.h>
@@ -7,7 +10,7 @@
 #include <preferences_persistence.h>
 #include "DEV_Config.h"
 #define MAX_BIT_DEPTH 8
-#ifndef BOARD_TRMNL_X
+#if !defined(BOARD_TRMNL_X) && !defined(BOARD_LILYGO_T5S3_PRO)
 #define BB_EPAPER
 #include "bb_epaper.h"
 const DISPLAY_PROFILE dpList[4] = { // 1-bit and 2-bit display types for each profile
@@ -54,6 +57,32 @@ uint8_t u8SpectraPal[512]; // RGB333 mapped to closest Spectra6 color
 #else
 #include "FastEPD.h"
 FASTEPD bbep;
+
+// Grayscale matrices for FastEPD boards
+#ifdef BOARD_LILYGO_T5S3_PRO
+// Custom 103-gray matrix for LilyGo T5S3 Pro (960x540)
+// Official LilyGo matrix for optimal rendering on 4.7" panel
+// Source: https://github.com/Xinyuan-LilyGO/T5S3-4.7-e-paper-PRO/blob/H752-01/examples/FastEPD/grayscale_test/
+const uint8_t u8_103Grays[] = {
+    /* 0 - White */         0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0,
+    /* 1 - Very Light */    0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 1, 1, 1, 0, 0, 0, 0,
+    /* 2 - Light */         0, 0, 0, 0, 0, 1, 1, 1, 2, 1, 1, 1, 2, 1, 0, 0, 0, 0,
+    /* 3 - Light Gray */    0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 1, 0, 0, 0, 0, 0,
+    /* 4 - Light-Mid */     0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 1, 0, 0, 0, 0, 0, 0,
+    /* 5 - Mid Light */     0, 0, 0, 0, 0, 1, 0, 0, 1, 2, 0, 1, 0, 0, 0, 0, 0, 0,
+    /* 6 - Mid Gray */      0, 0, 0, 0, 0, 1, 2, 0, 1, 2, 0, 1, 0, 0, 0, 0, 0, 0,
+    /* 7 - Mid */           0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 0, 0, 0,
+    /* 8 - Mid-Dark */      0, 0, 0, 0, 0, 0, 0, 1, 2, 2, 1, 2, 1, 0, 0, 0, 0, 0,
+    /* 9 - Dark Gray */     0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2, 0, 0, 0,
+    /* 10 - Dark */         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 0, 0, 0,
+    /* 11 - Very Dark */    0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 0, 0,
+    /* 12 - Darker */       0, 0, 0, 0, 0, 1, 1, 1, 2, 1, 2, 0, 0, 0, 0, 0, 0, 0,
+    /* 13 - Nearly Black */ 0, 0, 0, 0, 0, 1, 1, 2, 2, 2, 2, 1, 2, 0, 0, 0, 0, 0,
+    /* 14 - Almost Black */ 1, 1, 1, 1, 1, 1, 2, 2, 1, 2, 2, 0, 0, 0, 0, 0, 0, 0,
+    /* 15 - Black */        0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2
+};
+#else
+// Default grayscale matrix for TRMNL_X and other FastEPD boards
 const uint8_t u8_graytable[] = {
 /* 0 */  2, 2, 1, 1, 1, 1, 1, 1,
 /* 1 */  2, 2, 2, 2, 1, 1, 2, 1,
@@ -72,6 +101,7 @@ const uint8_t u8_graytable[] = {
 /* 14 */  2, 2, 2, 2, 2, 1, 2, 2,
 /* 15 */  2, 2, 2, 2, 2, 2, 2, 2
 };
+#endif
 #endif
 // Counts the number of partial updates to know when to do a full update
 RTC_DATA_ATTR int iUpdateCount = 0;
@@ -109,7 +139,83 @@ void display_init(void)
 #ifdef BB_EPAPER
     bbep.setPanelType(dpList[iTempProfile].OneBit); // must be set BEFORE calling initio
     bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
+#elif defined(BOARD_LILYGO_T5S3_PRO)
+    // LilyGo T5S3 Pro: 960x540 4.7" e-paper display
+    int rc;
+
+    // Suppress verbose GPIO/I2C logging from ESP-IDF
+    esp_log_level_set("gpio", ESP_LOG_ERROR);
+    esp_log_level_set("I2C", ESP_LOG_ERROR);
+
+    // CRITICAL: Initialize I2C bus BEFORE display operations
+    // LilyGo T5S3 Pro uses PCA9535 IO expander (0x20) and TPS65185 e-paper power driver (0x68)
+    Log_info("[I2C] Initializing I2C bus (SDA=39, SCL=40, 100kHz)...");
+
+    Wire.begin(39, 40, 100000);
+    delay(100);
+
+    Log_info("[I2C] Bus initialized");
+
+    // Scan for expected I2C peripherals to verify bus is functional
+    Log_info("[I2C] Scanning for board control peripherals...");
+
+    Wire.beginTransmission(0x20);  // PCA9535 IO expander
+    uint8_t pca9535_error = Wire.endTransmission();
+    Log_info("[I2C] 0x20 PCA9535 IO expander: %s", pca9535_error == 0 ? "FOUND" : "NOT FOUND");
+
+    Wire.beginTransmission(0x55);  // BQ27220 fuel gauge
+    uint8_t bq27220_error = Wire.endTransmission();
+    Log_info("[I2C] 0x55 BQ27220 fuel gauge: %s", bq27220_error == 0 ? "FOUND" : "NOT FOUND");
+
+    Wire.beginTransmission(0x68);  // TPS65185 e-paper power driver
+    uint8_t tps65185_error = Wire.endTransmission();
+    Log_info("[I2C] 0x68 TPS65185 power driver: %s", tps65185_error == 0 ? "FOUND" : "NOT FOUND");
+
+    Wire.beginTransmission(0x51);  // PCF85063 RTC (optional sanity check)
+    uint8_t rtc_error = Wire.endTransmission();
+    Log_info("[I2C] 0x51 PCF85063 RTC: %s", rtc_error == 0 ? "FOUND" : "NOT FOUND");
+
+    if (pca9535_error != 0 || tps65185_error != 0) {
+        Log_error("[I2C] CRITICAL: Required display control chips (0x20/0x68) not responding!");
+    }
+
+    // Initialize display panel using BB_PANEL_EPDIY_V7
+    // (Reference firmware uses EPDIY_V7 successfully with this board)
+    Log_info("[DISPLAY-INIT] Calling initPanel(BB_PANEL_EPDIY_V7, 26666666)...");
+
+    // Feed watchdog before potentially slow bit-banged I2C operation
+    esp_task_wdt_reset();
+
+    rc = bbep.initPanel(BB_PANEL_EPDIY_V7, 26666666);
+
+    // Feed watchdog after init
+    esp_task_wdt_reset();
+
+    Log_info("[DISPLAY-INIT] initPanel returned: rc=%d, pCurrent=%p, width=%d, height=%d",
+             rc, bbep.currentBuffer(), bbep.width(), bbep.height());
+
+    if (rc != 0) {
+        Log_error("[DISPLAY-INIT] initPanel FAILED with error code %d", rc);
+    }
+
+    rc = bbep.setPanelSize(960, 540, BB_PANEL_FLAG_NONE);
+    Log_info("setPanelSize rc=%d, pCurrent=%p", rc, bbep.currentBuffer());
+
+    rc = bbep.setCustomMatrix(u8_103Grays, sizeof(u8_103Grays));
+    Log_info("setCustomMatrix rc=%d, pCurrent=%p", rc, bbep.currentBuffer());
+
+    rc = bbep.setMode(BB_MODE_4BPP);
+    Log_info("setMode rc=%d, pCurrent=%p", rc, bbep.currentBuffer());
+
+    rc = bbep.setRotation(0);
+    Log_info("setRotation rc=%d, pCurrent=%p", rc, bbep.currentBuffer());
+
+    Log_info("Init complete: pCurrent=%p, pPrev=%p, w=%d, h=%d, mode=%d",
+             bbep.currentBuffer(), bbep.previousBuffer(),
+             bbep.width(), bbep.height(), bbep.getMode());
+
 #else
+    // TRMNL_X and other FastEPD boards
     bbep.initPanel(BB_PANEL_EPDIY_V7_16); //, 26000000);
     bbep.setPanelSize(1872, 1404, BB_PANEL_FLAG_MIRROR_X);
 #endif
@@ -123,7 +229,12 @@ void display_init(void)
  */
 void display_set_light_sleep(uint8_t enabled)
 {
+#ifdef BB_EPAPER
     bbep.setLightSleep(enabled);
+#else
+    // FastEPD doesn't support setLightSleep
+    (void)enabled; // Suppress unused parameter warning
+#endif
 }
 
 /**
@@ -154,8 +265,8 @@ void display_reset(void)
 {
     Log_info("e-Paper Clear start");
     bbep.fillScreen(BBEP_WHITE);
-    bbep.setLightSleep(true);
 #ifdef BB_EPAPER
+    bbep.setLightSleep(true);
     if (!apiDisplayResult.response.maximum_compatibility) {
         bbep.refresh(REFRESH_FAST, true);
     } else {
@@ -441,6 +552,8 @@ enum {
     PNG_2_BIT_BOTH,
     PNG_2_BIT_INVERTED,
 };
+
+#ifdef BB_EPAPER
 //
 // Match the given pixel to black (00), white (01), or red (1x)
 //
@@ -506,6 +619,8 @@ unsigned char GetBWYRPixel(int r, int g, int b)
     }
     return ucOut;
 } /* GetBWYRPixel() */
+#endif // BB_EPAPER
+
 #ifdef BOARD_SEEED_RETERMINAL_E1002
 //
 // bb_epaper colors to map to Spectra6 colors
@@ -844,10 +959,14 @@ int png_draw(PNGDRAW *pDraw)
                 }
             } // for x
         } else { // normal 0/1 split plane
-            ucMask = (iPlane == PNG_2_BIT_0) ? 0x40 : 0x80; // lower or upper source bit
+            const uint8_t ucTranslate[4] = {0, 2, 1, 3}; // translate grays to odd order of native 4-gray mode on 7.5" panel
+            const uint8_t ucNoTranslate[4] = {0, 1, 2, 3}; // for other 2-bit panels
+            uint8_t ucPT = bbep.getPanelType();
+            const uint8_t *pTranslate = (ucPT == EP75_800x480_4GRAY || ucPT == EP75_800x480_4GRAY_GEN2) ? ucTranslate : ucNoTranslate;
+            ucMask = (iPlane == PNG_2_BIT_0) ? 0x1 : 0x2; // lower or upper source bit
             for (x=0; x<iWidth; x++) {
                 uc <<= 1;
-                if (src & ucMask) {
+                if (pTranslate[src>>6] & ucMask) {
                     uc |= 1; // high bit of source pair
                 }
                 src <<= 2;
@@ -1262,6 +1381,7 @@ PNG *png = new PNG();
                     png->decode(&iPlane, 0);
                 } // temp profile needs the second plane written
             } else { // 2-bpp (or greater, but reduced to 2-bpp)
+                Log_info("%s [%d]: Using temp profile %d\r\n", __FILE__, __LINE__, iTempProfile);
                 bbep.setPanelType(dpList[iTempProfile].TwoBit);
                 rc = REFRESH_FULL; // 4gray mode must be full refresh
                 iUpdateCount = 0; // grayscale mode resets the partial update counter
@@ -1298,6 +1418,14 @@ PNG *png = new PNG();
 void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
 
 {
+    // DIAGNOSTIC: Entry point logging (TAG: embedded-logo or plugin-png path)
+    if (!image_buffer) {
+        Log_error("[DISPLAY] display_show_image: image_buffer is NULL!");
+        return;
+    }
+    Log_info("[DISPLAY] display_show_image ENTRY: buffer=%p, size=%d, wait=%d",
+             image_buffer, data_size, bWait);
+
     bool isPNG = data_size >= 4 && MOTOLONG(image_buffer) == (int32_t)0x89504e47;
     auto width = display_width();
     auto height = display_height();
@@ -1338,30 +1466,102 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
 #endif // BB_EPAPER
     if (isPNG == true && data_size < MAX_IMAGE_SIZE)
     {
-        Log_info("Drawing PNG");
+        Log_info("[DISPLAY-PATH] TAG: plugin-png - Drawing PNG image");
         iRefreshMode = png_to_epd(image_buffer, data_size);
     }
     else if (MOTOSHORT(image_buffer) == 0xffd8) {
-        Log_info("Drawing JPEG");
+        Log_info("[DISPLAY-PATH] Drawing JPEG");
         iRefreshMode = jpeg_to_epd(image_buffer, data_size);
     }
     else // uncompressed BMP or Group5 compressed image
     {
         if (*(uint16_t *)image_buffer == BB_BITMAP_MARKER)
         {
+            Log_info("[DISPLAY-PATH] TAG: embedded-logo - G5 compressed image detected");
             // G5 compressed image
             BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
 #ifdef BB_EPAPER
             bbep.allocBuffer(false);
             bAlloc = true;
 #endif
-            int x = (width - pBBB->width)/2;
-            int y = (height - pBBB->height)/2; // center it
+            // For T5S3 Pro: position logo_small (86x86) in lower right corner
+            // For other boards: center the logo
+#ifdef BOARD_LILYGO_T5S3_PRO
+            bbep.fillScreen(0xF);  // Explicit white background for 4BPP
+            Log_info("[DISPLAY] T5S3 Pro: Cleared screen to white (0xF) before logo");
+
+            int margin = 20;
+            int x = width - pBBB->width - margin;   // Right-aligned with margin
+            int y = height - pBBB->height - margin; // Bottom-aligned with margin
+#else
+            int x = (width - pBBB->width)/2;   // Centered
+            int y = (height - pBBB->height)/2;
             if (x > 0 || y > 0) // only clear if the image is smaller than the display
             {
-                bbep.fillScreen(BBEP_WHITE);
+#ifdef BB_EPAPER
+                if (!bbep.getBuffer()) {
+#else
+                if (!bbep.currentBuffer()) {
+#endif
+                    Log_error("[DISPLAY-FAIL] TAG: embedded-logo - FATAL: pCurrent is NULL before fillScreen!");
+                    return;
+                }
+                bbep.fillScreen(BBEP_WHITE);  // 1BPP white
             }
-            bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
+#endif
+
+            // DIAGNOSTIC: Inspect G5 image header
+            Log_info("Loading G5 image at (%d,%d)...", x, y);
+
+            // Dump G5 header (8 bytes: marker, width, height, size)
+            uint16_t g5_marker = (image_buffer[1] << 8) | image_buffer[0];
+            uint16_t g5_width = (image_buffer[3] << 8) | image_buffer[2];
+            uint16_t g5_height = (image_buffer[5] << 8) | image_buffer[4];
+            uint16_t g5_size = (image_buffer[7] << 8) | image_buffer[6];
+            Log_info("G5 header: marker=0x%04X, width=%d, height=%d, size=%d",
+                     g5_marker, g5_width, g5_height, g5_size);
+            Log_info("G5 raw header bytes: %02X %02X %02X %02X %02X %02X %02X %02X",
+                     image_buffer[0], image_buffer[1], image_buffer[2], image_buffer[3],
+                     image_buffer[4], image_buffer[5], image_buffer[6], image_buffer[7]);
+            Log_info("Color params: FG=BBEP_WHITE(%d), BG=BBEP_BLACK(%d)", BBEP_WHITE, BBEP_BLACK);
+
+#ifdef BOARD_LILYGO_T5S3_PRO
+            uint8_t *buf = bbep.currentBuffer();
+            // Calculate buffer offset for draw position (x,y) with 180° rotation
+            // Using same calculation as bbepSetPixelFast16Clr_180
+            int iPitch = bbep.width() / 2;  // 4BPP mode: 2 pixels per byte
+            int rot_x = (bbep.width() - 1 - x);
+            int rot_y = (bbep.height() - 1 - y);
+            int offset = (rot_x >> 1) + (rot_y * iPitch);
+
+            Log_info("Buffer offset calculation: pitch=%d, rot_coords=(%d,%d), offset=%d",
+                     iPitch, rot_x, rot_y, offset);
+            Log_info("Buffer BEFORE loadG5Image (at offset %d): %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X",
+                     offset,
+                     buf[offset+0], buf[offset+1], buf[offset+2], buf[offset+3],
+                     buf[offset+4], buf[offset+5], buf[offset+6], buf[offset+7],
+                     buf[offset+8], buf[offset+9], buf[offset+10], buf[offset+11],
+                     buf[offset+12], buf[offset+13], buf[offset+14], buf[offset+15]);
+#endif
+
+            // Use 4-bit pixel values for T5S3 Pro (4BPP mode), symbolic constants for others (1BPP mode)
+#ifdef BOARD_LILYGO_T5S3_PRO
+            int rc = bbep.loadG5Image(image_buffer, x, y, 0xF, 0x0);  // 4-bit: foreground=black(0), background=white(15)
+            Log_info("[DISPLAY] T5S3 Pro: loadG5Image with 4-bit values (0x0, 0xF)");
+#else
+            int rc = bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
+#endif
+            Log_info("loadG5Image() returned: %d", rc);
+
+#ifdef BOARD_LILYGO_T5S3_PRO
+            // DIAGNOSTIC: Check buffer after loadG5Image
+            Log_info("Buffer AFTER loadG5Image (at offset %d): %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X",
+                     offset,
+                     buf[offset+0], buf[offset+1], buf[offset+2], buf[offset+3],
+                     buf[offset+4], buf[offset+5], buf[offset+6], buf[offset+7],
+                     buf[offset+8], buf[offset+9], buf[offset+10], buf[offset+11],
+                     buf[offset+12], buf[offset+13], buf[offset+14], buf[offset+15]);
+#endif
         }
         else
         {
@@ -1369,6 +1569,10 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
             flip_image(image_buffer+62, bbep.width(), bbep.height(), false); // fix bottom-up bitmap images
 #ifdef BB_EPAPER
             bbep.setBuffer(image_buffer+62); // uncompressed 1-bpp bitmap
+#else
+            // For FastEPD, copy the uncompressed bitmap data into the framebuffer
+            size_t buf_size = (bbep.width() * bbep.height()) / 8; // 1-bit per pixel
+            memcpy(bbep.currentBuffer(), image_buffer+62, buf_size);
 #endif
         }
 #ifdef BB_EPAPER
@@ -1383,11 +1587,6 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     }
     Log_info("Display refresh start");
 #ifdef BB_EPAPER
-    if (iTempProfile != apiDisplayResult.response.temp_profile) {
-        iTempProfile = apiDisplayResult.response.temp_profile;
-        Log_info("Saving new temperature profile (%d) to FLASH", iTempProfile);
-        preferences.putUInt(PREFERENCES_TEMP_PROFILE, iTempProfile);
-    }
     if ((iUpdateCount & 7) == 0 || apiDisplayResult.response.maximum_compatibility == true) {
         Log_info("%s [%d]: Forcing full refresh; desired refresh mode was: %d\r\n", __FILE__, __LINE__, iRefreshMode);
         iRefreshMode = REFRESH_FULL; // force full refresh every 8 partials
@@ -1399,7 +1598,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
         iRefreshMode = REFRESH_FAST;
     }
     if (bbep.capabilities() & (BBEP_4COLOR | BBEP_3COLOR | BBEP_7COLOR)) bWait = 1;
-    if (!bWait) iRefreshMode = REFRESH_PARTIAL; // fast update when showing loading screen
+    if (!bWait) iRefreshMode = REFRESH_FAST; // fast update when showing loading screen
     Log_info("%s [%d]: EPD refresh mode: %d\r\n", __FILE__, __LINE__, iRefreshMode);
     bbep.setLightSleep(true);
     bbep.refresh(iRefreshMode, bWait);
@@ -1411,8 +1610,15 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     }
     iUpdateCount++;
 #else
-    bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
-    bbep.fullUpdate();
+    // Set appropriate grayscale matrix for FastEPD boards
+    #ifdef BOARD_LILYGO_T5S3_PRO
+        bbep.setCustomMatrix(u8_103Grays, sizeof(u8_103Grays));
+    #else
+        bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
+    #endif
+    Log_info("Calling fullUpdate()...");
+    int rc = bbep.fullUpdate();
+    Log_info("fullUpdate() returned: %d", rc);
 #endif
     Log_info("display_show_image end");
 }
@@ -1452,6 +1658,16 @@ uint8_t *buffer;
  */
 void display_show_msg(uint8_t *image_buffer, MSG message_type)
 {
+    // DIAGNOSTIC: Entry point logging (TAG: msg-screen path)
+    Log_info("[DISPLAY] display_show_msg ENTRY: buffer=%p, msg_type=%d",
+             image_buffer, message_type);
+
+    // Initialize display mode for T5S3 Pro (matrix set later, before fullUpdate)
+#ifdef BOARD_LILYGO_T5S3_PRO
+    bbep.setMode(BB_MODE_4BPP);
+    Log_info("[DISPLAY] T5S3 Pro: Set 4BPP mode");
+#endif
+
     auto width = display_width();
     auto height = display_height();
     UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
@@ -1470,9 +1686,17 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         int y = (height - pBBB->height)/2; // center it
         if (x > 0 || y > 0) // only clear if the image is smaller than the display
         {
+#ifdef BOARD_LILYGO_T5S3_PRO
+            bbep.fillScreen(0xF);  // Use 4-bit white for T5S3 Pro
+#else
             bbep.fillScreen(BBEP_WHITE);
+#endif
         }
+#ifdef BOARD_LILYGO_T5S3_PRO
+        bbep.loadG5Image(image_buffer, x, y, 0xF, 0x0);
+#else
         bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
+#endif
     }
     else
     {
@@ -1486,12 +1710,20 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
 #else
     bbep.setFont(nicoclean_8);
 #endif
+#ifdef BOARD_LILYGO_T5S3_PRO
+    bbep.setTextColor(BBEP_BLACK);  // Transparent bg - rely on fillScreen(0xF)
+#else
     bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
+#endif
 
     switch (message_type)
     {
     case WIFI_CONNECT:
     {
+#ifdef BOARD_LILYGO_T5S3_PRO
+        bbep.fillScreen(0xF);
+        Log_info("[DISPLAY] T5S3 Pro: Cleared screen to white before WIFI_CONNECT");
+#endif
         const char string1[] = "Connect to TRMNL WiFi";
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w)/2, 430);
@@ -1504,6 +1736,10 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     break;
     case WIFI_FAILED:
     {
+#ifdef BOARD_LILYGO_T5S3_PRO
+        bbep.fillScreen(0xF);  // Explicit white background for 4BPP
+        Log_info("[DISPLAY] T5S3 Pro: Cleared screen to white (0xF) before WIFI_FAILED");
+#endif
         String string0 = "TRMNL firmware ";
         string0 += FW_VERSION_STRING;
 #ifdef __BB_EPAPER__
@@ -1521,14 +1757,26 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.println(string2);
 #ifdef __BB_EPAPER__
+    #ifdef BOARD_LILYGO_T5S3_PRO
+        bbep.loadG5Image(wifi_failed_qr, bbep.width() - 66 - 40, 40, 0xF, 0x0);
+    #else
         bbep.loadG5Image(wifi_failed_qr, bbep.width() - 66 - 40, 40, BBEP_WHITE, BBEP_BLACK);
+    #endif
 #else // bigger for X
+    #ifdef BOARD_LILYGO_T5S3_PRO
+        bbep.loadG5Image(wifi_failed_qr, bbep.width() - (66*2) - 80, 80, 0xF, 0x0, 2.0f);
+    #else
         bbep.loadG5Image(wifi_failed_qr, bbep.width() - (66*2) - 80, 80, BBEP_WHITE, BBEP_BLACK, 2.0f);
+    #endif
 #endif
     }
     break;
     case WIFI_INTERNAL_ERROR:
     {
+#ifdef BOARD_LILYGO_T5S3_PRO
+        bbep.fillScreen(0xF);
+        Log_info("[DISPLAY] T5S3 Pro: Cleared screen to white before WIFI_INTERNAL_ERROR");
+#endif
         const char string1[] = "WiFi connected, but";
 #ifdef __BB_EPAPER__
         int x = 132;
@@ -1555,14 +1803,26 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         bbep.setCursor((bbep.width() - x - rect.w) / 2, -1);
         bbep.print(string4);
 #ifdef __BB_EPAPER__
+    #ifdef BOARD_LILYGO_T5S3_PRO
+        bbep.loadG5Image(wifi_failed_qr, 639, 336, 0xF, 0x0);
+    #else
         bbep.loadG5Image(wifi_failed_qr, 639, 336, BBEP_WHITE, BBEP_BLACK);
+    #endif
 #else // bigger for X
+    #ifdef BOARD_LILYGO_T5S3_PRO
+        bbep.loadG5Image(wifi_failed_qr, bbep.width() - (66*2) - 80, 80, 0xF, 0x0, 2.0f);
+    #else
         bbep.loadG5Image(wifi_failed_qr, bbep.width() - (66*2) - 80, 80, BBEP_WHITE, BBEP_BLACK, 2.0f);
+    #endif
 #endif
     }
     break;
     case WIFI_WEAK:
     {
+#ifdef BOARD_LILYGO_T5S3_PRO
+        bbep.fillScreen(0xF);
+        Log_info("[DISPLAY] T5S3 Pro: Cleared screen to white before WIFI_WEAK");
+#endif
         const char string1[] = "WiFi connected but signal is weak";
         bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
@@ -1575,6 +1835,10 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     break;
     case API_REQUEST_FAILED:
     {
+#ifdef BOARD_LILYGO_T5S3_PRO
+        bbep.fillScreen(0xF);
+        Log_info("[DISPLAY] T5S3 Pro: Cleared screen to white before API_REQUEST_FAILED");
+#endif
         const char string1[] = "WiFi connected, request to API failed.";
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, 340);
@@ -1591,6 +1855,10 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     break;
     case API_UNABLE_TO_CONNECT:
     {
+#ifdef BOARD_LILYGO_T5S3_PRO
+        bbep.fillScreen(0xF);
+        Log_info("[DISPLAY] T5S3 Pro: Cleared screen to white before API_UNABLE_TO_CONNECT");
+#endif
         const char string1[] = "WiFi connected, unable connect to API.";
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, 340);
@@ -1607,6 +1875,10 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     break;
     case API_SETUP_FAILED:
     {
+#ifdef BOARD_LILYGO_T5S3_PRO
+        bbep.fillScreen(0xF);
+        Log_info("[DISPLAY] T5S3 Pro: Cleared screen to white before API_SETUP_FAILED");
+#endif
         const char string1[] = "WiFi connected, /api/setup returned error.";
         bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
@@ -1627,6 +1899,10 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     break;
     case API_SIZE_ERROR:
     {
+#ifdef BOARD_LILYGO_T5S3_PRO
+        bbep.fillScreen(0xF);
+        Log_info("[DISPLAY] T5S3 Pro: Cleared screen to white before API_SIZE_ERROR");
+#endif
         const char string1[] = "WiFi connected, TRMNL content malformed.";
         bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
@@ -1643,6 +1919,10 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     break;
     case API_FIRMWARE_UPDATE_ERROR:
     {
+#ifdef BOARD_LILYGO_T5S3_PRO
+        bbep.fillScreen(0xF);
+        Log_info("[DISPLAY] T5S3 Pro: Cleared screen to white before API_FIRMWARE_UPDATE_ERROR");
+#endif
         const char string1[] = "WiFi connected, could not get firmware update from api.";
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, 400);
@@ -1655,6 +1935,10 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     break;
     case API_IMAGE_DOWNLOAD_ERROR:
     {
+#ifdef BOARD_LILYGO_T5S3_PRO
+        bbep.fillScreen(0xF);
+        Log_info("[DISPLAY] T5S3 Pro: Cleared screen to white before API_IMAGE_DOWNLOAD_ERROR");
+#endif
         const char string1[] = "WiFi connected, API could not deliver image to device.";
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, 400);
@@ -1667,6 +1951,10 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     break;
     case FW_UPDATE:
     {
+#ifdef BOARD_LILYGO_T5S3_PRO
+        bbep.fillScreen(0xF);
+        Log_info("[DISPLAY] T5S3 Pro: Cleared screen to white before FW_UPDATE");
+#endif
         const char string1[] = "Firmware update available! Starting now...";
         bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
@@ -1679,6 +1967,10 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     break;
     case FW_UPDATE_FAILED:
     {
+#ifdef BOARD_LILYGO_T5S3_PRO
+        bbep.fillScreen(0xF);
+        Log_info("[DISPLAY] T5S3 Pro: Cleared screen to white before FW_UPDATE_FAILED");
+#endif
         const char string1[] = "Firmware update failed. Device will restart...";
         bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
@@ -1691,6 +1983,10 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     break;
     case FW_UPDATE_SUCCESS:
     {
+#ifdef BOARD_LILYGO_T5S3_PRO
+        bbep.fillScreen(0xF);
+        Log_info("[DISPLAY] T5S3 Pro: Cleared screen to white before FW_UPDATE_SUCCESS");
+#endif
         const char string1[] = "Firmware update success. Device will restart...";
         bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
@@ -1703,6 +1999,10 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     break;
     case QA_START:
     {
+#ifdef BOARD_LILYGO_T5S3_PRO
+        bbep.fillScreen(0xF);
+        Log_info("[DISPLAY] T5S3 Pro: Cleared screen to white before QA_START");
+#endif
         const char string1[] = "Starting QA test";
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, 400);
@@ -1711,6 +2011,10 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     break;
     case MSG_TOO_BIG:
     {
+#ifdef BOARD_LILYGO_T5S3_PRO
+        bbep.fillScreen(0xF);
+        Log_info("[DISPLAY] T5S3 Pro: Cleared screen to white before MSG_TOO_BIG");
+#endif
         const char string1[] = "The image file from this URL is too large.";
         bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
@@ -1743,6 +2047,10 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     break;
     case MSG_FORMAT_ERROR:
     {
+#ifdef BOARD_LILYGO_T5S3_PRO
+        bbep.fillScreen(0xF);
+        Log_info("[DISPLAY] T5S3 Pro: Cleared screen to white before MSG_FORMAT_ERROR");
+#endif
         const char string1[] = "The image format is incorrect";
         bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
@@ -1755,6 +2063,10 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     break;
     case TEST:
     {
+#ifdef BOARD_LILYGO_T5S3_PRO
+        bbep.fillScreen(0xF);
+        Log_info("[DISPLAY] T5S3 Pro: Cleared screen to white before TEST");
+#endif
         bbep.setCursor(0, 40);
         bbep.println("ABCDEFGHIYABCDEFGHIYABCDEFGHIYABCDEFGHIYABCDEFGHIY");
         bbep.println("abcdefghiyabcdefghiyabcdefghiyabcdefghiyabcdefghiy");
@@ -1775,6 +2087,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     bbep.refresh(REFRESH_FULL, true);
     bbep.freeBuffer();
 #else
+    // Set grayscale matrix immediately before fullUpdate (matches PNG path timing)
+    #ifdef BOARD_LILYGO_T5S3_PRO
+        bbep.setCustomMatrix(u8_103Grays, sizeof(u8_103Grays));
+        Log_info("[DISPLAY] T5S3 Pro: Applied 103-gray matrix before fullUpdate");
+    #endif
     bbep.fullUpdate();
 #endif
     Log_info("display_show_msg end");
@@ -1801,9 +2118,17 @@ void display_show_msg_qa(uint8_t *image_buffer, const float *voltage, const floa
         int y = (height - pBBB->height)/2; // center it
         if (x > 0 || y > 0) // only clear if the image is smaller than the display
         {
+#ifdef BOARD_LILYGO_T5S3_PRO
+            bbep.fillScreen(0xF);  // Use 4-bit white for T5S3 Pro
+#else
             bbep.fillScreen(BBEP_WHITE);
+#endif
         }
+#ifdef BOARD_LILYGO_T5S3_PRO
+        bbep.loadG5Image(image_buffer, x, y, 0xF, 0x0);
+#else
         bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
+#endif
     }
     else
     {
@@ -1890,6 +2215,10 @@ void display_show_msg_qa(uint8_t *image_buffer, const float *voltage, const floa
  */
 void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_id, bool id, const char *fw_version, String message)
 {
+    // DIAGNOSTIC: Entry point logging (TAG: msg-screen path)
+    Log_info("[DISPLAY] display_show_msg(full) ENTRY: buffer=%p, msg_type=%d, id=%s",
+             image_buffer, message_type, friendly_id.c_str());
+
     Log_info("Free heap in display_show_msg - %d", ESP.getMaxAllocHeap());
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef BB_EPAPER
@@ -1930,9 +2259,17 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         int y = (height - pBBB->height)/2; // center it
         if (x > 0 || y > 0) // only clear if the image is smaller than the display
         {
+#ifdef BOARD_LILYGO_T5S3_PRO
+            bbep.fillScreen(0xF);  // Use 4-bit white for T5S3 Pro
+#else
             bbep.fillScreen(BBEP_WHITE);
+#endif
         }
+#ifdef BOARD_LILYGO_T5S3_PRO
+        bbep.loadG5Image(image_buffer, x, y, 0xF, 0x0);
+#else
         bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
+#endif
     }
     else
     {
@@ -1946,11 +2283,19 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 #else
     bbep.setFont(nicoclean_8);
 #endif
+#ifdef BOARD_LILYGO_T5S3_PRO
+    bbep.setTextColor(BBEP_BLACK);  // Transparent bg - rely on fillScreen(0xF)
+#else
     bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
+#endif
     switch (message_type)
     {
     case FRIENDLY_ID:
     {
+#ifdef BOARD_LILYGO_T5S3_PRO
+        bbep.fillScreen(0xF);
+        Log_info("[DISPLAY] T5S3 Pro: Cleared screen to white before FRIENDLY_ID");
+#endif
         Log_info("friendly id case");
         const char string1[] = "Please sign up at trmnl.com/start";
         bbep.getStringBox(string1, &rect);
@@ -1974,6 +2319,10 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     break;
     case WIFI_CONNECT:
     {
+#ifdef BOARD_LILYGO_T5S3_PRO
+        bbep.fillScreen(0xF);  // Explicit white background for 4BPP
+        Log_info("[DISPLAY] T5S3 Pro: Cleared screen to white (0xF) before WIFI_CONNECT");
+#endif
         Log_info("wifi connect case");
 
         String string1 = "TRMNL firmware ";
@@ -1993,14 +2342,26 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.print(string3);
 #ifdef __BB_EPAPER__
+    #ifdef BOARD_LILYGO_T5S3_PRO
+        bbep.loadG5Image(wifi_connect_qr, bbep.width() - 40 - 66, 40, 0xF, 0x0); // 66x66 QR code
+    #else
         bbep.loadG5Image(wifi_connect_qr, bbep.width() - 40 - 66, 40, BBEP_WHITE, BBEP_BLACK); // 66x66 QR code
+    #endif
 #else // bigger for X
+    #ifdef BOARD_LILYGO_T5S3_PRO
+        bbep.loadG5Image(wifi_connect_qr, bbep.width() - (66*2) - 80, 80, 0xF, 0x0, 2.0f);
+    #else
         bbep.loadG5Image(wifi_connect_qr, bbep.width() - (66*2) - 80, 80, BBEP_WHITE, BBEP_BLACK, 2.0f);
+    #endif
 #endif
     }
     break;
     case MAC_NOT_REGISTERED:
     {
+#ifdef BOARD_LILYGO_T5S3_PRO
+        bbep.fillScreen(0xF);
+        Log_info("[DISPLAY] T5S3 Pro: Cleared screen to white before MAC_NOT_REGISTERED");
+#endif
         UWORD y_start = 340;
         UWORD font_width = 18; // DEBUG
         Paint_DrawMultilineText(0, y_start, message.c_str(), width, font_width, BBEP_BLACK, BBEP_WHITE,
@@ -2020,7 +2381,9 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     bbep.refresh(REFRESH_FULL, true);
     bbep.freeBuffer();
 #else
-    bbep.fullUpdate();
+    Log_info("Calling fullUpdate() from display_show_msg...");
+    int rc = bbep.fullUpdate();
+    Log_info("fullUpdate() returned: %d", rc);
 #endif
     Log_info("display_show_msg2 end");
 }
