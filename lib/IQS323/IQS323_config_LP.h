@@ -45,8 +45,8 @@
 #define S1_PATTERN_SETUP                         0x03
 #define S1_PATTERN_SELECT                        0x00
 #define S1_BIAS_CURRENT                          0x00
-#define S1_ATI_SETUP_0                           0xE4
-#define S1_ATI_SETUP_1                           0x15
+#define S1_ATI_SETUP_0                           0xC4
+#define S1_ATI_SETUP_1                           0x12
 #define S1_ATI_BASE_0                            0x64
 #define S1_ATI_BASE_1                            0x00
 #define S1_ATI_COARSE                            0x47

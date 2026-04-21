@@ -191,18 +191,23 @@ void read_gesture_data_only()
 // Releases the I2C lock during the wait so the iqs323 task can update the memory map.
 static bool tap_mode_is_hold(uint8_t channel_index, time_t hold_threshold_ms = 600)
 {
-    const uint32_t HOLD_THRESHOLD_US = hold_threshold_ms * 1000;  // Convert ms to us
+    const uint32_t HOLD_THRESHOLD_US = hold_threshold_ms * 1000;
+    const uint32_t POLL_INTERVAL_MS = 20;
     uint32_t ticks_per_us = esp_rom_get_cpu_ticks_per_us();
 
-    uint32_t elapsed_us = esp_cpu_get_cycle_count() / ticks_per_us - wakeup_time;
-    if (elapsed_us < HOLD_THRESHOLD_US) {
-        uint32_t remaining_ms = (HOLD_THRESHOLD_US - elapsed_us) / 1000;
+    while (true) {
+        uint32_t elapsed_us = esp_cpu_get_cycle_count() / ticks_per_us - wakeup_time;
+        if (elapsed_us >= HOLD_THRESHOLD_US) break;
+
         iqs323_task_i2c_unlock();
-        delay(remaining_ms);
+        delay(POLL_INTERVAL_MS);
         iqs323_task_i2c_lock();
+
+        // Early exit: touch was released before hold threshold — it was a tap.
+        iqs323.updateInfoFlags(STOP);
+        if (!iqs323.channel_touchState((iqs323_channel_e)channel_index)) return false;
     }
-    // Force a live read so the cache reflects the current touch state.
-    // In event mode the device does not push release updates automatically.
+
     iqs323.updateInfoFlags(STOP);
     return iqs323.channel_touchState((iqs323_channel_e)channel_index);
 }
@@ -227,13 +232,36 @@ bool check_wifi_reset_cancel()
   return false;
 }
 
-// Handle WiFi reset confirmation flow
-void handle_wifi_reset_confirmation()
+static void confirm_wifi_reset()
 {
-  Log_info("Entering WiFi reset confirmation mode");
-  in_wifi_reset_confirmation = true;
+  resetDeviceCredentials();
+}
 
-  showMessageWithLogo(WIFI_RESET_CONFIRM);
+static void confirm_power_off()
+{
+  clearShipmentStatus();
+  ESP.restart();
+}
+
+static void handle_confirmation_flow(bool &in_flag, MSG message, void (*on_confirm)(void))
+{
+  in_flag = true;
+  showMessageWithLogo(message);
+
+  // Wait for the triggering hold to be fully released before accepting new input.
+  // Without this, lifting fingers from the initial hold could register as a cancel tap.
+  {
+    const uint32_t RELEASE_TIMEOUT_MS = 2000;
+    unsigned long release_start = millis();
+    do {
+      delay(20);
+      iqs323.updateInfoFlags(STOP);
+    } while ((iqs323.channel_touchState(IQS323_CH0) ||
+              iqs323.channel_touchState(IQS323_CH1) ||
+              iqs323.channel_touchState(IQS323_CH2)) &&
+             millis() - release_start < RELEASE_TIMEOUT_MS);
+    slider_event = IQS323_GESTURE_NONE;
+  }
 
   if (touchbar_tap_mode) {
     const uint32_t HOLD_MS = 600;
@@ -244,139 +272,71 @@ void handle_wifi_reset_confirmation()
       delay(POLL_MS);
       iqs323.updateInfoFlags(STOP);
 
-      // Outer buttons → cancel immediately
       if (iqs323.channel_touchState(IQS323_CH0) || iqs323.channel_touchState(IQS323_CH2)) {
-        Log_info("WiFi reset cancelled by user - outer button in tap mode");
-        in_wifi_reset_confirmation = false;
+        Log_info("Confirmation cancelled - outer button in tap mode");
+        in_flag = false;
         return;
       }
 
-      // Middle button touched → determine TAP vs HOLD
       if (iqs323.channel_touchState(IQS323_CH1)) {
         unsigned long touch_start = millis();
         while (millis() - touch_start < HOLD_MS) {
           delay(POLL_MS);
           iqs323.updateInfoFlags(STOP);
           if (!iqs323.channel_touchState(IQS323_CH1)) {
-            Log_info("WiFi reset cancelled by user - tap on middle button in tap mode");
-            in_wifi_reset_confirmation = false;
+            Log_info("Confirmation cancelled - tap on middle button in tap mode");
+            in_flag = false;
             return;
           }
         }
-        Log_info("WiFi reset confirmed by user - holding middle button in tap mode");
-        in_wifi_reset_confirmation = false;
-        resetDeviceCredentials();
+        Log_info("Confirmed - holding middle button in tap mode");
+        in_flag = false;
+        on_confirm();
         return;
       }
     }
 
-    Log_info("WiFi reset confirmation timeout - cancelling");
-    in_wifi_reset_confirmation = false;
+    Log_info("Confirmation timeout - cancelling");
+    in_flag = false;
     return;
   }
 
   unsigned long start_time = millis();
 
-  // Poll for user input until timeout or action
   while (millis() - start_time < WIFI_RESET_CONFIRMATION_TIMEOUT_MS) {
     delay(WIFI_RESET_POLL_INTERVAL_MS);
-    read_gesture_data_only();  // Read gesture without triggering handlers
+    read_gesture_data_only();
 
     if (check_wifi_reset_confirm()) {
-      in_wifi_reset_confirmation = false;
-      resetDeviceCredentials();
+      in_flag = false;
+      on_confirm();
       return;
     }
 
     if (check_wifi_reset_cancel()) {
-      in_wifi_reset_confirmation = false;
+      in_flag = false;
       return;
     }
-    // Clear event after checking (if finger removed)
+
     if (slider_position == 65535) {
       slider_event = IQS323_GESTURE_NONE;
     }
   }
 
-  // Timeout - cancel reset
-  Log_info("WiFi reset confirmation timeout - cancelling");
-  in_wifi_reset_confirmation = false;
+  Log_info("Confirmation timeout - cancelling");
+  in_flag = false;
+}
+
+void handle_wifi_reset_confirmation()
+{
+  Log_info("Entering WiFi reset confirmation mode");
+  handle_confirmation_flow(in_wifi_reset_confirmation, WIFI_RESET_CONFIRM, confirm_wifi_reset);
 }
 
 void handle_power_off_confirmation()
 {
   Log_info("Entering power-off confirmation mode");
-  in_power_off_confirmation = true;
-
-  showMessageWithLogo(POWER_OFF_CONFIRM);
-
-  if (touchbar_tap_mode) {
-    const uint32_t HOLD_MS = 600;
-    const uint32_t POLL_MS = 20;
-    unsigned long start_time = millis();
-
-    while (millis() - start_time < WIFI_RESET_CONFIRMATION_TIMEOUT_MS) {
-      delay(POLL_MS);
-      iqs323.updateInfoFlags(STOP);
-
-      // Outer buttons → cancel
-      if (iqs323.channel_touchState(IQS323_CH0) || iqs323.channel_touchState(IQS323_CH2)) {
-        Log_info("Power-off cancelled - outer button");
-        in_power_off_confirmation = false;
-        return;
-      }
-
-      // Middle button → distinguish tap vs hold
-      if (iqs323.channel_touchState(IQS323_CH1)) {
-        unsigned long touch_start = millis();
-        while (millis() - touch_start < HOLD_MS) {
-          delay(POLL_MS);
-          iqs323.updateInfoFlags(STOP);
-          if (!iqs323.channel_touchState(IQS323_CH1)) {
-            Log_info("Power-off cancelled - tap on middle button");
-            in_power_off_confirmation = false;
-            return;
-          }
-        }
-        Log_info("Power-off confirmed - entering shipment mode");
-        in_power_off_confirmation = false;
-        clearShipmentStatus();
-        ESP.restart();
-        return;
-      }
-    }
-
-    Log_info("Power-off confirmation timeout - cancelling");
-    in_power_off_confirmation = false;
-    return;
-  }
-
-  // Slide mode
-  unsigned long start_time = millis();
-  while (millis() - start_time < WIFI_RESET_CONFIRMATION_TIMEOUT_MS) {
-    delay(WIFI_RESET_POLL_INTERVAL_MS);
-    read_gesture_data_only();
-
-    if (check_wifi_reset_confirm()) {  // middle button hold
-      Log_info("Power-off confirmed (slide mode) - entering shipment mode");
-      in_power_off_confirmation = false;
-      clearShipmentStatus();
-      ESP.restart();
-      return;
-    }
-
-    if (check_wifi_reset_cancel()) {
-      in_power_off_confirmation = false;
-      return;
-    }
-
-    if (slider_position == 65535) {
-      slider_event = IQS323_GESTURE_NONE;
-    }
-  }
-
-  Log_info("Power-off confirmation timeout - cancelling");
-  in_power_off_confirmation = false;
+  handle_confirmation_flow(in_power_off_confirmation, POWER_OFF_CONFIRM, confirm_power_off);
 }
 
 // Check if both left and right corners are being held
