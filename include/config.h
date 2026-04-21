@@ -37,8 +37,13 @@
 
 #define WIFI_CONNECTION_RSSI (-100)
 
+#ifdef BOARD_XTEINK_X3
+#define DISPLAY_BMP_IMAGE_SIZE 52334 // 62-byte header + 52272 bytes bitmap (792*528 1bpp / 8)
+#define DEFAULT_IMAGE_SIZE 52272
+#else
 #define DISPLAY_BMP_IMAGE_SIZE 48062 // in bytes - 62 bytes - header; 48000 bytes - bitmap (480*800 1bpp) / 8
 #define DEFAULT_IMAGE_SIZE 48000
+#endif
 #ifdef BOARD_TRMNL_X
 #define MAX_IMAGE_SIZE 750000 // Use PSRAM on the ESP32-S3
 #else
@@ -76,6 +81,9 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #define DEVICE_MODEL "og"
 #elif defined(BOARD_XTEINK_X4)
 #define DEVICE_MODEL "XTEINK_X4"
+#define PIN_INTERRUPT 3
+#elif defined(BOARD_XTEINK_X3)
+#define DEVICE_MODEL "XTEINK_X3"
 #define PIN_INTERRUPT 3
 #elif defined(BOARD_TRMNL_X)
 #define PIN_INTERRUPT 0
@@ -119,7 +127,7 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 
 #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002)
 #define PIN_BATTERY 1
-#elif defined(BOARD_XTEINK_X4)
+#elif defined(BOARD_XTEINK_X4) || defined(BOARD_XTEINK_X3)
 #define PIN_BATTERY 0
 #else
 #define PIN_BATTERY 3

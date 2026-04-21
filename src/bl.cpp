@@ -1993,7 +1993,7 @@ static void goToSleep(void)
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
 #endif
-#ifdef BOARD_XTEINK_X4
+#if defined(BOARD_XTEINK_X4) || defined(BOARD_XTEINK_X3)
   gpio_hold_en(GPIO_NUM_13); // MOSFET enabling the battery power
   gpio_deep_sleep_hold_en(); // Needed to keep the battery power enabled during RTC sleep
 #endif

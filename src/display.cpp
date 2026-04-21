@@ -17,6 +17,12 @@ const DISPLAY_PROFILE dpList[4] = { // 1-bit and 2-bit display types for each pr
     {EP426_800x480, EP426_800x480_4GRAY}, // b = darker grays
 };
 BBEPAPER bbep(EP426_800x480);
+#elif defined(BOARD_XTEINK_X3)
+    {EP368_792x528, EP368_792x528_4GRAY}, // default
+    {EP368_792x528, EP368_792x528_4GRAY}, // a
+    {EP368_792x528, EP368_792x528_4GRAY}, // b
+};
+BBEPAPER bbep(EP368_792x528);
 #elif defined(BOARD_WAVESHARE_397)
     {EP397_800x480, EP397_800x480_4GRAY}, // default (for original EPD)
     {EP397_800x480, EP397_800x480_4GRAY}, // a = uses built-in fast + 4-gray
