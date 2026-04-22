@@ -1712,10 +1712,12 @@ static https_request_err_e downloadAndShow()
           buffer = nullptr;
           if (content_size <= 0) {
           // getString() handles lack of content size and chunked transfer encoding automatically
+            Log.info("%s [%d]: Downloading image with getString\r\n", __FILE__, __LINE__);
             payload = https.getString();
             counter = payload.length();
             buffer = (uint8_t *)payload.c_str();
           } else {
+            Log.info("%s [%d]: Downloading image with WifiClient (stream)\r\n", __FILE__, __LINE__);
             counter = https.getSize();
             if (counter && counter <= MAX_IMAGE_SIZE) {
               WiFiClient *stream = https.getStreamPtr();
