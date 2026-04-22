@@ -857,11 +857,9 @@ static https_request_err_e downloadAndShow()
 
               buffer = (uint8_t *)malloc(counter);
               if (buffer) {
-                while (iCount < counter && millis() < (lStartTime + API_FIRST_RETRY*1000) && stream->connected()) {
-                  iLen = stream->available();
-                  if (iLen) {
-                    stream->readBytes(&buffer[iCount], iLen);
-                    iCount += iLen;
+                while (iCount < counter && millis() < (lStartTime + API_FIRST_RETRY*1000)) {
+                  if (stream->available()) {
+                    buffer[iCount++] = stream->read();
                   } else {
                     vTaskDelay(1); // yield to allow time for the data to arrive
                   }
