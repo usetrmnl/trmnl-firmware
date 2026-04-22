@@ -5,6 +5,18 @@
 #include "http_client.h"
 #include <WiFi.h>
 #include <api_request_serialization.h>
+#include "ethernet_config.h"
+#include "esp_mac.h"
+
+static String get_device_mac()
+{
+    uint8_t mac[6] = {};
+    esp_efuse_mac_get_default(mac);
+    char buf[18];
+    snprintf(buf, sizeof(buf), "%02X:%02X:%02X:%02X:%02X:%02X",
+             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    return String(buf);
+}
 
 bool submitLogToApi(LogApiInput &input, const char *api_url)
 {
@@ -27,7 +39,7 @@ bool submitLogToApi(LogApiInput &input, const char *api_url)
 
                     HTTPClient &https = *httpsPointer;
 
-                    https.addHeader("ID", WiFi.macAddress());
+                    https.addHeader("ID", get_device_mac());
                     https.addHeader("Accept", "application/json, */*");
                     https.addHeader("Access-Token", input.api_key);
                     https.addHeader("Content-Type", "application/json");
@@ -46,8 +58,8 @@ bool submitLogToApi(LogApiInput &input, const char *api_url)
                           ? location
                           : (String(api_url) + location);
                       https.begin(redirectUrl);
-                      https.setReuse(false); 
-                      https.addHeader("ID", WiFi.macAddress());
+                      https.setReuse(false);
+                      https.addHeader("ID", get_device_mac());
                       https.addHeader("Accept", "application/json, */*");
                       https.addHeader("Access-Token", input.api_key);
                       https.addHeader("Content-Type", "application/json");
