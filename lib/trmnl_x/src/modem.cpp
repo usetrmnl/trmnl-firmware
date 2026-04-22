@@ -94,13 +94,14 @@ String Modem::readResponse(unsigned long timeout) {
   return response;
 }
 
-bool Modem::flashFromFile(const char* filename) {
+bool Modem::flashFromFile(const char* filename, String& errorOut) {
   Serial.printf("[MODEM] Starting modem flash from: %s\n", filename);
 
   // Step 1: Open and validate firmware file
   File firmwareFile = FS.open(filename, "r");
   if (!firmwareFile) {
     Serial.println("[MODEM] ERROR: File not found!");
+    errorOut = "Firmware file not found";
     return false;
   }
 
@@ -110,6 +111,7 @@ bool Modem::flashFromFile(const char* filename) {
   if (firmwareSize == 0) {
     Serial.println("[MODEM] ERROR: File is empty!");
     firmwareFile.close();
+    errorOut = "Firmware file is empty";
     return false;
   }
 
@@ -142,6 +144,7 @@ bool Modem::flashFromFile(const char* filename) {
     Serial.printf("[MODEM] ERROR: Serial flasher init failed (code %d)\n", err);
     firmwareFile.close();
     ModemSerial.begin(baudRate, SERIAL_8N1, AT_UART_RX, AT_UART_TX);
+    errorOut = "Flasher init failed (code " + String((int)err) + ")";
     return false;
   }
 
@@ -161,8 +164,8 @@ bool Modem::flashFromFile(const char* filename) {
     firmwareFile.close();
     loader_port_reset_target();
     loader_port_esp32_deinit();
-    // Restart ModemSerial
     ModemSerial.begin(baudRate, SERIAL_8N1, AT_UART_RX, AT_UART_TX);
+    errorOut = "Bootloader connection failed";
     return false;
   }
 
@@ -185,6 +188,7 @@ bool Modem::flashFromFile(const char* filename) {
     loader_port_reset_target();
     loader_port_esp32_deinit();
     ModemSerial.begin(baudRate, SERIAL_8N1, AT_UART_RX, AT_UART_TX);
+    errorOut = "Flash start failed (code " + String((int)err) + ")";
     return false;
   }
 
@@ -198,6 +202,7 @@ bool Modem::flashFromFile(const char* filename) {
     loader_port_reset_target();
     loader_port_esp32_deinit();
     ModemSerial.begin(baudRate, SERIAL_8N1, AT_UART_RX, AT_UART_TX);
+    errorOut = "Out of memory for block buffer";
     return false;
   }
 
@@ -218,6 +223,7 @@ bool Modem::flashFromFile(const char* filename) {
     err = esp_loader_flash_write(blockBuffer, FLASH_BLOCK_SIZE);
     if (err != ESP_LOADER_SUCCESS) {
       Serial.printf("[MODEM] ERROR: Write failed at block %u (code %d)\n", blockNum, err);
+      errorOut = "Write error at block " + String((unsigned)blockNum) + " (code " + String((int)err) + ")";
       flashSuccess = false;
       break;
     }

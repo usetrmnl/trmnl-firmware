@@ -1778,7 +1778,7 @@ uint8_t *buffer;
  * @param message_type type of message that will show on the screen
  * @return none
  */
-void display_show_msg(uint8_t *image_buffer, MSG message_type)
+void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *message_text)
 {
     auto width = display_width();
     auto height = display_height();
@@ -1840,6 +1840,26 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w)/2, 430);
         bbep.println(string1);
+    break;
+    }
+    case MODEM_FLASH_FAILED:
+    {
+        const char string1[] = "Failed to flash modem firmware,";
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - rect.w)/2, 430);
+        bbep.println(string1);
+
+        const char string2[] = "device would only operate with 2.4Ghz WiFi.";
+        bbep.getStringBox(string2, &rect);
+        bbep.setCursor((bbep.width() - rect.w)/2, 500);
+        if (message_text) {
+            bbep.println(string2);
+            bbep.getStringBox(message_text, &rect);
+            bbep.setCursor((bbep.width() - rect.w)/2, 570);
+            bbep.print(message_text);
+        } else {
+            bbep.print(string2);
+        }
     break;
     }
     case READY_TO_SHIP:

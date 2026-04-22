@@ -38,15 +38,18 @@ void setup()
         modem_reset_target();
         delay(500);  // let modem reach bootloader
 
-        display_show_msg(const_cast<uint8_t *>(logo_medium),MODEM_FLASHING);
+        display_show_msg(const_cast<uint8_t *>(logo_medium), MODEM_FLASHING);
 
         Modem modem(115200);
-        if (modem.flashFromFile("/system/factory_ESP32C5-4MB.bin")) {
+        String flashError;
+        if (modem.flashFromFile("/system/factory_ESP32C5-4MB.bin", flashError)) {
           Serial.println("[MODEM] Factory flash complete.");
           saveModemFlashed();
         }
         else {
           Serial.println("[MODEM] Factory flash FAILED.");
+          display_show_msg(const_cast<uint8_t *>(logo_medium), MODEM_FLASH_FAILED, flashError.c_str());
+          delay(5000);
         }
       }
       else {

@@ -11,6 +11,7 @@ enum MSG
   OTG_TURNED_ON,
   OTG_TURNED_OFF,
   MODEM_FLASHING,
+  MODEM_FLASH_FAILED,
   READY_TO_SHIP,
   SHIPPING_MODE,
   WIFI_RESET_CONFIRM,
@@ -145,7 +146,7 @@ uint8_t * display_read_file(const char *filename, int *file_size);
  * @param message_type type of message that will show on the screen
  * @return none
  */
-void display_show_msg(uint8_t *image_buffer, MSG message_type);
+void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *message_text = nullptr);
 
 /**
  * @brief Function to show the image with message on the display

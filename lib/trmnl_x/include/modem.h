@@ -23,7 +23,7 @@ public:
   bool isInitialized() const { return _initialized; }
   bool sendCommand(const char* command);
   String readResponse(unsigned long timeout);
-  bool flashFromFile(const char* filename);
+  bool flashFromFile(const char* filename, String& errorOut);
   bool eraseFlash();
   void setSerialBaud(uint32_t baud);
 

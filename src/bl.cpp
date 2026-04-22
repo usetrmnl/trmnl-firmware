@@ -203,8 +203,11 @@ static bool tap_mode_is_hold(uint8_t channel_index, time_t hold_threshold_ms = 6
         delay(POLL_INTERVAL_MS);
         iqs323_task_i2c_lock();
 
-        // Early exit: touch was released before hold threshold — it was a tap.
-        iqs323.updateInfoFlags(STOP);
+        // Only read from chip when it has naturally opened a window (RDY LOW).
+        // Forcing I2C on every tick causes the chip to stop responding after ~30+ iterations
+        if (iqs323.getRDYStatus()) {
+            iqs323.updateInfoFlags(STOP);
+        }
         if (!iqs323.channel_touchState((iqs323_channel_e)channel_index)) return false;
     }
 
@@ -243,7 +246,7 @@ static void confirm_power_off()
   ESP.restart();
 }
 
-static void handle_confirmation_flow(bool &in_flag, MSG message, void (*on_confirm)(void))
+static bool handle_confirmation_flow(bool &in_flag, MSG message, void (*on_confirm)(void))
 {
   in_flag = true;
   showMessageWithLogo(message);
@@ -275,7 +278,7 @@ static void handle_confirmation_flow(bool &in_flag, MSG message, void (*on_confi
       if (iqs323.channel_touchState(IQS323_CH0) || iqs323.channel_touchState(IQS323_CH2)) {
         Log_info("Confirmation cancelled - outer button in tap mode");
         in_flag = false;
-        return;
+        return false;
       }
 
       if (iqs323.channel_touchState(IQS323_CH1)) {
@@ -286,19 +289,19 @@ static void handle_confirmation_flow(bool &in_flag, MSG message, void (*on_confi
           if (!iqs323.channel_touchState(IQS323_CH1)) {
             Log_info("Confirmation cancelled - tap on middle button in tap mode");
             in_flag = false;
-            return;
+            return false;
           }
         }
         Log_info("Confirmed - holding middle button in tap mode");
         in_flag = false;
         on_confirm();
-        return;
+        return true;
       }
     }
 
     Log_info("Confirmation timeout - cancelling");
     in_flag = false;
-    return;
+    return false;
   }
 
   unsigned long start_time = millis();
@@ -310,12 +313,12 @@ static void handle_confirmation_flow(bool &in_flag, MSG message, void (*on_confi
     if (check_wifi_reset_confirm()) {
       in_flag = false;
       on_confirm();
-      return;
+      return true;
     }
 
     if (check_wifi_reset_cancel()) {
       in_flag = false;
-      return;
+      return false;
     }
 
     if (slider_position == 65535) {
@@ -325,12 +328,27 @@ static void handle_confirmation_flow(bool &in_flag, MSG message, void (*on_confi
 
   Log_info("Confirmation timeout - cancelling");
   in_flag = false;
+  return false;
 }
 
 void handle_wifi_reset_confirmation()
 {
   Log_info("Entering WiFi reset confirmation mode");
-  handle_confirmation_flow(in_wifi_reset_confirmation, WIFI_RESET_CONFIRM, confirm_wifi_reset);
+  bool confirmed = handle_confirmation_flow(in_wifi_reset_confirmation, WIFI_RESET_CONFIRM, confirm_wifi_reset);
+  
+  if (!confirmed) {
+    Log_info("WiFi reset cancelled - redrawing last image and sleeping");
+    int file_size = 0;
+    String curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
+    if (!curPath.isEmpty()) {
+      uint8_t *buf = display_read_file(curPath.c_str(), &file_size);
+      if (buf && file_size > 0) {
+        display_show_image(buf, file_size, true);
+        free(buf);
+      }
+    }
+    goToSleep();
+  }
 }
 
 void handle_power_off_confirmation()
