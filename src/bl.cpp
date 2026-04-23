@@ -361,12 +361,18 @@ void handle_power_off_confirmation()
 bool check_wifi_reset_trigger()
 {
   bool left  = iqs323.channel_touchState(IQS323_CH0);
+  bool middle = iqs323.channel_touchState(IQS323_CH1);
   bool right = iqs323.channel_touchState(IQS323_CH2);
+  Log_info("Hold edges: left=%d middle=%d right=%d tap_mode=%d", left, middle, right, touchbar_tap_mode);
   if (!left || !right) return false;
 
   if (touchbar_tap_mode) {
-    return tap_mode_is_hold(0) && tap_mode_is_hold(2);  // both outer channels active
+    bool hold_left  = tap_mode_is_hold(0);
+    bool hold_right = tap_mode_is_hold(2);
+    Log_info("Hold edges tap mode: hold_left=%d hold_right=%d", hold_left, hold_right);
+    return hold_left && hold_right;
   }
+  Log_info("Hold edges slider mode: event=%d (HOLD=%d)", slider_event, IQS323_GESTURE_HOLD);
   return slider_event == IQS323_GESTURE_HOLD;
 }
 
@@ -897,9 +903,17 @@ void bl_init(void)
   {
     Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
 
-    if (!otg_message) {
-    display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false);
+#ifdef BOARD_TRMNL_X
+
+    if (!otg_message && WifiCaptivePortal.isSaved()) {
+      display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false);
     }
+    else if (!WifiCaptivePortal.isSaved()) {
+      showMessageWithLogo(NONE);
+    }
+#else 
+    display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false);
+#endif // BOARD_TRMNL_X
 
     need_to_refresh_display = 1;
     preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
@@ -1559,7 +1573,8 @@ static https_request_err_e downloadAndShow()
       strcpy(szPrevFile, szTemp); // current image becomes the previous image
       // Rotate NVS path keys: last ← current ← szTemp
       String _curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
-      if (!_curPath.isEmpty() && _curPath != String(szTemp))
+      String _lastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
+      if (!_curPath.isEmpty() && (_curPath != String(szTemp) || _lastPath.isEmpty()))
         preferences.putString(PREFERENCES_LAST_PATH_KEY, _curPath);
       preferences.putString(PREFERENCES_CURRENT_PATH_KEY, String(szTemp));
       return result;
@@ -1578,7 +1593,9 @@ static https_request_err_e downloadAndShow()
     filesystem_purge_old_file(szTemp);
 
     String _prevPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
-    if (!_prevPath.isEmpty()) preferences.putString(PREFERENCES_LAST_PATH_KEY, _prevPath);
+    String _prevLastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
+    if (!_prevPath.isEmpty() && (_prevPath != String(szTemp) || _prevLastPath.isEmpty()))
+      preferences.putString(PREFERENCES_LAST_PATH_KEY, _prevPath);
 
     auto httpRes = g_modem->httpGet(String(filename), szTemp, 0);
     if (!httpRes.ok)
@@ -1806,6 +1823,11 @@ static https_request_err_e downloadAndShow()
             }
             buffer = nullptr;
             png_res = PNG_NO_ERR; // DEBUG
+            String _curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
+            String _lastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
+            if (!_curPath.isEmpty() && (_curPath != String(szTemp) || _lastPath.isEmpty()))
+              preferences.putString(PREFERENCES_LAST_PATH_KEY, _curPath);
+            preferences.putString(PREFERENCES_CURRENT_PATH_KEY, String(szTemp));
           }
           else
           {

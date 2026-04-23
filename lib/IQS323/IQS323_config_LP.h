@@ -182,8 +182,8 @@
 #define OUTA_MASK_1                              0x00
 #define I2C_TIMEOUT_0                            0xC8
 #define I2C_TIMEOUT_1                            0x00
-#define PROX_EVENT_TIMEOUT                       0x06
-#define TOUCH_EVENT_TIMEOUT                      0x06
+#define PROX_EVENT_TIMEOUT                       0x75
+#define TOUCH_EVENT_TIMEOUT                      0x75
 #define EVENTS_ENABLE                            0x04
 #define ACTIVATION_THRESHOLD                     0x18
 #define RELEASE_DELTA_PERCENTAGE                 0x08
