@@ -43,6 +43,11 @@
 #include "loading.h"
 #include <wifi-helpers.h>
 #include <sys/time.h>
+#ifdef BOARD_TRMNL_X
+#include "ethernet_config.h"
+#include "esp_mac.h"
+#include "connection_manager.h"
+#endif // BOARD_TRMNL_X
 #ifdef SENSOR_SDA
 #include <bb_scd41.h>
 #include <bb_temperature.h>
@@ -53,6 +58,7 @@ int iSensorType = -1;
 long lSampleTime;
 int lastCO2 = 0, lastSCDTemp = 0, lastTemp = 0, lastSCDHumid = 0, lastHumid = 0, lastPressure = 0, lastType = -1, lastTime = 0;
 #endif // SENSOR_SDA
+
 
 RTC_DATA_ATTR char szPrevFile[32] = {0}; // name of the last image displayed
 bool pref_clear = false;
@@ -675,7 +681,9 @@ void bl_init(void)
 
   if (digitalRead(PIN_INTERRUPT) == LOW) {
     Log_info("Boot button pressed during startup, resetting WiFi credentials...");
-    WifiCaptivePortal.resetSettings();
+    if (conn_mgr_is_wifi()) {
+      WifiCaptivePortal.resetSettings();
+    }
     Log_info("WiFi credentials reset completed");
   }
 #endif
@@ -786,7 +794,9 @@ void bl_init(void)
     {
     case LongPress:
       Log_info("WiFi reset");
-      WifiCaptivePortal.resetSettings();
+      if (conn_mgr_is_wifi()) {
+        WifiCaptivePortal.resetSettings();
+      }
       break;
     case DoubleClick:
       double_click = true;
@@ -1077,6 +1087,25 @@ void bl_init(void)
   log_nvs_usage();
 
 #ifdef BOARD_TRMNL_X
+
+  ESP_ERROR_CHECK(esp_netif_init());
+  ESP_ERROR_CHECK(esp_event_loop_create_default());
+  conn_mgr_init();
+  ethernet_start();
+  Log_info("Waiting for Ethernet DHCP");
+  bool network_via_eth = false;
+  for (int _eth_s = 1; _eth_s <= 5; _eth_s++) {
+    network_via_eth = (conn_mgr_wait_any(pdMS_TO_TICKS(1000)) & ETH_READY_BIT) != 0;
+    if (network_via_eth) break;
+    Log_info("No Ethernet yet... (waiting %ds)", _eth_s);
+    if (_eth_s == 5) {
+      Log_info("Ethernet DHCP still not ready after %ds, giving up and trying WiFi", _eth_s);
+    }
+  }
+
+  // WiFi block — runs when Ethernet is not available.
+  if (!conn_mgr_is_eth()) {
+
   modem_reset_target();
   delay(500);  // give modem time to boot before UART init
   static Modem modemInstance(115200);
@@ -1147,6 +1176,8 @@ void bl_init(void)
       String ip = String(WiFi.localIP());
       Log.info("%s [%d]:wifi_connection [DEBUG]: Connected: %s\r\n", __FILE__, __LINE__, ip.c_str());
       preferences.putInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT, 1);
+      conn_mgr_mark_ready(CONNECTION_INTERFACE_WIFI);
+      conn_mgr_update_default_route();
     }
     else
     {
@@ -1204,6 +1235,7 @@ void bl_init(void)
     if (!res)
     {
       WiFi.disconnect(true);
+      conn_mgr_mark_lost(CONNECTION_INTERFACE_WIFI);
 
       showMessageWithLogo(WIFI_FAILED);
 
@@ -1217,6 +1249,8 @@ void bl_init(void)
   }
 
 #endif
+
+  } // end WiFi fallback block
 
   // clock synchronization
   if (setClock())
@@ -1340,7 +1374,7 @@ void bl_init(void)
   {
   case HTTPS_REQUEST_FAILED:
   {
-    if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+    if (conn_mgr_is_eth() || WiFi.RSSI() > WIFI_CONNECTION_RSSI)
     {
       showMessageWithLogo(API_REQUEST_FAILED);
     }
@@ -1357,7 +1391,7 @@ void bl_init(void)
   break;
   case HTTPS_UNABLE_TO_CONNECT:
   {
-    if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+    if (conn_mgr_is_eth() || WiFi.RSSI() > WIFI_CONNECTION_RSSI)
     {
       showMessageWithLogo(API_UNABLE_TO_CONNECT);
     }
@@ -1374,7 +1408,7 @@ void bl_init(void)
   break;
   case HTTPS_WRONG_IMAGE_SIZE:
   {
-    if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+    if (conn_mgr_is_eth() || WiFi.RSSI() > WIFI_CONNECTION_RSSI)
     {
       showMessageWithLogo(API_SIZE_ERROR);
     }
@@ -1421,6 +1455,15 @@ void bl_process(void)
 {
 }
 
+static String get_device_mac() {
+  uint8_t mac[6] = {};
+  esp_efuse_mac_get_default(mac);
+  char buf[18];
+  snprintf(buf, sizeof(buf), "%02X:%02X:%02X:%02X:%02X:%02X",
+           mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+  return String(buf);
+}
+
 ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
 {
   ApiDisplayInputs inputs;
@@ -1459,7 +1502,7 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
     Log.info("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_SLEEP_TIME_KEY);
   }
 
-  inputs.macAddress = WiFi.macAddress();
+  inputs.macAddress = get_device_mac();
 
   inputs.batteryVoltage = readBatteryVoltage(); //readBatteryVoltage();
   inputs.batteryCount = battery_count;
@@ -1483,7 +1526,7 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
 
   inputs.firmwareVersion = String(FW_VERSION_STRING);
 
-  inputs.rssi = WiFi.RSSI();
+  inputs.rssi = conn_mgr_is_eth() ? 0 : WiFi.RSSI();
   inputs.displayWidth = display_width();
   inputs.displayHeight = display_height();
   inputs.model = DEVICE_MODEL;
@@ -1563,17 +1606,19 @@ static https_request_err_e downloadAndShow()
     int colon = apiHostname.indexOf(':');
     if (colon != -1) apiHostname = apiHostname.substring(0, colon);
 
-    for (int attempt = 1; attempt <= 5; ++attempt)
-    {
-      if (WiFi.hostByName(apiHostname.c_str(), serverIP) == 1)
+    if (conn_mgr_is_wifi()) {
+      for (int attempt = 1; attempt <= 5; ++attempt)
       {
-        Log.info("%s [%d]: Hostname resolved to %s on attempt %d\r\n", __FILE__, __LINE__, serverIP.toString().c_str(), attempt);
-        break;
-      }
-      else
-      {
-        Log_error("Failed to resolve hostname on attempt %d", attempt);
-        delay(2000);
+        if (WiFi.hostByName(apiHostname.c_str(), serverIP) == 1)
+        {
+          Log.info("%s [%d]: Hostname resolved to %s on attempt %d\r\n", __FILE__, __LINE__, serverIP.toString().c_str(), attempt);
+          break;
+        }
+        else
+        {
+          Log_error("Failed to resolve hostname on attempt %d", attempt);
+          delay(2000);
+        }
       }
     }
 
@@ -1711,7 +1756,7 @@ static https_request_err_e downloadAndShow()
           const char *headers[] = {"Content-Type"};
           https.collectHeaders(headers, 1);
           Log_info("GET...");
-          Log_info("RSSI: %d", WiFi.RSSI());
+          if (conn_mgr_is_eth()) { Log_info("RSSI: N/A (ethernet)"); } else { Log_info("RSSI: %d", WiFi.RSSI()); }
           // start connection and send HTTP header
           int httpCode = https.GET();
           int content_size = https.getSize();
@@ -1738,7 +1783,7 @@ static https_request_err_e downloadAndShow()
 
           // HTTP header has been send and Server response header has been handled
           Log.error("%s [%d]: [HTTPS] GET... code: %d\r\n", __FILE__, __LINE__, httpCode);
-          Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
+          if (conn_mgr_is_eth()) { Log.info("%s [%d]: RSSI: N/A (ethernet)\r\n", __FILE__, __LINE__); } else { Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI()); }
           // file found at server
           if (httpCode != HTTP_CODE_OK && httpCode != HTTP_CODE_MOVED_PERMANENTLY)
           {
@@ -1796,8 +1841,11 @@ static https_request_err_e downloadAndShow()
 
           submitStoredLogs();
 
-          WiFi.disconnect(true); // no need for WiFi, save power starting here
-          Log.info("%s [%d]: Received successfully; WiFi off; WiFi off\r\n", __FILE__, __LINE__);
+          if (conn_mgr_is_wifi()) {
+            WiFi.disconnect(true); // no need for WiFi, save power starting here
+            conn_mgr_mark_lost(CONNECTION_INTERFACE_WIFI);
+          }
+          Log.info("%s [%d]: Received successfully; network done\r\n", __FILE__, __LINE__);
 
 
           bool image_reverse = false;
@@ -2565,13 +2613,13 @@ static bool performApiSetup()
   // Set up the API inputs
   ApiSetupInputs inputs;
   inputs.baseUrl = preferences.getString(PREFERENCES_API_URL, API_BASE_URL);
-  inputs.macAddress = WiFi.macAddress();
+  inputs.macAddress = get_device_mac();
   inputs.firmwareVersion = FW_VERSION_STRING;
   inputs.model = String(DEVICE_MODEL);
 
   Log.info("%s [%d]: [HTTPS] begin /api/setup ...\r\n", __FILE__, __LINE__);
-  Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
-  Log.info("%s [%d]: Device MAC address: %s\r\n", __FILE__, __LINE__, WiFi.macAddress().c_str());
+  if (conn_mgr_is_eth()) { Log.info("%s [%d]: RSSI: N/A (ethernet)\r\n", __FILE__, __LINE__); } else { Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI()); }
+  Log.info("%s [%d]: Device MAC address: %s\r\n", __FILE__, __LINE__, get_device_mac().c_str());
 
   // Call the API client — modem path for 5 GHz, WiFi path otherwise
   ApiSetupResult result;
@@ -2622,7 +2670,7 @@ static bool performApiSetup()
   // Handle HTTP request errors
   if (result.error != HTTPS_NO_ERR)
   {
-    if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+    if (conn_mgr_is_eth() || WiFi.RSSI() > WIFI_CONNECTION_RSSI)
     {
       showMessageWithLogo(API_SETUP_FAILED);
     }
@@ -2717,7 +2765,7 @@ static void downloadSetupImage()
            {
     if (error != HttpError::HTTPCLIENT_SUCCESS)
     {
-      if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+      if (conn_mgr_is_eth() || WiFi.RSSI() > WIFI_CONNECTION_RSSI)
       {
         showMessageWithLogo(API_IMAGE_DOWNLOAD_ERROR);
       }
@@ -2749,7 +2797,7 @@ static void downloadSetupImage()
     // httpCode will be negative on error
     if (httpCode <= 0)
     {
-      if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+      if (conn_mgr_is_eth() || WiFi.RSSI() > WIFI_CONNECTION_RSSI)
       {
         showMessageWithLogo(API_IMAGE_DOWNLOAD_ERROR);
       }
@@ -2767,7 +2815,7 @@ static void downloadSetupImage()
     // file found at server
     if (httpCode != HTTP_CODE_OK && httpCode != HTTP_CODE_MOVED_PERMANENTLY)
     {
-      if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+      if (conn_mgr_is_eth() || WiFi.RSSI() > WIFI_CONNECTION_RSSI)
       {
         showMessageWithLogo(API_IMAGE_DOWNLOAD_ERROR);
       }
@@ -2840,7 +2888,7 @@ static void downloadSetupImage()
     {
       free(buffer);
       buffer = nullptr;
-      if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+      if (conn_mgr_is_eth() || WiFi.RSSI() > WIFI_CONNECTION_RSSI)
       {
         showMessageWithLogo(API_SIZE_ERROR);
       }
@@ -2879,7 +2927,9 @@ static void resetDeviceCredentials(void)
 {
   Log.info("%s [%d]: The device will be reset now...\r\n", __FILE__, __LINE__);
   Log.info("%s [%d]: WiFi reseting...\r\n", __FILE__, __LINE__);
-  WifiCaptivePortal.resetSettings();
+  if (conn_mgr_is_wifi()) {
+    WifiCaptivePortal.resetSettings();
+  }
   need_to_refresh_display = 1;
   bool res = preferences.clear();
   if (res)
@@ -2966,7 +3016,7 @@ static void checkAndPerformFirmwareUpdate(void)
              if (errorCode != HttpError::HTTPCLIENT_SUCCESS || !https)
              {
                Log.fatal("%s [%d]: Unable to connect for firmware update\r\n", __FILE__, __LINE__);
-               if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+               if (conn_mgr_is_eth() || WiFi.RSSI() > WIFI_CONNECTION_RSSI)
                {
                  showMessageWithLogo(API_FIRMWARE_UPDATE_ERROR);
                }
@@ -3379,9 +3429,9 @@ uint32_t getTime(void)
 
 static void submitStoredLogs(void)
 {
-  if (WiFi.isConnected() == false)
+  if (!conn_mgr_is_ready())
   {
-    Log_info("WiFi not connected; not submitting stored logs.");
+    Log_info("Network not connected; not submitting stored logs.");
     return;
   }
   String log = storedLogs.gather_stored_logs();
@@ -3600,8 +3650,16 @@ DeviceStatusStamp getDeviceStatusStamp()
 {
   DeviceStatusStamp deviceStatus = {};
 
-  deviceStatus.wifi_rssi_level = WiFi.RSSI();
-  strncpy(deviceStatus.wifi_status, wifiStatusStr(WiFi.status()), sizeof(deviceStatus.wifi_status) - 1);
+  if (conn_mgr_is_eth()) {
+    deviceStatus.wifi_rssi_level = 0;
+    strncpy(deviceStatus.wifi_status, "ethernet", sizeof(deviceStatus.wifi_status) - 1);
+  } else if (conn_mgr_is_wifi()) {
+    deviceStatus.wifi_rssi_level = WiFi.RSSI();
+    strncpy(deviceStatus.wifi_status, wifiStatusStr(WiFi.status()), sizeof(deviceStatus.wifi_status) - 1);
+  } else {
+    deviceStatus.wifi_rssi_level = 0;
+    strncpy(deviceStatus.wifi_status, "none", sizeof(deviceStatus.wifi_status) - 1);
+  }
   deviceStatus.refresh_rate = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY);
   deviceStatus.time_since_last_sleep = time_since_sleep;
   snprintf(deviceStatus.current_fw_version, sizeof(deviceStatus.current_fw_version), "%s", FW_VERSION_STRING);
