@@ -191,9 +191,7 @@ void read_gesture_data_only()
 // Releases the I2C lock during the wait so the iqs323 task can update the memory map.
 static bool tap_mode_is_hold(uint8_t channel_index, time_t hold_threshold_ms = 600)
 {
-  const uint32_t HOLD_THRESHOLD_US = hold_threshold_ms * 1000;
   const uint32_t POLL_INTERVAL_MS = 20;
-  uint32_t ticks_per_us = esp_rom_get_cpu_ticks_per_us();
 
   // update the memory map to get the latest touch states, but save wakeup stub values for TAPs
   uint8_t saved_status[2] = { iqs323.IQSMemoryMap.SYSTEM_STATUS[0], iqs323.IQSMemoryMap.SYSTEM_STATUS[1] };
@@ -202,8 +200,7 @@ static bool tap_mode_is_hold(uint8_t channel_index, time_t hold_threshold_ms = 6
   iqs323_task_i2c_unlock();
 
   while (true) {
-    uint32_t elapsed_us = esp_cpu_get_cycle_count() / ticks_per_us - wakeup_time;
-    if (elapsed_us >= HOLD_THRESHOLD_US) break;
+    if (millis() - startup_time >= hold_threshold_ms) break;
 
     iqs323_task_i2c_unlock();
     delay(POLL_INTERVAL_MS);
@@ -272,7 +269,7 @@ static bool handle_confirmation_flow(bool &in_flag, MSG message, void (*on_confi
     const uint32_t RELEASE_TIMEOUT_MS = 2000;
     unsigned long release_start = millis();
     do {
-      delay(20);
+      delay(200);
       iqs323.updateInfoFlags(STOP);
     } while ((iqs323.channel_touchState(IQS323_CH0) ||
               iqs323.channel_touchState(IQS323_CH1) ||
@@ -288,7 +285,9 @@ static bool handle_confirmation_flow(bool &in_flag, MSG message, void (*on_confi
 
     while (millis() - start_time < WIFI_RESET_CONFIRMATION_TIMEOUT_MS) {
       delay(POLL_MS);
-      iqs323.updateInfoFlags(STOP);
+      if (iqs323.getRDYStatus()) {
+        iqs323.updateInfoFlags(STOP);
+      }
 
       if (iqs323.channel_touchState(IQS323_CH0) || iqs323.channel_touchState(IQS323_CH2)) {
         Log_info("Confirmation cancelled - outer button in tap mode, status: left=%d right=%d", iqs323.channel_touchState(IQS323_CH0), iqs323.channel_touchState(IQS323_CH2));
@@ -300,7 +299,9 @@ static bool handle_confirmation_flow(bool &in_flag, MSG message, void (*on_confi
         unsigned long touch_start = millis();
         while (millis() - touch_start < HOLD_MS) {
           delay(POLL_MS);
-          iqs323.updateInfoFlags(STOP);
+          if (iqs323.getRDYStatus()) {
+            iqs323.updateInfoFlags(STOP);
+          }
           if (!iqs323.channel_touchState(IQS323_CH1)) {
             Log_info("Confirmation cancelled - tap on middle button in tap mode");
             in_flag = false;
@@ -346,6 +347,20 @@ static bool handle_confirmation_flow(bool &in_flag, MSG message, void (*on_confi
   return false;
 }
 
+static void showLastImageAndSleep()
+{
+  int file_size = 0;
+  String curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
+  if (!curPath.isEmpty()) {
+    uint8_t *buf = display_read_file(curPath.c_str(), &file_size);
+    if (buf && file_size > 0) {
+      display_show_image(buf, file_size, true);
+      free(buf);
+    }
+  }
+  goToSleep();
+}
+
 void handle_wifi_reset_confirmation()
 {
   Log_info("Entering WiFi reset confirmation mode");
@@ -353,16 +368,7 @@ void handle_wifi_reset_confirmation()
   
   if (!confirmed) {
     Log_info("WiFi reset cancelled - redrawing last image and sleeping");
-    int file_size = 0;
-    String curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
-    if (!curPath.isEmpty()) {
-      uint8_t *buf = display_read_file(curPath.c_str(), &file_size);
-      if (buf && file_size > 0) {
-        display_show_image(buf, file_size, true);
-        free(buf);
-      }
-    }
-    goToSleep();
+    showLastImageAndSleep();
   }
 }
 
@@ -419,11 +425,12 @@ void check_channel_states(void)
               showMessageWithLogo(OTG_TURNED_OFF); otg_state = false;
             }
             else {
-              otg_turn_on(); 
+              otg_turn_on();
               showMessageWithLogo(OTG_TURNED_ON);
               otg_state = true;
             }
-            otg_message = true;
+            delay(1000);
+            showLastImageAndSleep();
           }
           // No action - update on tap
           break;
@@ -455,12 +462,12 @@ void check_channel_states(void)
               showMessageWithLogo(OTG_TURNED_OFF); otg_state = false;
             }
             else {
-              otg_turn_on(); 
+              otg_turn_on();
               showMessageWithLogo(OTG_TURNED_ON);
               otg_state = true;
             }
-            otg_message = true;
-            Log_info("Free heap after drawing message with logo: %u bytes, max heap chunk: %u", ESP.getFreeHeap(), ESP.getMaxAllocHeap());
+            delay(1000);
+            showLastImageAndSleep();
             break;
           case 2:
             Log_info("Next button pressed");
@@ -1131,20 +1138,27 @@ void bl_init(void)
 
     showMessageWithLogo(WIFI_CONNECT, "", false, FW_VERSION_STRING, "");
 #ifdef BOARD_TRMNL_X
+    // set TAP mode as default
+    iqs323_task_i2c_lock();
+    iqs323.setGestureConfig(true, STOP);
+    iqs323_task_i2c_unlock();
+    touchbar_tap_mode = true;
+
+    static uint32_t s_corners_start_ms = 0;
     WifiCaptivePortal.setPortalTickCallback([]() {
       if (in_power_off_confirmation) return;
       if (millis() < s_power_off_cooldown_until) return;
       iqs323_task_i2c_lock();
-      iqs323.updateInfoFlags(STOP);
+      if (iqs323.getRDYStatus()) {
+        iqs323.updateInfoFlags(STOP);
+      }
       bool left  = iqs323.channel_touchState(IQS323_CH0);
       bool right = iqs323.channel_touchState(IQS323_CH2);
       if (left && right) {
         if (!s_corners_detected) {
-          // Reset wakeup_time so tap_mode_is_hold() waits 600 ms from this point
-          wakeup_time = esp_cpu_get_cycle_count() / esp_rom_get_cpu_ticks_per_us();
+          s_corners_start_ms = millis();
           s_corners_detected = true;
-        }
-        if (check_corners_gesture()) {
+        } else if (millis() - s_corners_start_ms >= 600) {
           s_corners_detected = false;
           handle_power_off_confirmation();
           // Only reached on cancel — confirmed path calls ESP.restart()
