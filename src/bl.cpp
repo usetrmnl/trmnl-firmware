@@ -191,28 +191,43 @@ void read_gesture_data_only()
 // Releases the I2C lock during the wait so the iqs323 task can update the memory map.
 static bool tap_mode_is_hold(uint8_t channel_index, time_t hold_threshold_ms = 600)
 {
-    const uint32_t HOLD_THRESHOLD_US = hold_threshold_ms * 1000;
-    const uint32_t POLL_INTERVAL_MS = 20;
-    uint32_t ticks_per_us = esp_rom_get_cpu_ticks_per_us();
+  const uint32_t HOLD_THRESHOLD_US = hold_threshold_ms * 1000;
+  const uint32_t POLL_INTERVAL_MS = 20;
+  uint32_t ticks_per_us = esp_rom_get_cpu_ticks_per_us();
 
-    while (true) {
-        uint32_t elapsed_us = esp_cpu_get_cycle_count() / ticks_per_us - wakeup_time;
-        if (elapsed_us >= HOLD_THRESHOLD_US) break;
+  // update the memory map to get the latest touch states, but save wakeup stub values for TAPs
+  uint8_t saved_status[2] = { iqs323.IQSMemoryMap.SYSTEM_STATUS[0], iqs323.IQSMemoryMap.SYSTEM_STATUS[1] };
+  iqs323_task_i2c_lock();
+  iqs323.updateInfoFlags(STOP);
+  iqs323_task_i2c_unlock();
 
-        iqs323_task_i2c_unlock();
-        delay(POLL_INTERVAL_MS);
-        iqs323_task_i2c_lock();
+  while (true) {
+    uint32_t elapsed_us = esp_cpu_get_cycle_count() / ticks_per_us - wakeup_time;
+    if (elapsed_us >= HOLD_THRESHOLD_US) break;
 
-        // Only read from chip when it has naturally opened a window (RDY LOW).
-        // Forcing I2C on every tick causes the chip to stop responding after ~30+ iterations
-        if (iqs323.getRDYStatus()) {
-            iqs323.updateInfoFlags(STOP);
-        }
-        if (!iqs323.channel_touchState((iqs323_channel_e)channel_index)) return false;
+    iqs323_task_i2c_unlock();
+    delay(POLL_INTERVAL_MS);
+    iqs323_task_i2c_lock();
+
+    // Only read from chip when it has naturally opened a window (RDY LOW).
+    // Forcing I2C on every tick causes the chip to stop responding after ~30+ iterations
+    if (iqs323.getRDYStatus()) {
+      iqs323.updateInfoFlags(STOP);
     }
+    if (!iqs323.channel_touchState((iqs323_channel_e)channel_index)) {
+      iqs323.IQSMemoryMap.SYSTEM_STATUS[0] = saved_status[0];
+      iqs323.IQSMemoryMap.SYSTEM_STATUS[1] = saved_status[1];
+      return false;
+    }
+  }
 
-    iqs323.updateInfoFlags(STOP);
-    return iqs323.channel_touchState((iqs323_channel_e)channel_index);
+  iqs323.updateInfoFlags(STOP);
+
+  if (!iqs323.channel_touchState((iqs323_channel_e)channel_index)) {
+    iqs323.IQSMemoryMap.SYSTEM_STATUS[0] = saved_status[0];
+    iqs323.IQSMemoryMap.SYSTEM_STATUS[1] = saved_status[1];
+  }
+  return iqs323.channel_touchState((iqs323_channel_e)channel_index);
 }
 
 // Check if user wants to confirm WiFi reset (middle button hold)
@@ -276,7 +291,7 @@ static bool handle_confirmation_flow(bool &in_flag, MSG message, void (*on_confi
       iqs323.updateInfoFlags(STOP);
 
       if (iqs323.channel_touchState(IQS323_CH0) || iqs323.channel_touchState(IQS323_CH2)) {
-        Log_info("Confirmation cancelled - outer button in tap mode");
+        Log_info("Confirmation cancelled - outer button in tap mode, status: left=%d right=%d", iqs323.channel_touchState(IQS323_CH0), iqs323.channel_touchState(IQS323_CH2));
         in_flag = false;
         return false;
       }
@@ -358,13 +373,13 @@ void handle_power_off_confirmation()
 }
 
 // Check if both left and right corners are being held
-bool check_wifi_reset_trigger()
+bool check_corners_gesture()
 {
+  // check updated values
   bool left  = iqs323.channel_touchState(IQS323_CH0);
   bool middle = iqs323.channel_touchState(IQS323_CH1);
   bool right = iqs323.channel_touchState(IQS323_CH2);
   Log_info("Hold edges: left=%d middle=%d right=%d tap_mode=%d", left, middle, right, touchbar_tap_mode);
-  if (!left || !right) return false;
 
   if (touchbar_tap_mode) {
     bool hold_left  = tap_mode_is_hold(0);
@@ -372,18 +387,12 @@ bool check_wifi_reset_trigger()
     Log_info("Hold edges tap mode: hold_left=%d hold_right=%d", hold_left, hold_right);
     return hold_left && hold_right;
   }
-  Log_info("Hold edges slider mode: event=%d (HOLD=%d)", slider_event, IQS323_GESTURE_HOLD);
-  return slider_event == IQS323_GESTURE_HOLD;
+  Log_info("Hold edges slider mode: event=%d (HOLD=%d) left=%d right=%d", slider_event, IQS323_GESTURE_HOLD, left, right);
+  return slider_event == IQS323_GESTURE_HOLD && left && right;
 }
 
 void check_channel_states(void)
 {
-  // Don't check for WiFi reset trigger if already in confirmation mode
-  if (!in_wifi_reset_confirmation && check_wifi_reset_trigger()) {
-    handle_wifi_reset_confirmation();
-    return;
-  }
-
   /* Loop through all the active channels */
   for (uint8_t i = 0; i < 3; i++) {
     if (iqs323.channel_touchState((iqs323_channel_e)(i))) {
@@ -571,7 +580,7 @@ void process_iqs323_data(void)
 
   iqs323_task_i2c_unlock();
 
-  if (!in_wifi_reset_confirmation && check_wifi_reset_trigger()) {
+  if (!in_wifi_reset_confirmation && check_corners_gesture()) {
     handle_wifi_reset_confirmation();
     return;
   }
@@ -1135,7 +1144,7 @@ void bl_init(void)
           wakeup_time = esp_cpu_get_cycle_count() / esp_rom_get_cpu_ticks_per_us();
           s_corners_detected = true;
         }
-        if (check_wifi_reset_trigger()) {
+        if (check_corners_gesture()) {
           s_corners_detected = false;
           handle_power_off_confirmation();
           // Only reached on cancel — confirmed path calls ESP.restart()
@@ -2715,7 +2724,7 @@ static void downloadSetupImage()
     {
       Log_error_submit("Modem logo download failed: ok=%d bytes=%u expected=%u",
                        httpRes.ok, httpRes.bytesReceived, DISPLAY_BMP_IMAGE_SIZE);
-      return;
+      filesystem_file_delete("/logo.bmp");
     }
     String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
     display_show_msg(storedLogoOrDefault(0), FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
