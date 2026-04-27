@@ -39,7 +39,7 @@
 
 #define DISPLAY_BMP_IMAGE_SIZE 48062 // in bytes - 62 bytes - header; 48000 bytes - bitmap (480*800 1bpp) / 8
 #define DEFAULT_IMAGE_SIZE 48000
-#ifdef BOARD_TRMNL_X
+#if defined(BOARD_TRMNL_X) || defined(BOARD_SEEED_RETERMINAL_E1003)
 #define MAX_IMAGE_SIZE 750000 // Use PSRAM on the ESP32-S3
 #else
 #define MAX_IMAGE_SIZE 90000 // largest compressed image we can receive
@@ -115,9 +115,12 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #define PIN_INTERRUPT 3         //the green button
 #define PIN_VBAT_SWITCH 21      //load switch enable pin for battery voltage measurement
 #define VBAT_SWITCH_LEVEL HIGH  //load switch enable pin active level
+#elif defined(BOARD_SEEED_RETERMINAL_E1003)
+#define DEVICE_MODEL "reTerminal E1003"
+#define PIN_INTERRUPT 3         //the green button
 #endif
 
-#if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002)
+#if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002) || defined(BOARD_SEEED_RETERMINAL_E1003)
 #define PIN_BATTERY 1
 #elif defined(BOARD_XTEINK_X4)
 #define PIN_BATTERY 0

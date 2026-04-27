@@ -71,6 +71,7 @@ MSG current_msg = NONE;
 SPECIAL_FUNCTION special_function = SF_NONE;
 RTC_DATA_ATTR uint8_t need_to_refresh_display = 1;
 RTC_DATA_ATTR char szPrevName[36] = {0};
+extern int iTempProfile;
 Preferences preferences;
 PreferencesPersistence preferencesPersistence(preferences);
 StoredLogs storedLogs(LOG_MAX_NOTES_NUMBER / 2, LOG_MAX_NOTES_NUMBER / 2, PREFERENCES_LOG_KEY, PREFERENCES_LOG_BUFFER_HEAD_KEY, preferencesPersistence);
@@ -1092,6 +1093,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
       String firmware_url = apiResponse.firmware_url;
       uint64_t rate = apiResponse.refresh_rate;
       reset_firmware = apiResponse.reset_firmware;
+      iTempProfile = apiResponse.temp_profile;
 
       bool sleep_5_seconds = false;
 
@@ -1185,6 +1187,11 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
         Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, rate);
         preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, rate);
         Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
+      }
+      Log.info("%s [%d]: temp_profile: %d\r\n", __FILE__, __LINE__, iTempProfile);
+      if (iTempProfile != preferences.getUInt(PREFERENCES_TEMP_PROFILE, TEMP_PROFILE_DEFAULT)) {
+        Log_info("Saving new temperature profile (%d) to FLASH", iTempProfile);
+        preferences.putUInt(PREFERENCES_TEMP_PROFILE, iTempProfile);
       }
 
       if (reset_firmware)

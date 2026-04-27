@@ -132,6 +132,17 @@
    #define EPD_RST_PIN  12
    #define EPD_DC_PIN   11
    #define EPD_BUSY_PIN 13
+
+#elif defined(BOARD_SEEED_RETERMINAL_E1003)
+   // Pin definition for reTerminal E1003 (IT8951-based 10.3" ePaper)
+   #define EPD_SCK_PIN   7
+   #define EPD_MISO_PIN  8
+   #define EPD_MOSI_PIN  9
+   #define EPD_CS_PIN    10
+   #define EPD_BUSY_PIN  13
+   #define EPD_RST_PIN   12
+   #define EPD_EN_PIN    11
+   #define EPD_ITE_EN_PIN 21
 #else
    #error "Board type not defined. Please define BOARD_WAVESHARE_ESP32_DRIVER or BOARD_TRMNL or BOARD_SEEED_XIAO_ESP32C3 or BOARD_SEEED_XIAO_ESP32S3 in platformio.ini build_flags."
 #endif
