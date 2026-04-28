@@ -7,7 +7,7 @@
 #include <preferences_persistence.h>
 #include "DEV_Config.h"
 #define MAX_BIT_DEPTH 8
-#ifndef BOARD_TRMNL_X
+#if !defined(BOARD_TRMNL_X) && !defined(BOARD_SEEED_RETERMINAL_E1003)
 #define BB_EPAPER
 #include "bb_epaper.h"
 const DISPLAY_PROFILE dpList[4] = { // 1-bit and 2-bit display types for each profile
@@ -51,9 +51,22 @@ BBEPAPER bbep(EP75_800x480);
 #ifdef BOARD_SEEED_RETERMINAL_E1002
 uint8_t u8SpectraPal[512]; // RGB333 mapped to closest Spectra6 color
 #endif // E1002
-#else
+#else // BOARD_TRMNL_X or BOARD_SEEED_RETERMINAL_E1003
 #include "FastEPD.h"
 FASTEPD bbep;
+#ifdef BOARD_SEEED_RETERMINAL_E1003
+#define IT8951_EPAPER
+#include "it8951.h"
+static IT8951 it8951;
+// IT8951 expects actual 4-bit grayscale values (0x00=black, 0x0F=white).
+// FastEPD's BBEP_WHITE/BBEP_BLACK are 1-bit palette indices (0 and 1) that
+// TRMNL_X maps via its custom waveform graytable, but IT8951 uses them as
+// literal gray levels — so remap to the full 4-bit range.
+#undef BBEP_WHITE
+#undef BBEP_BLACK
+#define BBEP_WHITE 0x0F
+#define BBEP_BLACK 0x00
+#else // TRMNL_X only
 const uint8_t u8_graytable[] = {
 /* 0 */  2, 2, 1, 1, 1, 1, 1, 1,
 /* 1 */  2, 2, 2, 2, 1, 1, 2, 1,
@@ -72,7 +85,8 @@ const uint8_t u8_graytable[] = {
 /* 14 */  2, 2, 2, 2, 2, 1, 2, 2,
 /* 15 */  2, 2, 2, 2, 2, 2, 2, 2
 };
-#endif
+#endif // BOARD_SEEED_RETERMINAL_E1003 vs TRMNL_X
+#endif // BB_EPAPER vs FastEPD
 // Counts the number of partial updates to know when to do a full update
 RTC_DATA_ATTR int iUpdateCount = 0;
 #include "Group5.h"
@@ -82,6 +96,14 @@ RTC_DATA_ATTR int iUpdateCount = 0;
 #include <ctype.h> //iscntrl()
 #include <api-client/display.h>
 #include <trmnl_log.h>
+// Color constants that are defined in bb_epaper.h but not in FastEPD.h.
+// These are used in the color-matching functions for 3/4-color panels.
+#ifndef BBEP_RED
+#define BBEP_RED 3
+#endif
+#ifndef BBEP_YELLOW
+#define BBEP_YELLOW 4
+#endif
 #include "png_flip.h"
 #include "nicoclean_8.h"
 #include "Inter_18.h"
@@ -96,6 +118,31 @@ static uint8_t *pDither;
 // Runtime control for light sleep (true = enabled, false = disabled)
 static bool g_light_sleep_enabled = true;
 
+#ifdef IT8951_EPAPER
+/**
+ * @brief Upload the FastEPD virtual framebuffer to IT8951 and trigger a display refresh.
+ *        Automatically selects the sharper 1bpp path when the image is pure black/white.
+ */
+static void it8951_flush_framebuffer(void)
+{
+    uint16_t w = bbep.width();
+    uint16_t h = bbep.height();
+    uint8_t *buf = bbep.currentBuffer();
+    uint32_t buf_size = (uint32_t(w) * h) / 2;
+    bool use_1bpp = IT8951::framebufferIsBinary(buf, buf_size);
+
+    if (use_1bpp) {
+        Log_info("IT8951: Using sharp 1bpp upload path");
+        it8951.uploadFramebuffer1bpp(buf, w, h);
+        it8951.displayArea1bpp(0, 0, w, h, 2, 0xFF, 0x00);
+    } else {
+        Log_info("IT8951: Using 4bpp grayscale upload path");
+        it8951.uploadFramebuffer4bpp(buf, w, h);
+        it8951.displayArea(0, 0, w, h, 2);
+    }
+}
+#endif // IT8951_EPAPER
+
 /**
  * @brief Function to init the display
  * @param none
@@ -109,6 +156,24 @@ void display_init(void)
 #ifdef BB_EPAPER
     bbep.setPanelType(dpList[iTempProfile].OneBit); // must be set BEFORE calling initio
     bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
+#elif defined(IT8951_EPAPER)
+    // Use FastEPD as a virtual rendering backend (no hardware — just a framebuffer)
+    bbep.initPanel(BB_PANEL_VIRTUAL);
+    bbep.setPanelSize(1872, 1404, 0);
+    bbep.setMode(BB_MODE_4BPP); // IT8951 always uploads 4bpp; must match buffer layout
+    // Initialize the IT8951 controller for actual display hardware
+    IT8951Pins pins;
+    pins.sck = EPD_SCK_PIN;
+    pins.miso = EPD_MISO_PIN;
+    pins.mosi = EPD_MOSI_PIN;
+    pins.cs = EPD_CS_PIN;
+    pins.busy = EPD_BUSY_PIN;
+    pins.rst = EPD_RST_PIN;
+    pins.en = EPD_EN_PIN;
+    pins.ite_en = EPD_ITE_EN_PIN;
+    if (!it8951.init(pins)) {
+        Log_error("IT8951 initialization failed!");
+    }
 #else
     bbep.initPanel(BB_PANEL_EPDIY_V7_16); //, 26000000);
     bbep.setPanelSize(1872, 1404, BB_PANEL_FLAG_MIRROR_X);
@@ -123,7 +188,9 @@ void display_init(void)
  */
 void display_set_light_sleep(uint8_t enabled)
 {
+#ifdef BB_EPAPER
     bbep.setLightSleep(enabled);
+#endif
 }
 
 /**
@@ -154,13 +221,15 @@ void display_reset(void)
 {
     Log_info("e-Paper Clear start");
     bbep.fillScreen(BBEP_WHITE);
-    bbep.setLightSleep(true);
 #ifdef BB_EPAPER
+    bbep.setLightSleep(true);
     if (!apiDisplayResult.response.maximum_compatibility) {
         bbep.refresh(REFRESH_FAST, true);
     } else {
         bbep.refresh(REFRESH_FULL, true); // incompatible panel
     }
+#elif defined(IT8951_EPAPER)
+    it8951_flush_framebuffer();
 #else
     bbep.fullUpdate();
 #endif
@@ -844,10 +913,14 @@ int png_draw(PNGDRAW *pDraw)
                 }
             } // for x
         } else { // normal 0/1 split plane
-            ucMask = (iPlane == PNG_2_BIT_0) ? 0x40 : 0x80; // lower or upper source bit
+            const uint8_t ucTranslate[4] = {0, 2, 1, 3}; // translate grays to odd order of native 4-gray mode on 7.5" panel
+            const uint8_t ucNoTranslate[4] = {0, 1, 2, 3}; // for other 2-bit panels
+            uint8_t ucPT = bbep.getPanelType();
+            const uint8_t *pTranslate = (ucPT == EP75_800x480_4GRAY || ucPT == EP75_800x480_4GRAY_GEN2) ? ucTranslate : ucNoTranslate;
+            ucMask = (iPlane == PNG_2_BIT_0) ? 0x1 : 0x2; // lower or upper source bit
             for (x=0; x<iWidth; x++) {
                 uc <<= 1;
-                if (src & ucMask) {
+                if (pTranslate[src>>6] & ucMask) {
                     uc |= 1; // high bit of source pair
                 }
                 src <<= 2;
@@ -876,6 +949,35 @@ int png_draw(PNGDRAW *pDraw)
     d = bbep.currentBuffer();
     iPitch = bbep.width()/2;
     if (pDraw->iBpp == 1) {
+#ifdef IT8951_EPAPER
+        // IT8951 always uses 4bpp buffer: convert 1bpp source to 4bpp nibbles
+        d += pDraw->y * iPitch; // iPitch = bbep.width()/2 (4bpp pitch)
+        if (bbep.width() == pDraw->iWidth) { // normal orientation
+            for (x = 0; x < pDraw->iWidth; x++) {
+                uint8_t bit = (s[x >> 3] >> (7 - (x & 7))) & 1;
+                uint8_t nibble = bit ? 0x0F : 0x00;
+                if ((x & 1) == 0) {
+                    d[x >> 1] = nibble << 4;
+                } else {
+                    d[x >> 1] |= nibble;
+                }
+            }
+        } else { // rotated (portrait PNG on landscape display)
+            d = bbep.currentBuffer();
+            d += (bbep.height() - 1) * iPitch;
+            d += (pDraw->y / 2);
+            for (x = 0; x < pDraw->iWidth; x++) {
+                uint8_t bit = (s[x >> 3] >> (7 - (x & 7))) & 1;
+                uint8_t nibble = bit ? 0x0F : 0x00;
+                if (pDraw->y & 1) {
+                    d[0] = (d[0] & 0xF0) | nibble;
+                } else {
+                    d[0] = (d[0] & 0x0F) | (nibble << 4);
+                }
+                d -= iPitch;
+            }
+        }
+#else
         if (bbep.width() == pDraw->iWidth) { // normal orientation
             iPitch = (bbep.width() + 7)/8;
             d += pDraw->y * iPitch; // point to the correct line
@@ -894,6 +996,7 @@ int png_draw(PNGDRAW *pDraw)
                 d -= iPitch;
             }
         }
+#endif
     } else if (pDraw->iBpp == 2) { // we need to convert the 2-bit data into 4-bits
         iPitch = bbep.width()/2;
         if (bbep.width() == pDraw->iWidth) { // normal orientation
@@ -1262,6 +1365,7 @@ PNG *png = new PNG();
                     png->decode(&iPlane, 0);
                 } // temp profile needs the second plane written
             } else { // 2-bpp (or greater, but reduced to 2-bpp)
+                Log_info("%s [%d]: Using temp profile %d\r\n", __FILE__, __LINE__, iTempProfile);
                 bbep.setPanelType(dpList[iTempProfile].TwoBit);
                 rc = REFRESH_FULL; // 4gray mode must be full refresh
                 iUpdateCount = 0; // grayscale mode resets the partial update counter
@@ -1277,7 +1381,11 @@ PNG *png = new PNG();
                 bbep.startWrite(PLANE_1); // start writing image data to plane 1
                 png->decode(&iPlane, 0); // decode it again to get plane 1 data
             }
-#else // FastEPD
+#elif defined(IT8951_EPAPER)
+            bbep.setMode(BB_MODE_4BPP); // IT8951 always uses 4bpp; png_draw converts 1bpp->4bpp
+            png->decode(NULL, 0);
+            png->close();
+#else // FastEPD (TRMNL_X)
             bbep.setMode((png->getBpp() == 1) ? BB_MODE_1BPP : BB_MODE_4BPP);
             png->decode(NULL, 0);
             png->close();
@@ -1383,11 +1491,6 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     }
     Log_info("Display refresh start");
 #ifdef BB_EPAPER
-    if (iTempProfile != apiDisplayResult.response.temp_profile) {
-        iTempProfile = apiDisplayResult.response.temp_profile;
-        Log_info("Saving new temperature profile (%d) to FLASH", iTempProfile);
-        preferences.putUInt(PREFERENCES_TEMP_PROFILE, iTempProfile);
-    }
     if ((iUpdateCount & 7) == 0 || apiDisplayResult.response.maximum_compatibility == true) {
         Log_info("%s [%d]: Forcing full refresh; desired refresh mode was: %d\r\n", __FILE__, __LINE__, iRefreshMode);
         iRefreshMode = REFRESH_FULL; // force full refresh every 8 partials
@@ -1399,7 +1502,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
         iRefreshMode = REFRESH_FAST;
     }
     if (bbep.capabilities() & (BBEP_4COLOR | BBEP_3COLOR | BBEP_7COLOR)) bWait = 1;
-    if (!bWait) iRefreshMode = REFRESH_PARTIAL; // fast update when showing loading screen
+    if (!bWait) iRefreshMode = REFRESH_FAST; // fast update when showing loading screen
     Log_info("%s [%d]: EPD refresh mode: %d\r\n", __FILE__, __LINE__, iRefreshMode);
     bbep.setLightSleep(true);
     bbep.refresh(iRefreshMode, bWait);
@@ -1410,6 +1513,8 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
         bbep.freeBuffer();
     }
     iUpdateCount++;
+#elif defined(IT8951_EPAPER)
+    it8951_flush_framebuffer();
 #else
     bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
     bbep.fullUpdate();
@@ -1481,7 +1586,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
 #endif
     }
 
-#ifdef BOARD_TRMNL_X
+#if defined(BOARD_TRMNL_X) || defined(BOARD_SEEED_RETERMINAL_E1003)
     bbep.setFont(Inter_18);
 #else
     bbep.setFont(nicoclean_8);
@@ -1774,6 +1879,8 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     bbep.writePlane(PLANE_0);
     bbep.refresh(REFRESH_FULL, true);
     bbep.freeBuffer();
+#elif defined(IT8951_EPAPER)
+    it8951_flush_framebuffer();
 #else
     bbep.fullUpdate();
 #endif
@@ -1862,6 +1969,8 @@ void display_show_msg_qa(uint8_t *image_buffer, const float *voltage, const floa
         bbep.writePlane(PLANE_0);
         bbep.refresh(REFRESH_FULL, true);
         bbep.freeBuffer();
+    #elif defined(IT8951_EPAPER)
+        it8951_flush_framebuffer();
     #else
         bbep.fullUpdate();
     #endif
@@ -1908,6 +2017,8 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         } else {
             bbep.refresh(REFRESH_FULL, true); // incompatible panel (for now)
         }
+#elif defined(IT8951_EPAPER)
+        it8951_flush_framebuffer();
 #else
         bbep.fullUpdate();
 #endif
@@ -1941,7 +2052,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 #endif
     }
 
-#ifdef BOARD_TRMNL_X
+#if defined(BOARD_TRMNL_X) || defined(BOARD_SEEED_RETERMINAL_E1003)
     bbep.setFont(Inter_18);
 #else
     bbep.setFont(nicoclean_8);
@@ -2004,7 +2115,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         UWORD y_start = 340;
         UWORD font_width = 18; // DEBUG
         Paint_DrawMultilineText(0, y_start, message.c_str(), width, font_width, BBEP_BLACK, BBEP_WHITE,
-#ifdef BOARD_TRMNL_X
+#if defined(BOARD_TRMNL_X) || defined(BOARD_SEEED_RETERMINAL_E1003)
         Inter_18, true);
 #else
         nicoclean_8, true);
@@ -2019,6 +2130,8 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     bbep.writePlane(PLANE_0);
     bbep.refresh(REFRESH_FULL, true);
     bbep.freeBuffer();
+#elif defined(IT8951_EPAPER)
+    it8951_flush_framebuffer();
 #else
     bbep.fullUpdate();
 #endif
@@ -2035,6 +2148,8 @@ void display_sleep(void)
     Log_info("Goto Sleep...");
 #ifdef BB_EPAPER
     bbep.sleep(DEEP_SLEEP);
+#elif defined(IT8951_EPAPER)
+    it8951.sleep();
 #else
     bbep.einkPower(0);
     bbep.deInit();

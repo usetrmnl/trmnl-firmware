@@ -71,6 +71,7 @@ MSG current_msg = NONE;
 SPECIAL_FUNCTION special_function = SF_NONE;
 RTC_DATA_ATTR uint8_t need_to_refresh_display = 1;
 RTC_DATA_ATTR char szPrevName[36] = {0};
+extern int iTempProfile;
 Preferences preferences;
 PreferencesPersistence preferencesPersistence(preferences);
 StoredLogs storedLogs(LOG_MAX_NOTES_NUMBER / 2, LOG_MAX_NOTES_NUMBER / 2, PREFERENCES_LOG_KEY, PREFERENCES_LOG_BUFFER_HEAD_KEY, preferencesPersistence);
@@ -1092,6 +1093,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
       String firmware_url = apiResponse.firmware_url;
       uint64_t rate = apiResponse.refresh_rate;
       reset_firmware = apiResponse.reset_firmware;
+      iTempProfile = apiResponse.temp_profile;
 
       bool sleep_5_seconds = false;
 
@@ -1185,6 +1187,11 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
         Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, rate);
         preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, rate);
         Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
+      }
+      Log.info("%s [%d]: temp_profile: %d\r\n", __FILE__, __LINE__, iTempProfile);
+      if (iTempProfile != preferences.getUInt(PREFERENCES_TEMP_PROFILE, TEMP_PROFILE_DEFAULT)) {
+        Log_info("Saving new temperature profile (%d) to FLASH", iTempProfile);
+        preferences.putUInt(PREFERENCES_TEMP_PROFILE, iTempProfile);
       }
 
       if (reset_firmware)
@@ -2069,7 +2076,7 @@ static float readBatteryVoltage(void)
   Log.warning("%s [%d]: FAKE_BATTERY_VOLTAGE is defined. Returning 4.2V.\r\n", __FILE__, __LINE__);
   return 4.2f;
 #else
-  #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002)
+  #ifdef PIN_VBAT_SWITCH
     pinMode(PIN_VBAT_SWITCH, OUTPUT);
     digitalWrite(PIN_VBAT_SWITCH, VBAT_SWITCH_LEVEL);
     delay(10); // Wait for the switch to stabilize
@@ -2083,7 +2090,7 @@ static float readBatteryVoltage(void)
     for (uint8_t i = 0; i < 8; i++) {
       adc += analogReadMilliVolts(PIN_BATTERY);
     }
-  #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_XIAO_EPAPER_DISPLAY_3CLR)
+  #ifdef PIN_VBAT_SWITCH
     digitalWrite(PIN_VBAT_SWITCH, (VBAT_SWITCH_LEVEL == HIGH ? LOW : HIGH));
   #endif
     sensorValue = (adc / 8) * 2;
