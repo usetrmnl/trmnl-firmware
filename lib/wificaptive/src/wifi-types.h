@@ -7,7 +7,10 @@ struct WifiCredentials
 {
     String ssid;
     String pswd;
-    bool   is5GHz = false;
+    bool   is5GHz;
+    WifiCredentials() : is5GHz(false) {}
+    WifiCredentials(String ssid, String pswd, bool is5GHz = false)
+        : ssid(ssid), pswd(pswd), is5GHz(is5GHz) {}
 };
 
 struct WifiNetwork
@@ -16,7 +19,9 @@ struct WifiNetwork
     int32_t rssi;
     bool open;
     bool saved;
-    bool is5GHz = false;
+    bool is5GHz;
+    WifiNetwork(String ssid, int32_t rssi, bool open, bool saved, bool is5GHz = false)
+        : ssid(ssid), rssi(rssi), open(open), saved(saved), is5GHz(is5GHz) {}
 };
 
 struct WifiEventData

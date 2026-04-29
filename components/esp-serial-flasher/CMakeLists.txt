@@ -98,6 +98,14 @@ elseif(DEFINED SERIAL_FLASHER_INTERFACE_SDIO OR CONFIG_SERIAL_FLASHER_INTERFACE_
 endif()
 
 if (DEFINED ESP_PLATFORM)
+    # This component requires ESP-IDF 5.3+ (UART_SCLK_DEFAULT and split driver components).
+    # For older IDF versions (e.g. espressif32@6.12.0 ~ IDF 5.2), register an empty component
+    # so non-X builds using legacy platforms are not affected.
+    if("${IDF_VERSION_MAJOR}.${IDF_VERSION_MINOR}" VERSION_LESS "5.3")
+        idf_component_register()
+        return()
+    endif()
+
     if (${CONFIG_SERIAL_FLASHER_INTERFACE_UART})
         # Using custom port implementation for IO expander-based GPIO control
         list(APPEND srcs
