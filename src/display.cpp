@@ -12,7 +12,7 @@
 #include <SPIFFS.h>
 #define FS SPIFFS
 const DISPLAY_PROFILE dpList[4] = { // 1-bit and 2-bit display types for each profile
-#ifdef BOARD_XTEINK_X4
+#if defined ( BOARD_XTEINK_X4 ) || defined ( MINI_EPD )
     {EP426_800x480, EP426_800x480_4GRAY}, // default (for original EPD)
     {EP426_800x480, EP426_800x480_4GRAY}, // a = uses built-in fast + 4-gray
     {EP426_800x480, EP426_800x480_4GRAY}, // b = darker grays
@@ -1674,7 +1674,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
 #endif
         }
 #ifdef BB_EPAPER
-#ifdef BOARD_XTEINK_X4
+#if defined( BOARD_XTEINK_X4 ) || defined( MINI_EPD )
         bbep.writePlane(PLANE_FALSE_DIFF);
 #else
         bbep.writePlane(); // send image data to the EPD

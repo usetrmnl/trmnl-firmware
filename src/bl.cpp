@@ -76,7 +76,6 @@ RTC_DATA_ATTR uint8_t need_to_refresh_display = 1;
 RTC_DATA_ATTR bool otg_state = false;  // Track OTG state across deep sleep
 RTC_DATA_ATTR char szPrevFile[36] = {0};
 bool touchbar_tap_mode = true;  // false = "slide", true = "tap" (default)
-
 Preferences preferences;
 PreferencesPersistence preferencesPersistence(preferences);
 StoredLogs storedLogs(LOG_MAX_NOTES_NUMBER / 2, LOG_MAX_NOTES_NUMBER / 2, PREFERENCES_LOG_KEY, PREFERENCES_LOG_BUFFER_HEAD_KEY, preferencesPersistence);
@@ -930,6 +929,9 @@ void bl_init(void)
 #else 
     display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false);
 #endif // BOARD_TRMNL_X
+    // Force the display to show the current playlist image after the loading screen
+    // (even if it hasn't changed)
+    szPrevFile[0] = 0;
 
     need_to_refresh_display = 1;
     preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
@@ -1582,7 +1584,14 @@ static https_request_err_e downloadAndShow()
       }
 #endif // BOARD_X_CLASS
       fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
-      Log.info("%s [%d]: Reading %s from FLASH\r\n", __FILE__, __LINE__, szTemp);
+      if (strcmp(szTemp, szPrevFile) == 0) {
+        // We just displayed the same image, don't refresh the display
+        Log.info("%s [%d]: The image hasn't changed since the last wakeup, don't refresh the display.\r\n", __FILE__, __LINE__);
+        buffer = nullptr;
+        return result;
+      }
+      strcpy(szPrevFile, szTemp); // save the filename to compare on the next wakeup
+      Log.info("%s [%d]: Reading %s from SPIFFS\r\n", __FILE__, __LINE__, szTemp);
       size_t content_size = filesystem_read_and_allocate(szTemp, &buffer);
       if (!buffer || content_size == 0) {
         filesystem_file_delete(szTemp);
@@ -1783,11 +1792,9 @@ static https_request_err_e downloadAndShow()
 
               buffer = (uint8_t *)malloc(counter);
               if (buffer) {
-                while (iCount < counter && millis() < (lStartTime + API_FIRST_RETRY*1000) && stream->connected()) {
-                  iLen = stream->available();
-                  if (iLen) {
-                    stream->readBytes(&buffer[iCount], iLen);
-                    iCount += iLen;
+                while (iCount < counter && millis() < (lStartTime + API_FIRST_RETRY*1000)) {
+                  if (stream->available()) {
+                    buffer[iCount++] = stream->read();
                   } else {
                     vTaskDelay(1); // yield to allow time for the data to arrive
                   }
