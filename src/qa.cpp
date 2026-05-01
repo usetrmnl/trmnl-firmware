@@ -7,8 +7,7 @@
 #include <Preferences.h>
 #include "WifiCaptive.h"
 #include "logo_small.h"
-#include "bb_epaper.h"
-extern BBEPAPER bbep;
+#include "logo_medium.h"
 
 extern "C" {
   #include "esp_timer.h"   // esp_timer_get_time()
@@ -47,6 +46,83 @@ void savePassedTest(){
   preferencesQA.putBool("testPassed", true);
   preferencesQA.end();
 }
+
+bool checkIfAlreadyShipped(){
+  preferencesQA.begin("qa", true);
+  bool status = preferencesQA.getBool("ship_done", false);
+  preferencesQA.end();
+  return status;
+}
+
+bool saveShipmentDone(){
+  preferencesQA.begin("qa", false);
+  preferencesQA.putBool("ship_done", true);
+  preferencesQA.putBool("ship_started", false);  // Clear started flag
+  preferencesQA.end();
+  return true;
+}
+
+bool clearShipmentStatus(){
+  preferencesQA.begin("qa", false);
+  preferencesQA.putBool("ship_done", false);
+  preferencesQA.putBool("ship_started", false);
+  preferencesQA.end();
+  return true;
+}
+
+bool checkIfShipmentStarted(){
+  preferencesQA.begin("qa", true);
+  bool status = preferencesQA.getBool("ship_started", false);
+  preferencesQA.end();
+  return status;
+}
+
+bool saveShipmentStarted(){
+  preferencesQA.begin("qa", false);
+  preferencesQA.putBool("ship_started", true);
+  preferencesQA.end();
+  return true;
+}
+
+#ifdef BOARD_TRMNL_X
+bool checkIfModemFlashed(){
+  preferencesQA.begin("qa", true);
+  bool status = preferencesQA.getBool("modem_flashed", false);
+  preferencesQA.end();
+  return status;
+}
+
+bool saveModemFlashed(){
+  preferencesQA.begin("qa", false);
+  preferencesQA.putBool("modem_flashed", true);
+  preferencesQA.end();
+  return true;
+}
+
+bool enableShipmentMode() {
+  // should be already initialized
+  // display_init();
+
+  Serial.println("Waiting for USB plug-off to enter shipment mode...");
+
+  if (check_usb_power()) {
+    display_show_msg(const_cast<uint8_t *>(logo_medium),READY_TO_SHIP);
+    while (check_usb_power()) {
+      Serial.println("USB power still detected, waiting...");
+      delay(2000);
+    }
+  }
+
+  display_show_msg(const_cast<uint8_t *>(logo_medium),SHIPPING_MODE);
+
+  // Save that we've started shipment mode (in case battery dies during shipping)
+  saveShipmentStarted();
+
+  enter_shipment_sleep();
+
+  return true;
+}
+#endif // BOARD_TRMNL_X
 
 float measureTemperatureAverage() {
   float sum = 0;
@@ -117,6 +193,93 @@ static void loadCPUAndRadio(uint32_t ms) {
   }
 }
 
+#ifdef BOARD_TRMNL_X
+bool startQA(){
+  
+  bool wifiSaved = checkForSavedCredentials();
+
+  if(wifiSaved){
+
+    Serial.print("WiFi credentials found, skipping QA\n");
+    return true;
+  } else {
+    Serial.println("WiFi credentials not found, starting QA");
+  }
+
+  while(!stopRequested){
+
+  Serial.begin(115200);
+  
+  Log.begin(LOG_LEVEL_VERBOSE, &Serial);
+  pins_init();
+  Log.info("QA Test started\n");
+  attachInterrupt(digitalPinToInterrupt(PIN_INTERRUPT), onBtnPress, FALLING);
+
+  uint8_t *buffer = (uint8_t *)malloc(48000);
+  memset(buffer, 255, 48000);
+  display_init();
+
+  display_show_msg(const_cast<uint8_t *>(logo_small),QA_START);
+
+  Log.info("QA Test started\n");
+
+  float initial_temp = measureTemperatureAverage();/*
+  if (initial_temp > temperature_threshold){
+    return false;
+  }*/
+  float initial_voltage = measureVoltageAverage();
+  /*if (initial_voltage > temperature_threshold){
+    return false;
+  }*/
+
+  Log.info("Stress test started\n");
+  startRadioRX();
+  loadCPUAndRadio(intervalMs);
+  stopRadioRX();
+  Log.info("Stress test ended\n");
+  if(stopRequested){
+    break;
+  }
+ 
+  float last_temp = measureTemperatureAverage();
+  float last_voltage = measureVoltageAverage();
+
+  Log.info("QA test ended\n");
+
+  tempDiff = last_temp - initial_temp;
+  voltageDiff = last_voltage - initial_voltage;
+
+  float temperature[3] = {initial_temp, last_temp, tempDiff};
+  float voltage[3] = {initial_voltage, last_voltage, voltageDiff};
+
+  result = last_temp - initial_temp < 3;
+
+  Log.info("Displaying results\n");
+  display_init();
+  display_show_msg_qa(buffer,voltage,temperature,result);
+  break;
+
+  }
+
+  if(!stopRequested){
+    savePassedTest();
+    while (1){
+      Serial.println("QA Test Passed. Long press the button to continue...");
+      auto button = read_long_press();
+
+      if(button == LongPress){
+        Serial.println("Long press detected, painting screen white");
+        display_show_msg(NULL, FILL_WHITE);
+        delay(10000);
+        result = true;
+        break;
+      }
+
+    }
+  }
+  return result;
+}
+#else
 bool startQA(){
 
   int32_t rssi = 0;
@@ -226,6 +389,7 @@ bool startQA(){
 
   return result;
 }
+#endif // !BOARD_TRMNL_X
 
 void testLoadScreen(){
   display_init();

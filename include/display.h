@@ -8,6 +8,14 @@ enum MSG
 {
   NONE,
   FRIENDLY_ID,
+  OTG_TURNED_ON,
+  OTG_TURNED_OFF,
+  MODEM_FLASHING,
+  MODEM_FLASH_FAILED,
+  READY_TO_SHIP,
+  SHIPPING_MODE,
+  WIFI_RESET_CONFIRM,
+  POWER_OFF_CONFIRM,
   WIFI_CONNECT,
   WIFI_FAILED,
   WIFI_WEAK,
@@ -47,6 +55,29 @@ uint8_t u8Images[3952];
  * @return none
  */
 void display_init(void);
+
+uint8_t tca9535_interrupt_clear();
+void config_bma530_interrupt();
+void config_tca95535_pins_for_lp();
+void enter_shipment_sleep();
+bool check_usb_power();
+bool is_charging();
+void BQ27427_reset();
+void otg_turn_on();
+void otg_turn_off();
+
+typedef enum {
+    BATTERY_NONE = 0, // no battery — pin stayed HIGH (timeout >6000 µs)
+    BATTERY_ONE  = 1, // one 6K cell — discharge > 1100 µs
+    BATTERY_TWO  = 2, // two 6K cells — discharge ≤ 1100 µs
+} battery_count_t;
+
+battery_count_t detect_battery_count();
+
+extern "C" {
+  void modem_enter_bootloader();
+  void modem_reset_target();
+}
 
 /**
  * @brief Diagnostic function to continuously show the battery voltage
@@ -115,7 +146,7 @@ uint8_t * display_read_file(const char *filename, int *file_size);
  * @param message_type type of message that will show on the screen
  * @return none
  */
-void display_show_msg(uint8_t *image_buffer, MSG message_type);
+void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *message_text = nullptr);
 
 /**
  * @brief Function to show the image with message on the display

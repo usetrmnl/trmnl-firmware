@@ -31,15 +31,18 @@
 #define PREFERENCES_DEVICE_REGISTERED_KEY "plugin"
 #define PREFERENCES_SF_KEY "sf"
 #define PREFERENCES_FILENAME_KEY "filename"
+#define PREFERENCES_CURRENT_PATH_KEY "curr_path"
+#define PREFERENCES_LAST_PATH_KEY    "last_path"
 #define PREFERENCES_LAST_SLEEP_TIME "last_sleep"
 #define PREFERENCES_CONNECT_API_RETRY_COUNT "retry_count"
 #define PREFERENCES_CONNECT_WIFI_RETRY_COUNT "wifi_retry"
+#define PREFERENCES_TOUCHBAR_MODE_KEY "touchbar_mode"
 
 #define WIFI_CONNECTION_RSSI (-100)
 
 #define DISPLAY_BMP_IMAGE_SIZE 48062 // in bytes - 62 bytes - header; 48000 bytes - bitmap (480*800 1bpp) / 8
 #define DEFAULT_IMAGE_SIZE 48000
-#ifdef BOARD_TRMNL_X
+#if defined( BOARD_TRMNL_X ) || defined (BOARD_TRMNL_X_EPDIY)
 #define MAX_IMAGE_SIZE 750000 // Use PSRAM on the ESP32-S3
 #else
 #define MAX_IMAGE_SIZE 90000 // largest compressed image we can receive
@@ -78,8 +81,35 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #define DEVICE_MODEL "XTEINK_X4"
 #define PIN_INTERRUPT 3
 #elif defined(BOARD_TRMNL_X)
+#define PIN_INTERRUPT 3
+#define DEVICE_MODEL "x"
+#elif defined(BOARD_TRMNL_X_EPDIY)
 #define PIN_INTERRUPT 0
 #define DEVICE_MODEL "x"
+#elif defined(BOARD_TRMNL_X_SENSORIAC5)
+#define PIN_INTERRUPT 0
+#define DEVICE_MODEL "Sensoria_C5"
+#define SENSOR_SDA 7
+#define SENSOR_SCL 6
+#elif defined(BOARD_TRMNL_X_SENSORIAS3)
+#define PIN_INTERRUPT 0
+#define DEVICE_MODEL "Sensoria_S3"
+#define SENSOR_SDA 39
+#define SENSOR_SCL 40
+#elif defined(BOARD_TRMNL_X_LILYGO)
+// touch interrupt
+#define PIN_INTERRUPT 0
+// to-do: this has a BQ27220 power management chip that can read the battery voltage
+#define FAKE_BATTERY_VOLTAGE
+#define DEVICE_MODEL "LilyGo"
+#elif defined(BOARD_TRMNL_X_PAPERS3)
+// touch interrupt
+#define PIN_INTERRUPT 0
+#define FAKE_BATTERY_VOLTAGE
+#define DEVICE_MODEL "PaperS3"
+#elif defined(BOARD_ESP32_C5_DEVKITC_1)
+#define PIN_INTERRUPT 28
+#define DEVICE_MODEL "gen-2"
 #elif defined(BOARD_WAVESHARE_ESP32_DRIVER)
 #define PIN_INTERRUPT 33
 #define DEVICE_MODEL "waveshare"

@@ -3,6 +3,22 @@
 #include <Arduino.h>
 
 /**
+ * @brief Function to delete old versions of plugin images (by comparing the timestamp)
+ *        It also deletes files that are older than 24h to keep SPIFFS from filling up
+ * @param name filename
+ * @return nothing
+ */
+void filesystem_purge_old_file(const char *name);
+
+/**
+ * @brief Function to read a file into a newly allocated buffer
+ * @param name filename
+ * @param out_buffer pointer to pointer of the output buffer
+ * @return filesize in bytes or 0 if failed
+ */
+size_t filesystem_read_and_allocate(const char *name, uint8_t **out_buffer);
+
+/**
  * @brief Function to init the filesystem
  * @param none
  * @return bool result
