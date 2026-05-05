@@ -40,5 +40,6 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload)
       .reset_firmware = doc["reset_firmware"],
       .special_function = parseSpecialFunction(special_function_str),
       .action = doc["action"] | "",
+      .touchbar_mode = doc["touchbar_mode"] | ""
   };
 }
