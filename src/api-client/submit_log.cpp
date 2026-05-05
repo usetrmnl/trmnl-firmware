@@ -3,6 +3,7 @@
 #include "trmnl_log.h"
 #include <memory>
 #include "http_client.h"
+#include <WiFi.h>
 #include <api_request_serialization.h>
 #include <config.h>
 #include <api-client/time.h>
@@ -100,8 +101,13 @@ bool submitLogToApi(LogApiInput &input, const char *api_url)
                     // start connection and send HTTP header
                     int httpCode = https.POST(payload);
                     if(httpCode == HTTP_CODE_PERMANENT_REDIRECT || httpCode == HTTP_CODE_TEMPORARY_REDIRECT){
+                      String location = https.getLocation();
                       https.end();
-                      https.begin(String(api_url) + https.getLocation());
+                      String redirectUrl = (location.startsWith("http://") || location.startsWith("https://"))
+                          ? location
+                          : (String(api_url) + location);
+                      https.begin(redirectUrl);
+                      https.setReuse(false); 
                       https.addHeader("ID", WiFi.macAddress());
                       https.addHeader("Accept", "application/json, */*");
                       https.addHeader("Access-Token", input.api_key);

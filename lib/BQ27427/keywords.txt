@@ -1,0 +1,68 @@
+###############################################################
+# Syntax Coloring Map for SparkFun BQ27427 LiPo Gauge Library #
+###############################################################
+# Class
+###############################################################
+
+BQ27427	KEYWORD1
+lipo	KEYWORD1
+
+###############################################################
+# Methods and Functions
+###############################################################
+
+begin	KEYWORD2
+setCapacity	KEYWORD2
+voltage	KEYWORD2
+current	KEYWORD2
+capacity	KEYWORD2
+power	KEYWORD2
+soc	KEYWORD2
+soh	KEYWORD2
+temperature	KEYWORD2
+GPOUTPolarity	KEYWORD2
+setGPOUTPolarity	KEYWORD2
+GPOUTFunction	KEYWORD2
+setGPOUTFunction	KEYWORD2
+SOC1SetThreshold	KEYWORD2
+SOC1ClearThreshold	KEYWORD2
+setSOC1Thresholds	KEYWORD2
+SOCFSetThreshold	KEYWORD2
+SOCFClearThreshold	KEYWORD2
+setSOCFThresholds	KEYWORD2
+socFlag	KEYWORD2
+socfFlag	KEYWORD2
+sociDelta	KEYWORD2
+setSOCIDelta	KEYWORD2
+pulseGPOUT	KEYWORD2
+deviceType	KEYWORD2
+enterConfig	KEYWORD2
+exitConfig	KEYWORD2
+flags	KEYWORD2
+status	KEYWORD2
+
+###############################################################
+# Constants
+###############################################################
+
+BQ27427_CONTROL_DEVICE_TYPE	LITERAL1
+AVG	LITERAL1
+STBY	LITERAL1
+MAX	LITERAL1
+REMAIN	LITERAL1
+FULL	LITERAL1
+AVAIL	LITERAL1
+AVAIL_FULL	LITERAL1
+REMAIN_F	LITERAL1
+REMAIN_UF	LITERAL1
+FULL_F	LITERAL1
+FULL_UF	LITERAL1
+DESIGN	LITERAL1
+FILTERED	LITERAL1
+UNFILTERED	LITERAL1
+PERCENT	LITERAL1
+SOH_STAT	LITERAL1
+BATTERY	LITERAL1
+INTERNAL_TEMP	LITERAL1
+SOC_INT	LITERAL1
+BAT_LOW	LITERAL1

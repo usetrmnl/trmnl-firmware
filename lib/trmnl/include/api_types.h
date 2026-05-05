@@ -44,6 +44,7 @@ struct ApiDisplayResponse
   bool reset_firmware;
   SPECIAL_FUNCTION special_function;
   String action;
+  String touchbar_mode;
 };
 
 // Forward declaration for auth support
@@ -54,9 +55,20 @@ struct ApiDisplayInputs
   String baseUrl;
   String apiKey;
   String friendlyId;
+  String updateSource;
   uint32_t refreshRate;
   String macAddress;
   float batteryVoltage;
+#ifdef BOARD_TRMNL_X
+  int batteryCount;
+  int batteryCharging;
+  int batteryCurrent;
+  int currentBatteryCapacity;
+  int maxBatteryCapacity;
+  float batteryTemperature;
+  int stateOfCharge;
+  int stateOfHealth;
+#endif
   String firmwareVersion;
   String model;
   int rssi;
