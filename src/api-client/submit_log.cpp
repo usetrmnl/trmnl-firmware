@@ -46,6 +46,7 @@ bool submitLogToApi(LogApiInput &input, const char *api_url)
                           ? location
                           : (String(api_url) + location);
                       https.begin(redirectUrl);
+                      https.setReuse(false); 
                       https.addHeader("ID", WiFi.macAddress());
                       https.addHeader("Accept", "application/json, */*");
                       https.addHeader("Access-Token", input.api_key);

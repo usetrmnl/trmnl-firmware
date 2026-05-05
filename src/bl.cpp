@@ -1734,6 +1734,7 @@ static https_request_err_e downloadAndShow()
               }
               https.begin(redirectUrl);
               Log_info("Redirected to: %s", redirectUrl.c_str());
+              https.setReuse(false); 
               https.setTimeout(15000);
               https.setConnectTimeout(15000);
               httpCode = https.GET();
