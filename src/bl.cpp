@@ -88,14 +88,14 @@ static bool performApiSetup();     // perform API setup call and return success
 static void downloadSetupImage();                    // download and display setup image
 static void resetDeviceCredentials(void);            // reset device credentials API key, Friendly ID, Wi-Fi SSID and password
 static void checkAndPerformFirmwareUpdate(void);     // OTA update
-static void goToSleep(void);                         // sleep preparing
+void goToSleep(void);                         // sleep preparing
 static void goToSleepButtonOnly(void);               // sleep until button press, no timer
 static bool setClock(void);                          // clock synchronization
 static float readBatteryVoltage(void);               // battery voltage reading
 static void submitStoredLogs(void);
 static void writeSpecialFunction(SPECIAL_FUNCTION function);
 static void writeImageToFile(const char *name, uint8_t *in_buffer, size_t size);
-static void showMessageWithLogo(MSG message_type);
+void showMessageWithLogo(MSG message_type);
 static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, const char *fw_version, String message);
 static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiResponse);
 static void wifiErrorDeepSleep();
@@ -1578,7 +1578,7 @@ static https_request_err_e downloadAndShow()
 
   if (!status && result == HTTPS_SUCCESS) { // this means we already have this image stored in SPIFFS
       char szTemp[36];
-#ifdef BOARD_X_CLASS
+#if defined( BOARD_X_CLASS ) && !defined(BOARD_SEEED_RETERMINAL_E1003)
       if (szPrevFile[0]) {
         load_prev_image(); // decode the older image into the previous buffer of FastEPD
       }
@@ -1848,10 +1848,10 @@ static https_request_err_e downloadAndShow()
             writeImageToFile(szTemp, buffer, content_size);
             Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
             display_show_image(buffer, content_size, true);
-            if (payload.length() != content_size) { // we allocated this buffer
-                Log.info("%s [%d]: Freeing the image payload we allocated\r\n", __FILE__, __LINE__, szTemp);
-                free(buffer);
-            }
+//            if (payload.length() != content_size) { // we allocated this buffer
+//                Log.info("%s [%d]: Freeing the image payload we allocated\r\n", __FILE__, __LINE__, szTemp);
+//                free(buffer);
+//            }
             buffer = nullptr;
             png_res = PNG_NO_ERR; // DEBUG
             String _curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
@@ -3063,13 +3063,13 @@ static void checkAndPerformFirmwareUpdate(void)
  * @param none
  * @return none
  */
-static void goToSleep(void)
+void goToSleep(void)
 {
   Log.info("%s [%d]: go to sleep\r\n", __FILE__, __LINE__);
   submitStoredLogs();
 
 // DEBUG - workaround to prevent crash in the WiFi stack of unknown origin
-#ifndef BOARD_TRMNL_X
+#ifndef BOARD_X_CLASS
   if (WiFi.status() == WL_CONNECTED) {
     WiFi.disconnect();
   }
@@ -3478,7 +3478,7 @@ static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, c
   preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
 }
 
-static void showMessageWithLogo(MSG message_type)
+void showMessageWithLogo(MSG message_type)
 {
   display_show_msg(storedLogoOrDefault(0), message_type);
 }

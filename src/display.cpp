@@ -129,8 +129,11 @@ void display_init(void)
 #elif defined(BOARD_TRMNL_X_PAPERS3)
     bbep.initPanel(BB_PANEL_M5PAPERS3);
 #elif defined(BOARD_TRMNL_X_LILYGO)
-    bbep.initPanel(BB_PANEL_LILYGO_T5PRO); // BB_PANEL_EPDIY_V7_16);
-//    bbep.setPanelSize(1872, 1404, BB_PANEL_FLAG_MIRROR_X, -1100);
+    bbep.initPanel(BB_PANEL_EPDIY_V7);
+    bbep.setPanelSize(960, 540);
+#elif defined (BOARD_SEEED_RETERMINAL_E1003)
+    bbep.initIT8951(EPD_MOSI_PIN, EPD_MISO_PIN, EPD_SCK_PIN, EPD_CS_PIN, EPD_BUSY_PIN, EPD_RST_PIN, EPD_EN_PIN, EPD_VCC_EN);
+    bbep.setPanelSize(BBEP_DISPLAY_ED103TC2);
 #endif // X
 #endif // bb_epaper
     Log_info("dev module end");
@@ -1809,7 +1812,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
 #endif
     }
 
-#ifdef BOARD_TRMNL_X
+#ifdef BOARD_X_CLASS
     bbep.setFont(Inter_18);
 #else
     bbep.setFont(nicoclean_8);
@@ -2247,6 +2250,27 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.print(string3);
     }
+        break;
+    case CAPTIVE_WIFI_TIMEOUT:
+    {
+        const char string1[] = "Wifi Captive Portal timed out";
+        bbep.getStringBox(string1, &rect);
+#ifdef __BB_EPAPER__
+        bbep.setCursor((bbep.width() - rect.w) / 2, 340);
+#else
+        bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - (rect.h*2));
+#endif
+        bbep.println(string1);
+#ifdef BOARD_TRMNL_X
+        const char string2[] = "Tap touchbar to try again";
+#else
+        const char string2[] = "Press button to try again";
+#endif
+        bbep.getStringBox(string2, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+        bbep.println(string2);
+    }
+        break;
     default:
         break;
     }
