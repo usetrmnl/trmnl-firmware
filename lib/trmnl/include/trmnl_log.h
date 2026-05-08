@@ -1,6 +1,8 @@
 
 #pragma once
 
+#include <compiler_attrs.h>
+
 enum LogLevel {
     LOG_VERBOSE = 0,
     LOG_INFO = 1,
@@ -15,7 +17,7 @@ enum LogMode
     LOG_SUBMIT_OR_STORE
 };
 
-void log_impl(LogLevel level, LogMode mode, const char* file, int line, const char* format, ...);
+void log_impl(LogLevel level, LogMode mode, const char* file, int line, const char* format, ...) PRINTF_LIKE(5, 6);
 
 #define _LOG_IMPL(level, mode, format, ...) \
     log_impl(level, mode, __FILE__, __LINE__, format, ##__VA_ARGS__)
