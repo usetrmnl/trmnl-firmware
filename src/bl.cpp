@@ -3369,7 +3369,10 @@ bool storeLogString(const char *log_buffer)
   LogStoreResult store_result = storedLogs.store_log(String(log_buffer));
   if (store_result.status != LogStoreResult::SUCCESS)
   {
-    Log_error("Failed to store log: %s", store_result.message);
+    // Use the serial-only variant to avoid infinite recursion: Log_error here
+    // would route back into log_impl → handle_store_submit → logWithAction →
+    // storeLogString → store fails again → ...
+    Log_error_serial("Failed to store log: %s", store_result.message);
     return false;
   }
   return true;
