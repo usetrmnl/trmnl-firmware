@@ -1,0 +1,6 @@
+{
+  "name": "trmnl",
+  "build": {
+    "flags": ["-Wformat"]
+  }
+}
