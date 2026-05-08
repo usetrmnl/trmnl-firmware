@@ -33,7 +33,7 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
            String(inputs.batteryVoltage).c_str(),
            inputs.firmwareVersion.c_str(),
            inputs.model.c_str(),
-           String(inputs.rssi));
+           String(inputs.rssi).c_str());
 
   https.addHeader("ID", inputs.macAddress);
   https.addHeader("Content-Type", "application/json");
@@ -157,7 +157,7 @@ ApiDisplayResult fetchApiDisplay(ApiDisplayInputs &apiDisplayInputs)
         String payload = https->getString();
         size_t size = https->getSize();
         Log_info("Content size: %d", size);
-        Log_info("Free heap size: %d", ESP.getMaxAllocHeap());
+        Log_info("Free heap size: %" PRIu32, ESP.getMaxAllocHeap());
         Log_info("Payload - %s", payload.c_str());
 
         auto apiResponse = parseResponse_apiDisplay(payload);

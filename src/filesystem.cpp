@@ -148,7 +148,7 @@ bool bDel;
         strcpy(szTemp, "/"); // needed on this file operation
         strcat(szTemp, file.name());
 
-        Log_info("Comparing name %s with %s, timestamp %u, current time %u", name, file.name(), u32, (uint32_t)tt);
+        Log_info("Comparing name %s with %s, timestamp %" PRIu32 ", current time %" PRIu32, name, file.name(), u32, (uint32_t)tt);
         if (memcmp(name, szTemp, 14) == 0) { // older version of the same file
             Log_info("Deleting older version of plugin image %s - %s", name, file.name());
             bDel = true;
@@ -176,7 +176,7 @@ bool bDel;
 size_t filesystem_write_to_file(const char *name, uint8_t *in_buffer, size_t size)
 {
     uint32_t FS_freeBytes = (FS.totalBytes() - FS.usedBytes());
-    Log_info("FS free space - %d, total -%d", FS_freeBytes, FS.totalBytes());
+    Log_info("FS free space - %" PRIu32 ", total -%" PRIu32, FS_freeBytes, (uint32_t)FS.totalBytes());
     if (FS.exists(name))
     {
         Log_info("file %s exists. Deleting...", name);
