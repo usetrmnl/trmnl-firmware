@@ -38,7 +38,7 @@ BOARD=${BOARD:-$(basename "$BUILD_DIR")}
 case "$BOARD" in
     TRMNL_X*)
         CHIP=esp32s3
-        FLASH_MODE=qio
+        FLASH_MODE=dio
         FLASH_FREQ=80m
         FLASH_SIZE=16MB
         APP_OFFSET=0x20000

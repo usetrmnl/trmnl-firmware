@@ -44,7 +44,7 @@ fi
 echo ""
 echo "⚡ Flashing firmware (chip: $CHIP, mode: $MODE_LABEL)..."
 
-if $ESPTOOL --chip "$CHIP" --baud "$BAUD_RATE" "${EXTRA_OPTS[@]}" write_flash "${WRITE_OPTS[@]}" 0x0000 "$FIRMWARE_FILE"; then
+if PYTHONIOENCODING=utf-8 $ESPTOOL --chip "$CHIP" --baud "$BAUD_RATE" "${EXTRA_OPTS[@]}" write_flash "${WRITE_OPTS[@]}" 0x0000 "$FIRMWARE_FILE"; then
     echo ""
     echo "✅ Flash completed successfully!"
     echo "🔄 Device will reboot automatically"
