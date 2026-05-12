@@ -1467,7 +1467,7 @@ int iPlane = 0;
         }
     }
     jpg->close();
-    free(jpg);
+    delete(jpg);
     return rc;
 } /* jpeg_to_epd() */
 /**
@@ -1512,7 +1512,7 @@ PNG *png = new PNG();
             png->decode(NULL, 0);
             png->close();
             bbep.writePlane();
-            free(png); // free the decoder instance
+            delete(png); // free the decoder instance
             return REFRESH_FULL;
 #endif // E1002
 #ifdef BOARD_TRMNL_4CLR
@@ -1521,7 +1521,7 @@ PNG *png = new PNG();
             bbep.startWrite(PLANE_1); // start writing image data
             png->decode(NULL, 0);
             png->close();
-            free(png); // free the decoder instance
+            delete(png); // free the decoder instance
             return REFRESH_FULL;
 #endif // BOARD_TRMNL_4CLR
             bbep.setAddrWindow(0, 0, bbep.width(), bbep.height());
@@ -1588,7 +1588,7 @@ PNG *png = new PNG();
     } else {
         Log_error("%s [%d]: png->openRAM() returned %d", __FILE__, __LINE__, rc);
     }
-    free(png); // free the decoder instance
+    delete(png); // free the decoder instance
     return rc;
 } /* png_to_epd() */
 /**
@@ -2297,6 +2297,9 @@ void display_show_msg_qa(uint8_t *image_buffer, const float *voltage, const floa
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef BB_EPAPER
     bbep.allocBuffer(false);
+#else
+    bbep.setMode(BB_MODE_1BPP);
+    bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
 #endif
     if (*(uint16_t *)image_buffer == BB_BITMAP_MARKER)
     {
@@ -2446,7 +2449,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 #endif
     }
 
-#if defined( BOARD_TRMNL_X ) || defined( BOARD_TRMNL_X_EPDIY ) || defined( BOARD_TRMNL_X_SENSORIAS3 ) || defined( BOARD_TRMNL_X_SENSORIAC5 ) || defined( BOARD_TRMNL_X_LILYGO ) || defined( BOARD_TRMNL_X_PAPERS3 )
+#if defined( BOARD_X_CLASS )
     bbep.setFont(Inter_18);
 #else
     bbep.setFont(nicoclean_8);
