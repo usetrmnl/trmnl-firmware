@@ -49,28 +49,30 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
   https.addHeader("Height", String(inputs.displayHeight));
 #ifdef SENSOR_SDA
   char *szTemp, szPart[128];
-  szTemp = (char *)malloc(1024); // make sure we have enough space, but don't use the stack because it's small
+  szTemp = (char *)malloc(2048); // increased buffer to prevent overflow
+  if (!szTemp) return; // check for allocation failure
+  szTemp[0] = 0;
   if (lastCO2 != 0) { // valid data from SCD4x for CO2, Temperature and Humidity
     // create the multi-value string to pass as a HTTP header
-    sprintf(szTemp, "make=Sensirion;model=SCD41;kind=carbon_dioxide;value=%d;unit=parts_per_million;created_at=%d,make=Sensirion;model=SCD41;kind=temperature;value=%f;unit=celsius;created_at=%d,make=Sensirion;model=SCD41;kind=humidity;value=%d;unit=percent;created_at=%d", lastCO2, lastTime, (float)lastSCDTemp / 10.0f, lastTime, lastSCDHumid, lastTime);
+    snprintf(szTemp, 2048, "make=Sensirion;model=SCD41;kind=carbon_dioxide;value=%d;unit=parts_per_million;created_at=%d,make=Sensirion;model=SCD41;kind=temperature;value=%f;unit=celsius;created_at=%d,make=Sensirion;model=SCD41;kind=humidity;value=%d;unit=percent;created_at=%d", lastCO2, lastTime, (float)lastSCDTemp / 10.0f, lastTime, lastSCDHumid, lastTime);
     Log_info("%s [%d] Adding SCD41 data to api request: CO2: %d, Temp: %d.%dC, Humidity: %d%%", __FILE__, __LINE__, lastCO2, lastSCDTemp/10, lastSCDTemp % 10, lastSCDHumid);
   }
   if (lastType >= 0 && lastTemp != 0) { // we have data from another bb_temperature supported sensor too; add it
     if (lastCO2 != 0) {
-      strcat(szTemp, ","); // separate from CO2 data
+      strncat(szTemp, ",", 2048 - strlen(szTemp) - 1); // separate from CO2 data
     } else {
       szTemp[0] = 0;
     }
     Log_info("%s [%d] Adding bb_temperature data to api request: pressure: %d, Temp: %d.%dC, Humidity: %d%%", __FILE__, __LINE__, lastPressure, lastTemp/10, lastTemp % 10, lastHumid);
-    sprintf(szPart, "make=%s;model=%s;kind=temperature;value=%f;unit=celsius;created_at=%d",szMakers[lastType], szDevices[lastType], (float)lastTemp / 10.0f, lastTime);
-    strcat(szTemp, szPart);
+    snprintf(szPart, sizeof(szPart), "make=%s;model=%s;kind=temperature;value=%f;unit=celsius;created_at=%d",szMakers[lastType], szDevices[lastType], (float)lastTemp / 10.0f, lastTime);
+    strncat(szTemp, szPart, 2048 - strlen(szTemp) - 1);
     if (lastHumid > 0) { // add humidity
-      sprintf(szPart, ",make=%s;model=%s;kind=humidity;value=%d;unit=percent;created_at=%d",szMakers[lastType], szDevices[lastType], lastHumid, lastTime);
-      strcat(szTemp, szPart);
+      snprintf(szPart, sizeof(szPart), ",make=%s;model=%s;kind=humidity;value=%d;unit=percent;created_at=%d",szMakers[lastType], szDevices[lastType], lastHumid, lastTime);
+      strncat(szTemp, szPart, 2048 - strlen(szTemp) - 1);
     }
     if (lastPressure > 0) {
-      sprintf(szPart, ",make=%s;model=%s;kind=pressure;value=%d;unit=hectopascal;created_at=%d",szMakers[lastType], szDevices[lastType], lastPressure, lastTime);
-      strcat(szTemp, szPart);
+      snprintf(szPart, sizeof(szPart), ",make=%s;model=%s;kind=pressure;value=%d;unit=hectopascal;created_at=%d",szMakers[lastType], szDevices[lastType], lastPressure, lastTime);
+      strncat(szTemp, szPart, 2048 - strlen(szTemp) - 1);
     }
   }
   if (lastCO2 != 0 || lastType >= 0) {
