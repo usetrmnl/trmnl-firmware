@@ -720,6 +720,26 @@ void bl_init(void)
                       wakeup_reason == ESP_SLEEP_WAKEUP_EXT0 ||
                       wakeup_reason == ESP_SLEEP_WAKEUP_EXT1);
 
+  Log_info("preferences start");
+  bool res = preferences.begin("data", false);
+  if (res)
+  {
+    Log_info("preferences init success (%d free entries)", preferences.freeEntries());
+    if (pref_clear)
+    {
+      res = preferences.clear(); // if needed to clear the saved data
+      if (res)
+        Log_info("preferences cleared success");
+      else
+        Log_fatal("preferences clearing error");
+    }
+  }
+  else
+  {
+    Log_fatal("preferences init failed");
+    ESP.restart();
+  }
+  Log_info("preferences end");
   #ifndef BOARD_TRMNL_X
   if (gpio_wakeup)
   {
@@ -768,26 +788,6 @@ void bl_init(void)
   }
 #endif // BOARD_TRMNL_X
 
-  Log_info("preferences start");
-  bool res = preferences.begin("data", false);
-  if (res)
-  {
-    Log_info("preferences init success (%d free entries)", preferences.freeEntries());
-    if (pref_clear)
-    {
-      res = preferences.clear(); // if needed to clear the saved data
-      if (res)
-        Log_info("preferences cleared success");
-      else
-        Log_fatal("preferences clearing error");
-    }
-  }
-  else
-  {
-    Log_fatal("preferences init failed");
-    ESP.restart();
-  }
-  Log_info("preferences end");
 #ifdef BOARD_TRMNL_X
   touchbar_tap_mode = preferences.getBool(PREFERENCES_TOUCHBAR_MODE_KEY, true);
   Log_info("Touchbar mode from preferences: %s", touchbar_tap_mode ? "Tap" : "Slide");
