@@ -94,7 +94,11 @@ bool WifiCaptive::startPortal()
             return n >= 0;
         }};
 
+#ifdef BOARD_TRMNL_X
+    setUpWebserver(*_server, localIP, callbacks, _modemMac);
+#else
     setUpWebserver(*_server, localIP, callbacks);
+#endif
 
     // begin serving
     _server->begin();
@@ -619,6 +623,13 @@ void WifiCaptive::setModemConnectCallback(ModemConnectCallback cb)
 {
     _modemConnectCallback = cb;
 }
+
+#ifdef BOARD_TRMNL_X
+void WifiCaptive::setModemMac(const String& mac)
+{
+    _modemMac = mac;
+}
+#endif
 
 bool findNetwork(const char* ssid, int32_t* rssi_out)
 {
