@@ -42,7 +42,7 @@ BBEPAPER bbep(EP75YR_800x480);
     {EP73_SPECTRA_800x480, EP73_SPECTRA_800x480}, // b = darker grays
 };
 BBEPAPER bbep(EP73_SPECTRA_800x480);
-#else
+#else // TRMNL OG and V2
     {EP75_800x480, EP75_800x480_4GRAY}, // default (for original EPD)
     {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, // a = uses built-in fast + 4-gray
     {EP75_800x480, EP75_800x480_4GRAY_V2}, // b = darker grays
@@ -385,15 +385,6 @@ bool check_usb_power()
     return (bbep.ioRead(BQ25616_PG_PIN) == 0);
 }
 
-// Returns true while BQ25616 is actively charging (STAT LOW).
-// HIGH = charge complete or charge disabled; blinking = fault (reads as HIGH).
-bool is_charging()
-{
-    bbep.ioPinMode(BQ25616_STAT_PIN, INPUT);
-    return (bbep.ioRead(BQ25616_STAT_PIN) == 0);
-}
-
-
 #define PIN_ESP32C5_SPI_BOOT 4
 #define PIN_ESP32C5_USB_BOOT 5
 #define PIN_ESP32C5_EN 6
@@ -431,6 +422,20 @@ void modem_reset_target(void) {
 
 #endif
 
+#ifdef BQ25616_STAT_PIN
+// Returns true while BQ25616 is actively charging (STAT LOW).
+// HIGH = charge complete or charge disabled; blinking = fault (reads as HIGH).
+bool is_charging()
+{
+#ifdef BOARD_TRMNL_X
+    bbep.ioPinMode(BQ25616_STAT_PIN, INPUT);
+    return (bbep.ioRead(BQ25616_STAT_PIN) == 0);
+#else // OG V2
+    pinMode(BQ25616_STAT_PIN, INPUT);
+    return (digitalRead(BQ25616_STAT_PIN) == 0);
+#endif
+}
+#endif // BQ25616_STAT_PIN
 /**
  * @brief Enable or disable light sleep at runtime
  * @param enabled true to enable light sleep, false to disable
