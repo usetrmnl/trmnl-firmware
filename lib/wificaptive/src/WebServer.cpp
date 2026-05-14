@@ -4,7 +4,7 @@
 
 
 
-void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperationCallbacks callbacks)
+void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperationCallbacks callbacks, const String& modemMac)
 {
     //======================== Webserver ========================
     // WARNING IOS (and maybe macos) WILL NOT POP UP IF IT CONTAINS THE WORD "Success" https://www.esp8266.com/viewtopic.php?f=34&t=4398
@@ -71,7 +71,7 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
                 request->send(200, "application/json", json);
               });
 
-    auto scanGET = server.on("/scan", HTTP_GET, [callbacks](AsyncWebServerRequest *request)
+    auto scanGET = server.on("/scan", HTTP_GET, [callbacks, modemMac](AsyncWebServerRequest *request)
                              {
 		String json = "{\"networks\":[";
 
@@ -124,12 +124,16 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
         // Expose MAC pre-connect for easier setup debugging
         String mac = WiFi.macAddress();
         json+= "\"mac\":\""+mac+"\"";
-
+#ifdef BOARD_TRMNL_X
+        if (!modemMac.isEmpty()) {
+            json+= ",\"mac_5ghz\":\""+modemMac+"\"";
+        }
+#endif
         json += "}";
         request->send(200, "application/json", json);
 		json = String(); });
 
-    AsyncCallbackJsonWebHandler *handler = new AsyncCallbackJsonWebHandler("/connect", [callbacks](AsyncWebServerRequest *request, JsonVariant &json)
+    AsyncCallbackJsonWebHandler *handler = new AsyncCallbackJsonWebHandler("/connect", [callbacks, modemMac](AsyncWebServerRequest *request, JsonVariant &json)
                                                                            {
 		JsonObject data = json.as<JsonObject>();
 		String ssid = data["ssid"];
@@ -137,7 +141,13 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
         String api_server = data["server"];
         callbacks.setConnectionCredentials({ssid, pswd}, api_server);
         String mac = WiFi.macAddress();
-        String message = "{\"ssid\":\"" + ssid + "\",\"mac\":\"" + mac + "\"}";
+        String message = "{\"ssid\":\"" + ssid + "\",\"mac\":\"" + mac + "\"";
+#ifdef BOARD_TRMNL_X
+        if (!modemMac.isEmpty()) {
+            message += ",\"mac_5ghz\":\"" + modemMac + "\"";
+        }
+#endif
+        message += "}";
         request->send(200, "application/json", message); });
 
     server.addHandler(handler);

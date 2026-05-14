@@ -61,6 +61,9 @@ private:
 
     using ModemConnectCallback = std::function<bool(const String& ssid, const String& pass)>;
     ModemConnectCallback _modemConnectCallback;
+#ifdef BOARD_TRMNL_X
+    String _modemMac;
+#endif
 
     void setUpDNSServer(DNSServer &dnsServer, const IPAddress &localIP);
     void readWifiCredentials();
@@ -104,6 +107,10 @@ public:
 
     /// @brief Registers a callback used to connect to 5 GHz networks via the modem.
     void setModemConnectCallback(ModemConnectCallback cb);
+#ifdef BOARD_TRMNL_X
+    /// @brief Sets the modem (5 GHz) MAC address shown in the captive portal.
+    void setModemMac(const String& mac);
+#endif
 
     /// @brief Sets a callback invoked every portal loop iteration (approx. every 60 ms).
     ///        Use to poll hardware (e.g., touchbar) while the portal is blocking.

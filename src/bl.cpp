@@ -1074,6 +1074,11 @@ void bl_init(void)
     WifiCaptivePortal.setModemConnectCallback([](const String& ssid, const String& pass) {
       return g_modem->connectToNetwork(ssid, pass);
     });
+
+    String modemMac = g_modem->getMacAddress();
+    if (!modemMac.isEmpty()) {
+      WifiCaptivePortal.setModemMac(modemMac);
+    }
   }
 #endif // BOARD_TRMNL_X
 

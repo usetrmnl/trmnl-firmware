@@ -956,4 +956,29 @@ time_t Modem::getSntpTime() {
   Serial.printf("[MODEM] SNTP UTC time: %lu\n", (unsigned long)ts);
   return ts;
 }
+// ---------------------------------------------------------------------------
+// getMacAddress(): AT+CIPSTAMAC? — returns station MAC or empty on failure
+// ---------------------------------------------------------------------------
+String Modem::getMacAddress() {
+  while (ModemSerial.available()) ModemSerial.read();  // flush
+
+  sendCommand("AT+CIPSTAMAC?");
+  String resp = waitForResponse("OK", 3000);
+
+  // Response: +CIPSTAMAC:"xx:xx:xx:xx:xx:xx"\r\nOK
+  int idx = resp.indexOf("+CIPSTAMAC:\"");
+  if (idx < 0) {
+    Serial.println("[MODEM] getMacAddress: parse failed");
+    return "";
+  }
+  int start = idx + 12;
+  int end   = resp.indexOf('"', start);
+  if (end < 0) {
+    Serial.println("[MODEM] getMacAddress: closing quote not found");
+    return "";
+  }
+  String mac = resp.substring(start, end);
+  Serial.printf("[MODEM] MAC: %s\n", mac.c_str());
+  return mac;
+}
 #endif // BOARD_TRMNL_X

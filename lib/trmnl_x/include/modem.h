@@ -56,4 +56,7 @@ public:
 
   // Configures modem SNTP and returns Unix timestamp (UTC), or 0 on failure.
   time_t getSntpTime();
+
+  // Returns the MAC address of the ESP32-C5 station, or empty string on failure.
+  String getMacAddress();
 };

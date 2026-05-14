@@ -18,4 +18,4 @@ struct WifiOperationCallbacks
     std::function<bool()> isNetworkListReady;
 };
 
-void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperationCallbacks callbacks);
+void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperationCallbacks callbacks, const String& modemMac = "");
