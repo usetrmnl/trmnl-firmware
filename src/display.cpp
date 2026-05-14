@@ -1684,12 +1684,12 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
         iUpdateCount = 1; // use partial update
     }
     Log_info("Display refresh start");
-#ifdef BB_EPAPER
     if (iTempProfile != apiDisplayResult.response.temp_profile) {
         iTempProfile = apiDisplayResult.response.temp_profile;
         Log_info("Saving new temperature profile (%d) to FLASH", iTempProfile);
         preferences.putUInt(PREFERENCES_TEMP_PROFILE, iTempProfile);
     }
+#ifdef BB_EPAPER
     if ((iUpdateCount & 7) == 0 || apiDisplayResult.response.maximum_compatibility == true) {
         Log_info("%s [%d]: Forcing full refresh; desired refresh mode was: %d\r\n", __FILE__, __LINE__, iRefreshMode);
         iRefreshMode = REFRESH_FULL; // force full refresh every 8 partials
@@ -1725,7 +1725,9 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
  //       bbep.setPasses(6,6);
  //       bbep.partialUpdate(false); // we have a previous image to diff against; use a non-flickering update
  //   } else {
-        bbep.fullUpdate(((iUpdateCount & 7) == 0) ? CLEAR_SLOW : CLEAR_FAST, false);
+        int iClearMode = ((iUpdateCount & 7) == 0 || (iTempProfile > 0)) ? CLEAR_SLOW : CLEAR_FAST;
+        Log_info("fullUpdate clear mode = %d\n", iClearMode); 
+        bbep.fullUpdate(iClearMode, false);
  //   }
  }
 #endif
@@ -2099,6 +2101,18 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.print(string2);
+    }
+    break;
+    case WIFI_IMAGE_TIMEOUT:
+    {
+        const char string1[] = "Image download timed out; check your network status.";
+        bbep.getStringBox(string1, &rect);
+#ifdef __BB_EPAPER__
+        bbep.setCursor((bbep.width() - rect.w) / 2, 400);
+#else
+        bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - rect.h);
+#endif
+        bbep.print(string1);
     }
     break;
     case API_IMAGE_DOWNLOAD_ERROR:
