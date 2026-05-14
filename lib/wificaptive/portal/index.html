@@ -385,6 +385,10 @@
 
       var body = { ssid: ssid, pswd: pswd, server: server };
 
+      var btn = document.getElementById("btnConnect");
+      btn.disabled = true;
+      btn.textContent = "Connecting...";
+
       showLoader();
       fetch('/connect', {
         method: 'POST',
@@ -533,17 +537,13 @@
     }
 
     function displayWifiInfo(response) {
-      var ssid = response.ssid;
       var mac = response.mac;
       var macInfo = response.mac_5ghz ? `2.4GHz MAC: ${mac}\n5GHz MAC: ${response.mac_5ghz.toUpperCase()}` : `MAC: ${mac}`;
 
-      let message = "";
-      if (ssid.length > 0) {
-        message = `Connecting to SSID: ${ssid}. ${macInfo}`;
-      } else {
-        message = `No AP set. ${macInfo}`;
+      if (response.ssid.length > 0) {
+        displayAlert(`Connecting to: ${response.ssid}`, "alert-warning");
       }
-      displayInfo(message);
+      displayInfo(macInfo);
     }
 
     function displayInfo(message) {
