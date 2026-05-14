@@ -1367,6 +1367,11 @@ void bl_init(void)
     showMessageWithLogo(WIFI_INTERNAL_ERROR);
   }
   break;
+  case HTTPS_TIMED_OUT:
+  {
+    showMessageWithLogo(WIFI_IMAGE_TIMEOUT);
+  }
+  break;
   case HTTPS_PLUGIN_NOT_ATTACHED:
   {
     if (preferences.getInt(PREFERENCES_SLEEP_TIME_KEY, 0) != SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED)
@@ -1801,12 +1806,17 @@ static https_request_err_e downloadAndShow()
                 while (iCount < counter && millis() < (lStartTime + API_FIRST_RETRY*1000)) {
                   if (stream->available()) {
                     buffer[iCount++] = stream->read();
-                  } else {
+                    lStartTime = millis(); // reset start time
+                  } else { // 15 seconds with no activity => stop trying
                     vTaskDelay(1); // yield to allow time for the data to arrive
                   }
                 }
               } // if buffer
               stream->stop(); // Important! If you don't do this, WiFi will have a memory exception later
+              if (millis() > (lStartTime + API_FIRST_RETRY*1000)) { // we timed out
+                  Log_error_submit("Receiving failed; download timed out. Image size = %d", counter);
+                  return HTTPS_TIMED_OUT;
+              }
             }
           } // if payload size is non-zero
           Log.info("%s [%d]: %d bytes received in %d milliseconds\r\n", __FILE__, __LINE__, counter, (int)(millis() - lStartTime));
