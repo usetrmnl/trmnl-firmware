@@ -3258,8 +3258,18 @@ static bool setClock()
   }
 #endif
 
-  configTime(0, 0, ntp.c_str(), "time.cloudflare.com");
-  
+  configTime(0, 0, ntp.c_str(), "pool.ntp.org"); //"time.cloudflare.com");
+
+#ifdef BOARD_TRMNL_V2
+  // This seems to be necessary only on the ESP32-C5, otherwise NTP will fail 100% of the time
+  // Wait until a valid time is received from the NTP server
+  // 1577836800 is the Unix time for Jan 1, 2020
+  time_t now = 0;
+  while (time(&now) < 1577836800) {
+    vTaskDelay(50);
+  }
+#endif
+
   for (int i = 0; i < SNTP_MAX_SERVERS; i++)
   {
     const char *srv = esp_sntp_getservername(i);
