@@ -52,6 +52,24 @@ int iSensorType = -1;
 long lSampleTime;
 int lastCO2 = 0, lastSCDTemp = 0, lastTemp = 0, lastSCDHumid = 0, lastHumid = 0, lastPressure = 0, lastType = -1, lastTime = 0;
 #endif // SENSOR_SDA
+const char *szHTTPErrors[] = {
+    "HTTPS_NO_ERR",
+    "HTTPS_RESET",
+    "HTTPS_NO_REGISTER",
+    "HTTPS_SUCCESS",
+    "HTTPS_CLIENT_FAILED",
+    "HTTPS_REQUEST_FAILED",
+    "HTTPS_UNABLE_TO_CONNECT",
+    "HTTPS_RESPONSE_CODE_INVALID",
+    "HTTPS_JSON_PARSING_ERR",
+    "HTTPS_WRONG_IMAGE_SIZE",
+    "HTTPS_WRONG_IMAGE_FORMAT",
+    "HTTPS_IMAGE_FILE_TOO_BIG",
+    "HTTPS_PLUGIN_NOT_ATTACHED",
+    "HTTPS_BAD_CLIENT",
+    "HTTPS_OUT_OF_MEMORY"
+};
+
 bool pref_clear = false;
 String new_filename = "";
 ApiDisplayResult apiDisplayResult;
@@ -1225,7 +1243,7 @@ void bl_init(void)
 
   // OTA checking, image checking and drawing
   https_request_err_e request_result = downloadAndShow();
-  Log.info("%s [%d]: request result - %d\r\n", __FILE__, __LINE__, request_result);
+  Log.info("%s [%d]: request result - %s\r\n", __FILE__, __LINE__, szHTTPErrors[request_result]);
 
   if (request_result == HTTPS_IMAGE_FILE_TOO_BIG)
   {
@@ -1836,7 +1854,7 @@ static https_request_err_e downloadAndShow()
           submitStoredLogs();
 
           WiFi.disconnect(true); // no need for WiFi, save power starting here
-          Log.info("%s [%d]: Received successfully; WiFi off; WiFi off\r\n", __FILE__, __LINE__);
+          Log.info("%s [%d]: Received successfully; WiFi off.\r\n", __FILE__, __LINE__);
 
           bool image_reverse = false;
           if (isPNG || isJPEG)
@@ -1984,7 +2002,7 @@ static https_request_err_e downloadAndShow()
     send_log = false;
   }
 
-  Log_info("Returned result - %d", result);
+  Log_info("Returned result - %s", szHTTPErrors[result]);
 
   return result;
 }
@@ -2152,7 +2170,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
         result = HTTPS_RESET;
       if (sleep_5_seconds)
         result = HTTPS_PLUGIN_NOT_ATTACHED;
-      Log.info("%s [%d]: result - %d\r\n", __FILE__, __LINE__, result);
+      Log.info("%s [%d]: result - %s\r\n", __FILE__, __LINE__, szHTTPErrors[result]);
     }
     break;
     case 202:
@@ -2417,8 +2435,10 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           }
           else
           {
-            free(buffer);
-            buffer = nullptr;
+            if (buffer) {
+              free(buffer);
+              buffer = nullptr;
+            }
             showMessageWithLogo(MSG_FORMAT_ERROR);
           }
         }
@@ -2443,8 +2463,10 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           if (!filesystem_file_exists("/current.bmp") && !filesystem_file_exists("/current.png"))
           {
             Log.info("%s [%d]: No current image!\r\n", __FILE__, __LINE__);
-            free(buffer);
-            buffer = nullptr;
+            if (buffer) {
+              free(buffer);
+              buffer = nullptr;
+            }
             return HTTPS_WRONG_IMAGE_FORMAT;
           }
 
@@ -2483,8 +2505,10 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
             if (png_parse_result != PNG_NO_ERR)
             {
               Log_error_submit("Error parsing PNG header, code: %d", png_parse_result);
-              free(buffer);
-              buffer = nullptr;
+              if (buffer) {
+                free(buffer);
+                buffer = nullptr;
+              }
               return HTTPS_WRONG_IMAGE_FORMAT;
             }
           }
@@ -2492,9 +2516,10 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           Log.info("Showing image\n\r");
           display_show_image(buffer, file_size, true);
           need_to_refresh_display = 1;
-
-          free(buffer);
-          buffer = nullptr;
+          if (buffer) {
+            free(buffer);
+            buffer = nullptr;
+          }
         }
         else
         {
@@ -2881,8 +2906,10 @@ static void downloadSetupImage()
 #else
     else
     {
-      free(buffer);
-      buffer = nullptr;
+      if (buffer) {
+        free(buffer);
+        buffer = nullptr;
+      }
       if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
       {
         showMessageWithLogo(API_SIZE_ERROR);
