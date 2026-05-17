@@ -3,7 +3,7 @@
 #include <trmnl_log.h>
 #define _NO_DEV_CONFIG_
 #define UWORD   uint16_t
-#include "../../include/display.h"
+#include "include/display.h"
 #include "WebServer.h"
 #include "wifi-helpers.h"
 #include "esp_event.h"
