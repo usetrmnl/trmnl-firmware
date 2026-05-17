@@ -1,11 +1,19 @@
 #include "WifiCaptive.h"
 #include <WiFi.h>
 #include <trmnl_log.h>
+#define _NO_DEV_CONFIG_
+#define UWORD   uint16_t
+#include "include/display.h"
 #include "WebServer.h"
 #include "wifi-helpers.h"
 #include "esp_event.h"
 #include "esp_wifi.h"
 #include "connect.h"
+void goToSleep(void);
+void saveShipmentStarted(void);
+void showMessageWithLogo(MSG message_type);
+// 15 minute timeout to prevent dead batteries
+#define PORTAL_TIMEOUT (15*60*1000)
 
 void WifiCaptive::setUpDNSServer(DNSServer &dnsServer, const IPAddress &localIP)
 {
@@ -113,8 +121,9 @@ bool WifiCaptive::startPortal()
 
     bool succesfullyConnected = false;
     bool connected_via_modem = false;
+    long lTime = millis();
     // wait until SSID is provided
-    while (1)
+    while ((millis() - lTime) < PORTAL_TIMEOUT) // keep CaptivePortal active for a maximum of 15 minutes
     {
         _dnsServer->processNextRequest();
 
@@ -169,7 +178,7 @@ bool WifiCaptive::startPortal()
     WiFi.softAPdisconnect(true);
     delay(1000);
 
-    if (!connected_via_modem)
+    if (!connected_via_modem && (millis() - lTime) < PORTAL_TIMEOUT)
     {
         auto status = WiFi.status();
         if (status != WL_CONNECTED)
@@ -191,7 +200,24 @@ bool WifiCaptive::startPortal()
     _server->end();
     delete _server;
     _server = nullptr;
-
+// Take different action for timeout (go to sleep)
+    if ((millis() - lTime) > PORTAL_TIMEOUT) {
+#ifdef BOARD_TRMNL_X
+        if (check_usb_power()) {
+            showMessageWithLogo(READY_TO_SHIP);
+            while (check_usb_power()) {
+            Serial.println("USB power still detected, waiting...");
+            delay(2000);
+            }
+        }
+        showMessageWithLogo(SHIPPING_MODE);
+        saveShipmentStarted();
+        enter_shipment_sleep();
+#else
+        showMessageWithLogo(CAPTIVE_WIFI_TIMEOUT);
+        goToSleep();
+#endif
+    }
     return succesfullyConnected;
 }
 

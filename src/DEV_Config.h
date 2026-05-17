@@ -122,7 +122,7 @@
    // DEBUG - remove the fake battery line after testing
    #define FAKE_BATTERY_VOLTAGE
 #elif defined(BOARD_TRMNL_X)
-   #define FAKE_BATTERY_VOLTAGE
+//   #define FAKE_BATTERY_VOLTAGE
 
 #elif defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002)
    // Pin definition for reTerminal E1001 & E1002
@@ -132,6 +132,15 @@
    #define EPD_RST_PIN  12
    #define EPD_DC_PIN   11
    #define EPD_BUSY_PIN 13
+#elif defined (BOARD_SEEED_RETERMINAL_E1003)
+   #define EPD_SCK_PIN  7
+   #define EPD_MOSI_PIN 9
+   #define EPD_MISO_PIN 8
+   #define EPD_CS_PIN   10
+   #define EPD_RST_PIN  12
+   #define EPD_EN_PIN   11
+   #define EPD_BUSY_PIN 13
+   #define EPD_VCC_EN   21
 #elif defined (BOARD_X_CLASS)
 // Parallel Eink devices don't explicitly define GPIO pins for the display here
 #else
