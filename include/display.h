@@ -2,7 +2,9 @@
 #define DISPLAY_H
 
 #include <Arduino.h>
+#ifndef _NO_DEV_CONFIG_
 #include "DEV_Config.h"
+#endif
 
 enum MSG
 {
@@ -20,6 +22,7 @@ enum MSG
   WIFI_FAILED,
   WIFI_WEAK,
   WIFI_INTERNAL_ERROR,
+  WIFI_IMAGE_TIMEOUT,
   API_ERROR,
   API_REQUEST_FAILED,
   API_SIZE_ERROR,
@@ -37,6 +40,7 @@ enum MSG
   TEST,
   FILL_WHITE,
   WIFI_RETRY_LIMIT,
+  CAPTIVE_WIFI_TIMEOUT,
 };
 
 typedef struct dp_tag

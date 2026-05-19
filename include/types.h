@@ -26,7 +26,8 @@ enum https_request_err_e
     HTTPS_IMAGE_FILE_TOO_BIG,
     HTTPS_PLUGIN_NOT_ATTACHED,
     HTTPS_BAD_CLIENT,
-    HTTPS_OUT_OF_MEMORY
+    HTTPS_OUT_OF_MEMORY,
+    HTTPS_TIMED_OUT
 };
 
 #endif
