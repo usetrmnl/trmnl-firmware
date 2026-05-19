@@ -52,6 +52,24 @@ int iSensorType = -1;
 long lSampleTime;
 int lastCO2 = 0, lastSCDTemp = 0, lastTemp = 0, lastSCDHumid = 0, lastHumid = 0, lastPressure = 0, lastType = -1, lastTime = 0;
 #endif // SENSOR_SDA
+const char *szHTTPErrors[] = {
+    "HTTPS_NO_ERR",
+    "HTTPS_RESET",
+    "HTTPS_NO_REGISTER",
+    "HTTPS_SUCCESS",
+    "HTTPS_CLIENT_FAILED",
+    "HTTPS_REQUEST_FAILED",
+    "HTTPS_UNABLE_TO_CONNECT",
+    "HTTPS_RESPONSE_CODE_INVALID",
+    "HTTPS_JSON_PARSING_ERR",
+    "HTTPS_WRONG_IMAGE_SIZE",
+    "HTTPS_WRONG_IMAGE_FORMAT",
+    "HTTPS_IMAGE_FILE_TOO_BIG",
+    "HTTPS_PLUGIN_NOT_ATTACHED",
+    "HTTPS_BAD_CLIENT",
+    "HTTPS_OUT_OF_MEMORY"
+};
+
 bool pref_clear = false;
 String new_filename = "";
 ApiDisplayResult apiDisplayResult;
@@ -88,14 +106,14 @@ static bool performApiSetup();     // perform API setup call and return success
 static void downloadSetupImage();                    // download and display setup image
 static void resetDeviceCredentials(void);            // reset device credentials API key, Friendly ID, Wi-Fi SSID and password
 static void checkAndPerformFirmwareUpdate(void);     // OTA update
-static void goToSleep(void);                         // sleep preparing
+void goToSleep(void);                         // sleep preparing
 static void goToSleepButtonOnly(void);               // sleep until button press, no timer
 static bool setClock(void);                          // clock synchronization
 static float readBatteryVoltage(void);               // battery voltage reading
 static void submitStoredLogs(void);
 static void writeSpecialFunction(SPECIAL_FUNCTION function);
 static void writeImageToFile(const char *name, uint8_t *in_buffer, size_t size);
-static void showMessageWithLogo(MSG message_type);
+void showMessageWithLogo(MSG message_type);
 static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, const char *fw_version, String message);
 static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiResponse);
 static void wifiErrorDeepSleep();
@@ -1230,7 +1248,7 @@ void bl_init(void)
 
   // OTA checking, image checking and drawing
   https_request_err_e request_result = downloadAndShow();
-  Log.info("%s [%d]: request result - %d\r\n", __FILE__, __LINE__, request_result);
+  Log.info("%s [%d]: request result - %s\r\n", __FILE__, __LINE__, szHTTPErrors[request_result]);
 
   if (request_result == HTTPS_IMAGE_FILE_TOO_BIG)
   {
@@ -1588,7 +1606,7 @@ static https_request_err_e downloadAndShow()
 
   if (!status && result == HTTPS_SUCCESS) { // this means we already have this image stored in SPIFFS
       char szTemp[36];
-#ifdef BOARD_X_CLASS
+#if defined( BOARD_X_CLASS ) && !defined(BOARD_SEEED_RETERMINAL_E1003)
       if (szPrevFile[0]) {
         load_prev_image(); // decode the older image into the previous buffer of FastEPD
       }
@@ -1851,7 +1869,7 @@ static https_request_err_e downloadAndShow()
           submitStoredLogs();
 
           WiFi.disconnect(true); // no need for WiFi, save power starting here
-          Log.info("%s [%d]: Received successfully; WiFi off; WiFi off\r\n", __FILE__, __LINE__);
+          Log.info("%s [%d]: Received successfully; WiFi off.\r\n", __FILE__, __LINE__);
 
           bool image_reverse = false;
           if (isPNG || isJPEG)
@@ -1863,10 +1881,10 @@ static https_request_err_e downloadAndShow()
             writeImageToFile(szTemp, buffer, content_size);
             Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
             display_show_image(buffer, content_size, true);
-            if (payload.length() != content_size) { // we allocated this buffer
-                Log.info("%s [%d]: Freeing the image payload we allocated\r\n", __FILE__, __LINE__, szTemp);
-                free(buffer);
-            }
+//            if (payload.length() != content_size) { // we allocated this buffer
+//                Log.info("%s [%d]: Freeing the image payload we allocated\r\n", __FILE__, __LINE__, szTemp);
+//                free(buffer);
+//            }
             buffer = nullptr;
             png_res = PNG_NO_ERR; // DEBUG
             String _curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
@@ -1999,7 +2017,7 @@ static https_request_err_e downloadAndShow()
     send_log = false;
   }
 
-  Log_info("Returned result - %d", result);
+  Log_info("Returned result - %s", szHTTPErrors[result]);
 
   return result;
 }
@@ -2167,7 +2185,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
         result = HTTPS_RESET;
       if (sleep_5_seconds)
         result = HTTPS_PLUGIN_NOT_ATTACHED;
-      Log.info("%s [%d]: result - %d\r\n", __FILE__, __LINE__, result);
+      Log.info("%s [%d]: result - %s\r\n", __FILE__, __LINE__, szHTTPErrors[result]);
     }
     break;
     case 202:
@@ -2432,8 +2450,10 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           }
           else
           {
-            free(buffer);
-            buffer = nullptr;
+            if (buffer) {
+              free(buffer);
+              buffer = nullptr;
+            }
             showMessageWithLogo(MSG_FORMAT_ERROR);
           }
         }
@@ -2458,8 +2478,10 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           if (!filesystem_file_exists("/current.bmp") && !filesystem_file_exists("/current.png"))
           {
             Log.info("%s [%d]: No current image!\r\n", __FILE__, __LINE__);
-            free(buffer);
-            buffer = nullptr;
+            if (buffer) {
+              free(buffer);
+              buffer = nullptr;
+            }
             return HTTPS_WRONG_IMAGE_FORMAT;
           }
 
@@ -2498,8 +2520,10 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
             if (png_parse_result != PNG_NO_ERR)
             {
               Log_error_submit("Error parsing PNG header, code: %d", png_parse_result);
-              free(buffer);
-              buffer = nullptr;
+              if (buffer) {
+                free(buffer);
+                buffer = nullptr;
+              }
               return HTTPS_WRONG_IMAGE_FORMAT;
             }
           }
@@ -2507,9 +2531,10 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           Log.info("Showing image\n\r");
           display_show_image(buffer, file_size, true);
           need_to_refresh_display = 1;
-
-          free(buffer);
-          buffer = nullptr;
+          if (buffer) {
+            free(buffer);
+            buffer = nullptr;
+          }
         }
         else
         {
@@ -2896,8 +2921,10 @@ static void downloadSetupImage()
 #else
     else
     {
-      free(buffer);
-      buffer = nullptr;
+      if (buffer) {
+        free(buffer);
+        buffer = nullptr;
+      }
       if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
       {
         showMessageWithLogo(API_SIZE_ERROR);
@@ -3078,13 +3105,13 @@ static void checkAndPerformFirmwareUpdate(void)
  * @param none
  * @return none
  */
-static void goToSleep(void)
+void goToSleep(void)
 {
   Log.info("%s [%d]: go to sleep\r\n", __FILE__, __LINE__);
   submitStoredLogs();
 
 // DEBUG - workaround to prevent crash in the WiFi stack of unknown origin
-#ifndef BOARD_TRMNL_X
+#ifndef BOARD_X_CLASS
   if (WiFi.status() == WL_CONNECTED) {
     WiFi.disconnect();
   }
@@ -3496,7 +3523,7 @@ static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, c
   preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
 }
 
-static void showMessageWithLogo(MSG message_type)
+void showMessageWithLogo(MSG message_type)
 {
   display_show_msg(storedLogoOrDefault(0), message_type);
 }

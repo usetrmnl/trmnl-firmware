@@ -50,7 +50,7 @@ ButtonPressResult read_button_presses()
 {
   auto time_start = millis();
   Log_info("Button time=%lu: start", time_start);
-
+  pinMode(PIN_INTERRUPT, INPUT);
   if (digitalRead(PIN_INTERRUPT) == HIGH) {
     if (time_start < 2000) {
       Log_info("Button: already released at start (GPIO wakeup), waiting for second press");
