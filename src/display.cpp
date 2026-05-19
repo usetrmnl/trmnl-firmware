@@ -2110,6 +2110,18 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         bbep.print(string2);
     }
     break;
+    case WIFI_IMAGE_TIMEOUT:
+    {
+        const char string1[] = "Image download timed out; check your network status.";
+        bbep.getStringBox(string1, &rect);
+#ifdef __BB_EPAPER__
+        bbep.setCursor((bbep.width() - rect.w) / 2, 400);
+#else
+        bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - rect.h);
+#endif
+        bbep.print(string1);
+    }
+    break;
     case API_IMAGE_DOWNLOAD_ERROR:
     {
         const char string1[] = "WiFi connected, API could not deliver image to device.";
