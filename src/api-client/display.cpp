@@ -20,6 +20,15 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
            "Update-Source: %s\n\r"
            "Access-Token: %s\n\r"
            "Refresh_Rate: %s\n\r"
+#ifdef BOARD_TRMNL_X
+           "Battery-Charging: %s\n\r"
+           "Battery-Count: %s\n\r"
+           "Percent-Charged: %s\n\r"
+           "Battery-Health: %s\n\r"
+           "Battery-Current: %s\n\r"
+           "Battery-Temp: %s\n\r"
+           "Battery-Capacity: %s\n\r"
+#endif // BOARD_TRMNL_X
            "Battery-Voltage: %s\n\r"
            "FW-Version: %s\r\n"
            "Model: %s\r\n"
@@ -30,6 +39,15 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
            inputs.updateSource.c_str(),
            inputs.apiKey.c_str(),
            String(inputs.refreshRate).c_str(),
+#ifdef BOARD_TRMNL_X
+           String(inputs.batteryCharging).c_str(),
+           String(inputs.batteryCount).c_str(),
+           String(inputs.stateOfCharge).c_str(),
+           String(inputs.stateOfHealth).c_str(),
+           String(inputs.batteryCurrent).c_str(),
+           String(inputs.batteryTemperature).c_str(),
+           (String(inputs.currentBatteryCapacity) + "/" + String(inputs.maxBatteryCapacity)).c_str(),
+#endif // BOARD_TRMNL_X
            String(inputs.batteryVoltage).c_str(),
            inputs.firmwareVersion.c_str(),
            inputs.model.c_str(),
@@ -41,6 +59,15 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
   https.addHeader("Access-Token", inputs.apiKey);
   https.addHeader("Refresh-Rate", String(inputs.refreshRate));
   https.addHeader("Battery-Voltage", String(inputs.batteryVoltage));
+#ifdef BOARD_TRMNL_X
+  https.addHeader("Battery-Count", String(inputs.batteryCount));
+  https.addHeader("Battery-Charging", String(inputs.batteryCharging));
+  https.addHeader("Percent-Charged", String(inputs.stateOfCharge));
+  https.addHeader("Battery-Health", String(inputs.stateOfHealth));
+  https.addHeader("Battery-Current", String(inputs.batteryCurrent));
+  https.addHeader("Battery-Temp", String(inputs.batteryTemperature));
+  https.addHeader("Battery-Capacity", String(inputs.currentBatteryCapacity) + "/" + String(inputs.maxBatteryCapacity));
+#endif // BOARD_TRMNL_X
   https.addHeader("FW-Version", inputs.firmwareVersion);
   https.addHeader("Model", String(inputs.model));
   https.addHeader("RSSI", String(inputs.rssi));
