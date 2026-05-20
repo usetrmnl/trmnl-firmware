@@ -655,7 +655,6 @@ void bl_init(void)
 #endif
   Log_info("BL init success");
   pins_init();
-  vBatt = readBatteryVoltage(); // Read the battery voltage BEFORE WiFi is turned on
 #ifdef SENSOR_SDA
   // check if there is a SCD41 or supported temperature sensor attached
   if (scd41.init(SENSOR_SDA, SENSOR_SCL) == SCD41_SUCCESS) {
@@ -1055,6 +1054,7 @@ void bl_init(void)
     Log_info("No battery detected - skipping BQ27427 initialization");
   }
 #endif // BOARD_TRMNL_X
+  vBatt = readBatteryVoltage(); // Read the battery voltage BEFORE WiFi is turned on
 
   Log_info("Firmware version %s", FW_VERSION_STRING);
   Log_info("Arduino version %d.%d.%d", ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH);
