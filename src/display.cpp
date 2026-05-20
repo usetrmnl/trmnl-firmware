@@ -42,7 +42,7 @@ BBEPAPER bbep(EP75YR_800x480);
     {EP73_SPECTRA_800x480, EP73_SPECTRA_800x480}, // b = darker grays
 };
 BBEPAPER bbep(EP73_SPECTRA_800x480);
-#else // TRMNL OG and V2
+#else // TRMNL OG and GEN2
     {EP75_800x480, EP75_800x480_4GRAY}, // default (for original EPD)
     {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, // a = uses built-in fast + 4-gray
     {EP75_800x480, EP75_800x480_4GRAY_V2}, // b = darker grays
@@ -430,7 +430,7 @@ bool is_charging()
 #ifdef BOARD_TRMNL_X
     bbep.ioPinMode(BQ25616_STAT_PIN, INPUT);
     return (bbep.ioRead(BQ25616_STAT_PIN) == 0);
-#else // OG V2
+#else // OG GEN2
     pinMode(BQ25616_STAT_PIN, INPUT);
     return (digitalRead(BQ25616_STAT_PIN) == 0);
 #endif

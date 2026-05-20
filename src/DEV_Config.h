@@ -68,7 +68,7 @@
   #define EPD_BUSY_PIN 4
   #define SENSOR_SDA 21
   #define SENSOR_SCL 20
-#elif defined(BOARD_TRMNL_V2)
+#elif defined(BOARD_TRMNL_GEN2)
   #define EPD_SCK_PIN  6
   #define EPD_MOSI_PIN 1
   #define EPD_CS_PIN   7
