@@ -542,18 +542,18 @@ void check_channel_states(void)
           break;
         case 1:
           if (hold) {
-            Log_info("Middle button held - OTG toggle");
-            if (otg_state) {
-              otg_turn_off();
-              showMessageWithLogo(OTG_TURNED_OFF); otg_state = false;
-            }
-            else {
-              otg_turn_on();
-              showMessageWithLogo(OTG_TURNED_ON);
-              otg_state = true;
-            }
-            delay(1000);
-            showLastImageAndSleep();
+            // Log_info("Middle button held - OTG toggle");
+            // if (otg_state) {
+            //   otg_turn_off();
+            //   showMessageWithLogo(OTG_TURNED_OFF); otg_state = false;
+            // }
+            // else {
+            //   otg_turn_on();
+            //   showMessageWithLogo(OTG_TURNED_ON);
+            //   otg_state = true;
+            // }
+            // delay(1000);
+            // showLastImageAndSleep();
           }
           // No action - update on tap
           break;
@@ -575,17 +575,17 @@ void check_channel_states(void)
             break;
           case 1:
             Log_info("Middle button pressed");
-            if (otg_state) {
-              otg_turn_off();
-              showMessageWithLogo(OTG_TURNED_OFF); otg_state = false;
-            }
-            else {
-              otg_turn_on();
-              showMessageWithLogo(OTG_TURNED_ON);
-              otg_state = true;
-            }
-            delay(1000);
-            showLastImageAndSleep();
+            // if (otg_state) {
+            //   otg_turn_off();
+            //   showMessageWithLogo(OTG_TURNED_OFF); otg_state = false;
+            // }
+            // else {
+            //   otg_turn_on();
+            //   showMessageWithLogo(OTG_TURNED_ON);
+            //   otg_state = true;
+            // }
+            // delay(1000);
+            // showLastImageAndSleep();
             break;
           case 2:
             Log_info("Next button pressed");
@@ -872,6 +872,7 @@ void bl_init(void)
   Log.info("%s [%d]: Display init\r\n", __FILE__, __LINE__);
   iqs323_task_i2c_lock();
   display_init();
+  otg_turn_off(); // Since OTG function was commented out, need to ensure that OTG is turned off
   iqs323_task_i2c_unlock();
   filesystem_init();
 
