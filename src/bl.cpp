@@ -415,6 +415,116 @@ bool check_corners_gesture()
   return slider_event == IQS323_GESTURE_HOLD && left && right;
 }
 
+static void update_playlist_order(const char *new_path, const char *prev_path) {
+  String order = preferences.getString(PREFERENCES_PLAYLIST_ORDER_KEY, "");
+  String newStr = String(new_path);
+  String prefix = newStr.substring(0, 14); // same-plugin identity (matches purge logic)
+  String prevStr = String(prev_path);
+
+  if (order.isEmpty()) {
+    preferences.putString(PREFERENCES_PLAYLIST_ORDER_KEY, newStr);
+    return;
+  }
+
+  // Scan list: update in-place if prefix matches (refresh), otherwise build a cleaned list
+  // dropping entries whose files no longer exist (except prev_path, which anchors insertion).
+  bool found = false;
+  String result = "";
+  int start = 0;
+  while (start <= (int)order.length()) {
+    int sep = order.indexOf('|', start);
+    String entry = (sep < 0) ? order.substring(start) : order.substring(start, sep);
+    if (!entry.isEmpty()) {
+      if (!found && entry.startsWith(prefix)) {
+        result += (result.isEmpty() ? "" : "|") + newStr;
+        found = true;
+      } else if (entry == prevStr || filesystem_file_exists(entry.c_str())) {
+        result += (result.isEmpty() ? "" : "|") + entry;
+      }
+      // else: file was purged from filesystem — drop from list
+    }
+    if (sep < 0) break;
+    start = sep + 1;
+  }
+  if (found) { preferences.putString(PREFERENCES_PLAYLIST_ORDER_KEY, result); return; }
+
+  // New plugin — insert right after prev_path's position in the cleaned list
+  String result2 = "";
+  bool inserted = false;
+  start = 0;
+  while (start <= (int)result.length()) {
+    int sep = result.indexOf('|', start);
+    String entry = (sep < 0) ? result.substring(start) : result.substring(start, sep);
+    if (!entry.isEmpty()) {
+      result2 += (result2.isEmpty() ? "" : "|") + entry;
+      if (!inserted && entry == prevStr) {
+        result2 += "|" + newStr;
+        inserted = true;
+      }
+    }
+    if (sep < 0) break;
+    start = sep + 1;
+  }
+  if (!inserted) result2 += (result2.isEmpty() ? "" : "|") + newStr;
+  preferences.putString(PREFERENCES_PLAYLIST_ORDER_KEY, result2);
+}
+
+static void show_cached_image_by_offset(int offset) {
+  String order = preferences.getString(PREFERENCES_PLAYLIST_ORDER_KEY, "");
+
+  if (order.isEmpty()) {
+    String path = (offset > 0)
+      ? preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "")
+      : preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
+    if (path.isEmpty()) { Log_info("No cached image for gesture"); return; }
+    int file_size = 0;
+    buffer = display_read_file(path.c_str(), &file_size);
+    if (buffer && file_size > 0) { display_show_image(buffer, file_size, false); goToSleep(); }
+    return;
+  }
+
+  char images[MAX_CACHED_IMAGES][36];
+  int count = 0;
+  int start = 0;
+  while (start <= (int)order.length() && count < MAX_CACHED_IMAGES) {
+    int sep = order.indexOf('|', start);
+    String entry = (sep < 0) ? order.substring(start) : order.substring(start, sep);
+    if (!entry.isEmpty() && filesystem_file_exists(entry.c_str())) {
+      strncpy(images[count], entry.c_str(), 35);
+      images[count][35] = '\0';
+      count++;
+    }
+    if (sep < 0) break;
+    start = sep + 1;
+  }
+
+  if (count == 0) { Log_info("No cached images available"); return; }
+
+  String browsePath = preferences.getString(PREFERENCES_BROWSE_PATH_KEY, "");
+  if (browsePath.isEmpty()) {
+    // Seed from last_path so first RIGHT shows curr_path (forward) and first LEFT shows older (backward).
+    // Falls back to curr_path if last_path is absent (e.g. only one image cached).
+    String lp = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
+    browsePath = lp.isEmpty() ? preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "") : lp;
+  }
+
+  int cur_idx = count - 1;
+  for (int i = 0; i < count; i++) {
+    if (browsePath == String(images[i])) { cur_idx = i; break; }
+  }
+
+  int new_idx = (cur_idx + offset + count) % count;
+  Log_info("Playlist browse: %d/%d -> %d (%s)", cur_idx, count, new_idx, images[new_idx]);
+
+  int file_size = 0;
+  buffer = display_read_file(images[new_idx], &file_size);
+  if (!buffer || file_size == 0) { Log_info("Failed to read %s", images[new_idx]); return; }
+
+  preferences.putString(PREFERENCES_BROWSE_PATH_KEY, String(images[new_idx]));
+  display_show_image(buffer, file_size, false);
+  goToSleep();
+}
+
 void check_channel_states(void)
 {
   /* Loop through all the active channels */
@@ -427,40 +537,30 @@ void check_channel_states(void)
         case 0:
           if (!hold) {
             Log_info("Back button tapped");
-            int file_size = 0;
-            String lastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
-            if (lastPath.isEmpty()) { Log_info("No previous image saved"); break; }
-            Log_info("Reading previous image from %s", lastPath.c_str());
-            buffer = display_read_file(lastPath.c_str(), &file_size);
-            if (buffer && file_size > 0) { display_show_image(buffer, file_size, false); goToSleep(); }
+            show_cached_image_by_offset(-1);
           }
           break;
         case 1:
           if (hold) {
-            Log_info("Middle button held - OTG toggle");
-            if (otg_state) {
-              otg_turn_off();
-              showMessageWithLogo(OTG_TURNED_OFF); otg_state = false;
-            }
-            else {
-              otg_turn_on();
-              showMessageWithLogo(OTG_TURNED_ON);
-              otg_state = true;
-            }
-            delay(1000);
-            showLastImageAndSleep();
+            // Log_info("Middle button held - OTG toggle");
+            // if (otg_state) {
+            //   otg_turn_off();
+            //   showMessageWithLogo(OTG_TURNED_OFF); otg_state = false;
+            // }
+            // else {
+            //   otg_turn_on();
+            //   showMessageWithLogo(OTG_TURNED_ON);
+            //   otg_state = true;
+            // }
+            // delay(1000);
+            // showLastImageAndSleep();
           }
           // No action - update on tap
           break;
         case 2:
           if (!hold) {
             Log_info("Next button tapped");
-            int file_size = 0;
-            String curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
-            if (curPath.isEmpty()) { Log_info("No current image saved"); break; }
-            Log_info("Reading current image from %s", curPath.c_str());
-            buffer = display_read_file(curPath.c_str(), &file_size);
-            if (buffer && file_size > 0) { display_show_image(buffer, file_size, false); goToSleep(); }
+            show_cached_image_by_offset(+1);
           }
           break;
         }
@@ -475,17 +575,17 @@ void check_channel_states(void)
             break;
           case 1:
             Log_info("Middle button pressed");
-            if (otg_state) {
-              otg_turn_off();
-              showMessageWithLogo(OTG_TURNED_OFF); otg_state = false;
-            }
-            else {
-              otg_turn_on();
-              showMessageWithLogo(OTG_TURNED_ON);
-              otg_state = true;
-            }
-            delay(1000);
-            showLastImageAndSleep();
+            // if (otg_state) {
+            //   otg_turn_off();
+            //   showMessageWithLogo(OTG_TURNED_OFF); otg_state = false;
+            // }
+            // else {
+            //   otg_turn_on();
+            //   showMessageWithLogo(OTG_TURNED_ON);
+            //   otg_state = true;
+            // }
+            // delay(1000);
+            // showLastImageAndSleep();
             break;
           case 2:
             Log_info("Next button pressed");
@@ -523,7 +623,6 @@ void read_gesture_event(void)
     if(gesture_buffer != IQS323_GESTURE_NONE)
     {
       slider_event = gesture_buffer;
-      int file_size = 0;
       switch (slider_event)
       {
         case IQS323_GESTURE_UNKNOWN:
@@ -535,33 +634,13 @@ void read_gesture_event(void)
         case IQS323_GESTURE_SWIPE_NEGATIVE:
           Log_info("SLIDER: Swipe <-");
           if (!touchbar_tap_mode) {
-            String swipeLastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
-            if (swipeLastPath.isEmpty()) { Log_info("No previous image saved"); break; }
-            Log_info("Reading previous image from %s", swipeLastPath.c_str());
-            buffer = display_read_file(swipeLastPath.c_str(), &file_size);
-            if (!buffer || file_size == 0) {
-              Log_info("No previous image found");
-              break;
-            }
-            Log_info("Drawing previous plugin... File size: %d", file_size);
-            display_show_image(buffer, file_size, false);
-            goToSleep();
+            show_cached_image_by_offset(-1);
           }
           break;
         case IQS323_GESTURE_SWIPE_POSITIVE:
           Log_info("SLIDER: Swipe ->");
           if (!touchbar_tap_mode) {
-            String swipeCurPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
-            if (swipeCurPath.isEmpty()) { Log_info("No current image saved"); break; }
-            Log_info("Reading current image from %s", swipeCurPath.c_str());
-            buffer = display_read_file(swipeCurPath.c_str(), &file_size);
-            if (!buffer || file_size == 0) {
-              Log_info("No current image found");
-              break;
-            }
-            Log_info("Drawing current plugin... File size: %d", file_size);
-            display_show_image(buffer, file_size, false);
-            goToSleep();
+            show_cached_image_by_offset(+1);
           }
           break;
         case IQS323_GESTURE_FLICK_NEGATIVE:
@@ -792,6 +871,7 @@ void bl_init(void)
   Log.info("%s [%d]: Display init\r\n", __FILE__, __LINE__);
   iqs323_task_i2c_lock();
   display_init();
+  otg_turn_off(); // Since OTG function was commented out, need to ensure that OTG is turned off
   iqs323_task_i2c_unlock();
   filesystem_init();
 
@@ -1637,6 +1717,8 @@ static https_request_err_e downloadAndShow()
       if (!_curPath.isEmpty() && (_curPath != String(szTemp) || _lastPath.isEmpty()))
         preferences.putString(PREFERENCES_LAST_PATH_KEY, _curPath);
       preferences.putString(PREFERENCES_CURRENT_PATH_KEY, String(szTemp));
+      update_playlist_order(szTemp, _curPath.c_str());
+      preferences.putString(PREFERENCES_BROWSE_PATH_KEY, String(szTemp));
       return result;
   }
 
@@ -1677,6 +1759,8 @@ static https_request_err_e downloadAndShow()
     free(buf);
 
     preferences.putString(PREFERENCES_CURRENT_PATH_KEY, String(szTemp));
+    update_playlist_order(szTemp, _prevPath.c_str());
+    preferences.putString(PREFERENCES_BROWSE_PATH_KEY, String(szTemp));
 
 //    new_filename = apiDisplayResult.response.filename;
 //    saveCurrentFileName(new_filename);
@@ -1892,6 +1976,8 @@ static https_request_err_e downloadAndShow()
             if (!_curPath.isEmpty() && (_curPath != String(szTemp) || _lastPath.isEmpty()))
               preferences.putString(PREFERENCES_LAST_PATH_KEY, _curPath);
             preferences.putString(PREFERENCES_CURRENT_PATH_KEY, String(szTemp));
+            update_playlist_order(szTemp, _curPath.c_str());
+            preferences.putString(PREFERENCES_BROWSE_PATH_KEY, String(szTemp));
           }
           else
           {

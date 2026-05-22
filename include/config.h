@@ -32,7 +32,10 @@
 #define PREFERENCES_SF_KEY "sf"
 #define PREFERENCES_FILENAME_KEY "filename"
 #define PREFERENCES_CURRENT_PATH_KEY "curr_path"
-#define PREFERENCES_LAST_PATH_KEY    "last_path"
+#define PREFERENCES_LAST_PATH_KEY       "last_path"
+#define PREFERENCES_PLAYLIST_ORDER_KEY  "playlist_order"
+#define PREFERENCES_BROWSE_PATH_KEY     "browse_path"
+#define MAX_CACHED_IMAGES 30
 #define PREFERENCES_LAST_SLEEP_TIME "last_sleep"
 #define PREFERENCES_CONNECT_API_RETRY_COUNT "retry_count"
 #define PREFERENCES_CONNECT_WIFI_RETRY_COUNT "wifi_retry"
