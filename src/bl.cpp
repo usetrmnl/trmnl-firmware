@@ -1717,7 +1717,9 @@ static https_request_err_e downloadAndShow()
       if (!_curPath.isEmpty() && (_curPath != String(szTemp) || _lastPath.isEmpty()))
         preferences.putString(PREFERENCES_LAST_PATH_KEY, _curPath);
       preferences.putString(PREFERENCES_CURRENT_PATH_KEY, String(szTemp));
+      #ifdef BOARD_TRMNL_X
       update_playlist_order(szTemp, _curPath.c_str());
+      #endif
       preferences.putString(PREFERENCES_BROWSE_PATH_KEY, String(szTemp));
       return result;
   }
