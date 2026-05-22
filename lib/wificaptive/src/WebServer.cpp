@@ -116,6 +116,9 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
 		Serial.println(json);
 
 		if (WiFi.scanComplete() == -2){
+#ifdef CONFIG_IDF_TARGET_ESP32C5
+            WiFi.setBandMode(WIFI_BAND_MODE_AUTO);
+#endif
 			WiFi.scanNetworks(true);
 		}
 
