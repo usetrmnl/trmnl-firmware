@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <bl.h>
+#include <device_id.h>
 #include <trmnl_log.h>
 #include <types.h>
 #include <ArduinoLog.h>
@@ -1552,7 +1553,7 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
     Log.info("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_SLEEP_TIME_KEY);
   }
 
-  inputs.macAddress = WiFi.macAddress();
+  inputs.macAddress = device_mac_address();
 
   inputs.batteryVoltage = vBatt; //readBatteryVoltage();
 #ifdef BOARD_TRMNL_X
@@ -2736,13 +2737,13 @@ static bool performApiSetup()
   // Set up the API inputs
   ApiSetupInputs inputs;
   inputs.baseUrl = preferences.getString(PREFERENCES_API_URL, API_BASE_URL);
-  inputs.macAddress = WiFi.macAddress();
+  inputs.macAddress = device_mac_address();
   inputs.firmwareVersion = FW_VERSION_STRING;
   inputs.model = String(DEVICE_MODEL);
 
   Log.info("%s [%d]: [HTTPS] begin /api/setup ...\r\n", __FILE__, __LINE__);
   Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
-  Log.info("%s [%d]: Device MAC address: %s\r\n", __FILE__, __LINE__, WiFi.macAddress().c_str());
+  Log.info("%s [%d]: Device MAC address: %s\r\n", __FILE__, __LINE__, inputs.macAddress.c_str());
 
   ApiSetupResult result;
   // Call the API client
