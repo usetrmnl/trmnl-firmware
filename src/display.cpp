@@ -113,7 +113,7 @@ void display_init(void)
 {
     Log_info("dev module start");
     iTempProfile = preferences.getUInt(PREFERENCES_TEMP_PROFILE, TEMP_PROFILE_DEFAULT);
-    Log_info("Saved temperature profile: %d", iTempProfile);
+    Log_info("Saved temperature profile: %" PRIu32, iTempProfile);
 #ifdef BB_EPAPER
     bbep.setPanelType(dpList[iTempProfile].OneBit); // must be set BEFORE calling initio
     Log_info("BB e-Paper init");
@@ -1696,7 +1696,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     Log_info("Display refresh start");
     if (iTempProfile != apiDisplayResult.response.temp_profile) {
         iTempProfile = apiDisplayResult.response.temp_profile;
-        Log_info("Saving new temperature profile (%d) to FLASH", iTempProfile);
+        Log_info("Saving new temperature profile (%" PRIu32 ") to FLASH", iTempProfile);
         preferences.putUInt(PREFERENCES_TEMP_PROFILE, iTempProfile);
     }
 #ifdef BB_EPAPER
@@ -2419,11 +2419,11 @@ void display_show_msg_qa(uint8_t *image_buffer, const float *voltage, const floa
  */
 void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_id, bool id, const char *fw_version, String message)
 {
-    Log_info("Free heap in display_show_msg - %d", ESP.getMaxAllocHeap());
+    Log_info("Free heap in display_show_msg - %" PRIu32, ESP.getMaxAllocHeap());
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef BB_EPAPER
     bbep.allocBuffer(false);
-    Log_info("Free heap after bbep.allocBuffer() - %d", ESP.getMaxAllocHeap());
+    Log_info("Free heap after bbep.allocBuffer() - %" PRIu32, ESP.getMaxAllocHeap());
 #endif
 
     if (message_type == WIFI_CONNECT)

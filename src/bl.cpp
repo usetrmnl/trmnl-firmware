@@ -1814,7 +1814,7 @@ static https_request_err_e downloadAndShow()
             {
               // To avoid surprising behaviour if the server returned a timeout of more than 65 seconds
               // we will send a log message back to the server and truncate the timeout to the maximum.
-              Log_info_submit("Requested image URL timeout too large (%d ms). Using maximum of %d ms.", requestedTimeout, UINT16_MAX);
+              Log_info_submit("Requested image URL timeout too large (%" PRIu32 " ms). Using maximum of %d ms.", requestedTimeout, UINT16_MAX);
               https.setTimeout(UINT16_MAX);
             }
             else
@@ -1934,13 +1934,13 @@ static https_request_err_e downloadAndShow()
 
           if (counter > MAX_IMAGE_SIZE)
           {
-            Log_error_submit("Receiving failed; file size too big: %d", counter);
+            Log_error_submit("Receiving failed; file size too big: %" PRIu32, counter);
             return HTTPS_IMAGE_FILE_TOO_BIG;
           }
 
           if (buffer == NULL)
           {
-            Log_error_submit("Failed to allocate %d bytes for image buffer", counter);
+            Log_error_submit("Failed to allocate %" PRIu32 " bytes for image buffer", counter);
             return HTTPS_OUT_OF_MEMORY;
           }
 
@@ -2138,7 +2138,7 @@ uint32_t downloadStream(WiFiClient *stream, int content_size, uint8_t *buffer)
     delay(10);
   }
 
-  Log_info("Download end: %d/%d bytes in %d ms (%d iterations)", counter, content_size, millis() - download_start, iteration_counter);
+  Log_info("Download end: %d/%d bytes in %lu ms (%d iterations)", counter, content_size, millis() - download_start, iteration_counter);
   return counter;
 }
 
@@ -3024,7 +3024,7 @@ static void downloadSetupImage()
       {
         showMessageWithLogo(WIFI_WEAK);
       }
-      Log_error_submit("Receiving failed. Read: %d", counter);
+      Log_error_submit("Receiving failed. Read: %" PRIu32, counter);
     }
 #endif // !BOARD_TRMNL_X    
     return true; });
@@ -3648,7 +3648,7 @@ static uint8_t *storedLogoOrDefault(int iType)
    BRAND *pBrand;
 
    u32Size = ESP.getFlashChipSize();
-   Log_info("%s [%d]: esp flash size: %d\r\n", __FILE__, __LINE__, u32Size);
+   Log_info("%s [%d]: esp flash size: %" PRIu32 "\r\n", __FILE__, __LINE__, u32Size);
    if (u32Size != 0) {
    pBrand = (BRAND *)malloc(sizeof(BRAND)); // DEBUG - we can leak this memory for now
    esp_flash_init(NULL);
