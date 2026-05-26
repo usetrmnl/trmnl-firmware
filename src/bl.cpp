@@ -2954,13 +2954,18 @@ static void downloadSetupImage()
       counter = downloadStream(stream, contentSize, buffer);
     }
 #else
-    // Read and save BMP data to buffer
-    buffer = (uint8_t *)malloc(https->getSize());
-    if (stream->available() && https->getSize() == DISPLAY_BMP_IMAGE_SIZE)
+    // Read and save image data to buffer (BMP or PNG)
+    int contentSize = https->getSize();
+    buffer = (uint8_t *)malloc(contentSize > 0 ? contentSize : 1);
+    if (buffer == nullptr)
     {
-      counter = downloadStream(stream, DISPLAY_BMP_IMAGE_SIZE, buffer);
+      Log_error_submit("Failed to allocate buffer for setup image (%d bytes)", contentSize);
+      return false;
     }
-
+    if (stream->available() && contentSize > 0)
+    {
+      counter = downloadStream(stream, contentSize, buffer);
+    }
 #endif
 
     if (counter == DISPLAY_BMP_IMAGE_SIZE)
@@ -2994,6 +2999,17 @@ static void downloadSetupImage()
       Log_error_submit("Setup image: unexpected format or size. Read: %d bytes (expected BMP %d)", counter, DISPLAY_BMP_IMAGE_SIZE);
     }
 #else
+    else if (counter >= 4 && buffer[0] == 0x89 && buffer[1] == 'P' && buffer[2] == 'N' && buffer[3] == 'G')
+    {
+      Log.info("%s [%d]: Received PNG setup logo (%d bytes)\r\n", __FILE__, __LINE__, counter);
+      writeImageToFile("/logo.png", buffer, counter);
+      free(buffer);
+      buffer = nullptr;
+
+      String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
+      display_show_msg(storedLogoOrDefault(0), FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
+      need_to_refresh_display = 0;
+    }
     else
     {
       if (buffer) {
