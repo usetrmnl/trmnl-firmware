@@ -1653,7 +1653,10 @@ static https_request_err_e downloadAndShow()
     String apiHostname = preferences.getString(PREFERENCES_API_URL, API_BASE_URL);
     apiHostname.replace("https://", "");
     apiHostname.replace("http://", "");
-    apiHostname.replace("/", "");
+    int slash = apiHostname.indexOf('/');
+    if (slash != -1) {
+      apiHostname = apiHostname.substring(0, slash);
+    }
 
     int colon = apiHostname.indexOf(':');
     if (colon != -1) {
