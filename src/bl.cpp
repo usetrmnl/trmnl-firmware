@@ -594,7 +594,14 @@ static https_request_err_e downloadAndShow()
 {
   auto apiDisplayInputs = loadApiDisplayInputs(preferences);
 
-  apiDisplayResult = fetchApiDisplay(apiDisplayInputs);
+  for (int attempt = 1; attempt <= 5; ++attempt)
+  {
+    apiDisplayResult = fetchApiDisplay(apiDisplayInputs);
+    if (apiDisplayResult.error != HTTPS_UNABLE_TO_CONNECT)
+      break;
+    Log_error("Connection attempt %d/5 failed: %s", attempt, apiDisplayResult.error_detail.c_str());
+    if (attempt < 5) delay(2000);
+  }
 
   if (apiDisplayResult.error != HTTPS_NO_ERR)
   {
