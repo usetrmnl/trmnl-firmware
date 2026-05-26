@@ -61,6 +61,7 @@ const char *szHTTPErrors[] = {
     "HTTPS_CLIENT_FAILED",
     "HTTPS_REQUEST_FAILED",
     "HTTPS_UNABLE_TO_CONNECT",
+    "HTTPS_CONNECTION_FAILED",
     "HTTPS_RESPONSE_CODE_INVALID",
     "HTTPS_JSON_PARSING_ERR",
     "HTTPS_WRONG_IMAGE_SIZE",
@@ -1649,35 +1650,15 @@ static https_request_err_e downloadAndShow()
   else 
 #endif // BOARD_TRMNL_X  
   {
-    IPAddress serverIP;
-    String apiHostname = preferences.getString(PREFERENCES_API_URL, API_BASE_URL);
-    apiHostname.replace("https://", "");
-    apiHostname.replace("http://", "");
-    int slash = apiHostname.indexOf('/');
-    if (slash != -1) {
-      apiHostname = apiHostname.substring(0, slash);
-    }
-
-    int colon = apiHostname.indexOf(':');
-    if (colon != -1) {
-      apiHostname = apiHostname.substring(0, colon);
-    }
-
     for (int attempt = 1; attempt <= 5; ++attempt)
     {
-      if (WiFi.hostByName(apiHostname.c_str(), serverIP) == 1)
-      {
-        Log.info("%s [%d]: Hostname resolved to %s on attempt %d\r\n", __FILE__, __LINE__, serverIP.toString().c_str(), attempt);
+      apiDisplayResult = fetchApiDisplay(apiDisplayInputs);
+      if (apiDisplayResult.error != HTTPS_UNABLE_TO_CONNECT &&
+          apiDisplayResult.error != HTTPS_RESPONSE_CODE_INVALID)
         break;
-      }
-      else
-      {
-        Log_error("Failed to resolve hostname on attempt %d", attempt);
-        delay(2000);
-      }
+      Log_error("Connection attempt %d/5 failed: %s", attempt, apiDisplayResult.error_detail.c_str());
+      if (attempt < 5) delay(2000);
     }
-
-    apiDisplayResult = fetchApiDisplay(apiDisplayInputs);
   }
 
   if (apiDisplayResult.error != HTTPS_NO_ERR)
