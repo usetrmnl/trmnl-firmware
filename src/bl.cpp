@@ -91,6 +91,8 @@ bool log_retry = false;                                              // need to 
 esp_sleep_wakeup_cause_t wakeup_reason = ESP_SLEEP_WAKEUP_UNDEFINED; // wake-up reason
 MSG current_msg = NONE;
 SPECIAL_FUNCTION special_function = SF_NONE;
+RTC_DATA_ATTR int iPrevWakeTime = 0; // total wake time of the last cycle (for statistics collection)
+RTC_DATA_ATTR bool bUsedCachedImage = false; // if the last image displayed was read from cache (for statistics collection)
 RTC_DATA_ATTR uint8_t need_to_refresh_display = 1;
 RTC_DATA_ATTR bool otg_state = false;  // Track OTG state across deep sleep
 RTC_DATA_ATTR char szPrevFile[36] = {0};
@@ -716,25 +718,13 @@ battery_count_t battery_count = BATTERY_NONE;
 bool battery_charging = false;
 // ############################ Gas gauge #############################
 #endif
-
 /**
- * @brief Function to init business logic module
+ * @brief Function to initialize and read from I2C sensors (if present)
  * @param none
  * @return none
  */
-void bl_init(void)
+void sensor_init(void)
 {
-#ifdef BOARD_TRMNL_X
-  uint32_t init_time = esp_cpu_get_cycle_count() / esp_rom_get_cpu_ticks_per_us();
-#endif // BOARD_TRMNL_X
-  startup_time = millis();
-#ifdef DEV_FIRMWARE
-  Serial.begin(115200);
-  wait_for_serial();
-  Log.begin(LOG_LEVEL_VERBOSE, &Serial);
-#endif
-  Log_info("BL init success");
-  pins_init();
 #ifdef SENSOR_SDA
   // check if there is a SCD41 or supported temperature sensor attached
   if (scd41.init(SENSOR_SDA, SENSOR_SCL) == SCD41_SUCCESS) {
@@ -792,6 +782,28 @@ void bl_init(void)
       bbt.stop(); // turn off the sensor to conserve power
   }
 #endif // SENSOR_SDA
+} /* sensor_init() */
+/**
+ * @brief Function to init business logic module
+ * @param none
+ * @return none
+ */
+void bl_init(void)
+{
+#ifdef BOARD_TRMNL_X
+  uint32_t init_time = esp_cpu_get_cycle_count() / esp_rom_get_cpu_ticks_per_us();
+#else
+  uint32_t init_time = micros();
+#endif
+  startup_time = init_time/1000L; // convert to milliseconds
+#ifdef DEV_FIRMWARE
+  Serial.begin(115200);
+  wait_for_serial();
+  Log.begin(LOG_LEVEL_VERBOSE, &Serial);
+#endif
+  Log_info("BL init success");
+  pins_init();
+  sensor_init();
 #ifdef BOARD_TRMNL_X
   // Debug: Print all wakeup_stub_iqs_status structure fields
   Log_info("wakeup_stub_iqs_status.status: 0x%02X 0x%02X", wakeup_stub_iqs_status.status[0], wakeup_stub_iqs_status.status[1]);
@@ -1492,7 +1504,7 @@ void bl_init(void)
     goToSleep();
   else
     ESP.restart();
-}
+} /* bl_init() */
 
 /**
  * @brief Function to process business logic module
@@ -2243,11 +2255,13 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           {
             Log.info("%s [%d]: New image. Download and show it.\r\n", __FILE__, __LINE__);
             status = true;
+            bUsedCachedImage = false;
           }
           else
           {
             Log.info("%s [%d]: Old image. Read from FLASH and show it.\r\n", __FILE__, __LINE__);
             status = false;
+            bUsedCachedImage = true;
             result = HTTPS_SUCCESS;
           }
         }
@@ -3237,7 +3251,8 @@ void goToSleep(void)
 
   if (preferences.isKey(PREFERENCES_SLEEP_TIME_KEY))
     time_to_sleep = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
-  Log.info("%s [%d]: total awake time - %d ms\r\n", __FILE__, __LINE__, millis() - startup_time); 
+  iPrevWakeTime = millis() - startup_time; // save for statistics
+  Log.info("%s [%d]: total awake time - %d ms\r\n", __FILE__, __LINE__, iPrevWakeTime); 
   Log.info("%s [%d]: time to sleep - %d\r\n", __FILE__, __LINE__, time_to_sleep);
   preferences.putUInt(PREFERENCES_LAST_SLEEP_TIME, getTime());
   preferences.end();
