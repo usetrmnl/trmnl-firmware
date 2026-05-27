@@ -6,11 +6,14 @@
 #include <api_response_parsing.h>
 #include <http_client.h>
 #include <DEV_Config.h>
+extern RTC_DATA_ATTR int iPrevWakeTime; // total wake time of the last cycle (for statistics collection)
+extern RTC_DATA_ATTR bool bUsedCachedImage; // if the last image displayed was read from cache (for statistics collection)
 #ifdef SENSOR_SDA
 extern int lastCO2, lastSCDTemp, lastTemp, lastSCDHumid, lastHumid, lastPressure, lastType, lastTime;
 const char *szDevices[] = {"None", "AHT20", "BMP180", "BME280", "BMP388", "SHT3X", "HDC1080", "HTS221", "MCP9808","BME68x","SHTC3"};
 const char *szMakers[] = {"None", "ASAIR", "Bosch", "Bosch", "Bosch", "Sensirion", "TI", "STMicro","MicroChip","Bosch","Sensirion"};
 #endif // SENSOR_SDA
+bool check_usb_power();
 
 void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
 {
@@ -22,6 +25,7 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
            "Refresh_Rate: %s\n\r"
 #ifdef BOARD_TRMNL_X
            "Battery-Charging: %s\n\r"
+           "USB-Connected: %s\n\r"
            "Battery-Count: %s\n\r"
            "Percent-Charged: %s\n\r"
            "Battery-Health: %s\n\r"
@@ -32,6 +36,8 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
            "Battery-Voltage: %s\n\r"
            "FW-Version: %s\r\n"
            "Model: %s\r\n"
+           "IMAGE-CACHED: %s\r\n"
+           "WAKE-TIME: %d\r\n"
            "RSSI: %s\r\n"
            "temperature-profile:true\r\n",
            inputs.macAddress.c_str(),
@@ -41,6 +47,7 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
            String(inputs.refreshRate).c_str(),
 #ifdef BOARD_TRMNL_X
            String(inputs.batteryCharging).c_str(),
+           (check_usb_power()) ? "true" : "false",
            String(inputs.batteryCount).c_str(),
            String(inputs.stateOfCharge).c_str(),
            String(inputs.stateOfHealth).c_str(),
@@ -51,8 +58,10 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
            String(inputs.batteryVoltage).c_str(),
            inputs.firmwareVersion.c_str(),
            inputs.model.c_str(),
+           bUsedCachedImage ? "true" : "false",
+           iPrevWakeTime,
            String(inputs.rssi));
-
+           
   https.addHeader("ID", inputs.macAddress);
   https.addHeader("Content-Type", "application/json");
   https.addHeader("Update-Source", inputs.updateSource);
@@ -62,6 +71,7 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
 #ifdef BOARD_TRMNL_X
   https.addHeader("Battery-Count", String(inputs.batteryCount));
   https.addHeader("Battery-Charging", String(inputs.batteryCharging));
+  https.addHeader("USB-Connected", (check_usb_power()) ? "true" : "false");
   https.addHeader("Percent-Charged", String(inputs.stateOfCharge));
   https.addHeader("Battery-Health", String(inputs.stateOfHealth));
   https.addHeader("Battery-Current", String(inputs.batteryCurrent));
@@ -70,6 +80,8 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
 #endif // BOARD_TRMNL_X
   https.addHeader("FW-Version", inputs.firmwareVersion);
   https.addHeader("Model", String(inputs.model));
+  https.addHeader("image-cached", (bUsedCachedImage) ? "true" : "false");
+  https.addHeader("wake-time", String(iPrevWakeTime));
   https.addHeader("RSSI", String(inputs.rssi));
   https.addHeader("temperature-profile", "true");
   https.addHeader("Width", String(inputs.displayWidth));
