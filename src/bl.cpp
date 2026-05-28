@@ -1650,6 +1650,8 @@ static https_request_err_e downloadAndShow()
     reqHeaders += "Battery-Capacity: " + String(apiDisplayInputs.currentBatteryCapacity) + "/" + String(apiDisplayInputs.maxBatteryCapacity) + "\n";
     reqHeaders += "FW-Version: "       + apiDisplayInputs.firmwareVersion           + "\n";
     reqHeaders += "Model: "            + apiDisplayInputs.model                     + "\n";
+    reqHeaders += "Image-Cached: "     + String(bUsedCachedImage ? "true" : "false") + "\n";
+    reqHeaders += "Wake-Time: "        + String(iPrevWakeTime) + "\n";
     reqHeaders += "RSSI: "             + String(apiDisplayInputs.rssi)              + "\n";
     reqHeaders += "Width: "            + String(apiDisplayInputs.displayWidth)      + "\n";
     reqHeaders += "Height: "           + String(apiDisplayInputs.displayHeight);
