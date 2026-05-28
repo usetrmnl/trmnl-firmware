@@ -109,7 +109,7 @@ static void getDeviceCredentials();                  // receiveing API key and F
 static bool performApiSetup();     // perform API setup call and return success
 static void downloadSetupImage();                    // download and display setup image
 static void resetDeviceCredentials(void);            // reset device credentials API key, Friendly ID, Wi-Fi SSID and password
-static void checkAndPerformFirmwareUpdate(void);     // OTA update
+static bool checkAndPerformFirmwareUpdate(void);     // OTA update
 void goToSleep(void);                         // sleep preparing
 static void goToSleepButtonOnly(void);               // sleep until button press, no timer
 static bool setClock(void);                          // clock synchronization
@@ -1422,7 +1422,17 @@ void bl_init(void)
   // OTA update checking
   if (update_firmware)
   {
-    checkAndPerformFirmwareUpdate();
+    uint32_t now = getTime();
+    if (now - preferences.getUInt(PREFERENCES_LAST_OTA) >= 24*60*60) {
+      Log.info("%s [%d]: Last OTA attempt was > 24h ago, proceeding with download...\r\n", __FILE__, __LINE__);
+      if (!checkAndPerformFirmwareUpdate()) {
+        Log.info("%s [%d]: OTA update failed, storing the timestamp to prevent boot looping.\r\n", __FILE__, __LINE__);
+        preferences.putUInt(PREFERENCES_LAST_OTA, now); // store new time
+      }
+    } else {
+      Log.info("%s [%d]: Last OTA attempt was < 24h ago, skipping...\r\n", __FILE__, __LINE__);
+      update_firmware = false; // logic further down will use this to decide to sleep vs reboot
+    }
   }
 
   // error handling
@@ -3082,9 +3092,9 @@ static void resetDeviceCredentials(void)
 /**
  * @brief Function to check and performing OTA update
  * @param none
- * @return none
+ * @return true for success, false for failure
  */
-static void checkAndPerformFirmwareUpdate(void)
+static bool checkAndPerformFirmwareUpdate(void)
 {
 #ifdef BOARD_TRMNL_X
   if (g_modem && WifiCaptivePortal.getLastCredentials().is5GHz)
@@ -3095,7 +3105,7 @@ static void checkAndPerformFirmwareUpdate(void)
     if (!update_partition) {
       Log.fatal("%s [%d]: No OTA partition available\r\n", __FILE__, __LINE__);
       showMessageWithLogo(FW_UPDATE_FAILED);
-      return;
+      return false;
     }
 
     esp_ota_handle_t ota_handle = 0;
@@ -3103,7 +3113,7 @@ static void checkAndPerformFirmwareUpdate(void)
     if (err != ESP_OK) {
       Log.fatal("%s [%d]: esp_ota_begin failed: %s\r\n", __FILE__, __LINE__, esp_err_to_name(err));
       showMessageWithLogo(FW_UPDATE_FAILED);
-      return;
+      return false;
     }
 
     showMessageWithLogo(FW_UPDATE);
@@ -3126,27 +3136,27 @@ static void checkAndPerformFirmwareUpdate(void)
       esp_ota_abort(ota_handle);
       Log.fatal("%s [%d]: Modem OTA download failed\r\n", __FILE__, __LINE__);
       showMessageWithLogo(FW_UPDATE_FAILED);
-      return;
+      return false;
     }
 
     err = esp_ota_end(ota_handle);
     if (err != ESP_OK) {
       Log.fatal("%s [%d]: esp_ota_end failed: %s\r\n", __FILE__, __LINE__, esp_err_to_name(err));
       showMessageWithLogo(FW_UPDATE_FAILED);
-      return;
+      return false;
     }
 
     err = esp_ota_set_boot_partition(update_partition);
     if (err != ESP_OK) {
       Log.fatal("%s [%d]: esp_ota_set_boot_partition failed: %s\r\n", __FILE__, __LINE__, esp_err_to_name(err));
       showMessageWithLogo(FW_UPDATE_FAILED);
-      return;
+      return false;
     }
 
     Log.info("%s [%d]: Modem OTA successful. Rebooting...\r\n", __FILE__, __LINE__);
     showMessageWithLogo(FW_UPDATE_SUCCESS);
     esp_restart();
-    return;
+    return true;
   }
 #endif
 
@@ -3203,6 +3213,7 @@ static void checkAndPerformFirmwareUpdate(void)
                }
              }
              return true; });
+    return false; // if we got here, it failed
 }
 
 /**

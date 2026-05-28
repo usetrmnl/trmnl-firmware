@@ -40,6 +40,7 @@
 #define PREFERENCES_CONNECT_API_RETRY_COUNT "retry_count"
 #define PREFERENCES_CONNECT_WIFI_RETRY_COUNT "wifi_retry"
 #define PREFERENCES_TOUCHBAR_MODE_KEY "touchbar_mode"
+#define PREFERENCES_LAST_OTA "last_ota"
 
 #define WIFI_CONNECTION_RSSI (-100)
 
