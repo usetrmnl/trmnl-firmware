@@ -49,11 +49,7 @@ jobs:
 
       - name: Name files
         run: |
-          echo "MERGED_FIRMWARE_FILE=trmnl-merged.${{ env.SUFFIX }}.bin" >> $GITHUB_ENV
           echo "APP_FIRMWARE_FILE=trmnl-app.${{ env.SUFFIX }}.bin" >> $GITHUB_ENV
-
-      - name: Create combined firmware image
-        run: ./scripts/merge_firmware.sh .pio/build/trmnl ${{ env.MERGED_FIRMWARE_FILE }}
 
       - name: Copy application firmware
         run: cp .pio/build/trmnl/firmware.bin ${{ env.APP_FIRMWARE_FILE }}
@@ -70,16 +66,8 @@ jobs:
           cat >> $GITHUB_STEP_SUMMARY << 'EOF'
           ## 📦 Firmware Artifacts
 
-          Two firmware images have been built:
-
-          ### 🔄 `${{ env.MERGED_FIRMWARE_FILE }}` - Full Firmware
-          - **Complete factory image** with bootloader, partitions, and application
-          - **⚠️ Wipes all persistent storage** (settings, wifi credentials, etc.)
-          - Use for initial flashing or factory reset
-          - Flash command: `./scripts/flash_merged.sh ${{ env.MERGED_FIRMWARE_FILE }}`
-
           ### ⚡ `${{ env.APP_FIRMWARE_FILE }}` - Application Only
-          - **Application firmware only** 
+          - **Application firmware only**
           - **✅ Preserves persistent storage** (settings, wifi credentials, etc.)
           - Use for updates without losing configuration
           - Flash command: `./scripts/flash_app.sh ${{ env.APP_FIRMWARE_FILE }}`
