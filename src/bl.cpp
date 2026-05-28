@@ -1642,6 +1642,7 @@ static https_request_err_e downloadAndShow()
     reqHeaders += "Battery-Voltage: " + String(apiDisplayInputs.batteryVoltage, 2) + "\n";
     reqHeaders += "Battery-Count: "   + String(apiDisplayInputs.batteryCount)     + "\n";
     reqHeaders += "Battery-Charging: " + String(apiDisplayInputs.batteryCharging) + "\n";
+    reqHeaders += "USB-Connected: "    + String(check_usb_power() ? "true\n" : "false\n");
     reqHeaders += "Percent-Charged: " + String(apiDisplayInputs.stateOfCharge) + "\n";
     reqHeaders += "Battery-Health: "  + String(apiDisplayInputs.stateOfHealth) + "\n";
     reqHeaders += "Battery-Current: " + String(apiDisplayInputs.batteryCurrent) + "\n";
@@ -1649,6 +1650,8 @@ static https_request_err_e downloadAndShow()
     reqHeaders += "Battery-Capacity: " + String(apiDisplayInputs.currentBatteryCapacity) + "/" + String(apiDisplayInputs.maxBatteryCapacity) + "\n";
     reqHeaders += "FW-Version: "       + apiDisplayInputs.firmwareVersion           + "\n";
     reqHeaders += "Model: "            + apiDisplayInputs.model                     + "\n";
+    reqHeaders += "Image-Cached: "     + String(bUsedCachedImage ? "true" : "false") + "\n";
+    reqHeaders += "Wake-Time: "        + String(iPrevWakeTime) + "\n";
     reqHeaders += "RSSI: "             + String(apiDisplayInputs.rssi)              + "\n";
     reqHeaders += "Width: "            + String(apiDisplayInputs.displayWidth)      + "\n";
     reqHeaders += "Height: "           + String(apiDisplayInputs.displayHeight);

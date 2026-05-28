@@ -36,10 +36,10 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
            "Battery-Voltage: %s\n\r"
            "FW-Version: %s\r\n"
            "Model: %s\r\n"
-           "IMAGE-CACHED: %s\r\n"
-           "WAKE-TIME: %d\r\n"
+           "Image-Cached: %s\r\n"
+           "Wake-Time: %d\r\n"
            "RSSI: %s\r\n"
-           "temperature-profile:true\r\n",
+           "Temperature-Profile: true\r\n",
            inputs.macAddress.c_str(),
            inputs.specialFunction,
            inputs.updateSource.c_str(),
@@ -80,10 +80,10 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
 #endif // BOARD_TRMNL_X
   https.addHeader("FW-Version", inputs.firmwareVersion);
   https.addHeader("Model", String(inputs.model));
-  https.addHeader("image-cached", (bUsedCachedImage) ? "true" : "false");
-  https.addHeader("wake-time", String(iPrevWakeTime));
+  https.addHeader("Image-Cached", (bUsedCachedImage) ? "true" : "false");
+  https.addHeader("Wake-Time", String(iPrevWakeTime));
   https.addHeader("RSSI", String(inputs.rssi));
-  https.addHeader("temperature-profile", "true");
+  https.addHeader("Temperature-Profile", "true");
   https.addHeader("Width", String(inputs.displayWidth));
   https.addHeader("Height", String(inputs.displayHeight));
 #ifdef SENSOR_SDA
