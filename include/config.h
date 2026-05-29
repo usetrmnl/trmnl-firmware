@@ -42,6 +42,13 @@
 #define PREFERENCES_TOUCHBAR_MODE_KEY "touchbar_mode"
 #define PREFERENCES_LAST_OTA "last_ota"
 
+// Ed25519 authentication keys
+#define PREFERENCES_ED25519_PUBLIC_KEY "ed_pub"
+#define PREFERENCES_ED25519_PRIVATE_KEY "ed_priv"
+#define PREFERENCES_AUTH_MODE "auth_mode"
+#define PREFERENCES_AUTH_MODE_DEFAULT "api_key"
+#define PREFERENCES_AUTH_MODE_ED25519 "ed25519"
+
 #define WIFI_CONNECTION_RSSI (-100)
 
 #define DISPLAY_BMP_IMAGE_SIZE 48062 // in bytes - 62 bytes - header; 48000 bytes - bitmap (480*800 1bpp) / 8

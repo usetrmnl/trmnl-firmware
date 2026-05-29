@@ -99,7 +99,20 @@ graph TB
 
 ## **Web Server Endpoints**
 
-following Wifi connection via the captive portal, device swaps its Mac Address for an API Key and Friendly ID from the server (which get saved on device).
+### GET /api/time
+
+Returns current server timestamp for Ed25519 authentication.
+
+```curl
+GET /api/time
+
+response example:
+{ "timestamp_ms": 1706380800000 }
+```
+
+### GET /api/setup
+
+Following WiFi connection via the captive portal, device swaps its Mac Address for an API Key and Friendly ID from the server (which get saved on device).
 
 ```curl
 GET /api/setup
@@ -109,13 +122,25 @@ headers = {
 }
 
 response example (success):
-{ "status": 200, "api_key": "2r--SahjsAKCFksVcped2Q", "friendly_id": "917F0B", "image_url": "https://trmnl.com/images/setup/setup-logo.bmp", "filename": "empty_state" }
+
+{
+  "status": 200,
+  "api_key": "2r--SahjsAKCFksVcped2Q",
+  "friendly_id": "917F0B",
+  "image_url": "https://usetrmnl.com/images/setup/setup-logo.bmp",
+  "filename": "empty_state",
+  "auth_mode": "ed25519"
+}
+
+# auth_mode can be "api_key" (default) or "ed25519"
 
 response example (fail, device with this Mac Address not found)
-{ "status" => 404, "api_key" => nil, "friendly_id" => nil, "image_url" => nil, "filename" => nil }
+{ "status": 404, "api_key": null, "friendly_id": null, "image_url": null, "filename": null }
 ```
 
-assuming the Setup endpoint responded successfully, future requests are made solely for image / display content:
+### GET /api/display
+
+Assuming the Setup endpoint responded successfully, future requests are made solely for image / display content:
 
 ```curl
 GET /api/display
@@ -126,7 +151,11 @@ headers = {
   'Refresh-Rate' => '1800',
   'Battery-Voltage' => '4.1',
   'FW-Version' => '2.1.3',
-  'RSSI' => '-69'
+  'RSSI' => '-69',
+  # When auth_mode is "ed25519", these additional headers are sent:
+  'X-Public-Key' => '3b6a27bc...64 hex chars',    # Ed25519 public key (device identity)
+  'X-Signature' => 'a1b2c3d4...128 hex chars',    # Ed25519 signature
+  'X-Timestamp' => '1706380800000'                 # Timestamp used in signature
 }
 
 response example (success, device found with this access token):
@@ -175,6 +204,13 @@ POST /api/log
 
 # example request tbd
 ```
+
+## **Authentication**
+
+The server controls the authentication mode via the `auth_mode` field in the `/api/setup` response:
+
+- **`api_key`** (default) — device sends `Access-Token` header. Backward compatible.
+- **`ed25519`** — device generates an Ed25519 keypair on first boot (stored in NVS) and signs each request with `timestamp_ms || public_key`. See the `X-Public-Key`, `X-Signature`, and `X-Timestamp` headers above. Factory reset regenerates the keypair.
 
 ## **Power consumption**
 

@@ -50,6 +50,16 @@ size_t PreferencesPersistence::writeBool(const char *key, const bool value)
   return _preferences.putBool(key, value);
 }
 
+size_t PreferencesPersistence::readBytes(const char *key, uint8_t *buffer, size_t maxLen)
+{
+  return _preferences.getBytes(key, buffer, maxLen);
+}
+
+size_t PreferencesPersistence::writeBytes(const char *key, const uint8_t *buffer, size_t len)
+{
+  return _preferences.putBytes(key, buffer, len);
+}
+
 bool PreferencesPersistence::clear()
 {
   return _preferences.clear();
