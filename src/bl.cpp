@@ -785,51 +785,12 @@ void sensor_init(void)
 #endif // SENSOR_SDA
 } /* sensor_init() */
 /**
- * @brief Function to init business logic module
+ * @brief Function to initialize the ESP32 preferences API (non-volatile storage in the FLASH memory)
  * @param none
  * @return none
  */
-void bl_init(void)
+void prefs_init(void)
 {
-#ifdef BOARD_TRMNL_X
-  uint32_t init_time = esp_cpu_get_cycle_count() / esp_rom_get_cpu_ticks_per_us();
-#else
-  uint32_t init_time = micros();
-#endif
-  startup_time = init_time/1000L; // convert to milliseconds
-#ifdef DEV_FIRMWARE
-  Serial.begin(115200);
-  wait_for_serial();
-  Log.begin(LOG_LEVEL_VERBOSE, &Serial);
-#endif
-  Log_info("BL init success");
-  pins_init();
-  sensor_init();
-#ifdef BOARD_TRMNL_X
-  // Debug: Print all wakeup_stub_iqs_status structure fields
-  Log_info("wakeup_stub_iqs_status.status: 0x%02X 0x%02X", wakeup_stub_iqs_status.status[0], wakeup_stub_iqs_status.status[1]);
-  Log_info("wakeup_stub_iqs_status.gestures: 0x%02X 0x%02X", wakeup_stub_iqs_status.gestures[0], wakeup_stub_iqs_status.gestures[1]);
-  Log_info("wakeup_stub_iqs_status.slider_cords: 0x%02X 0x%02X", wakeup_stub_iqs_status.slider_cords[0], wakeup_stub_iqs_status.slider_cords[1]);
-  Log_info("wakeup_stub_iqs_status.ch0_cnts: 0x%02X 0x%02X 0x%02X 0x%02X", wakeup_stub_iqs_status.ch0_cnts[0], wakeup_stub_iqs_status.ch0_cnts[1], wakeup_stub_iqs_status.ch0_cnts[2], wakeup_stub_iqs_status.ch0_cnts[3]);
-  Log_info("wakeup_stub_iqs_status.ch1_cnts: 0x%02X 0x%02X 0x%02X 0x%02X", wakeup_stub_iqs_status.ch1_cnts[0], wakeup_stub_iqs_status.ch1_cnts[1], wakeup_stub_iqs_status.ch1_cnts[2], wakeup_stub_iqs_status.ch1_cnts[3]);
-  Log_info("wakeup_stub_iqs_status.ch2_cnts: 0x%02X 0x%02X 0x%02X 0x%02X", wakeup_stub_iqs_status.ch2_cnts[0], wakeup_stub_iqs_status.ch2_cnts[1], wakeup_stub_iqs_status.ch2_cnts[2], wakeup_stub_iqs_status.ch2_cnts[3]);
-#endif
-
-#if defined(BOARD_SEEED_XIAO_ESP32C3)
-  delay(2000);
-
-  if (digitalRead(PIN_INTERRUPT) == LOW) {
-    Log_info("Boot button pressed during startup, resetting WiFi credentials...");
-    WifiCaptivePortal.resetSettings();
-    Log_info("WiFi credentials reset completed");
-  }
-#endif
-
-  wakeup_reason = esp_sleep_get_wakeup_cause();
-  bool gpio_wakeup = (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO ||
-                      wakeup_reason == ESP_SLEEP_WAKEUP_EXT0 ||
-                      wakeup_reason == ESP_SLEEP_WAKEUP_EXT1);
-
   Log_info("preferences start");
   bool res = preferences.begin("data", false);
   if (res)
@@ -850,6 +811,18 @@ void bl_init(void)
     ESP.restart();
   }
   Log_info("preferences end");
+} /* prefs_init() */
+/**
+ * @brief Execute button or touchbar actions which woke up the TRMNL
+ * @param none
+ * @return none
+ */
+void check_wakeup_actions(void)
+{ 
+  bool gpio_wakeup = (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO ||
+                      wakeup_reason == ESP_SLEEP_WAKEUP_EXT0 ||
+                      wakeup_reason == ESP_SLEEP_WAKEUP_EXT1);
+
   #ifndef BOARD_TRMNL_X
   if (gpio_wakeup)
   {
@@ -880,8 +853,15 @@ void bl_init(void)
     Log_info("Non-GPIO wakeup (%d) -> didn't read buttons", wakeup_reason);
   }
 #else // BOARD_TRMNL_X
-  // Notify IQS323 task about wakeup type BEFORE starting the task
+  // Debug: Print all wakeup_stub_iqs_status structure fields
+    Log_info("wakeup_stub_iqs_status.status: 0x%02X 0x%02X", wakeup_stub_iqs_status.status[0], wakeup_stub_iqs_status.status[1]);
+    Log_info("wakeup_stub_iqs_status.gestures: 0x%02X 0x%02X", wakeup_stub_iqs_status.gestures[0], wakeup_stub_iqs_status.gestures[1]);
+    Log_info("wakeup_stub_iqs_status.slider_cords: 0x%02X 0x%02X", wakeup_stub_iqs_status.slider_cords[0], wakeup_stub_iqs_status.slider_cords[1]);
+    Log_info("wakeup_stub_iqs_status.ch0_cnts: 0x%02X 0x%02X 0x%02X 0x%02X", wakeup_stub_iqs_status.ch0_cnts[0], wakeup_stub_iqs_status.ch0_cnts[1], wakeup_stub_iqs_status.ch0_cnts[2], wakeup_stub_iqs_status.ch0_cnts[3]);
+    Log_info("wakeup_stub_iqs_status.ch1_cnts: 0x%02X 0x%02X 0x%02X 0x%02X", wakeup_stub_iqs_status.ch1_cnts[0], wakeup_stub_iqs_status.ch1_cnts[1], wakeup_stub_iqs_status.ch1_cnts[2], wakeup_stub_iqs_status.ch1_cnts[3]);
+    Log_info("wakeup_stub_iqs_status.ch2_cnts: 0x%02X 0x%02X 0x%02X 0x%02X", wakeup_stub_iqs_status.ch2_cnts[0], wakeup_stub_iqs_status.ch2_cnts[1], wakeup_stub_iqs_status.ch2_cnts[2], wakeup_stub_iqs_status.ch2_cnts[3]);
 
+  // Notify IQS323 task about wakeup type BEFORE starting the task
   Log.info("%s [%d]: Display init\r\n", __FILE__, __LINE__);
   iqs323_task_i2c_lock();
   display_init();
@@ -924,8 +904,7 @@ void bl_init(void)
   // For future
   // iqs323_task_set_data_callback(process_iqs323_data);
 
-  Log_info("init time: %ld us", init_time);
-#else // BOARD_TRMNL_X
+#else // !BOARD_TRMNL_X
 
   if (double_click)
   { // special function reading
@@ -991,41 +970,6 @@ void bl_init(void)
   filesystem_init();
 #endif // !BOARD_TRMNL_X
 
-// #ifdef BOARD_TRMNL_X
-
-//   int8_t rslt;
-//   // I2C already initialized by IQS323 - do not call Wire.begin() again as it corrupts the bus on ESP32S3
-//   Serial.printf("Using I2C bus already initialized (SDA: %d, SCL: %d)\n\n", SENSOR_SDA_PIN, SENSOR_SCL_PIN);
-
-//   struct bma5_dev bma530_dev;
-
-//   rslt = bma530_init_device(&bma530_dev);
-//   if (rslt != BMA5_OK) {
-//     Serial.println("Failed to initialize BMA530!");
-//   }
-
-//   rslt = bma530_configure_low_power_mode(&bma530_dev);
-//   if (rslt != BMA5_OK) {
-//     Serial.println("Failed to configure BMA530 low power mode!");
-//   }
-
-//   rslt = bma530_configure_orientation(&bma530_dev);
-//   if (rslt != BMA5_OK) {
-//     Serial.println("Failed to configure BMA530 orientation!");
-//   }
-
-//   // Configure INT1 pin
-//   rslt = bma530_configure_int1(&bma530_dev);
-//   if (rslt != BMA5_OK) {
-//       Serial.println("Failed to configure BMA530 INT1!");
-//   }
-
-//   config_bma530_interrupt();
-
-//   pinMode(TCA9535_INT, INPUT);
-
-// #endif
-
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
   {
     Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
@@ -1049,7 +993,15 @@ void bl_init(void)
     preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
     Log.info("%s [%d]: Display TRMNL logo end\r\n", __FILE__, __LINE__);
     preferences.putString(PREFERENCES_FILENAME_KEY, "");
-  }
+  } // woke up to touch or button press
+} /* check_wakeup_actions() */
+/**
+ * @brief Talk to the LiPo charge controller for details about the X battery/batteries
+ * @param none
+ * @return none
+ */
+void get_x_battery_info(void)
+{
 #ifdef BOARD_TRMNL_X
   battery_count = detect_battery_count();
   battery_charging = is_charging();
@@ -1148,6 +1100,34 @@ void bl_init(void)
     Log_info("No battery detected - skipping BQ27427 initialization");
   }
 #endif // BOARD_TRMNL_X
+} /* get_x_battery_info() */
+/**
+ * @brief Function to init business logic module
+ * @param none
+ * @return none
+ */
+void bl_init(void)
+{
+bool res;
+#ifdef BOARD_TRMNL_X
+  uint32_t init_time = esp_cpu_get_cycle_count() / esp_rom_get_cpu_ticks_per_us();
+#else
+  uint32_t init_time = micros();
+#endif
+  startup_time = init_time/1000L; // convert to milliseconds
+#ifdef DEV_FIRMWARE
+  Serial.begin(115200);
+  wait_for_serial();
+  Log.begin(LOG_LEVEL_VERBOSE, &Serial);
+#endif
+  Log_info("BL init success; init time: %ld us", init_time);
+  pins_init();
+  sensor_init();
+
+  wakeup_reason = esp_sleep_get_wakeup_cause();
+  prefs_init();
+  check_wakeup_actions();
+  get_x_battery_info(); // gather info specific to the X (# of batteries, charge status, etc)
   vBatt = readBatteryVoltage(); // Read the battery voltage BEFORE WiFi is turned on
 
   Log_info("Firmware version %s", FW_VERSION_STRING);
@@ -1913,7 +1893,7 @@ static https_request_err_e downloadAndShow()
             counter = https.getSize();
             if (counter && counter <= MAX_IMAGE_SIZE) {
               WiFiClient *stream = https.getStreamPtr();
-              int iLen, iCount = 0;
+              int iCount = 0;
 
               buffer = (uint8_t *)malloc(counter);
               if (buffer) {
