@@ -537,11 +537,11 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, const String& saveToFil
     Serial.flush();
 
     while (ModemSerial.available()) ModemSerial.read();
-    Serial.println("[HTTP] cmd: AT+HTTPCLIENT=2,0,\"\",,,2");
+    Serial.println("[HTTP] cmd: AT+HTTPCLIENT=2,1,\"\",,,2");
     Serial.flush();
-    sendCommand("AT+HTTPCLIENT=2,0,\"\",,,2");
+    sendCommand("AT+HTTPCLIENT=2,1,\"\",,,2");
   } else {
-    String httpCmd = "AT+HTTPCLIENT=2,0,\"" + url + "\",,,2";
+    String httpCmd = "AT+HTTPCLIENT=2,1,\"" + url + "\",,,2";
     Serial.printf("[HTTP] cmd(%u): %s\n", httpCmd.length(), httpCmd.substring(0, 180).c_str());
     Serial.flush();
     sendCommand(httpCmd.c_str());
@@ -768,9 +768,9 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, std::function<bool(cons
     ModemSerial.flush();
     if (waitForResponse("SET OK", 5000).isEmpty()) return {false, 0, "", 0};
     while (ModemSerial.available()) ModemSerial.read();
-    sendCommand("AT+HTTPCLIENT=2,0,\"\",,,2");
+    sendCommand("AT+HTTPCLIENT=2,1,\"\",,,2");
   } else {
-    sendCommand(("AT+HTTPCLIENT=2,0,\"" + url + "\",,,2").c_str());
+    sendCommand(("AT+HTTPCLIENT=2,1,\"" + url + "\",,,2").c_str());
   }
 
   enum class ParseState { SCAN, SIZE, DATA };
