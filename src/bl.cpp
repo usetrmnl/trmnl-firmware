@@ -1636,6 +1636,7 @@ static https_request_err_e downloadAndShow()
   {
     Log_info("Fetching /api/display via modem (5 GHz path)");
     String reqHeaders = "";
+    reqHeaders += "Content-Type: application/json\n";
     reqHeaders += "ID: "               + apiDisplayInputs.macAddress                + "\n";
     reqHeaders += "Access-Token: "     + apiDisplayInputs.apiKey                    + "\n";
     reqHeaders += "Refresh-Rate: "     + String(apiDisplayInputs.refreshRate)       + "\n";
@@ -2765,6 +2766,7 @@ static bool performApiSetup()
   {
     Log_info("API setup via modem (5 GHz path)");
     String reqHeaders = "";
+    reqHeaders += "Content-Type: application/json\n";
     reqHeaders += "ID: "         + inputs.macAddress      + "\n";
     reqHeaders += "FW-Version: " + inputs.firmwareVersion + "\n";
     reqHeaders += "Model: "      + inputs.model           + "\n";
