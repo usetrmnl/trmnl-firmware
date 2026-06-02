@@ -99,7 +99,7 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
 			json+= "{";
 			json+= "\"name\":\""+ssid+"\",";
 			json+= "\"rssi\":\""+rssi+"\",";
-			json+= "\"open\":"+String(network.open == WIFI_AUTH_OPEN ? "true,": "false,");
+			json+= "\"open\":"+String(network.open ? "true,": "false,");
 			json+= "\"saved\":"+String(network.saved ? "true,": "false,"  );
 			json+= "\"band\":\""+String(network.is5GHz ? "5GHz" : "2.4GHz")+"\"";
 			json+= "}";

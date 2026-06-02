@@ -445,7 +445,7 @@ std::vector<WifiNetwork> WifiCaptive::getScannedUniqueNetworks(bool runScan)
         {
             String ssid = WiFi.SSID(i);
             int32_t rssi = WiFi.RSSI(i);
-            bool open = WiFi.encryptionType(i);
+            bool open = WiFi.encryptionType(i) == WIFI_AUTH_OPEN;
             bool found = false;
             for (auto &network : uniqueWifiNetworks)
             {
