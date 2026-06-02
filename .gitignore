@@ -8,7 +8,5 @@
 .vscode/ipch
 .idea
 .vscode/settings.json
-sdkconfig.*
-!sdkconfig.defaults
 managed_components/
 test/integration/test_config.h
