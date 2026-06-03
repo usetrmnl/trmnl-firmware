@@ -1,0 +1,7 @@
+#########################################################################
+# Per-variant overrides for env:TRMNL_X_E1003 (delta vs TRMNL_X).
+# AUTO-EXTRACTED. Edit deliberately; rebuild any affected env to
+# regenerate the materialized sdkconfig.<env>.
+#########################################################################
+
+CONFIG_I2C_ENABLE_DEBUG_LOG=y

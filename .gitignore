@@ -10,3 +10,9 @@
 .vscode/settings.json
 managed_components/
 test/integration/test_config.h
+
+# sdkconfig is now layered: keep only the hand-written defaults files,
+# treat the materialized per-env files as generated artifacts.
+sdkconfig.*
+!sdkconfig.defaults
+!sdkconfig.defaults.*

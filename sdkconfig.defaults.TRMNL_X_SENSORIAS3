@@ -1,0 +1,8 @@
+#########################################################################
+# Per-variant overrides for env:TRMNL_X_SENSORIAS3 (delta vs TRMNL_X).
+# AUTO-EXTRACTED. Edit deliberately; rebuild any affected env to
+# regenerate the materialized sdkconfig.<env>.
+#########################################################################
+
+# CONFIG_SR_WN_WN9_HISTACKCHAN_TTS3 is not set
+CONFIG_I2C_ENABLE_DEBUG_LOG=y
