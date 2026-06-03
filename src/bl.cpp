@@ -1607,6 +1607,12 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   inputs.firmwareVersion = String(FW_VERSION_STRING);
 
   inputs.rssi = WiFi.RSSI();
+#ifdef BOARD_TRMNL_X
+  // On the 5 GHz path the ESP32-C5 modem owns the Wi-Fi link, so the host's
+  // WiFi.RSSI() reads 0; query the modem for the real signal strength.
+  if (g_modem && WifiCaptivePortal.getLastCredentials().is5GHz)
+    inputs.rssi = g_modem->getSignalRssi();
+#endif // BOARD_TRMNL_X
   inputs.displayWidth = display_width();
   inputs.displayHeight = display_height();
   inputs.model = DEVICE_MODEL;
