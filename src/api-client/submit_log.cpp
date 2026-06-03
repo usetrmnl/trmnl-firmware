@@ -6,6 +6,7 @@
 #include <WiFi.h>
 #include <device_id.h>
 #include <api_request_serialization.h>
+#include <api-client/request_headers.h>
 
 bool submitLogToApi(LogApiInput &input, const char *api_url)
 {
@@ -28,10 +29,7 @@ bool submitLogToApi(LogApiInput &input, const char *api_url)
 
                     HTTPClient &https = *httpsPointer;
 
-                    https.addHeader("ID", device_mac_address());
-                    https.addHeader("Accept", "application/json, */*");
-                    https.addHeader("Access-Token", input.api_key);
-                    https.addHeader("Content-Type", "application/json");
+                    applyHeaders(https, buildLogHeaders({device_mac_address(), input.api_key}));
 
                     https.setTimeout(15000);
                     https.setConnectTimeout(15000);
@@ -47,11 +45,8 @@ bool submitLogToApi(LogApiInput &input, const char *api_url)
                           ? location
                           : (String(api_url) + location);
                       https.begin(redirectUrl);
-                      https.setReuse(false); 
-                      https.addHeader("ID", device_mac_address());
-                      https.addHeader("Accept", "application/json, */*");
-                      https.addHeader("Access-Token", input.api_key);
-                      https.addHeader("Content-Type", "application/json");
+                      https.setReuse(false);
+                      applyHeaders(https, buildLogHeaders({device_mac_address(), input.api_key}));
 
                       https.setTimeout(15000);
                       https.setConnectTimeout(15000);
