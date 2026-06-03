@@ -31,6 +31,7 @@
 #include <SPIFFS.h>
 #include "http_client.h"
 #include <api-client/display.h>
+#include <api-client/request_headers.h>
 #include "driver/gpio.h"
 #include "esp_ota_ops.h"
 #include "esp_sntp.h"
@@ -1580,6 +1581,7 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
 
   inputs.batteryVoltage = vBatt; //readBatteryVoltage();
 #ifdef BOARD_TRMNL_X
+  inputs.usbConnected = check_usb_power();
   inputs.batteryCount = battery_count;
   inputs.batteryCharging = battery_charging; // 1 charging, 0 not charging
   if (lipo._initialized) { // only report SoC if battery was detected and BQ27427 initialized successfully
@@ -1598,6 +1600,8 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
     inputs.currentBatteryCapacity = -1;
     inputs.maxBatteryCapacity = -1;
   }
+#else
+  inputs.usbConnected = false;
 #endif // BOARD_TRMNL_X
 
   inputs.firmwareVersion = String(FW_VERSION_STRING);
@@ -1607,6 +1611,8 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   inputs.displayHeight = display_height();
   inputs.model = DEVICE_MODEL;
   inputs.specialFunction = special_function;
+  inputs.imageCached = bUsedCachedImage;
+  inputs.prevWakeTime = iPrevWakeTime;
 
   return inputs;
 }
@@ -1635,29 +1641,7 @@ static https_request_err_e downloadAndShow()
   if (g_modem && WifiCaptivePortal.getLastCredentials().is5GHz)
   {
     Log_info("Fetching /api/display via modem (5 GHz path)");
-    String reqHeaders = "";
-    reqHeaders += "Content-Type: application/json\n";
-    reqHeaders += "ID: "               + apiDisplayInputs.macAddress                + "\n";
-    reqHeaders += "Access-Token: "     + apiDisplayInputs.apiKey                    + "\n";
-    reqHeaders += "Refresh-Rate: "     + String(apiDisplayInputs.refreshRate)       + "\n";
-    reqHeaders += "Battery-Voltage: " + String(apiDisplayInputs.batteryVoltage, 2) + "\n";
-    reqHeaders += "Battery-Count: "   + String(apiDisplayInputs.batteryCount)     + "\n";
-    reqHeaders += "Battery-Charging: " + String(apiDisplayInputs.batteryCharging) + "\n";
-    reqHeaders += "USB-Connected: "    + String(check_usb_power() ? "true\n" : "false\n");
-    reqHeaders += "Percent-Charged: " + String(apiDisplayInputs.stateOfCharge) + "\n";
-    reqHeaders += "Battery-Health: "  + String(apiDisplayInputs.stateOfHealth) + "\n";
-    reqHeaders += "Battery-Current: " + String(apiDisplayInputs.batteryCurrent) + "\n";
-    reqHeaders += "Battery-Temp: "    + String(apiDisplayInputs.batteryTemperature) + "\n";
-    reqHeaders += "Battery-Capacity: " + String(apiDisplayInputs.currentBatteryCapacity) + "/" + String(apiDisplayInputs.maxBatteryCapacity) + "\n";
-    reqHeaders += "FW-Version: "       + apiDisplayInputs.firmwareVersion           + "\n";
-    reqHeaders += "Model: "            + apiDisplayInputs.model                     + "\n";
-    reqHeaders += "Image-Cached: "     + String(bUsedCachedImage ? "true" : "false") + "\n";
-    reqHeaders += "Wake-Time: "        + String(iPrevWakeTime) + "\n";
-    reqHeaders += "RSSI: "             + String(apiDisplayInputs.rssi)              + "\n";
-    reqHeaders += "Width: "            + String(apiDisplayInputs.displayWidth)      + "\n";
-    reqHeaders += "Height: "           + String(apiDisplayInputs.displayHeight);
-    if (apiDisplayInputs.specialFunction != SF_NONE)
-      reqHeaders += "\nspecial_function: true";
+    String reqHeaders = formatHeaders(buildDisplayHeaders(apiDisplayInputs));
 
     auto httpRes = g_modem->httpGet(apiDisplayInputs.baseUrl + "/api/display", "", 0, reqHeaders);
     if (!httpRes.ok)
@@ -2765,11 +2749,7 @@ static bool performApiSetup()
   if (g_modem && WifiCaptivePortal.getLastCredentials().is5GHz)
   {
     Log_info("API setup via modem (5 GHz path)");
-    String reqHeaders = "";
-    reqHeaders += "Content-Type: application/json\n";
-    reqHeaders += "ID: "         + inputs.macAddress      + "\n";
-    reqHeaders += "FW-Version: " + inputs.firmwareVersion + "\n";
-    reqHeaders += "Model: "      + inputs.model           + "\n";
+    String reqHeaders = formatHeaders(buildSetupHeaders(inputs));
     auto httpRes = g_modem->httpGet(inputs.baseUrl + "/api/setup", "", 0, reqHeaders);
     if (!httpRes.ok)
     {

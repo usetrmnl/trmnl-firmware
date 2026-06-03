@@ -1,4 +1,5 @@
 #include <api-client/display.h>
+#include <api-client/request_headers.h>
 #include <HTTPClient.h>
 #include <trmnl_log.h>
 #include <WiFiClientSecure.h>
@@ -17,78 +18,12 @@ bool check_usb_power();
 
 void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
 {
-  Log_info("Added headers:\n\r"
-           "ID: %s\n\r"
-           "Special function: %d\n\r"
-           "Update-Source: %s\n\r"
-           "Access-Token: %s\n\r"
-           "Refresh_Rate: %s\n\r"
-#ifdef BOARD_TRMNL_X
-           "Battery-Charging: %s\n\r"
-           "USB-Connected: %s\n\r"
-           "Battery-Count: %s\n\r"
-           "Percent-Charged: %s\n\r"
-           "Battery-Health: %s\n\r"
-           "Battery-Current: %s\n\r"
-           "Battery-Temp: %s\n\r"
-           "Battery-Capacity: %s\n\r"
-#endif // BOARD_TRMNL_X
-           "Battery-Voltage: %s\n\r"
-           "FW-Version: %s\r\n"
-           "Model: %s\r\n"
-           "Image-Cached: %s\r\n"
-           "Wake-Time: %d\r\n"
-           "RSSI: %s\r\n"
-           "Temperature-Profile: true\r\n",
-           inputs.macAddress.c_str(),
-           inputs.specialFunction,
-           inputs.updateSource.c_str(),
-           inputs.apiKey.c_str(),
-           String(inputs.refreshRate).c_str(),
-#ifdef BOARD_TRMNL_X
-           String(inputs.batteryCharging).c_str(),
-           (check_usb_power()) ? "true" : "false",
-           String(inputs.batteryCount).c_str(),
-           String(inputs.stateOfCharge).c_str(),
-           String(inputs.stateOfHealth).c_str(),
-           String(inputs.batteryCurrent).c_str(),
-           String(inputs.batteryTemperature).c_str(),
-           (String(inputs.currentBatteryCapacity) + "/" + String(inputs.maxBatteryCapacity)).c_str(),
-#endif // BOARD_TRMNL_X
-           String(inputs.batteryVoltage).c_str(),
-           inputs.firmwareVersion.c_str(),
-           inputs.model.c_str(),
-           bUsedCachedImage ? "true" : "false",
-           iPrevWakeTime,
-           String(inputs.rssi));
-           
-  https.addHeader("ID", inputs.macAddress);
-  https.addHeader("Content-Type", "application/json");
-  https.addHeader("Update-Source", inputs.updateSource);
-  https.addHeader("Access-Token", inputs.apiKey);
-  https.addHeader("Refresh-Rate", String(inputs.refreshRate));
-  https.addHeader("Battery-Voltage", String(inputs.batteryVoltage));
-#ifdef BOARD_TRMNL_X
-  https.addHeader("Battery-Count", String(inputs.batteryCount));
-  https.addHeader("Battery-Charging", String(inputs.batteryCharging));
-  https.addHeader("USB-Connected", (check_usb_power()) ? "true" : "false");
-  https.addHeader("Percent-Charged", String(inputs.stateOfCharge));
-  https.addHeader("Battery-Health", String(inputs.stateOfHealth));
-  https.addHeader("Battery-Current", String(inputs.batteryCurrent));
-  https.addHeader("Battery-Temp", String(inputs.batteryTemperature));
-  https.addHeader("Battery-Capacity", String(inputs.currentBatteryCapacity) + "/" + String(inputs.maxBatteryCapacity));
-#endif // BOARD_TRMNL_X
-  https.addHeader("FW-Version", inputs.firmwareVersion);
-  https.addHeader("Model", String(inputs.model));
-  https.addHeader("Image-Cached", (bUsedCachedImage) ? "true" : "false");
-  https.addHeader("Wake-Time", String(iPrevWakeTime));
-  https.addHeader("RSSI", String(inputs.rssi));
-  https.addHeader("Temperature-Profile", "true");
-  https.addHeader("Width", String(inputs.displayWidth));
-  https.addHeader("Height", String(inputs.displayHeight));
+  HttpHeaderList headers = buildDisplayHeaders(inputs);
+
 #ifdef SENSOR_SDA
   char *szTemp, szPart[128];
   szTemp = (char *)malloc(1024); // make sure we have enough space, but don't use the stack because it's small
+  szTemp[0] = 0;
   if (lastCO2 != 0) { // valid data from SCD4x for CO2, Temperature and Humidity
     // create the multi-value string to pass as a HTTP header
     sprintf(szTemp, "make=Sensirion;model=SCD41;kind=carbon_dioxide;value=%d;unit=parts_per_million;created_at=%d,make=Sensirion;model=SCD41;kind=temperature;value=%f;unit=celsius;created_at=%d,make=Sensirion;model=SCD41;kind=humidity;value=%d;unit=percent;created_at=%d", lastCO2, lastTime, (float)lastSCDTemp / 10.0f, lastTime, lastSCDHumid, lastTime);
@@ -113,18 +48,15 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
     }
   }
   if (lastCO2 != 0 || lastType >= 0) {
-    https.addHeader("SENSORS", szTemp);
+    headers.push_back({"SENSORS", szTemp});
   } else {
     Log_info("%s [%d] Sensor data not available", __FILE__, __LINE__);
   }
   free(szTemp);
 #endif // SENSOR_SDA
 
-  if (inputs.specialFunction != SF_NONE)
-  {
-    Log_info("Add special function: true (%d)", inputs.specialFunction);
-    https.addHeader("special_function", "true");
-  }
+  applyHeaders(https, headers);
+  logHeaders(headers);
 }
 
 ApiDisplayResult fetchApiDisplay(ApiDisplayInputs &apiDisplayInputs)

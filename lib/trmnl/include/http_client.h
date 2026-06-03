@@ -5,6 +5,8 @@
 #include <WiFiClientSecure.h>
 #include <WiFiClient.h>
 #include <HTTPClient.h>
+#include <trmnl_log.h>
+#include "api-client/request_headers.h"
 
 // Error codes for the HTTP utilities - using distinct values to avoid overlap
 enum HttpError
@@ -67,5 +69,13 @@ ReturnType withHttp(const String &url, Callback callback)
 
   return result;
 }
+
+/**
+ * @brief Apply a list of request headers to an HTTPClient (Wi-Fi path).
+ *
+ * The header list is built by the transport-agnostic builders in
+ * request_headers.h; this is the HTTPClient adapter for it.
+ */
+void applyHeaders(HTTPClient &https, const HttpHeaderList &headers);
 
 #endif // HTTP_UTILS_H
