@@ -540,7 +540,7 @@ std::vector<WifiNetwork> WifiCaptive::getScannedUniqueNetworks(bool runScan)
             }
             if (!found)
             {
-                uniqueWifiNetworks.push_back({ssid, rssi, open, false, enterprise});
+                uniqueWifiNetworks.push_back({ssid, rssi, open, false, false, enterprise});
             }
         }
     }
@@ -589,14 +589,14 @@ std::vector<WifiNetwork> WifiCaptive::combineNetworks(
         {
             if (network.ssid == savedWifis[i].ssid)
             {
-                combinedWifiNetworks.push_back({network.ssid, network.rssi, network.open, true, network.enterprise});
+                combinedWifiNetworks.push_back({network.ssid, network.rssi, network.open, true, network.is5GHz, network.enterprise});
                 found = true;
                 break;
             }
         }
         if (!found)
         {
-            combinedWifiNetworks.push_back({network.ssid, network.rssi, network.open, false, network.enterprise});
+            combinedWifiNetworks.push_back({network.ssid, network.rssi, network.open, false, network.is5GHz, network.enterprise});
         }
     }
     // add saved wifis that are not combinedWifiNetworks
@@ -613,7 +613,7 @@ std::vector<WifiNetwork> WifiCaptive::combineNetworks(
         }
         if (!found && savedWifis[i].ssid != "")
         {
-            combinedWifiNetworks.push_back({savedWifis[i].ssid, -200, false, true, savedWifis[i].isEnterprise});
+            combinedWifiNetworks.push_back({savedWifis[i].ssid, -200, false, true, savedWifis[i].is5GHz, savedWifis[i].isEnterprise});
         }
     }
 

@@ -32,8 +32,8 @@ struct WifiNetwork
     bool saved;
     bool is5GHz;
     bool enterprise;
-    WifiNetwork(String ssid, int32_t rssi, bool open, bool saved, bool is5GHz = false)
-        : ssid(ssid), rssi(rssi), open(open), saved(saved), is5GHz(is5GHz) {}
+    WifiNetwork(String ssid, int32_t rssi, bool open, bool saved, bool is5GHz = false, bool enterprise = false)
+        : ssid(ssid), rssi(rssi), open(open), saved(saved), is5GHz(is5GHz), enterprise(enterprise) {}
 };
 
 struct WifiEventData
