@@ -76,6 +76,7 @@ struct ApiDisplayInputs
   String firmwareVersion;
   String model;
   int rssi;
+  String wifiBand;
   int displayWidth;
   int displayHeight;
   SPECIAL_FUNCTION specialFunction;
