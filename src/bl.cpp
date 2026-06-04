@@ -711,8 +711,10 @@ void process_iqs323_data(void)
 // ############################ esp32c5 modem #########################
 #include "modem.h"
 
-// File-scope modem pointer — set once during bl_init(), used by download helpers.
-static Modem* g_modem = nullptr;
+// Global modem pointer — set once during bl_init(), used by download helpers
+// here and by getWiFiStatus() in wifi_network.cpp (5 GHz path on TRMNL_X), so
+// it needs external linkage.
+Modem* g_modem = nullptr;
 // ############################ esp32c5 modem #########################
 
 // ############################ Gas gauge #############################
