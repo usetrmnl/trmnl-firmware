@@ -28,7 +28,7 @@
 // Include Files
 #include "Arduino.h"
 #include "Wire.h"
-#include "./inc/iqs323_addresses.h"
+#include "./inc/IQS323_addresses.h"
 #include "rtc_wake_stub_trmnl_x.h"
 
 /* Select the EV-Kit below by changing the value of the define (default = 0):
