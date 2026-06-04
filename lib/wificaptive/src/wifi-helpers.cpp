@@ -1,4 +1,3 @@
-#pragma once
 #include <WiFiType.h>
 #include <Arduino.h>
 

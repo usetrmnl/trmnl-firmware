@@ -1,26 +1,11 @@
 #include <api-client/setup.h>
+#include <api-client/request_headers.h>
 #include <HTTPClient.h>
 #include <trmnl_log.h>
 #include <WiFiClientSecure.h>
 #include <config.h>
 #include <api_response_parsing.h>
 #include <http_client.h>
-
-void addSetupHeaders(HTTPClient &https, ApiSetupInputs &inputs)
-{
-  Log_info("Added headers:\n\r"
-           "ID: %s\n\r"
-           "FW-Version: %s\r\n"
-           "Model: %s\n\r",
-           inputs.macAddress.c_str(),
-           inputs.firmwareVersion.c_str(),
-           inputs.model.c_str());
-
-  https.addHeader("ID", inputs.macAddress);
-  https.addHeader("Content-Type", "application/json");
-  https.addHeader("FW-Version", inputs.firmwareVersion);
-  https.addHeader("Model",inputs.model);
-}
 
 ApiSetupResult fetchApiSetup(ApiSetupInputs &apiSetupInputs)
 {
@@ -50,7 +35,9 @@ ApiSetupResult fetchApiSetup(ApiSetupInputs &apiSetupInputs)
         https->setTimeout(15000);
         https->setConnectTimeout(15000);
 
-        addSetupHeaders(*https, apiSetupInputs);
+        HttpHeaderList headers = buildSetupHeaders(apiSetupInputs);
+        applyHeaders(*https, headers);
+        logHeaders(headers);
 
         delay(5);
 
