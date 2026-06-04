@@ -1580,6 +1580,7 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   inputs.macAddress = device_mac_address();
   inputs.rssi = WiFi.RSSI(); // may be overridden below
   inputs.wifiBand = "2.4"; // may be overridden below
+  inputs.wifiSSID = WifiCaptivePortal.getLastCredentials().ssid;
   inputs.batteryVoltage = vBatt; //readBatteryVoltage();
   inputs.firmwareVersion = String(FW_VERSION_STRING);
   inputs.displayWidth = display_width();
