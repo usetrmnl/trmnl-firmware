@@ -1,0 +1,13 @@
+#pragma once
+
+// Copy this file to test_config.h and fill in real values.
+// test_config.h is gitignored so secrets don't get committed.
+
+#define TEST_WIFI_SSID "your-ssid-here"
+#define TEST_WIFI_PASSWORD "your-password-here"
+
+// Real TRMNL backend used by tests that talk to production (e.g. test_setup).
+#define TEST_BACKEND_URL "https://trmnl.app"
+
+// Override the hardware MAC address (optional)
+#define TEST_MAC_ADDRESS WiFi.macAddress()

@@ -253,7 +253,10 @@ There are technical and non-technical options to flashing firmware.
 
 ## **Uploading guide (PlatformIO)**
 
-1. Turn off PCB. Connect PCB to PC using USB-C cable. While holding down the boot button, turn on PCB. Let go of boot button. This puts board in flashing mode.
+1. Put the TRMNL into flashing mode.
+
+    1. **TRMNL OG and BWRY**: Turn off PCB. Connect PCB to PC using USB-C cable. While holding down the boot button, turn on PCB. Let go of boot button. This puts board in flashing mode.
+    2. **TRMNL X**: [See these instructions](https://help.trmnl.com/en/articles/11936721-put-your-trmnl-in-flashing-mode#h_96e07a072e)
 
 2. Mac/Windows: Select the proper COM port from drop-down list (or leave on "Auto"). Ubuntu: Look for something like "/dev/ttyACMO USB JTAG/serial debug unit" or "Espressif USB JTAG/serial debug unit" via lsusb.
 
@@ -322,6 +325,8 @@ Next turn off (toggle DOWN) and unplug the PCB. you are now ready to flash anoth
 
 ## **Hacking guide**
 
+### Local unit tests
+
 If you would like to run local tests, you'll need to have g++/gcc installed (f.e., as part of MinGW) in PATH:
 
 - Get MinGW online installer from https://github.com/niXman/mingw-builds-binaries/
@@ -333,3 +338,36 @@ Now you can switch from "env:esp32..." to "esp:native" clicking at the bottom of
 ![](pics/vscode-footer.png)
 
 And then run platformio tests by clicking test button (point 2).
+
+### Hardware integration tests
+
+There is a suite of on-device hardware tests written with the [Unity](https://registry.platformio.org/libraries/throwtheswitch/Unity) test framework, defined in `test/integration/test_all`. They compile into a single firmware image that is uploaded to the device, runs the tests sequentially in `setup()`, and prints results over the serial port.
+
+To run the test suite (currently only on OG):
+
+1. Make a copy of `test/integration/test_config.h.example` to `test/integration/test_config.h` and modify the file as needed to set up the WiFi network and other values. This file is ignored by Git and will not be checked in.
+2. Select the `env:trmnl_test` environment.
+3. Plug in the device and run the "PlatformIO: Test" action.
+    1. If the upload fails, retry the Test action once.
+    2. If the upload still fails, ensure the device is on.
+    3. If the upload still fails, put the device into flashing mode - see "Uploading guide (PlatformIO)" above, and retry.
+
+
+You should see terminal output like:
+
+```
+test/integration/test_all/all.test.cpp:33: connect_to_wifi      [PASSED]
+test/integration/test_all/all.test.cpp:75: test_setup_succeeds_with_registered_mac      [PASSED]
+test/integration/test_all/all.test.cpp:76: test_setup_returns_status_error_for_unknown_mac      [PASSED]
+test/integration/test_all/all.test.cpp:77: test_setup_fails_with_unreachable_host       [PASSED]
+test/integration/test_all/all.test.cpp:97: test_low_battery_returns_low_battery_image   [PASSED]
+test/integration/test_all/all.test.cpp:63: test_wifi_connects_with_valid_credentials    [PASSED]
+test/integration/test_all/all.test.cpp:64: test_wifi_fails_with_wrong_password  [PASSED]
+test/integration/test_all/all.test.cpp:65: test_wifi_fails_with_wrong_ssid      [PASSED]
+---------------------------------------------------------------------------- trmnl_test:integration/test_all [PASSED] Took 56.49 seconds ----------------------------------------------------------------------------
+
+====================================================================================================== SUMMARY ======================================================================================================
+Environment    Test                  Status    Duration
+-------------  --------------------  --------  ------------
+trmnl_test     integration/test_all  PASSED    00:00:56.488
+```

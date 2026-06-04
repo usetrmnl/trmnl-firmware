@@ -1,4 +1,5 @@
 #include <api-client/display.h>
+#include <api-client/request_headers.h>
 #include <HTTPClient.h>
 #include <trmnl_log.h>
 #include <WiFiClientSecure.h>
@@ -6,50 +7,23 @@
 #include <api_response_parsing.h>
 #include <http_client.h>
 #include <DEV_Config.h>
+extern RTC_DATA_ATTR int iPrevWakeTime; // total wake time of the last cycle (for statistics collection)
+extern RTC_DATA_ATTR bool bUsedCachedImage; // if the last image displayed was read from cache (for statistics collection)
 #ifdef SENSOR_SDA
 extern int lastCO2, lastSCDTemp, lastTemp, lastSCDHumid, lastHumid, lastPressure, lastType, lastTime;
 const char *szDevices[] = {"None", "AHT20", "BMP180", "BME280", "BMP388", "SHT3X", "HDC1080", "HTS221", "MCP9808","BME68x","SHTC3"};
 const char *szMakers[] = {"None", "ASAIR", "Bosch", "Bosch", "Bosch", "Sensirion", "TI", "STMicro","MicroChip","Bosch","Sensirion"};
 #endif // SENSOR_SDA
+bool check_usb_power();
 
 void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
 {
-  Log_info("Added headers:\n\r"
-           "ID: %s\n\r"
-           "Special function: %d\n\r"
-           "Update-Source: %s\n\r"
-           "Access-Token: %s\n\r"
-           "Refresh_Rate: %s\n\r"
-           "Battery-Voltage: %s\n\r"
-           "FW-Version: %s\r\n"
-           "Model: %s\r\n"
-           "RSSI: %s\r\n"
-           "temperature-profile:true\r\n",
-           inputs.macAddress.c_str(),
-           inputs.specialFunction,
-           inputs.updateSource.c_str(),
-           inputs.apiKey.c_str(),
-           String(inputs.refreshRate).c_str(),
-           String(inputs.batteryVoltage).c_str(),
-           inputs.firmwareVersion.c_str(),
-           inputs.model.c_str(),
-           String(inputs.rssi));
+  HttpHeaderList headers = buildDisplayHeaders(inputs);
 
-  https.addHeader("ID", inputs.macAddress);
-  https.addHeader("Content-Type", "application/json");
-  https.addHeader("Update-Source", inputs.updateSource);
-  https.addHeader("Access-Token", inputs.apiKey);
-  https.addHeader("Refresh-Rate", String(inputs.refreshRate));
-  https.addHeader("Battery-Voltage", String(inputs.batteryVoltage));
-  https.addHeader("FW-Version", inputs.firmwareVersion);
-  https.addHeader("Model", String(inputs.model));
-  https.addHeader("RSSI", String(inputs.rssi));
-  https.addHeader("temperature-profile", "true");
-  https.addHeader("Width", String(inputs.displayWidth));
-  https.addHeader("Height", String(inputs.displayHeight));
 #ifdef SENSOR_SDA
   char *szTemp, szPart[128];
   szTemp = (char *)malloc(1024); // make sure we have enough space, but don't use the stack because it's small
+  szTemp[0] = 0;
   if (lastCO2 != 0) { // valid data from SCD4x for CO2, Temperature and Humidity
     // create the multi-value string to pass as a HTTP header
     sprintf(szTemp, "make=Sensirion;model=SCD41;kind=carbon_dioxide;value=%d;unit=parts_per_million;created_at=%d,make=Sensirion;model=SCD41;kind=temperature;value=%f;unit=celsius;created_at=%d,make=Sensirion;model=SCD41;kind=humidity;value=%d;unit=percent;created_at=%d", lastCO2, lastTime, (float)lastSCDTemp / 10.0f, lastTime, lastSCDHumid, lastTime);
@@ -74,18 +48,15 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
     }
   }
   if (lastCO2 != 0 || lastType >= 0) {
-    https.addHeader("SENSORS", szTemp);
+    headers.push_back({"SENSORS", szTemp});
   } else {
     Log_info("%s [%d] Sensor data not available", __FILE__, __LINE__);
   }
   free(szTemp);
 #endif // SENSOR_SDA
 
-  if (inputs.specialFunction != SF_NONE)
-  {
-    Log_info("Add special function: true (%d)", inputs.specialFunction);
-    https.addHeader("special_function", "true");
-  }
+  applyHeaders(https, headers);
+  logHeaders(headers);
 }
 
 ApiDisplayResult fetchApiDisplay(ApiDisplayInputs &apiDisplayInputs)
