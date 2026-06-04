@@ -1898,22 +1898,38 @@ static https_request_err_e downloadAndShow()
             counter = https.getSize();
             if (counter && counter <= MAX_IMAGE_SIZE) {
               WiFiClient *stream = https.getStreamPtr();
-              int iLen, iCount = 0;
+              uint32_t iCount = 0;
+
+              // NOTE: Read in chunks rather than one byte at a time. Byte-by-byte issued one
+              // available()/read() pair per byte (~160k calls for a 160KB image), each routed
+              // through mbedtls_ssl_read; chunked issues ~115. When per-call cost is non-trivial this
+              // shortens the download and narrows the window in which a weak-link stall can trip the
+              // timeout. Magnitude depends on per-read overhead (not yet measured on hardware).
+              // Mirrors the chunked pattern already used by downloadStream() for setup/firmware.
+              const unsigned long INACTIVITY_TIMEOUT_MS = 20000; // give up after 20s of no data
+              const unsigned long OVERALL_TIMEOUT_MS = 60000;    // hard cap on total download time
+              unsigned long lOverallStart = millis();
+              lStartTime = millis();
 
               buffer = (uint8_t *)malloc(counter);
               if (buffer) {
-                while (iCount < counter && millis() < (lStartTime + API_FIRST_RETRY*1000)) {
-                  if (stream->available()) {
-                    buffer[iCount++] = stream->read();
-                    lStartTime = millis(); // reset start time
-                  } else { // 15 seconds with no activity => stop trying
+                while (iCount < counter &&
+                       millis() < (lStartTime + INACTIVITY_TIMEOUT_MS) &&
+                       millis() < (lOverallStart + OVERALL_TIMEOUT_MS)) {
+                  int avail = stream->available();
+                  if (avail > 0) {
+                    int toRead = min(avail, (int)(counter - iCount));
+                    iCount += stream->readBytes(buffer + iCount, toRead);
+                    lStartTime = millis(); // reset inactivity timer on data
+                  } else {
                     vTaskDelay(1); // yield to allow time for the data to arrive
                   }
                 }
               } // if buffer
               stream->stop(); // Important! If you don't do this, WiFi will have a memory exception later
-              if (millis() > (lStartTime + API_FIRST_RETRY*1000)) { // we timed out
+              if (iCount < counter) { // we didn't receive the whole image
                   Log_error_submit("Receiving failed; download timed out. Image size = %d", counter);
+                  if (buffer) { free(buffer); buffer = nullptr; }
                   return HTTPS_TIMED_OUT;
               }
             }
