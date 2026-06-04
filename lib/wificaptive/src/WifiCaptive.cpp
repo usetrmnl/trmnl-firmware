@@ -115,6 +115,10 @@ bool WifiCaptive::startPortal()
     // Start async WiFi scan only when no external network list is provided
     if (_networks.empty())
     {
+#ifdef CONFIG_IDF_TARGET_ESP32C5
+    // Enable 5GHz network scan
+    WiFi.setBandMode(WIFI_BAND_MODE_AUTO);
+#endif
         WiFi.scanNetworks(true);
     }
 
@@ -467,6 +471,12 @@ std::vector<WifiNetwork> WifiCaptive::getScannedUniqueNetworks(bool runScan)
     int n = WiFi.scanComplete();
     if (runScan == true)
     {
+#ifdef CONFIG_IDF_TARGET_ESP32C5
+    // Enable 5GHz network scan
+       Log_info("About to set 2.4+5GHz mode");
+       esp_wifi_set_band_mode(WIFI_BAND_MODE_AUTO);
+       Log_info("after set 5GHz mode");
+#endif
         WiFi.scanNetworks(false);
         delay(100);
         int n = WiFi.scanComplete();
@@ -521,15 +531,16 @@ std::vector<WifiNetwork> WifiCaptive::getScannedUniqueNetworks(bool runScan)
             String ssid = WiFi.SSID(i);
             int32_t rssi = WiFi.RSSI(i);
             wifi_auth_mode_t encType = WiFi.encryptionType(i);
+            bool bIs5GHz = (WiFi.channel(i) >= 36);
             bool open = WiFi.encryptionType(i);
             bool enterprise = (encType == WIFI_AUTH_WPA2_ENTERPRISE);
 
             bool found = false;
             for (auto &network : uniqueWifiNetworks)
             {
-                if (network.ssid == ssid)
+                if (network.ssid == ssid && network.is5GHz == bIs5GHz)
                 {
-                    Serial.println("Equal SSID");
+                    Serial.println("Equal SSID & WiFi Band");
                     found = true;
                     if (network.rssi < rssi)
                     {
@@ -540,7 +551,7 @@ std::vector<WifiNetwork> WifiCaptive::getScannedUniqueNetworks(bool runScan)
             }
             if (!found)
             {
-                uniqueWifiNetworks.push_back({ssid, rssi, open, false, false, enterprise});
+                uniqueWifiNetworks.push_back({ssid, rssi, open, false, bIs5GHz, enterprise});
             }
         }
     }
@@ -548,7 +559,7 @@ std::vector<WifiNetwork> WifiCaptive::getScannedUniqueNetworks(bool runScan)
     Log_info("Unique networks found: %d", uniqueWifiNetworks.size());
     for (auto &network : uniqueWifiNetworks)
     {
-        Log_info("SSID: %s, RSSI: %d, Open: %d", network.ssid.c_str(), network.rssi, network.open);
+        Log_info("SSID: %s, RSSI: %d, Open: %d, Band: %s", network.ssid.c_str(), network.rssi, network.open, (network.is5GHz) ? "5GHz" : "2.4GHz");
     }
 
     return uniqueWifiNetworks;
@@ -567,7 +578,7 @@ std::vector<WifiCredentials> WifiCaptive::matchNetworks(
     {
         for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
         {
-            if (network.ssid == savedWifis[i].ssid)
+            if (network.ssid == savedWifis[i].ssid && network.is5GHz == savedWifis[i].is5GHz)
             {
                 sortedWifis.push_back(savedWifis[i]);
             }
@@ -605,7 +616,7 @@ std::vector<WifiNetwork> WifiCaptive::combineNetworks(
         bool found = false;
         for (auto &network : combinedWifiNetworks)
         {
-            if (network.ssid == savedWifis[i].ssid)
+            if (network.ssid == savedWifis[i].ssid && network.is5GHz == savedWifis[i].is5GHz)
             {
                 found = true;
                 break;

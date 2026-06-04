@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <bl.h>
+#include <wifi_network.h>
 #include <device_id.h>
 #include <trmnl_log.h>
 #include <types.h>
@@ -31,6 +32,7 @@
 #include <SPIFFS.h>
 #include "http_client.h"
 #include <api-client/display.h>
+#include <api-client/request_headers.h>
 #include "driver/gpio.h"
 #include "esp_ota_ops.h"
 #include "esp_sntp.h"
@@ -709,8 +711,10 @@ void process_iqs323_data(void)
 // ############################ esp32c5 modem #########################
 #include "modem.h"
 
-// File-scope modem pointer — set once during bl_init(), used by download helpers.
-static Modem* g_modem = nullptr;
+// Global modem pointer — set once during bl_init(), used by download helpers
+// here and by getWiFiStatus() in wifi_network.cpp (5 GHz path on TRMNL_X), so
+// it needs external linkage.
+Modem* g_modem = nullptr;
 // ############################ esp32c5 modem #########################
 
 // ############################ Gas gauge #############################
@@ -829,6 +833,7 @@ void bl_init(void)
   bool gpio_wakeup = (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO ||
                       wakeup_reason == ESP_SLEEP_WAKEUP_EXT0 ||
                       wakeup_reason == ESP_SLEEP_WAKEUP_EXT1);
+  Log.info("%s [%d]: Wake reason: %d\r\n", __FILE__, __LINE__, (int)wakeup_reason);
 
   Log_info("preferences start");
   bool res = preferences.begin("data", false);
@@ -1577,9 +1582,22 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   }
 
   inputs.macAddress = device_mac_address();
-
+  WiFiStatus wifi = getWiFiStatus();
+  inputs.rssi = wifi.rssi;
+  inputs.wifiBand = wifi.band;
+  inputs.wifiSSID = wifi.ssid;
   inputs.batteryVoltage = vBatt; //readBatteryVoltage();
+  inputs.firmwareVersion = String(FW_VERSION_STRING);
+  inputs.displayWidth = display_width();
+  inputs.displayHeight = display_height();
+  inputs.model = DEVICE_MODEL;
+  inputs.specialFunction = special_function;
+  inputs.imageCached = bUsedCachedImage;
+  inputs.prevWakeTime = iPrevWakeTime;
+  inputs.usbConnected = false;
+  
 #ifdef BOARD_TRMNL_X
+  inputs.usbConnected = check_usb_power();
   inputs.batteryCount = battery_count;
   inputs.batteryCharging = battery_charging; // 1 charging, 0 not charging
   if (lipo._initialized) { // only report SoC if battery was detected and BQ27427 initialized successfully
@@ -1599,14 +1617,6 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
     inputs.maxBatteryCapacity = -1;
   }
 #endif // BOARD_TRMNL_X
-
-  inputs.firmwareVersion = String(FW_VERSION_STRING);
-
-  inputs.rssi = WiFi.RSSI();
-  inputs.displayWidth = display_width();
-  inputs.displayHeight = display_height();
-  inputs.model = DEVICE_MODEL;
-  inputs.specialFunction = special_function;
 
   return inputs;
 }
@@ -1635,28 +1645,7 @@ static https_request_err_e downloadAndShow()
   if (g_modem && WifiCaptivePortal.getLastCredentials().is5GHz)
   {
     Log_info("Fetching /api/display via modem (5 GHz path)");
-    String reqHeaders = "";
-    reqHeaders += "ID: "               + apiDisplayInputs.macAddress                + "\n";
-    reqHeaders += "Access-Token: "     + apiDisplayInputs.apiKey                    + "\n";
-    reqHeaders += "Refresh-Rate: "     + String(apiDisplayInputs.refreshRate)       + "\n";
-    reqHeaders += "Battery-Voltage: " + String(apiDisplayInputs.batteryVoltage, 2) + "\n";
-    reqHeaders += "Battery-Count: "   + String(apiDisplayInputs.batteryCount)     + "\n";
-    reqHeaders += "Battery-Charging: " + String(apiDisplayInputs.batteryCharging) + "\n";
-    reqHeaders += "USB-Connected: "    + String(check_usb_power() ? "true\n" : "false\n");
-    reqHeaders += "Percent-Charged: " + String(apiDisplayInputs.stateOfCharge) + "\n";
-    reqHeaders += "Battery-Health: "  + String(apiDisplayInputs.stateOfHealth) + "\n";
-    reqHeaders += "Battery-Current: " + String(apiDisplayInputs.batteryCurrent) + "\n";
-    reqHeaders += "Battery-Temp: "    + String(apiDisplayInputs.batteryTemperature) + "\n";
-    reqHeaders += "Battery-Capacity: " + String(apiDisplayInputs.currentBatteryCapacity) + "/" + String(apiDisplayInputs.maxBatteryCapacity) + "\n";
-    reqHeaders += "FW-Version: "       + apiDisplayInputs.firmwareVersion           + "\n";
-    reqHeaders += "Model: "            + apiDisplayInputs.model                     + "\n";
-    reqHeaders += "Image-Cached: "     + String(bUsedCachedImage ? "true" : "false") + "\n";
-    reqHeaders += "Wake-Time: "        + String(iPrevWakeTime) + "\n";
-    reqHeaders += "RSSI: "             + String(apiDisplayInputs.rssi)              + "\n";
-    reqHeaders += "Width: "            + String(apiDisplayInputs.displayWidth)      + "\n";
-    reqHeaders += "Height: "           + String(apiDisplayInputs.displayHeight);
-    if (apiDisplayInputs.specialFunction != SF_NONE)
-      reqHeaders += "\nspecial_function: true";
+    String reqHeaders = formatHeaders(buildDisplayHeaders(apiDisplayInputs));
 
     auto httpRes = g_modem->httpGet(apiDisplayInputs.baseUrl + "/api/display", "", 0, reqHeaders);
     if (!httpRes.ok)
@@ -1681,7 +1670,7 @@ static https_request_err_e downloadAndShow()
       if (apiDisplayResult.error != HTTPS_UNABLE_TO_CONNECT &&
           apiDisplayResult.error != HTTPS_RESPONSE_CODE_INVALID)
         break;
-      Log_error("Connection attempt %d/5 failed: %s", attempt, apiDisplayResult.error_detail.c_str());
+      Log_error_serial("Connection attempt %d/5 failed: %s", attempt, apiDisplayResult.error_detail.c_str());
       if (attempt < 5) delay(2000);
     }
   }
@@ -2764,10 +2753,7 @@ static bool performApiSetup()
   if (g_modem && WifiCaptivePortal.getLastCredentials().is5GHz)
   {
     Log_info("API setup via modem (5 GHz path)");
-    String reqHeaders = "";
-    reqHeaders += "ID: "         + inputs.macAddress      + "\n";
-    reqHeaders += "FW-Version: " + inputs.firmwareVersion + "\n";
-    reqHeaders += "Model: "      + inputs.model           + "\n";
+    String reqHeaders = formatHeaders(buildSetupHeaders(inputs));
     auto httpRes = g_modem->httpGet(inputs.baseUrl + "/api/setup", "", 0, reqHeaders);
     if (!httpRes.ok)
     {
@@ -3275,9 +3261,10 @@ void goToSleep(void)
 #if CONFIG_IDF_TARGET_ESP32
   #define BUTTON_PIN_BITMASK(GPIO) (1ULL << GPIO)  // 2 ^ GPIO_NUMBER in hex
   esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK(PIN_INTERRUPT), ESP_EXT1_WAKEUP_ALL_LOW);
-#elif CONFIG_IDF_TARGET_ESP32C3
+#elif defined(CONFIG_IDF_TARGET_ESP32C3) || defined (CONFIG_IDF_TARGET_ESP32C5)
+  pinMode(PIN_INTERRUPT, INPUT); // needed to not immediately wake up
   esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
-#elif CONFIG_IDF_TARGET_ESP32S3
+#elif defined(CONFIG_IDF_TARGET_ESP32S3)
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
@@ -3301,7 +3288,7 @@ static void goToSleepButtonOnly(void)
 #if CONFIG_IDF_TARGET_ESP32
   #define BUTTON_PIN_BITMASK_BTN(GPIO) (1ULL << GPIO)
   esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK_BTN(PIN_INTERRUPT), ESP_EXT1_WAKEUP_ALL_LOW);
-#elif CONFIG_IDF_TARGET_ESP32C3
+#elif defined( CONFIG_IDF_TARGET_ESP32C3 ) || defined ( CONFIG_IDF_TARGET_ESP32C5 )
   esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
 #elif CONFIG_IDF_TARGET_ESP32S3
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
@@ -3420,8 +3407,18 @@ static bool setClock()
   }
 #endif
 
-  configTime(0, 0, ntp.c_str(), "time.cloudflare.com");
-  
+  configTime(0, 0, ntp.c_str(), "pool.ntp.org"); //"time.cloudflare.com");
+
+#ifdef BOARD_TRMNL_GEN2
+  // This seems to be necessary only on the ESP32-C5, otherwise NTP will fail 100% of the time
+  // Wait until a valid time is received from the NTP server
+  // 1577836800 is the Unix time for Jan 1, 2020
+  time_t now = 0;
+  while (time(&now) < 1577836800) {
+    vTaskDelay(50);
+  }
+#endif
+
   for (int i = 0; i < SNTP_MAX_SERVERS; i++)
   {
     const char *srv = esp_sntp_getservername(i);

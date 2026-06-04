@@ -21,6 +21,14 @@ struct ApiSetupResponse
   String message;
 };
 
+struct ApiSetupInputs
+{
+  String baseUrl;
+  String macAddress;
+  String firmwareVersion;
+  String model;
+};
+
 enum class ApiDisplayOutcome
 {
   Ok,
@@ -68,9 +76,20 @@ struct ApiDisplayInputs
   String firmwareVersion;
   String model;
   int rssi;
+  String wifiBand;
+  String wifiSSID;
   int displayWidth;
   int displayHeight;
   SPECIAL_FUNCTION specialFunction;
+  bool usbConnected;
+  bool imageCached;
+  int prevWakeTime;
+};
+
+struct ApiLogInputs
+{
+  String macAddress;
+  String apiKey;
 };
 
 typedef struct
