@@ -1666,7 +1666,7 @@ static https_request_err_e downloadAndShow()
       if (apiDisplayResult.error != HTTPS_UNABLE_TO_CONNECT &&
           apiDisplayResult.error != HTTPS_RESPONSE_CODE_INVALID)
         break;
-      Log_error("Connection attempt %d/5 failed: %s", attempt, apiDisplayResult.error_detail.c_str());
+      Log_error_serial("Connection attempt %d/5 failed: %s", attempt, apiDisplayResult.error_detail.c_str());
       if (attempt < 5) delay(2000);
     }
   }
