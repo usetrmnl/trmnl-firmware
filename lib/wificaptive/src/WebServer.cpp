@@ -1,8 +1,8 @@
 #include "WebServer.h"
 #include <WiFi.h>
 #include <test.h>
-
-
+#include <trmnl_log.h>
+#include <Preferences.h> 
 
 void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperationCallbacks callbacks, const String& modemMac)
 {
@@ -101,7 +101,8 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
 			json+= "\"rssi\":\""+rssi+"\",";
 			json+= "\"open\":"+String(network.open == WIFI_AUTH_OPEN ? "true,": "false,");
 			json+= "\"saved\":"+String(network.saved ? "true,": "false,"  );
-			json+= "\"band\":\""+String(network.is5GHz ? "5GHz" : "2.4GHz")+"\"";
+			json+= "\"band\":\""+String(network.is5GHz ? "5GHz" : "2.4GHz")+"\",";
+			json+= "\"enterprise\":"+String(network.enterprise ? "true": "false");
 			json+= "}";
 
 			size += 1;
@@ -142,7 +143,43 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
 		String ssid = data["ssid"];
 		String pswd = data["pswd"];
         String api_server = data["server"];
-        callbacks.setConnectionCredentials({ssid, pswd}, api_server);
+        bool isEnterprise = data["isEnterprise"].is<bool>() && data["isEnterprise"].as<bool>();
+        String username = data["username"].is<String>() ? data["username"].as<String>() : "";
+        String identity = data["identity"].is<String>() ? data["identity"].as<String>() : "";
+
+        // Static IP fields (optional)
+        bool useStaticIP = data["useStaticIP"].is<bool>() && data["useStaticIP"].as<bool>();
+        String staticIP = data["staticIP"].is<String>() ? data["staticIP"].as<String>() : "";
+        String gateway = data["gateway"].is<String>() ? data["gateway"].as<String>() : "";
+        String subnet = data["subnet"].is<String>() ? data["subnet"].as<String>() : "";
+        String dns1 = data["dns1"].is<String>() ? data["dns1"].as<String>() : "";
+        String dns2 = data["dns2"].is<String>() ? data["dns2"].as<String>() : "";
+        WifiCredentials credentials;
+        credentials.ssid = ssid;
+        credentials.pswd = pswd;
+        credentials.isEnterprise = isEnterprise;
+        credentials.username = username;
+        credentials.identity = identity;
+        // Static IP settings
+        credentials.useStaticIP = useStaticIP;
+        credentials.staticIP = staticIP;
+        credentials.gateway = gateway;
+        credentials.subnet = subnet;
+        credentials.dns1 = dns1;
+        credentials.dns2 = dns2;
+
+        String ntpServer = data["ntpServer1"].is<String>() ? data["ntpServer1"].as<String>() : "";
+        if (ntpServer.length() > 0) {
+            Preferences prefs;
+            prefs.begin("data", false);
+            prefs.putString("ntp_server", ntpServer);
+            prefs.end();
+            Log_info("WebServer: Saved NTP server: %s", ntpServer.c_str());
+        }
+
+        Log_info("WebServer: Received SSID: %s, Static IP: %s", ssid.c_str(), useStaticIP ? "yes" : "no");
+
+        callbacks.setConnectionCredentials(credentials, api_server);
         String mac = WiFi.macAddress();
         String message = "{\"ssid\":\"" + ssid + "\",\"mac\":\"" + mac + "\"";
 #ifdef BOARD_TRMNL_X

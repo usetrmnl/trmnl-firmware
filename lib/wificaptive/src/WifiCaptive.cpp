@@ -75,7 +75,8 @@ bool WifiCaptive::startPortal()
         {
             _ssid = credentials.ssid;
             _password = credentials.pswd;
-            _api_server = api_server; },
+            _api_server = api_server;
+            _enterprise_credentials = credentials; },
         .getAnnotatedNetworks = [this](bool runScan)
         {
             if (!_networks.empty())
@@ -139,7 +140,18 @@ bool WifiCaptive::startPortal()
         }
         else
         {
-            WifiCredentials credentials = {_ssid, _password};
+            // use enterprise credentials if available, otherwise use basic credentials
+            // Always start with _enterprise_credentials to preserve static IP settings
+            WifiCredentials credentials = _enterprise_credentials;
+            if (!credentials.isEnterprise)
+            {
+                // For non-enterprise, ensure basic fields are set
+                credentials.ssid = _ssid;
+                credentials.pswd = _password;
+            }
+            Log_info("Connecting with static IP: %s, IP: %s",
+                     credentials.useStaticIP ? "yes" : "no",
+                     credentials.staticIP.c_str());
 
             // Detect 5 GHz from the external network list
             bool is5GHz = false;
@@ -169,6 +181,7 @@ bool WifiCaptive::startPortal()
             {
                 _ssid = "";
                 _password = "";
+                _enterprise_credentials = WifiCredentials{};
 
                 WiFi.disconnect();
                 WiFi.enableSTA(false);
@@ -189,8 +202,18 @@ bool WifiCaptive::startPortal()
         {
             Log_info("Not connected after AP disconnect");
             WiFi.mode(WIFI_STA);
-
-            auto result = initiateConnectionAndWaitForOutcome({_ssid, _password});
+            // Always start with _enterprise_credentials to preserve static IP settings
+            WifiCredentials credentials = _enterprise_credentials;
+            if (!credentials.isEnterprise)
+            {
+                // For non-enterprise, ensure basic fields are set
+                credentials.ssid = _ssid;
+                credentials.pswd = _password;
+            }
+            Log_info("Reconnecting with static IP: %s, IP: %s",
+                 credentials.useStaticIP ? "yes" : "no",
+                 credentials.staticIP.c_str());
+            auto result = initiateConnectionAndWaitForOutcome(credentials);
             status = result.status;
         }
     }
@@ -227,6 +250,8 @@ bool WifiCaptive::startPortal()
 
 void WifiCaptive::resetSettings()
 {
+    Log_info("Resetting WiFi settings");
+
     Preferences preferences;
     preferences.begin("wificaptive", false);
     preferences.remove("api_url");
@@ -236,13 +261,26 @@ void WifiCaptive::resetSettings()
         preferences.remove(WIFI_SSID_KEY(i));
         preferences.remove(WIFI_PSWD_KEY(i));
         preferences.remove(WIFI_5GHZ_KEY(i));
+        preferences.remove(WIFI_ENT_KEY(i));
+        preferences.remove(WIFI_USERNAME_KEY(i));
+        preferences.remove(WIFI_IDENTITY_KEY(i));
+        // Remove static IP settings
+        preferences.remove(WIFI_USE_STATIC_KEY(i));
+        preferences.remove(WIFI_STATIC_IP_KEY(i));
+        preferences.remove(WIFI_STATIC_GW_KEY(i));
+        preferences.remove(WIFI_STATIC_SN_KEY(i));
+        preferences.remove(WIFI_STATIC_DNS1_KEY(i));
+        preferences.remove(WIFI_STATIC_DNS2_KEY(i));
     }
     preferences.end();
 
     for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
     {
-        _savedWifis[i] = {"", "", false};
+        _savedWifis[i] = WifiCredentials{};
     }
+
+    // Clean up any WPA2 Enterprise state
+    disableWpa2Enterprise();
 
     WiFi.disconnect(true, true);
     WiFi.eraseAP();
@@ -289,6 +327,16 @@ void WifiCaptive::readWifiCredentials()
         _savedWifis[i].ssid   = preferences.getString(WIFI_SSID_KEY(i), "");
         _savedWifis[i].pswd   = preferences.getString(WIFI_PSWD_KEY(i), "");
         _savedWifis[i].is5GHz = preferences.getBool(WIFI_5GHZ_KEY(i), false);
+        _savedWifis[i].isEnterprise = preferences.getBool(WIFI_ENT_KEY(i), false);
+        _savedWifis[i].username = preferences.getString(WIFI_USERNAME_KEY(i), "");
+        _savedWifis[i].identity = preferences.getString(WIFI_IDENTITY_KEY(i), "");
+        // Load static IP settings
+        _savedWifis[i].useStaticIP = preferences.getBool(WIFI_USE_STATIC_KEY(i), false);
+        _savedWifis[i].staticIP = preferences.getString(WIFI_STATIC_IP_KEY(i), "");
+        _savedWifis[i].gateway = preferences.getString(WIFI_STATIC_GW_KEY(i), "");
+        _savedWifis[i].subnet = preferences.getString(WIFI_STATIC_SN_KEY(i), "");
+        _savedWifis[i].dns1 = preferences.getString(WIFI_STATIC_DNS1_KEY(i), "");
+        _savedWifis[i].dns2 = preferences.getString(WIFI_STATIC_DNS2_KEY(i), "");
     }
 
     int idx = preferences.getInt(WIFI_LAST_INDEX, 0);
@@ -301,14 +349,31 @@ void WifiCaptive::readWifiCredentials()
 
 void WifiCaptive::saveWifiCredentials(const WifiCredentials credentials)
 {
-    Log_info("Saving wifi credentials: %s", credentials.ssid.c_str());
+    Log_info("Saving wifi credentials: %s (Enterprise: %s)", credentials.ssid.c_str(), credentials.isEnterprise ? "yes" : "no");
 
     // Check if the credentials already exist
     for (u16_t i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
     {
-        if (_savedWifis[i].ssid == credentials.ssid && _savedWifis[i].pswd == credentials.pswd)
+        // For regular networks, check SSID and password
+        if (!credentials.isEnterprise && !_savedWifis[i].isEnterprise)
         {
-            return; // Avoid saving duplicate networks
+            if (_savedWifis[i].ssid == credentials.ssid && _savedWifis[i].pswd == credentials.pswd)
+            {
+                Log_info("Duplicate regular network found, not saving");
+                return; // Avoid saving duplicate networks
+            }
+        }
+        // For enterprise networks, check SSID, username, identity, and password
+        else if (credentials.isEnterprise && _savedWifis[i].isEnterprise)
+        {
+            if (_savedWifis[i].ssid == credentials.ssid &&
+                _savedWifis[i].username == credentials.username &&
+                _savedWifis[i].identity == credentials.identity &&
+                _savedWifis[i].pswd == credentials.pswd)
+            {
+                Log_info("Duplicate enterprise network found, not saving");
+                return; // Avoid saving duplicate networks
+            }
         }
     }
 
@@ -326,6 +391,16 @@ void WifiCaptive::saveWifiCredentials(const WifiCredentials credentials)
         preferences.putString(WIFI_SSID_KEY(i), _savedWifis[i].ssid);
         preferences.putString(WIFI_PSWD_KEY(i), _savedWifis[i].pswd);
         preferences.putBool(WIFI_5GHZ_KEY(i), _savedWifis[i].is5GHz);
+        preferences.putBool(WIFI_ENT_KEY(i), _savedWifis[i].isEnterprise);
+        preferences.putString(WIFI_USERNAME_KEY(i), _savedWifis[i].username);
+        preferences.putString(WIFI_IDENTITY_KEY(i), _savedWifis[i].identity);
+        // Save static IP settings
+        preferences.putBool(WIFI_USE_STATIC_KEY(i), _savedWifis[i].useStaticIP);
+        preferences.putString(WIFI_STATIC_IP_KEY(i), _savedWifis[i].staticIP);
+        preferences.putString(WIFI_STATIC_GW_KEY(i), _savedWifis[i].gateway);
+        preferences.putString(WIFI_STATIC_SN_KEY(i), _savedWifis[i].subnet);
+        preferences.putString(WIFI_STATIC_DNS1_KEY(i), _savedWifis[i].dns1);
+        preferences.putString(WIFI_STATIC_DNS2_KEY(i), _savedWifis[i].dns2);
     }
     preferences.putInt(WIFI_LAST_INDEX, 0);
     preferences.end();
@@ -398,7 +473,6 @@ std::vector<WifiNetwork> WifiCaptive::getScannedUniqueNetworks(bool runScan)
     {
 #ifdef CONFIG_IDF_TARGET_ESP32C5
     // Enable 5GHz network scan
-       // WiFi.setBandMode(WIFI_BAND_MODE_AUTO);
        Log_info("About to set 2.4+5GHz mode");
        esp_wifi_set_band_mode(WIFI_BAND_MODE_AUTO);
        Log_info("after set 5GHz mode");
@@ -456,8 +530,11 @@ std::vector<WifiNetwork> WifiCaptive::getScannedUniqueNetworks(bool runScan)
         {
             String ssid = WiFi.SSID(i);
             int32_t rssi = WiFi.RSSI(i);
+            wifi_auth_mode_t encType = WiFi.encryptionType(i);
             bool bIs5GHz = (WiFi.channel(i) >= 36);
             bool open = WiFi.encryptionType(i);
+            bool enterprise = (encType == WIFI_AUTH_WPA2_ENTERPRISE);
+
             bool found = false;
             for (auto &network : uniqueWifiNetworks)
             {
@@ -474,7 +551,7 @@ std::vector<WifiNetwork> WifiCaptive::getScannedUniqueNetworks(bool runScan)
             }
             if (!found)
             {
-                uniqueWifiNetworks.push_back({ssid, rssi, open, false, bIs5GHz});
+                uniqueWifiNetworks.push_back({ssid, rssi, open, false, bIs5GHz, enterprise});
             }
         }
     }
@@ -523,14 +600,14 @@ std::vector<WifiNetwork> WifiCaptive::combineNetworks(
         {
             if (network.ssid == savedWifis[i].ssid)
             {
-                combinedWifiNetworks.push_back({network.ssid, network.rssi, network.open, true, network.is5GHz});
+                combinedWifiNetworks.push_back({network.ssid, network.rssi, network.open, true, network.is5GHz, network.enterprise});
                 found = true;
                 break;
             }
         }
         if (!found)
         {
-            combinedWifiNetworks.push_back({network.ssid, network.rssi, network.open, false, network.is5GHz});
+            combinedWifiNetworks.push_back({network.ssid, network.rssi, network.open, false, network.is5GHz, network.enterprise});
         }
     }
     // add saved wifis that are not combinedWifiNetworks
@@ -547,7 +624,7 @@ std::vector<WifiNetwork> WifiCaptive::combineNetworks(
         }
         if (!found && savedWifis[i].ssid != "")
         {
-            combinedWifiNetworks.push_back({savedWifis[i].ssid, -200, false, true, savedWifis[i].is5GHz});
+            combinedWifiNetworks.push_back({savedWifis[i].ssid, -200, false, true, savedWifis[i].is5GHz, savedWifis[i].isEnterprise});
         }
     }
 
@@ -615,7 +692,11 @@ bool WifiCaptive::tryConnectWithRetries(const WifiCredentials creds, int last_us
 {
     for (int attempt = 0; attempt < WIFI_CONNECTION_ATTEMPTS; attempt++)
     {
-        Log_info("Attempt %d to connect to %s", attempt + 1, creds.ssid.c_str());
+        Log_info("Attempt %d to connect to %s (Enterprise: %s, Static IP: %s, IP: %s)",
+                 attempt + 1, creds.ssid.c_str(),
+                 creds.isEnterprise ? "yes" : "no",
+                 creds.useStaticIP ? "yes" : "no",
+                 creds.staticIP.c_str());
         connect(creds);
         if (WiFi.status() == WL_CONNECTED)
         {
@@ -627,6 +708,14 @@ bool WifiCaptive::tryConnectWithRetries(const WifiCredentials creds, int last_us
             return true;
         }
         WiFi.disconnect();
+
+        // If this was an enterprise connection, clean up WPA2 Enterprise state
+        if (creds.isEnterprise)
+        {
+            Log_info("Cleaning up WPA2 Enterprise state after failed attempt");
+            disableWpa2Enterprise();
+        }
+
         if (attempt < WIFI_CONNECTION_ATTEMPTS - 1)
         {
             uint32_t backoff_delay = 2000 * (1 << attempt);
