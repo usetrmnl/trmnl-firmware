@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <bl.h>
+#include <wifi_network.h>
 #include <device_id.h>
 #include <trmnl_log.h>
 #include <types.h>
@@ -830,6 +831,7 @@ void bl_init(void)
   bool gpio_wakeup = (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO ||
                       wakeup_reason == ESP_SLEEP_WAKEUP_EXT0 ||
                       wakeup_reason == ESP_SLEEP_WAKEUP_EXT1);
+  Log.info("%s [%d]: Wake reason: %d\r\n", __FILE__, __LINE__, (int)wakeup_reason);
 
   Log_info("preferences start");
   bool res = preferences.begin("data", false);
@@ -1578,9 +1580,10 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   }
 
   inputs.macAddress = device_mac_address();
-  inputs.rssi = WiFi.RSSI(); // may be overridden below
-  inputs.wifiBand = "2.4"; // may be overridden below
-  inputs.wifiSSID = WifiCaptivePortal.getLastCredentials().ssid;
+  WiFiStatus wifi = getWiFiStatus();
+  inputs.rssi = wifi.rssi;
+  inputs.wifiBand = wifi.band;
+  inputs.wifiSSID = wifi.ssid;
   inputs.batteryVoltage = vBatt; //readBatteryVoltage();
   inputs.firmwareVersion = String(FW_VERSION_STRING);
   inputs.displayWidth = display_width();
@@ -1589,7 +1592,8 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   inputs.specialFunction = special_function;
   inputs.imageCached = bUsedCachedImage;
   inputs.prevWakeTime = iPrevWakeTime;
-
+  inputs.usbConnected = false;
+  
 #ifdef BOARD_TRMNL_X
   inputs.usbConnected = check_usb_power();
   inputs.batteryCount = battery_count;
@@ -1610,15 +1614,6 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
     inputs.currentBatteryCapacity = -1;
     inputs.maxBatteryCapacity = -1;
   }
-
-  // On the 5 GHz path the ESP32-C5 modem owns the Wi-Fi link, so the host's
-  // WiFi.RSSI() reads 0; query the modem for the real signal strength.
-  if (g_modem && WifiCaptivePortal.getLastCredentials().is5GHz) {
-    inputs.rssi = g_modem->getSignalRssi();
-    inputs.wifiBand = "5";
-  }
-#else
-  inputs.usbConnected = false;
 #endif // BOARD_TRMNL_X
 
   return inputs;
@@ -3264,9 +3259,10 @@ void goToSleep(void)
 #if CONFIG_IDF_TARGET_ESP32
   #define BUTTON_PIN_BITMASK(GPIO) (1ULL << GPIO)  // 2 ^ GPIO_NUMBER in hex
   esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK(PIN_INTERRUPT), ESP_EXT1_WAKEUP_ALL_LOW);
-#elif CONFIG_IDF_TARGET_ESP32C3
+#elif defined(CONFIG_IDF_TARGET_ESP32C3) || defined (CONFIG_IDF_TARGET_ESP32C5)
+  pinMode(PIN_INTERRUPT, INPUT); // needed to not immediately wake up
   esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
-#elif CONFIG_IDF_TARGET_ESP32S3
+#elif defined(CONFIG_IDF_TARGET_ESP32S3)
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
@@ -3290,7 +3286,7 @@ static void goToSleepButtonOnly(void)
 #if CONFIG_IDF_TARGET_ESP32
   #define BUTTON_PIN_BITMASK_BTN(GPIO) (1ULL << GPIO)
   esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK_BTN(PIN_INTERRUPT), ESP_EXT1_WAKEUP_ALL_LOW);
-#elif CONFIG_IDF_TARGET_ESP32C3
+#elif defined( CONFIG_IDF_TARGET_ESP32C3 ) || defined ( CONFIG_IDF_TARGET_ESP32C5 )
   esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
 #elif CONFIG_IDF_TARGET_ESP32S3
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
@@ -3409,8 +3405,18 @@ static bool setClock()
   }
 #endif
 
-  configTime(0, 0, ntp.c_str(), "time.cloudflare.com");
-  
+  configTime(0, 0, ntp.c_str(), "pool.ntp.org"); //"time.cloudflare.com");
+
+#ifdef BOARD_TRMNL_GEN2
+  // This seems to be necessary only on the ESP32-C5, otherwise NTP will fail 100% of the time
+  // Wait until a valid time is received from the NTP server
+  // 1577836800 is the Unix time for Jan 1, 2020
+  time_t now = 0;
+  while (time(&now) < 1577836800) {
+    vTaskDelay(50);
+  }
+#endif
+
   for (int i = 0; i < SNTP_MAX_SERVERS; i++)
   {
     const char *srv = esp_sntp_getservername(i);

@@ -4,6 +4,7 @@
 #include "button.h"
 
 static unsigned long wait_for_button_release(unsigned long start_time) {
+  pinMode(PIN_INTERRUPT, INPUT);
   while (digitalRead(PIN_INTERRUPT) == LOW && millis() - start_time < BUTTON_SOFT_RESET_TIME) {
     delay(10);
   }
