@@ -1259,8 +1259,10 @@ void bl_init(void)
       String ip = String(WiFi.localIP());
       Log.info("%s [%d]:wifi_connection [DEBUG]: Connected: %s\r\n", __FILE__, __LINE__, ip.c_str());
       preferences.putInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT, 1);
+#ifdef BOARD_TRMNL_X
       conn_mgr_mark_ready(CONNECTION_INTERFACE_WIFI);
       conn_mgr_update_default_route();
+#endif
     }
     else
     {
@@ -1335,7 +1337,9 @@ void bl_init(void)
     if (!res)
     {
       WiFi.disconnect(true);
+#ifdef BOARD_TRMNL_X
       conn_mgr_mark_lost(CONNECTION_INTERFACE_WIFI);
+#endif
 
       showMessageWithLogo(WIFI_FAILED);
 
@@ -1350,7 +1354,9 @@ void bl_init(void)
 
 #endif
 
-  } // end WiFi fallback block
+#ifdef BOARD_TRMNL_X
+  } // end WiFi fallback block (closes the `if (!conn_mgr_is_eth())` opened above)
+#endif
 
   // clock synchronization
   if (setClock())
@@ -1481,7 +1487,11 @@ void bl_init(void)
   {
   case HTTPS_REQUEST_FAILED:
   {
+    #ifdef BOARD_TRMNL_X
     if (conn_mgr_is_eth() || WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+#else
+    if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+#endif
     {
       showMessageWithLogo(API_REQUEST_FAILED);
     }
@@ -1498,7 +1508,11 @@ void bl_init(void)
   break;
   case HTTPS_UNABLE_TO_CONNECT:
   {
+    #ifdef BOARD_TRMNL_X
     if (conn_mgr_is_eth() || WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+#else
+    if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+#endif
     {
       showMessageWithLogo(API_UNABLE_TO_CONNECT);
     }
@@ -1515,7 +1529,11 @@ void bl_init(void)
   break;
   case HTTPS_WRONG_IMAGE_SIZE:
   {
+    #ifdef BOARD_TRMNL_X
     if (conn_mgr_is_eth() || WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+#else
+    if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+#endif
     {
       showMessageWithLogo(API_SIZE_ERROR);
     }
@@ -1646,7 +1664,11 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
 
   inputs.firmwareVersion = String(FW_VERSION_STRING);
 
+#ifdef BOARD_TRMNL_X
   inputs.rssi = conn_mgr_is_eth() ? 0 : WiFi.RSSI();
+#else
+  inputs.rssi = WiFi.RSSI();
+#endif
   inputs.displayWidth = display_width();
   inputs.displayHeight = display_height();
   inputs.model = DEVICE_MODEL;
@@ -1860,7 +1882,11 @@ static https_request_err_e downloadAndShow()
           const char *headers[] = {"Content-Type"};
           https.collectHeaders(headers, 1);
           Log_info("GET...");
+#ifdef BOARD_TRMNL_X
           if (conn_mgr_is_eth()) { Log_info("RSSI: N/A (ethernet)"); } else { Log_info("RSSI: %d", WiFi.RSSI()); }
+#else
+          Log_info("RSSI: %d", WiFi.RSSI());
+#endif
           // start connection and send HTTP header
           int httpCode = https.GET();
           int content_size = https.getSize();
@@ -1902,7 +1928,11 @@ static https_request_err_e downloadAndShow()
 
           // HTTP header has been send and Server response header has been handled
           Log.error("%s [%d]: [HTTPS] GET... code: %d\r\n", __FILE__, __LINE__, httpCode);
+#ifdef BOARD_TRMNL_X
           if (conn_mgr_is_eth()) { Log.info("%s [%d]: RSSI: N/A (ethernet)\r\n", __FILE__, __LINE__); } else { Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI()); }
+#else
+          Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
+#endif
           // file found at server
           if (httpCode != HTTP_CODE_OK && httpCode != HTTP_CODE_MOVED_PERMANENTLY)
           {
@@ -1989,10 +2019,14 @@ static https_request_err_e downloadAndShow()
 
           submitStoredLogs();
 
+#ifdef BOARD_TRMNL_X
           if (conn_mgr_is_wifi()) {
             WiFi.disconnect(true); // no need for WiFi, save power starting here
             conn_mgr_mark_lost(CONNECTION_INTERFACE_WIFI);
           }
+#else
+          WiFi.disconnect(true);
+#endif
           Log.info("%s [%d]: Received successfully; network done\r\n", __FILE__, __LINE__);
 
           bool image_reverse = false;
@@ -2831,7 +2865,11 @@ static bool performApiSetup()
   // Handle HTTP request errors
   if (result.error != HTTPS_NO_ERR)
   {
+    #ifdef BOARD_TRMNL_X
     if (conn_mgr_is_eth() || WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+#else
+    if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+#endif
     {
       showMessageWithLogo(API_SETUP_FAILED);
     }
@@ -2926,7 +2964,11 @@ static void downloadSetupImage()
            {
     if (error != HttpError::HTTPCLIENT_SUCCESS)
     {
-      if (conn_mgr_is_eth() || WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+      #ifdef BOARD_TRMNL_X
+    if (conn_mgr_is_eth() || WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+#else
+    if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+#endif
       {
         showMessageWithLogo(API_IMAGE_DOWNLOAD_ERROR);
       }
@@ -2958,7 +3000,11 @@ static void downloadSetupImage()
     // httpCode will be negative on error
     if (httpCode <= 0)
     {
-      if (conn_mgr_is_eth() || WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+      #ifdef BOARD_TRMNL_X
+    if (conn_mgr_is_eth() || WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+#else
+    if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+#endif
       {
         showMessageWithLogo(API_IMAGE_DOWNLOAD_ERROR);
       }
@@ -2976,7 +3022,11 @@ static void downloadSetupImage()
     // file found at server
     if (httpCode != HTTP_CODE_OK && httpCode != HTTP_CODE_MOVED_PERMANENTLY)
     {
-      if (conn_mgr_is_eth() || WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+      #ifdef BOARD_TRMNL_X
+    if (conn_mgr_is_eth() || WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+#else
+    if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+#endif
       {
         showMessageWithLogo(API_IMAGE_DOWNLOAD_ERROR);
       }
@@ -3068,7 +3118,11 @@ static void downloadSetupImage()
         free(buffer);
         buffer = nullptr;
       }
-      if (conn_mgr_is_eth() || WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+      #ifdef BOARD_TRMNL_X
+    if (conn_mgr_is_eth() || WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+#else
+    if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+#endif
       {
         showMessageWithLogo(API_SIZE_ERROR);
       }
@@ -3193,7 +3247,11 @@ static bool checkAndPerformFirmwareUpdate(void)
              if (errorCode != HttpError::HTTPCLIENT_SUCCESS || !https)
              {
                Log.fatal("%s [%d]: Unable to connect for firmware update\r\n", __FILE__, __LINE__);
-               if (conn_mgr_is_eth() || WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+               #ifdef BOARD_TRMNL_X
+    if (conn_mgr_is_eth() || WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+#else
+    if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+#endif
                {
                  showMessageWithLogo(API_FIRMWARE_UPDATE_ERROR);
                }
@@ -3581,11 +3639,13 @@ uint32_t getTime(void)
 
 static void submitStoredLogs(void)
 {
+#ifdef BOARD_TRMNL_X
   if (!conn_mgr_is_ready())
   {
     Log_info("Network not connected; not submitting stored logs.");
     return;
   }
+#endif
   String log = storedLogs.gather_stored_logs();
 
   String api_key = "";
@@ -3808,6 +3868,7 @@ DeviceStatusStamp getDeviceStatusStamp()
 {
   DeviceStatusStamp deviceStatus = {};
 
+#ifdef BOARD_TRMNL_X
   if (conn_mgr_is_eth()) {
     deviceStatus.wifi_rssi_level = 0;
     strncpy(deviceStatus.wifi_status, "ethernet", sizeof(deviceStatus.wifi_status) - 1);
@@ -3818,6 +3879,10 @@ DeviceStatusStamp getDeviceStatusStamp()
     deviceStatus.wifi_rssi_level = 0;
     strncpy(deviceStatus.wifi_status, "none", sizeof(deviceStatus.wifi_status) - 1);
   }
+#else
+  deviceStatus.wifi_rssi_level = WiFi.RSSI();
+  strncpy(deviceStatus.wifi_status, wifiStatusStr(WiFi.status()), sizeof(deviceStatus.wifi_status) - 1);
+#endif
   deviceStatus.refresh_rate = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY);
   deviceStatus.time_since_last_sleep = time_since_sleep;
   snprintf(deviceStatus.current_fw_version, sizeof(deviceStatus.current_fw_version), "%s", FW_VERSION_STRING);
