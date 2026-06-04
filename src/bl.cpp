@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <bl.h>
+#include <wifi_network.h>
 #include <device_id.h>
 #include <trmnl_log.h>
 #include <types.h>
@@ -1579,9 +1580,10 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   }
 
   inputs.macAddress = device_mac_address();
-  inputs.rssi = WiFi.RSSI(); // may be overridden below
-  inputs.wifiBand = "2.4"; // may be overridden below
-  inputs.wifiSSID = WifiCaptivePortal.getLastCredentials().ssid;
+  WiFiStatus wifi = getWiFiStatus();
+  inputs.rssi = wifi.rssi;
+  inputs.wifiBand = wifi.band;
+  inputs.wifiSSID = wifi.ssid;
   inputs.batteryVoltage = vBatt; //readBatteryVoltage();
   inputs.firmwareVersion = String(FW_VERSION_STRING);
   inputs.displayWidth = display_width();
@@ -1612,22 +1614,7 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
     inputs.currentBatteryCapacity = -1;
     inputs.maxBatteryCapacity = -1;
   }
-
-  // On the 5 GHz path the ESP32-C5 modem owns the Wi-Fi link, so the host's
-  // WiFi.RSSI() reads 0; query the modem for the real signal strength.
-  if (g_modem && WifiCaptivePortal.getLastCredentials().is5GHz) {
-    inputs.rssi = g_modem->getSignalRssi();
-    inputs.wifiBand = "5";
-  }
 #endif // BOARD_TRMNL_X
-
-#ifdef BOARD_TRMNL_GEN2
-  // The C5 is the host radio and connects natively on either band (no separate
-  // modem), so WiFi.RSSI() above is already correct. Derive the band from the
-  // connected channel: 1–14 are 2.4 GHz, 36+ are 5 GHz (matches the scan logic
-  // in WifiCaptive).
-  inputs.wifiBand = WiFi.channel() >= 36 ? "5" : "2.4";
-#endif
 
   return inputs;
 }
