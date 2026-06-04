@@ -25,6 +25,10 @@ HttpHeaderList buildDisplayHeaders(const ApiDisplayInputs &inputs)
   headers.push_back({"Image-Cached", inputs.imageCached ? "true" : "false"});
   headers.push_back({"Wake-Time", String(inputs.prevWakeTime)});
   headers.push_back({"RSSI", String(inputs.rssi)});
+  if (inputs.wifiBand.length() > 0)
+    headers.push_back({"WiFi-Band", inputs.wifiBand});
+  if (inputs.wifiSSID.length() > 0)
+    headers.push_back({"WiFi-SSID", percentEncode(inputs.wifiSSID)});
   headers.push_back({"Temperature-Profile", "true"});
   headers.push_back({"Width", String(inputs.displayWidth)});
   headers.push_back({"Height", String(inputs.displayHeight)});
@@ -53,6 +57,29 @@ HttpHeaderList buildLogHeaders(const ApiLogInputs &inputs)
   headers.push_back({"Access-Token", inputs.apiKey});
   headers.push_back({"Content-Type", "application/json"});
   return headers;
+}
+
+String percentEncode(const String &value)
+{
+  static const char hex[] = "0123456789ABCDEF";
+  String out;
+  out.reserve(value.length());
+  for (size_t i = 0; i < value.length(); ++i)
+  {
+    unsigned char c = (unsigned char)value[i];
+    if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+        (c >= '0' && c <= '9') || c == '-' || c == '.' || c == '_' || c == '~')
+    {
+      out += (char)c;
+    }
+    else
+    {
+      out += '%';
+      out += hex[c >> 4];
+      out += hex[c & 0x0F];
+    }
+  }
+  return out;
 }
 
 String formatHeaders(const HttpHeaderList &headers)

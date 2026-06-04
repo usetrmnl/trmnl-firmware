@@ -1578,8 +1578,18 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   }
 
   inputs.macAddress = device_mac_address();
-
+  inputs.rssi = WiFi.RSSI(); // may be overridden below
+  inputs.wifiBand = "2.4"; // may be overridden below
+  inputs.wifiSSID = WifiCaptivePortal.getLastCredentials().ssid;
   inputs.batteryVoltage = vBatt; //readBatteryVoltage();
+  inputs.firmwareVersion = String(FW_VERSION_STRING);
+  inputs.displayWidth = display_width();
+  inputs.displayHeight = display_height();
+  inputs.model = DEVICE_MODEL;
+  inputs.specialFunction = special_function;
+  inputs.imageCached = bUsedCachedImage;
+  inputs.prevWakeTime = iPrevWakeTime;
+
 #ifdef BOARD_TRMNL_X
   inputs.usbConnected = check_usb_power();
   inputs.batteryCount = battery_count;
@@ -1600,25 +1610,16 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
     inputs.currentBatteryCapacity = -1;
     inputs.maxBatteryCapacity = -1;
   }
+
+  // On the 5 GHz path the ESP32-C5 modem owns the Wi-Fi link, so the host's
+  // WiFi.RSSI() reads 0; query the modem for the real signal strength.
+  if (g_modem && WifiCaptivePortal.getLastCredentials().is5GHz) {
+    inputs.rssi = g_modem->getSignalRssi();
+    inputs.wifiBand = "5";
+  }
 #else
   inputs.usbConnected = false;
 #endif // BOARD_TRMNL_X
-
-  inputs.firmwareVersion = String(FW_VERSION_STRING);
-
-  inputs.rssi = WiFi.RSSI();
-#ifdef BOARD_TRMNL_X
-  // On the 5 GHz path the ESP32-C5 modem owns the Wi-Fi link, so the host's
-  // WiFi.RSSI() reads 0; query the modem for the real signal strength.
-  if (g_modem && WifiCaptivePortal.getLastCredentials().is5GHz)
-    inputs.rssi = g_modem->getSignalRssi();
-#endif // BOARD_TRMNL_X
-  inputs.displayWidth = display_width();
-  inputs.displayHeight = display_height();
-  inputs.model = DEVICE_MODEL;
-  inputs.specialFunction = special_function;
-  inputs.imageCached = bUsedCachedImage;
-  inputs.prevWakeTime = iPrevWakeTime;
 
   return inputs;
 }
