@@ -1669,8 +1669,8 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
             }
             bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
 #ifdef BOARD_TRMNL_X
-            // Show charging indicator if it's charging
-            if (is_charging()) {
+            // Show charging indicator if the USB power is connected (whether actually charging or not)
+            if (check_usb_power()) {
                 bbep.loadG5Image(battery_small, 40, bbep.height() - 120, BBEP_WHITE, BBEP_BLACK);
             }
 #endif // BOARD_TRMNL_X

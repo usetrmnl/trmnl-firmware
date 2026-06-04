@@ -3,7 +3,7 @@
 
 #define FW_MAJOR_VERSION 1
 #define FW_MINOR_VERSION 8
-#define FW_PATCH_VERSION 3
+#define FW_PATCH_VERSION 5
 
 // Helper macros for stringification
 #define STRINGIFY(x) #x
@@ -32,17 +32,21 @@
 #define PREFERENCES_SF_KEY "sf"
 #define PREFERENCES_FILENAME_KEY "filename"
 #define PREFERENCES_CURRENT_PATH_KEY "curr_path"
-#define PREFERENCES_LAST_PATH_KEY    "last_path"
+#define PREFERENCES_LAST_PATH_KEY "last_path"
+#define PREFERENCES_PLAYLIST_ORDER_KEY "playlist_order"
+#define PREFERENCES_BROWSE_PATH_KEY "browse_path"
+#define MAX_CACHED_IMAGES 30
 #define PREFERENCES_LAST_SLEEP_TIME "last_sleep"
 #define PREFERENCES_CONNECT_API_RETRY_COUNT "retry_count"
 #define PREFERENCES_CONNECT_WIFI_RETRY_COUNT "wifi_retry"
 #define PREFERENCES_TOUCHBAR_MODE_KEY "touchbar_mode"
+#define PREFERENCES_LAST_OTA "last_ota"
 
 #define WIFI_CONNECTION_RSSI (-100)
 
 #define DISPLAY_BMP_IMAGE_SIZE 48062 // in bytes - 62 bytes - header; 48000 bytes - bitmap (480*800 1bpp) / 8
 #define DEFAULT_IMAGE_SIZE 48000
-#if defined( BOARD_TRMNL_X ) || defined (BOARD_TRMNL_X_EPDIY)
+#if defined(BOARD_TRMNL_X) || defined(BOARD_TRMNL_X_EPDIY)
 #define MAX_IMAGE_SIZE 750000 // Use PSRAM on the ESP32-S3
 #else
 #define MAX_IMAGE_SIZE 90000 // largest compressed image we can receive
@@ -58,7 +62,7 @@
 #define TEMP_PROFILE_B 2
 #define TEMP_PROFILE_C 3
 
-#define MS_TO_S_FACTOR 1000                    /* Conversion factor for milliseconds to seconds */
+#define MS_TO_S_FACTOR 1000 /* Conversion factor for milliseconds to seconds */
 
 enum API_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the API (in seconds)
 {
@@ -121,34 +125,34 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #define SENSOR_SCL 42
 #elif defined(BOARD_SEEED_XIAO_ESP32C3)
 #define DEVICE_MODEL "seeed_esp32c3"
-#define PIN_INTERRUPT 9         //the boot button on the XIAO ESP32-C3, this button can't be used as wakeup  source though
-                                //because it's not in the RTC GPIO group. Instead, you can always use the reset button to
-                                //wake up the device. Resetting WiFi configuration needs special routine - press reset button
-                                //then press the boot button in less than 2 seconds, and hold it for 5 seconds.
+#define PIN_INTERRUPT 9 // the boot button on the XIAO ESP32-C3, this button can't be used as wakeup  source though
+                        // because it's not in the RTC GPIO group. Instead, you can always use the reset button to
+                        // wake up the device. Resetting WiFi configuration needs special routine - press reset button
+                        // then press the boot button in less than 2 seconds, and hold it for 5 seconds.
 #define FAKE_BATTERY_VOLTAGE
 #elif defined(BOARD_SEEED_XIAO_ESP32S3)
 #define DEVICE_MODEL "seeed_esp32s3"
-#define PIN_INTERRUPT 0         //the boot button on the XIAO ESP32-S3, this button works as regular wakeup button
+#define PIN_INTERRUPT 0 // the boot button on the XIAO ESP32-S3, this button works as regular wakeup button
 #define FAKE_BATTERY_VOLTAGE
 #elif (defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_XIAO_EPAPER_DISPLAY_3CLR))
 #define DEVICE_MODEL "xiao_epaper_display"
 #ifdef MINI_EPD
-#define PIN_INTERRUPT 2         //with silkscreen "KEY1"
+#define PIN_INTERRUPT 2 // with silkscreen "KEY1"
 #else
-#define PIN_INTERRUPT 5         //with silkscreen "KEY3"
-#endif // !MINI_EPD
-#define PIN_VBAT_SWITCH 6       //load switch enable pin for battery voltage measurement
-#define VBAT_SWITCH_LEVEL HIGH  //load switch enable pin active level
+#define PIN_INTERRUPT 5        // with silkscreen "KEY3"
+#endif                         // !MINI_EPD
+#define PIN_VBAT_SWITCH 6      // load switch enable pin for battery voltage measurement
+#define VBAT_SWITCH_LEVEL HIGH // load switch enable pin active level
 #elif defined(BOARD_SEEED_RETERMINAL_E1001)
 #define DEVICE_MODEL "reTerminal E1001"
-#define PIN_INTERRUPT 3         //the green button
-#define PIN_VBAT_SWITCH 21      //load switch enable pin for battery voltage measurement
-#define VBAT_SWITCH_LEVEL HIGH  //load switch enable pin active level
+#define PIN_INTERRUPT 3        // the green button
+#define PIN_VBAT_SWITCH 21     // load switch enable pin for battery voltage measurement
+#define VBAT_SWITCH_LEVEL HIGH // load switch enable pin active level
 #elif defined(BOARD_SEEED_RETERMINAL_E1002)
 #define DEVICE_MODEL "reTerminal E1002"
-#define PIN_INTERRUPT 3         //the green button
-#define PIN_VBAT_SWITCH 21      //load switch enable pin for battery voltage measurement
-#define VBAT_SWITCH_LEVEL HIGH  //load switch enable pin active level
+#define PIN_INTERRUPT 3        // the green button
+#define PIN_VBAT_SWITCH 21     // load switch enable pin for battery voltage measurement
+#define VBAT_SWITCH_LEVEL HIGH // load switch enable pin active level
 #elif defined(BOARD_SEEED_RETERMINAL_E1003)
 #define PIN_INTERRUPT 3 // green button
 #define PIN_VBAT_SWITCH 40
