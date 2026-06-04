@@ -1,0 +1,99 @@
+name: publish-dev-firmware
+
+on:
+  # Called by build.yml after build-test passes on pushes to main.
+  workflow_call:
+  # TODO: remove this push trigger after merge — it exists only so we can test
+  # dev publishing on the branch before it lands on main (workflow_dispatch is
+  # invisible until the workflow exists on the default branch). On a branch push
+  # this runs standalone, skipping build.yml's build-test gate.
+  push:
+    branches: [add-dev-builds]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { env: trmnl, folder: trmnl_og }
+          - { env: TRMNL_X, folder: trmnl_x }
+          - { env: trmnl_gen2, folder: trmnl_gen2 }
+          - { env: trmnl_4clr, folder: trmnl_bwry }
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio/.cache
+          key: ${{ runner.os }}-pio
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
+
+      - name: Install PlatformIO Core
+        run: pip install --upgrade platformio esptool
+
+      - name: Build dev firmware (${{ matrix.env }})
+        env:
+          INCLUDE_GIT_HASH_IN_VERSION_NUMBER: "true"
+        run: pio run -e ${{ matrix.env }}
+
+      - name: Derive version, commit and filenames
+        run: |
+          MAJOR=$(grep -E '^#define FW_MAJOR_VERSION' include/config.h | awk '{print $3}')
+          MINOR=$(grep -E '^#define FW_MINOR_VERSION' include/config.h | awk '{print $3}')
+          PATCH=$(grep -E '^#define FW_PATCH_VERSION' include/config.h | awk '{print $3}')
+          VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          COMMIT=$(git rev-parse --short HEAD)
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+          echo "COMMIT=${COMMIT}" >> "$GITHUB_ENV"
+          echo "OTA_FILE=FW${VERSION}-${{ matrix.folder }}-ota-${COMMIT}.bin" >> "$GITHUB_ENV"
+          echo "FLASH_FILE=FW${VERSION}-${{ matrix.folder }}-flash-${COMMIT}.bin" >> "$GITHUB_ENV"
+
+      - name: Stage firmware files
+        run: |
+          cp ".pio/build/${{ matrix.env }}/firmware.bin" "${OTA_FILE}"
+          cp ".pio/build/${{ matrix.env }}/merged_firmware.bin" "${FLASH_FILE}"
+
+      - name: Write latest.json
+        run: |
+          BASE_URL="https://trmnl-fw.s3.us-east-2.amazonaws.com/${{ matrix.folder }}/dev"
+          jq -n \
+            --arg version "$VERSION" \
+            --arg commit "$COMMIT" \
+            --arg generated_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg ota_file "$OTA_FILE" \
+            --arg ota_url "${BASE_URL}/${OTA_FILE}" \
+            --argjson ota_size "$(stat -c%s "$OTA_FILE")" \
+            --arg flash_file "$FLASH_FILE" \
+            --arg flash_url "${BASE_URL}/${FLASH_FILE}" \
+            --argjson flash_size "$(stat -c%s "$FLASH_FILE")" \
+            '{
+              version: $version,
+              commit: $commit,
+              generated_at: $generated_at,
+              ota: { file: $ota_file, url: $ota_url, size: $ota_size },
+              flash: { file: $flash_file, url: $flash_url, size: $flash_size }
+            }' > latest.json
+          cat latest.json
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-2
+
+      - name: Upload to S3
+        run: |
+          DEST="s3://trmnl-fw/${{ matrix.folder }}/dev"
+          aws s3 cp "$OTA_FILE" "${DEST}/${OTA_FILE}"
+          aws s3 cp "$FLASH_FILE" "${DEST}/${FLASH_FILE}"
+          aws s3 cp latest.json "${DEST}/latest.json" --content-type application/json --cache-control no-cache
