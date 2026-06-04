@@ -733,9 +733,7 @@ void bl_init(void)
 
   if (digitalRead(PIN_INTERRUPT) == LOW) {
     Log_info("Boot button pressed during startup, resetting WiFi credentials...");
-    if (conn_mgr_is_wifi()) {
-      WifiCaptivePortal.resetSettings();
-    }
+    WifiCaptivePortal.resetSettings();
     Log_info("WiFi credentials reset completed");
   }
 #endif
