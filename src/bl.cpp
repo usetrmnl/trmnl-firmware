@@ -946,7 +946,7 @@ void bl_init(void)
 
 #ifdef BOARD_TRMNL_X
 
-    if (!otg_message && WifiCaptivePortal.isSaved()) {
+    if (!otg_message && (WifiCaptivePortal.isSaved() || preferences.getBool("eth_enabled", false))) {
       display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false);
     }
     else if (!WifiCaptivePortal.isSaved()) {
@@ -1078,15 +1078,15 @@ void bl_init(void)
   ESP_ERROR_CHECK(esp_netif_init());
   ESP_ERROR_CHECK(esp_event_loop_create_default());
   conn_mgr_init();
-  ethernet_start();
-  Log_info("Waiting for Ethernet DHCP");
-  bool network_via_eth = false;
-  for (int _eth_s = 1; _eth_s <= 5; _eth_s++) {
-    network_via_eth = (conn_mgr_wait_any(pdMS_TO_TICKS(1000)) & ETH_READY_BIT) != 0;
-    if (network_via_eth) break;
-    Log_info("No Ethernet yet... (waiting %ds)", _eth_s);
-    if (_eth_s == 5) {
-      Log_info("Ethernet DHCP still not ready after %ds, giving up and trying WiFi", _eth_s);
+  if (preferences.getBool("eth_enabled", false)) {
+    ethernet_start();
+    Log_info("Waiting for Ethernet DHCP");
+    for (int _eth_s = 1; _eth_s <= 5; _eth_s++) {
+      if ((conn_mgr_wait_any(pdMS_TO_TICKS(1000)) & ETH_READY_BIT) != 0) break;
+      Log_info("No Ethernet yet... (waiting %ds)", _eth_s);
+      if (_eth_s == 5) {
+        Log_info("Ethernet DHCP still not ready after %ds, giving up and trying WiFi", _eth_s);
+      }
     }
   }
 
@@ -1186,6 +1186,17 @@ void bl_init(void)
   {
     // WiFi credentials are not saved - start captive portal
     Log.info("%s [%d]: WiFi NOT saved\r\n", __FILE__, __LINE__);
+
+#ifdef BOARD_TRMNL_X
+    if (preferences.getBool("eth_enabled", false)) {
+      if (ethernet_is_link_up()) {
+        showMessageWithLogo(ETH_DHCP_FAILED);
+      } else {
+        showMessageWithLogo(ETH_NOT_DETECTED);
+      }
+      wifiErrorDeepSleep();
+    }
+#endif
 
     Log_info("FW version %s", FW_VERSION_STRING);
 
@@ -3008,9 +3019,7 @@ static void resetDeviceCredentials(void)
 {
   Log.info("%s [%d]: The device will be reset now...\r\n", __FILE__, __LINE__);
   Log.info("%s [%d]: WiFi reseting...\r\n", __FILE__, __LINE__);
-  if (conn_mgr_is_wifi()) {
-    WifiCaptivePortal.resetSettings();
-  }
+  WifiCaptivePortal.resetSettings();
   need_to_refresh_display = 1;
   bool res = preferences.clear();
   if (res)

@@ -54,6 +54,13 @@ static void netif_event_handler(void *arg, esp_event_base_t event_base,
  */
 bool ethernet_get_mac(uint8_t mac[6]);
 
+/**
+ * @brief Query whether the CDC-ECM physical link is up (independent of DHCP).
+ *
+ * @return true if ETHERNET_EVENT_CONNECTED has fired and link is still up.
+ */
+bool ethernet_is_link_up(void);
+
 #ifdef __cplusplus
 }
 #endif

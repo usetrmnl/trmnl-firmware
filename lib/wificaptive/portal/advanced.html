@@ -462,11 +462,51 @@
       displayAlert(ntp ? 'NTP server saved.' : 'Using default NTP (time.google.com).', 'primary');
     }
 
+    function loadEthernetFromStorage() {
+      fetch('/get-ethernet')
+        .then(r => r.json())
+        .then(data => {
+          document.getElementById('useEthernet').checked = data.enabled;
+          localStorage.setItem('useEthernet', data.enabled);
+        })
+        .catch(_ => {
+          document.getElementById('useEthernet').checked = localStorage.getItem('useEthernet') === 'true';
+        });
+    }
+
+    function displayEthernetAlert(message, type) {
+      var box = document.getElementById("ethernet-message");
+      box.style.display = "block";
+      box.textContent = message;
+      box.classList.remove("alert-primary", "alert-warning");
+      box.classList.add("alert-" + type);
+    }
+
+    function restartDevice() {
+      showLoader();
+      fetch('/restart')
+        .catch(_ => {})
+        .finally(() => {
+          hideLoader();
+          displayEthernetAlert('Device is restarting...', 'primary');
+        });
+    }
+
+    function saveEthernet() {
+      const enabled = document.getElementById('useEthernet').checked;
+      localStorage.setItem('useEthernet', enabled);
+      fetch('/set-ethernet?enabled=' + (enabled ? '1' : '0'))
+        .then(r => r.json())
+        .then(_ => displayEthernetAlert(enabled ? 'Ethernet enabled. Reboot to apply.' : 'Ethernet disabled. Reboot to apply.', 'primary'))
+        .catch(_ => displayEthernetAlert('Failed to save Ethernet setting.', 'warning'));
+    }
+
     // Load server value when page loads
     window.onload = function() {
       loadServerFromStorage();
       loadStaticIPFromStorage();
       loadNTPFromStorage();
+      loadEthernetFromStorage();
     };
 
   </script>
@@ -536,6 +576,23 @@
     <div class="form-group">
       <div class="alert alert-primary" id="test-output" role="alert" style="display: none;"></div>
     </div>
+
+    <!-- Ethernet over USB Configuration -->
+    <div style="width: 100%; margin-top: 20px; border-top: 1px solid #ccc; padding-top: 15px;">
+      <h3 style="margin-bottom: 10px;">Ethernet over USB</h3>
+      <div class="form-group">
+        <label style="display: flex; align-items: center; gap: 10px;">
+          <input type="checkbox" id="useEthernet" style="width: auto;">
+          Enable Ethernet over USB
+        </label>
+      </div>
+      <span style="margin-top: 5px;">
+        <button class="button button-primary" onclick="saveEthernet()">Save</button>
+        <button class="button button-secondary" onclick="restartDevice()">Reboot</button>
+      </span>
+      <div class="alert" id="ethernet-message" role="alert" style="display: none; margin-top: 10px;"></div>
+    </div>
+
     <span style="margin-top: 20px;">
       <button id="btnBack" class="button button-primary" onclick="goBack()">Back to Wi-Fi</button>
     </span>

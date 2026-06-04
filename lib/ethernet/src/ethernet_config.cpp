@@ -76,6 +76,12 @@ static void netif_event_handler(void *arg, esp_event_base_t event_base,
     }
 }
 
+bool ethernet_is_link_up(void)
+{
+    if (!eth_event_group) return false;
+    return (xEventGroupGetBits(eth_event_group) & ETH_LINK_UP_BIT) != 0;
+}
+
 bool ethernet_is_connected(void)
 {
     esp_netif_t *n = esp_netif_get_handle_from_ifkey("cdc_ecm_host");
