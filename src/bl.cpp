@@ -1590,7 +1590,8 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   inputs.specialFunction = special_function;
   inputs.imageCached = bUsedCachedImage;
   inputs.prevWakeTime = iPrevWakeTime;
-
+  inputs.usbConnected = false;
+  
 #ifdef BOARD_TRMNL_X
   inputs.usbConnected = check_usb_power();
   inputs.batteryCount = battery_count;
@@ -1618,9 +1619,15 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
     inputs.rssi = g_modem->getSignalRssi();
     inputs.wifiBand = "5";
   }
-#else
-  inputs.usbConnected = false;
 #endif // BOARD_TRMNL_X
+
+#ifdef BOARD_TRMNL_GEN2
+  // The C5 is the host radio and connects natively on either band (no separate
+  // modem), so WiFi.RSSI() above is already correct. Derive the band from the
+  // connected channel: 1–14 are 2.4 GHz, 36+ are 5 GHz (matches the scan logic
+  // in WifiCaptive).
+  inputs.wifiBand = WiFi.channel() >= 36 ? "5" : "2.4";
+#endif
 
   return inputs;
 }
