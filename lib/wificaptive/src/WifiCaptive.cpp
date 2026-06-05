@@ -4,6 +4,7 @@
 #define _NO_DEV_CONFIG_
 #define UWORD   uint16_t
 #include "../../../include/display.h"
+#include "../../../include/power.h"
 #include "WebServer.h"
 #include "wifi-helpers.h"
 #include "esp_event.h"
@@ -230,9 +231,9 @@ bool WifiCaptive::startPortal()
 // Take different action for timeout (go to sleep)
     if ((millis() - lTime) > PORTAL_TIMEOUT) {
 #ifdef BOARD_TRMNL_X
-        if (check_usb_power()) {
+        if (get_usb_status() == UsbStatus::CONNECTED) {
             showMessageWithLogo(READY_TO_SHIP);
-            while (check_usb_power()) {
+            while (get_usb_status() == UsbStatus::CONNECTED) {
             Serial.println("USB power still detected, waiting...");
             delay(2000);
             }

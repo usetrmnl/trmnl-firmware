@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <display.h>
+#include <power.h>
 #include <PNGdec.h>
 #include <JPEGDEC.h>
 #include <Preferences.h>
@@ -221,9 +222,6 @@ void otg_turn_off()
     Log_info("OTG turned off");
 }
 
-#define BQ25616_PG_PIN    0    // TCA9535 P0_0 — open-drain, LOW = VBUS OK
-#define BQ25616_STAT_PIN  2    // TCA9535 P0_2 — open-drain, LOW = charging in progress
-
 #define BAT_DET_PIN       7    // TCA9535 P0_7 in bbep pin numbering
 #define BAT_CHARGE_MS     2    // drive HIGH for 2 ms to charge RC network
 #define BAT_TIMEOUT_US    6000 // no battery if pin is still HIGH after this
@@ -383,12 +381,6 @@ void enter_shipment_sleep()
     Serial.flush();
 }
 
-bool check_usb_power()
-{
-    bbep.ioPinMode(BQ25616_PG_PIN, INPUT);
-    return (bbep.ioRead(BQ25616_PG_PIN) == 0);
-}
-
 #define PIN_ESP32C5_SPI_BOOT 4
 #define PIN_ESP32C5_USB_BOOT 5
 #define PIN_ESP32C5_EN 6
@@ -426,20 +418,6 @@ void modem_reset_target(void) {
 
 #endif
 
-#ifdef BQ25616_STAT_PIN
-// Returns true while BQ25616 is actively charging (STAT LOW).
-// HIGH = charge complete or charge disabled; blinking = fault (reads as HIGH).
-bool is_charging()
-{
-#ifdef BOARD_TRMNL_X
-    bbep.ioPinMode(BQ25616_STAT_PIN, INPUT);
-    return (bbep.ioRead(BQ25616_STAT_PIN) == 0);
-#else // OG GEN2
-    pinMode(BQ25616_STAT_PIN, INPUT);
-    return (digitalRead(BQ25616_STAT_PIN) == 0);
-#endif
-}
-#endif // BQ25616_STAT_PIN
 /**
  * @brief Enable or disable light sleep at runtime
  * @param enabled true to enable light sleep, false to disable
@@ -1675,7 +1653,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
             bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
 #ifdef BOARD_TRMNL_X
             // Show charging indicator if the USB power is connected (whether actually charging or not)
-            if (check_usb_power()) {
+            if (get_usb_status() == UsbStatus::CONNECTED) {
                 bbep.loadG5Image(battery_small, 40, bbep.height() - 120, BBEP_WHITE, BBEP_BLACK);
             }
 #endif // BOARD_TRMNL_X

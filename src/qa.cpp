@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <display.h>
+#include <power.h>
 #include "button.h"
 #include "pins.h"
 #include "config.h"
@@ -105,9 +106,9 @@ bool enableShipmentMode() {
 
   Serial.println("Waiting for USB plug-off to enter shipment mode...");
 
-  if (check_usb_power()) {
+  if (get_usb_status() == UsbStatus::CONNECTED) {
     display_show_msg(const_cast<uint8_t *>(logo_medium),READY_TO_SHIP);
-    while (check_usb_power()) {
+    while (get_usb_status() == UsbStatus::CONNECTED) {
       Serial.println("USB power still detected, waiting...");
       delay(2000);
     }
