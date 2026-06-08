@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include "special_function.h"
+#include "hardware_types.h"
 
 enum class ApiSetupOutcome
 {
@@ -63,9 +64,9 @@ struct ApiDisplayInputs
   uint32_t refreshRate;
   String macAddress;
   float batteryVoltage;
+  ChargingStatus chargingStatus;
 #ifdef BOARD_TRMNL_X
   int batteryCount;
-  int batteryCharging;
   int batteryCurrent;
   int currentBatteryCapacity;
   int maxBatteryCapacity;
@@ -81,7 +82,7 @@ struct ApiDisplayInputs
   int displayWidth;
   int displayHeight;
   SPECIAL_FUNCTION specialFunction;
-  bool usbConnected;
+  UsbStatus usbStatus;
   bool imageCached;
   int prevWakeTime;
 };

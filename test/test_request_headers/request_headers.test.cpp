@@ -41,7 +41,7 @@ static ApiDisplayInputs makeDisplayInputs()
   inputs.displayWidth = 800;
   inputs.displayHeight = 480;
   inputs.specialFunction = SF_NONE;
-  inputs.usbConnected = false;
+  inputs.usbStatus = UsbStatus::UNKNOWN;
   inputs.imageCached = false;
   inputs.prevWakeTime = 42;
   return inputs;

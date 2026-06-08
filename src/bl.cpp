@@ -1595,12 +1595,11 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   inputs.specialFunction = special_function;
   inputs.imageCached = bUsedCachedImage;
   inputs.prevWakeTime = iPrevWakeTime;
-
-  inputs.usbConnected = (get_usb_status() == UsbStatus::CONNECTED);
+  inputs.usbStatus = get_usb_status();
+  inputs.chargingStatus = get_charging_status();
 
 #ifdef BOARD_TRMNL_X
   inputs.batteryCount = battery_count;
-  inputs.batteryCharging = (get_charging_status() == ChargingStatus::CHARGING); // 1 charging, 0 not charging
   if (lipo._initialized) { // only report SoC if battery was detected and BQ27427 initialized successfully
     inputs.stateOfCharge = lipo.soc();
     inputs.stateOfHealth = lipo.soh();

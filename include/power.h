@@ -1,22 +1,6 @@
-#ifndef POWER_H
-#define POWER_H
+#pragma once
 
-/// USB / VBUS presence. UNKNOWN on boards without USB-detection support.
-enum class UsbStatus
-{
-  UNKNOWN,      // not implemented / not readable on this board
-  CONNECTED,    // VBUS (USB) power present
-  DISCONNECTED, // running on battery
-};
-
-/// Battery charge state reported by the charger IC (BQ25616 on TRMNL X / gen2).
-enum class ChargingStatus
-{
-  UNKNOWN,      // not implemented / not readable on this board
-  CHARGING,     // actively charging
-  NOT_CHARGING, // charge complete, disabled, or no battery
-  FAULT,        // charger fault — not yet implemented
-};
+#include <hardware_types.h>
 
 /// @brief Resolve USB/VBUS presence for the running board.
 ///        Safe to call on any board with no guards at the call site — returns
@@ -29,5 +13,3 @@ UsbStatus get_usb_status(void);
 ///        Safe to call on any board with no guards at the call site — returns
 ///        UNKNOWN where the hardware isn't supported.
 ChargingStatus get_charging_status(void);
-
-#endif // POWER_H
