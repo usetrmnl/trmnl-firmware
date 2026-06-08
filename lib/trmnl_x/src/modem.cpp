@@ -981,4 +981,37 @@ String Modem::getMacAddress() {
   Serial.printf("[MODEM] MAC: %s\n", mac.c_str());
   return mac;
 }
+// ---------------------------------------------------------------------------
+// getSignalRssi(): AT+CWJAP? — RSSI (dBm) of the joined AP, 0 if not connected
+// ---------------------------------------------------------------------------
+int32_t Modem::getSignalRssi() {
+  while (ModemSerial.available()) ModemSerial.read();  // flush
+
+  sendCommand("AT+CWJAP?");
+  String resp = waitForResponse("OK", 3000);
+
+  // Response (when connected):
+  //   +CWJAP:"ssid","bssid",<channel>,<rssi>,<pci_en>,...\r\nOK
+  // When not connected: "No AP\r\nOK" (no +CWJAP: line).
+  int idx = resp.indexOf("+CWJAP:");
+  if (idx < 0) {
+    Serial.println("[MODEM] getSignalRssi: not connected / parse failed");
+    return 0;
+  }
+
+  // Skip the two quoted fields (ssid, bssid), then channel, to reach rssi.
+  int q2 = resp.indexOf('"', resp.indexOf('"', idx) + 1); // end of ssid
+  int q4 = resp.indexOf('"', resp.indexOf('"', q2 + 1) + 1); // end of bssid
+  int cChannel = resp.indexOf(',', q4 + 1);    // comma before channel
+  int cRssi    = resp.indexOf(',', cChannel + 1); // comma before rssi
+  int cEnd     = resp.indexOf(',', cRssi + 1);    // comma after rssi (or -1)
+  if (q2 < 0 || q4 < 0 || cChannel < 0 || cRssi < 0) {
+    Serial.println("[MODEM] getSignalRssi: field parse failed");
+    return 0;
+  }
+
+  int32_t rssi = resp.substring(cRssi + 1, cEnd >= 0 ? cEnd : resp.length()).toInt();
+  Serial.printf("[MODEM] RSSI: %d dBm\n", rssi);
+  return rssi;
+}
 #endif // BOARD_TRMNL_X
