@@ -475,6 +475,37 @@ static void update_playlist_order(const char *new_path, const char *prev_path) {
   preferences.putString(PREFERENCES_PLAYLIST_ORDER_KEY, result2);
 }
 
+// Drop locally-cached playlist entries the server no longer lists (deleted
+// items), so a tap can't browse to a removed plugin. `manifest` is the
+// '|'-joined list of live cache identities from the /display response; each
+// stored path is "/<type>-<id>-<timestamp>", whose substring(1,14) "<type>-<id>"
+// stem is exactly what the server sends. Empty manifest (older server) => no-op.
+static void prune_playlist_order(const String &manifest) {
+  if (manifest.isEmpty()) return;
+  String order = preferences.getString(PREFERENCES_PLAYLIST_ORDER_KEY, "");
+  if (order.isEmpty()) return;
+
+  String wrapped = "|" + manifest + "|"; // delimiter-guard for exact-identity match
+  String result = "";
+  int start = 0;
+  while (start <= (int)order.length()) {
+    int sep = order.indexOf('|', start);
+    String entry = (sep < 0) ? order.substring(start) : order.substring(start, sep);
+    if (!entry.isEmpty()) {
+      String identity = entry.substring(1, 14); // strip leading '/', keep <type>-<id>
+      if (wrapped.indexOf("|" + identity + "|") >= 0) {
+        result += (result.isEmpty() ? "" : "|") + entry; // still live -> keep
+      } else {
+        filesystem_file_delete(entry.c_str());            // deleted -> drop cached frame
+        Log_info("Pruned deleted playlist entry %s", entry.c_str());
+      }
+    }
+    if (sep < 0) break;
+    start = sep + 1;
+  }
+  preferences.putString(PREFERENCES_PLAYLIST_ORDER_KEY, result);
+}
+
 static void show_cached_image_by_offset(int offset) {
   String order = preferences.getString(PREFERENCES_PLAYLIST_ORDER_KEY, "");
 
@@ -1718,6 +1749,7 @@ static https_request_err_e downloadAndShow()
       preferences.putString(PREFERENCES_CURRENT_PATH_KEY, String(szTemp));
       #ifdef BOARD_TRMNL_X
       update_playlist_order(szTemp, _curPath.c_str());
+      prune_playlist_order(apiDisplayResult.response.playlist);
       #endif
       preferences.putString(PREFERENCES_BROWSE_PATH_KEY, String(szTemp));
       return result;
@@ -1761,6 +1793,7 @@ static https_request_err_e downloadAndShow()
 
     preferences.putString(PREFERENCES_CURRENT_PATH_KEY, String(szTemp));
     update_playlist_order(szTemp, _prevPath.c_str());
+    prune_playlist_order(apiDisplayResult.response.playlist);
     preferences.putString(PREFERENCES_BROWSE_PATH_KEY, String(szTemp));
 
 //    new_filename = apiDisplayResult.response.filename;
@@ -1979,6 +2012,7 @@ static https_request_err_e downloadAndShow()
             preferences.putString(PREFERENCES_CURRENT_PATH_KEY, String(szTemp));
             #ifdef BOARD_TRMNL_X
             update_playlist_order(szTemp, _curPath.c_str());
+            prune_playlist_order(apiDisplayResult.response.playlist);
             #endif
             preferences.putString(PREFERENCES_BROWSE_PATH_KEY, String(szTemp));
           }
