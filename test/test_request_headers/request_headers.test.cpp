@@ -174,31 +174,6 @@ void test_display_headers_wifi_band_omitted_when_empty(void)
   TEST_ASSERT_FALSE(has(headers, "WiFi-Band"));
 }
 
-void test_display_headers_wifi_ssid_present(void)
-{
-  auto inputs = makeDisplayInputs();
-  inputs.wifiSSID = "MyNetwork";
-  auto headers = buildDisplayHeaders(inputs);
-  TEST_ASSERT_EQUAL_STRING("MyNetwork", valueOf(headers, "WiFi-SSID").c_str());
-}
-
-void test_display_headers_wifi_ssid_percent_encoded(void)
-{
-  auto inputs = makeDisplayInputs();
-  inputs.wifiSSID = "My Wi-Fi: café";
-  auto headers = buildDisplayHeaders(inputs);
-  // space, ':' and the UTF-8 bytes of 'é' (0xC3 0xA9) are escaped
-  TEST_ASSERT_EQUAL_STRING("My%20Wi-Fi%3A%20caf%C3%A9", valueOf(headers, "WiFi-SSID").c_str());
-}
-
-void test_display_headers_wifi_ssid_omitted_when_empty(void)
-{
-  auto inputs = makeDisplayInputs();
-  inputs.wifiSSID = "";
-  auto headers = buildDisplayHeaders(inputs);
-  TEST_ASSERT_FALSE(has(headers, "WiFi-SSID"));
-}
-
 // --- formatHeaders ---------------------------------------------------------
 
 void test_format_headers_newline_separated_no_trailing_newline(void)
@@ -216,24 +191,6 @@ void test_format_headers_empty_list_is_empty_string(void)
 {
   HttpHeaderList headers;
   TEST_ASSERT_EQUAL_STRING("", formatHeaders(headers).c_str());
-}
-
-// --- percentEncode ---------------------------------------------------------
-
-void test_percent_encode_passes_through_unreserved(void)
-{
-  TEST_ASSERT_EQUAL_STRING("abcXYZ09-._~", percentEncode("abcXYZ09-._~").c_str());
-}
-
-void test_percent_encode_escapes_reserved_and_control(void)
-{
-  // space, ':', '\n', '%' must all be escaped (uppercase hex)
-  TEST_ASSERT_EQUAL_STRING("a%20b%3A%0A%25", percentEncode("a b:\n%").c_str());
-}
-
-void test_percent_encode_empty_is_empty(void)
-{
-  TEST_ASSERT_EQUAL_STRING("", percentEncode("").c_str());
 }
 
 void test_format_setup_headers_round_trip(void)
@@ -268,14 +225,8 @@ void process()
   RUN_TEST(test_display_headers_wifi_band_2_4);
   RUN_TEST(test_display_headers_wifi_band_5);
   RUN_TEST(test_display_headers_wifi_band_omitted_when_empty);
-  RUN_TEST(test_display_headers_wifi_ssid_present);
-  RUN_TEST(test_display_headers_wifi_ssid_percent_encoded);
-  RUN_TEST(test_display_headers_wifi_ssid_omitted_when_empty);
   RUN_TEST(test_format_headers_newline_separated_no_trailing_newline);
   RUN_TEST(test_format_headers_empty_list_is_empty_string);
-  RUN_TEST(test_percent_encode_passes_through_unreserved);
-  RUN_TEST(test_percent_encode_escapes_reserved_and_control);
-  RUN_TEST(test_percent_encode_empty_is_empty);
   RUN_TEST(test_format_setup_headers_round_trip);
   UNITY_END();
 }

@@ -1585,7 +1585,6 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   WiFiStatus wifi = getWiFiStatus();
   inputs.rssi = wifi.rssi;
   inputs.wifiBand = wifi.band;
-  inputs.wifiSSID = wifi.ssid;
   inputs.batteryVoltage = vBatt; //readBatteryVoltage();
   inputs.firmwareVersion = String(FW_VERSION_STRING);
   inputs.displayWidth = display_width();

@@ -77,7 +77,6 @@ struct ApiDisplayInputs
   String model;
   int rssi;
   String wifiBand;
-  String wifiSSID;
   int displayWidth;
   int displayHeight;
   SPECIAL_FUNCTION specialFunction;
