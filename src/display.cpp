@@ -1730,7 +1730,6 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
     auto height = display_height();
 //    uint32_t *d32;
     bool bAlloc = false;
-    static int i426Workaround = 0;
 #ifdef BB_EPAPER
     int iRefreshMode = REFRESH_FULL; // assume full (slow) refresh
 #else
@@ -1757,12 +1756,9 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
     }
 #endif
 #ifdef BB_EPAPER
-    if (i426Workaround && bbep.getPanelType() == dpList[iTempProfile].OneBit) {
-        // After a partial update, the 3.97" & 4.26" 800x480 needs to be 'reset' to accept writes
-        // This is only needed if the user pressed the WAKE button and there will be 2 updates
-        // while the power is on
-        bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
-    }
+    // Re-initialize the EPD controller to ensure it is awake and ready.
+    // Needed after any non-blocking refresh with light sleep enabled.
+    bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
 #endif // BB_EPAPER
     if (isPNG == true && data_size < MAX_IMAGE_SIZE)
     {
@@ -1862,7 +1858,6 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
     bbep.setLightSleep(false);
 #else
     bbep.setLightSleep(true);
-
 #endif // DO_NOT_LIGHT_SLEEP
 #endif // !BOARD_SEEED_RETERMINAL_E1002
     if (!display_update_epaper(iRefreshMode, bWait)) {
@@ -1871,10 +1866,6 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
             bbep.freeBuffer();
         }
         return;
-    }
-
-    if ((bbep.getPanelType() == EP426_800x480 || bbep.getPanelType() == EP426_800x480_4GRAY || bbep.getPanelType() == EP397_800x480 || bbep.getPanelType() == EP397_800x480_4GRAY) && iRefreshMode == REFRESH_PARTIAL) {
-        i426Workaround = 1; // need to re-initialize the controller for another update before sleeping
     }
     if (bAlloc) {
         bbep.freeBuffer();
@@ -2466,6 +2457,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         break;
     }
 #ifdef BB_EPAPER
+    bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
     if (!display_update_epaper(REFRESH_FULL, true, true, PLANE_0)) {
         Log_error("display_show_msg: e-paper update failed");
         bbep.freeBuffer();
@@ -2607,6 +2599,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     if (message_type == WIFI_CONNECT)
     {
         Log_info("Display set to white");
+#ifdef BB_EPAPER
+        // Re-initialize the EPD controller in case a previous non-blocking
+        // refresh (e.g. the boot logo) left it busy or in deep-sleep.
+        bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
+#endif
         bbep.fillScreen(BBEP_WHITE);
 #ifdef BB_EPAPER
         if (!display_update_epaper(apiDisplayResult.response.maximum_compatibility ? REFRESH_FULL : REFRESH_FAST, true, true, PLANE_0)) {
@@ -2724,6 +2721,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     }
     Log_info("Start drawing...");
 #ifdef BB_EPAPER
+    bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
     if (!display_update_epaper(REFRESH_FULL, true, true, PLANE_0)) {
         Log_error("display_show_msg2: e-paper update failed");
         bbep.freeBuffer();
