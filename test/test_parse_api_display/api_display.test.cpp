@@ -67,6 +67,22 @@ void test_parseResponse_apiDisplay_treats_unknown_sf_as_none(void)
   TEST_ASSERT_EQUAL(parsed.special_function, SPECIAL_FUNCTION::SF_NONE);
 }
 
+void test_parseResponse_apiDisplay_joins_playlist_with_pipes(void)
+{
+  String input = "{\"status\":200,\"filename\":\"plugin-a1b2c3-1771674964\",\"playlist\":[\"plugin-a1b2c3\",\"mashup-d4e5f6\"]}";
+
+  auto parsed = parseResponse_apiDisplay(input);
+  TEST_ASSERT_EQUAL_STRING("plugin-a1b2c3|mashup-d4e5f6", parsed.playlist.c_str());
+}
+
+void test_parseResponse_apiDisplay_playlist_absent_is_empty(void)
+{
+  String input = "{\"status\":200,\"filename\":\"plugin-a1b2c3-1771674964\"}";
+
+  auto parsed = parseResponse_apiDisplay(input);
+  TEST_ASSERT_EQUAL_STRING("", parsed.playlist.c_str());
+}
+
 void setUp(void) {
   // set stuff up here
 }
@@ -82,6 +98,8 @@ void process()
   RUN_TEST(test_parseResponse_apiDisplay_deserializationError);
   RUN_TEST(test_parseResponse_apiDisplay_treats_unknown_sf_as_none);
   RUN_TEST(test_parseResponse_apiDisplay_missing_fields);
+  RUN_TEST(test_parseResponse_apiDisplay_joins_playlist_with_pipes);
+  RUN_TEST(test_parseResponse_apiDisplay_playlist_absent_is_empty);
   UNITY_END();
 }
 

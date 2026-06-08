@@ -25,6 +25,15 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload)
      else if (tp == "b") u32TP = 2;
 //     else if (tp == "c") u32TP = 3;
 
+  // Cache identities of the live playlist, '|'-joined to match playlist_order.
+  // Absent on older servers -> empty string -> the device prune is a no-op.
+  String playlist = "";
+  for (JsonVariant entry : doc["playlist"].as<JsonArray>())
+  {
+    if (playlist.length() > 0) playlist += "|";
+    playlist += entry.as<String>();
+  }
+
   return ApiDisplayResponse{
       .outcome = ApiDisplayOutcome::Ok,
       .error_detail = "",
@@ -40,6 +49,7 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload)
       .reset_firmware = doc["reset_firmware"],
       .special_function = parseSpecialFunction(special_function_str),
       .action = doc["action"] | "",
-      .touchbar_mode = doc["touchbar_mode"] | ""
+      .touchbar_mode = doc["touchbar_mode"] | "",
+      .playlist = playlist
   };
 }

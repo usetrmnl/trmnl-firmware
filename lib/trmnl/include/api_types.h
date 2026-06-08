@@ -52,6 +52,7 @@ struct ApiDisplayResponse
   SPECIAL_FUNCTION special_function;
   String action;
   String touchbar_mode;
+  String playlist; // '|'-joined cache identities of the live playlist (TRMNL-X prune)
 };
 
 struct ApiDisplayInputs
