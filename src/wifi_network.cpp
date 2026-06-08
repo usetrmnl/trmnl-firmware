@@ -11,7 +11,6 @@ extern Modem *g_modem;
 WiFiStatus getWiFiStatus(void)
 {
   WiFiStatus status;
-  status.ssid = WifiCaptivePortal.getLastCredentials().ssid;
   status.rssi = WiFi.RSSI();
   status.band = WiFi.channel() >= 36 ? "5" : "2.4";
 

@@ -5,7 +5,6 @@
 
 struct WiFiStatus
 {
-  String ssid; // connected network SSID ("" if unknown)
   int rssi;    // signal strength in dBm
   String band; // "2.4" or "5"
 };
