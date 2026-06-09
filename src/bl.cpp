@@ -27,6 +27,7 @@
 #include "api-client/submit_log.h"
 #include <api-client/setup.h>
 #include <special_function.h>
+#include <ota_schedule.h>
 #include <api_response_parsing.h>
 #include "logging_parcers.h"
 #include <SPIFFS.h>
@@ -1428,11 +1429,12 @@ void bl_init(void)
   if (update_firmware)
   {
     uint32_t now = getTime();
-    if (now - preferences.getUInt(PREFERENCES_LAST_OTA) >= 24*60*60) {
+    if (otaAttemptDue(now, otaLastAttempt(preferencesPersistence))) {
       Log.info("%s [%d]: Last OTA attempt was > 24h ago, proceeding with download...\r\n", __FILE__, __LINE__);
       if (!checkAndPerformFirmwareUpdate()) {
         Log.info("%s [%d]: OTA update failed, storing the timestamp to prevent boot looping.\r\n", __FILE__, __LINE__);
-        preferences.putUInt(PREFERENCES_LAST_OTA, now); // store new time
+        otaRecordAttempt(preferencesPersistence, now);
+        update_firmware = false;
       }
     } else {
       Log.info("%s [%d]: Last OTA attempt was < 24h ago, skipping...\r\n", __FILE__, __LINE__);
@@ -3148,6 +3150,7 @@ static bool checkAndPerformFirmwareUpdate(void)
   }
 #endif
 
+  bool ota_ok = false;
   withHttp(binUrl, [&](HTTPClient *https, HttpError errorCode) -> bool
            {
              if (errorCode != HttpError::HTTPCLIENT_SUCCESS || !https)
@@ -3161,6 +3164,7 @@ static bool checkAndPerformFirmwareUpdate(void)
                {
                  showMessageWithLogo(WIFI_WEAK);
                }
+               return false;
              }
 
              int httpCode = https->GET();
@@ -3181,6 +3185,7 @@ static bool checkAndPerformFirmwareUpdate(void)
                    {
                      Log.info("%s [%d]: Firmware update successful. Rebooting...\r\n", __FILE__, __LINE__);
                      showMessageWithLogo(FW_UPDATE_SUCCESS);
+                     ota_ok = true;
                    }
                    else
                    {
@@ -3200,8 +3205,14 @@ static bool checkAndPerformFirmwareUpdate(void)
                  showMessageWithLogo(FW_UPDATE_FAILED);
                }
              }
-             return true; });
-    return false; // if we got here, it failed
+             else
+             {
+               Log.fatal("%s [%d]: Firmware GET failed, code: %d\r\n", __FILE__, __LINE__, httpCode);
+               showMessageWithLogo(API_FIRMWARE_UPDATE_ERROR);
+             }
+             return false;
+           });
+  return ota_ok;
 }
 
 /**
