@@ -530,9 +530,10 @@ std::vector<WifiNetwork> WifiCaptive::getScannedUniqueNetworks(bool runScan)
         {
             String ssid = WiFi.SSID(i);
             int32_t rssi = WiFi.RSSI(i);
+           
             wifi_auth_mode_t encType = WiFi.encryptionType(i);
             bool bIs5GHz = (WiFi.channel(i) >= 36);
-            bool open = WiFi.encryptionType(i);
+            bool open = WiFi.encryptionType(i) == WIFI_AUTH_OPEN;
             bool enterprise = (encType == WIFI_AUTH_WPA2_ENTERPRISE);
 
             bool found = false;
