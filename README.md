@@ -251,6 +251,57 @@ There are technical and non-technical options to flashing firmware.
 
 ![Image Alt text](/pics/bin_folder.png "Bin")
 
+### Good Display GDP075FW1 / ESP32-M075
+
+The `esp32_m075_gdp075fw1` PlatformIO environment supports ESP32-M075-style
+controller boards paired with the Good Display GDP075FW1 7.5 inch 800x480
+four-color e-paper panel.
+
+This target has been tested with the WiFi version of the
+[GDP075FW1/GDP075FU1 7.5 inch 4-color e-paper tag](https://buy-lcd.com/products/gdp075fu1).
+
+```bash
+pio run -e esp32_m075_gdp075fw1
+```
+
+When registering this target as a TRMNL BYOD device, select
+`Waveshare 7.5" B/W/R/Y` as the device type. That profile requests four-color
+content from the TRMNL service and has been tested with this panel.
+
+This target uses the following e-paper pins:
+
+| Signal | GPIO |
+| --- | --- |
+| SCK | 18 |
+| MOSI | 23 |
+| CS | 27 |
+| RESET | 12 |
+| DC | 14 |
+| BUSY | 13 |
+
+The target currently builds without a configured wake button and reports a
+fixed battery voltage. If your board exposes a wake button or battery gauge,
+add those pins before relying on button wake or battery telemetry.
+
+Because this target has no configured button input, the firmware WiFi reset
+long-press flow is not available. Holding the tested board's reset button only
+resets the ESP32; it does not clear saved WiFi or API settings. To force the
+device back into captive portal setup mode, erase the NVS settings partition
+for this target and then reset or power-cycle the board:
+
+```bash
+uvx esptool \
+  --chip esp32 \
+  --port /dev/ttyUSB0 \
+  --baud 115200 \
+  erase-region 0x9000 0x5000
+```
+
+Replace `/dev/ttyUSB0` with your serial port. Keep the `0x` prefixes on both
+address values; they are hexadecimal, and decimal `5000` is not a
+4096-byte-aligned erase size. This clears saved WiFi, API key, friendly ID, and
+custom API server preferences without reflashing the firmware.
+
 ## **Uploading guide (PlatformIO)**
 
 1. Put the TRMNL into flashing mode.
@@ -263,6 +314,36 @@ There are technical and non-technical options to flashing firmware.
 ![Image Alt text](/pics/fs.jpg "FS")
 
 3. Click on "PlatformIO: Upload" button.
+
+## **Uploading guide (esptool)**
+
+You can also flash a built firmware image directly with
+[esptool](https://docs.espressif.com/projects/esptool/en/latest/esp32/).
+This is useful for third-party ESP32 boards such as the Good Display
+GDP075FW1 / ESP32-M075 setup.
+
+From the repository root, replace `/dev/ttyUSB0` with your serial port and run:
+
+```bash
+uvx esptool \
+  --chip esp32 \
+  --port /dev/ttyUSB0 \
+  --baud 115200 \
+  --before default-reset \
+  --after hard-reset \
+  write-flash -z \
+  --flash-mode dio \
+  --flash-freq 40m \
+  --flash-size 4MB \
+  0x1000 .pio/build/esp32_m075_gdp075fw1/bootloader.bin \
+  0x8000 .pio/build/esp32_m075_gdp075fw1/partitions.bin \
+  0xe000 "$HOME/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin" \
+  0x10000 .pio/build/esp32_m075_gdp075fw1/firmware.bin
+```
+
+If `460800` baud fails during flash detection or writing, retry at `115200`.
+On Linux, your user must have permission to access the serial device, commonly
+by membership in the `dialout` or `uucp` group.
 
 ## **Uploading guide (ESP32 Flash Download Tool)**
 

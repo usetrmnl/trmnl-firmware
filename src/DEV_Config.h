@@ -103,6 +103,14 @@
    #define EPD_DC_PIN   9
    #define EPD_BUSY_PIN 3
 #define FAKE_BATTERY_VOLTAGE
+#elif defined(BOARD_ESP32_M075_GDP075FW1)
+   // Good Display GDP075FW1 / ESP32-M075 board.
+   #define EPD_SCK_PIN  18
+   #define EPD_MOSI_PIN 23
+   #define EPD_CS_PIN   27
+   #define EPD_RST_PIN  12
+   #define EPD_DC_PIN   14
+   #define EPD_BUSY_PIN 13
 #elif defined(BOARD_SEEED_XIAO_ESP32C3)
    // Pin definition for Seeed XIAO ESP32C3 Board
    #define EPD_SCK_PIN  8

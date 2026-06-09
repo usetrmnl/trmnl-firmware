@@ -31,7 +31,7 @@ BBEPAPER bbep(EP397_800x480);
     {EP75R_800x480, EP75R_800x480}, // b = darker grays
 };
 BBEPAPER bbep(EP75R_800x480);
-#elif defined(BOARD_TRMNL_4CLR)
+#elif defined(BOARD_TRMNL_4CLR) || defined(BOARD_ESP32_M075_GDP075FW1)
     {EP75YR_800x480, EP75YR_800x480}, // default (for original EPD)
     {EP75YR_800x480, EP75YR_800x480}, // a = uses built-in fast + 4-gray
     {EP75YR_800x480, EP75YR_800x480}, // b = darker grays
@@ -1001,7 +1001,7 @@ int png_draw_6clr(PNGDRAW *pDraw)
 } /* png_draw_6clr() */
 #endif // E1002 (Spectra6 only)
 
-#ifdef BOARD_TRMNL_4CLR
+#if defined(BOARD_TRMNL_4CLR) || defined(BOARD_ESP32_M075_GDP075FW1)
 //
 // Draw the PNG image into the local framebuffer memory using the drawPixel() method
 // to do color translation and to properly format the memory layout
@@ -1108,7 +1108,7 @@ int png_draw_4clr(PNGDRAW *pDraw)
     bbep.writeData(pTemp, (pDraw->iWidth+3)/4);
     return 1; // continue decoding
 } /* png_draw4clr() */
-#endif // BOARD_TRMNL_4CLR (4 color only)
+#endif // 4 color only
 
 int png_draw(PNGDRAW *pDraw)
 {
@@ -1521,7 +1521,7 @@ PNG *png = new PNG();
             delete(png); // free the decoder instance
             return REFRESH_FULL;
 #endif // E1002
-#ifdef BOARD_TRMNL_4CLR
+#if defined(BOARD_TRMNL_4CLR) || defined(BOARD_ESP32_M075_GDP075FW1)
             Log_info("%s [%d]: decoding for 4-color EPD\r\n", __FILE__, __LINE__);
             png->openRAM((uint8_t *)pPNG, iDataSize, png_draw_4clr);
             bbep.startWrite(PLANE_1); // start writing image data
@@ -1529,7 +1529,7 @@ PNG *png = new PNG();
             png->close();
             delete(png); // free the decoder instance
             return REFRESH_FULL;
-#endif // BOARD_TRMNL_4CLR
+#endif // 4 color only
             bbep.setAddrWindow(0, 0, bbep.width(), bbep.height());
             if (png->getBpp() == 1 || (png->getBpp() == 2 && png_count_colors(png, pPNG, iDataSize) == 2)) { // 1-bit image (single plane)
                 png->close(); // use a different PNGDraw callback for color matching
