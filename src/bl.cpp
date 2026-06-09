@@ -75,6 +75,7 @@ const char *szHTTPErrors[] = {
 };
 
 bool pref_clear = false;
+bool bModemNeeded = false;
 String new_filename = "";
 ApiDisplayResult apiDisplayResult;
 uint8_t *buffer = nullptr;
@@ -807,6 +808,19 @@ void bl_init(void)
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
 #endif
   Log_info("BL init success");
+#ifdef BOARD_TRMNL_X
+  Log.info("%s [%d]: Checking if we need to use the ESP32-C5 modem...\r\n", __FILE__, __LINE__);
+  if (WifiCaptivePortal.isSaved()) {
+    // WiFi saved, connection
+    WifiCredentials lastCreds = WifiCaptivePortal.getLastCredentials();
+    bModemNeeded = lastCreds.is5GHz;
+    Log.info("%s [%d]: modem needed = %d\n\r", __FILE__, __LINE__, bModemNeeded);
+    if (bModemNeeded) {
+        modem_reset_target(); // reset it here so that it will be ready when we need it
+        // No need to add an extra delay since the other systems add delay before WiFi is activated
+    }
+  }
+#endif // X
   pins_init();
   sensor_init();
 #ifdef BOARD_TRMNL_X
@@ -1099,7 +1113,6 @@ void bl_init(void)
         lipo._initialized = true;
       }
     }
-
     uint8_t energyScale = lipo.designEnergyScale();
     unsigned int soc = lipo.soc();                               // State-of-charge (%) — use this for battery level display
     unsigned int volts = lipo.voltage();                         // Battery voltage (mV)
@@ -1166,15 +1179,17 @@ void bl_init(void)
   // display_show_msg(storedLogoOrDefault(1), WIFI_CONNECT, "ABCDEF", true, FW_VERSION_STRING, "Hello World!");
   // wifiErrorDeepSleep();
 #ifdef BOARD_TRMNL_X
-  modem_reset_target();
-  delay(500);  // give modem time to boot before UART init
-  static Modem modemInstance(115200);
-  if (modemInstance.isInitialized()) {
-    g_modem = &modemInstance;
+  if (bModemNeeded) {
+    static Modem modemInstance(115200);
+    if (modemInstance.isInitialized()) {
+      g_modem = &modemInstance;
+    } else {
+      Log_info("Modem init failed — falling back to 2.4 GHz mode");
+      g_modem = nullptr;
+    }
   } else {
-    Log_info("Modem init failed — falling back to 2.4 GHz mode");
     g_modem = nullptr;
-  } 
+  }
     
   // Only scan when no credentials are saved (i.e. captive portal will be shown). 
   if (g_modem && !WifiCaptivePortal.isSaved())
