@@ -45,6 +45,7 @@
 #include "loading.h"
 #include <wifi-helpers.h>
 #include <sys/time.h>
+#include <buzzer.h>
 #ifdef SENSOR_SDA
 #include <bb_scd41.h>
 #include <bb_temperature.h>
@@ -808,6 +809,7 @@ void bl_init(void)
 #endif
   Log_info("BL init success");
   pins_init();
+  buzzer_init();
   sensor_init();
 #ifdef BOARD_TRMNL_X
   // Debug: Print all wakeup_stub_iqs_status structure fields
