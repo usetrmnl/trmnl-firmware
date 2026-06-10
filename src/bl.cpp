@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <bl.h>
+#include <wifi_network.h>
 #include <device_id.h>
 #include <trmnl_log.h>
 #include <types.h>
@@ -715,8 +716,10 @@ void process_iqs323_data(void)
 // ############################ esp32c5 modem #########################
 #include "modem.h"
 
-// File-scope modem pointer — set once during bl_init(), used by download helpers.
-static Modem* g_modem = nullptr;
+// Global modem pointer — set once during bl_init(), used by download helpers
+// here and by getWiFiStatus() in wifi_network.cpp (5 GHz path on TRMNL_X), so
+// it needs external linkage.
+Modem* g_modem = nullptr;
 // ############################ esp32c5 modem #########################
 
 // ############################ Gas gauge #############################
@@ -835,6 +838,7 @@ void bl_init(void)
   bool gpio_wakeup = (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO ||
                       wakeup_reason == ESP_SLEEP_WAKEUP_EXT0 ||
                       wakeup_reason == ESP_SLEEP_WAKEUP_EXT1);
+  Log.info("%s [%d]: Wake reason: %d\r\n", __FILE__, __LINE__, (int)wakeup_reason);
 
   Log_info("preferences start");
   bool res = preferences.begin("data", false);
@@ -1636,8 +1640,19 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   }
 
   inputs.macAddress = device_mac_address();
-
+  WiFiStatus wifi = getWiFiStatus();
+  inputs.rssi = wifi.rssi;
+  inputs.wifiBand = wifi.band;
   inputs.batteryVoltage = vBatt; //readBatteryVoltage();
+  inputs.firmwareVersion = String(FW_VERSION_STRING);
+  inputs.displayWidth = display_width();
+  inputs.displayHeight = display_height();
+  inputs.model = DEVICE_MODEL;
+  inputs.specialFunction = special_function;
+  inputs.imageCached = bUsedCachedImage;
+  inputs.prevWakeTime = iPrevWakeTime;
+  inputs.usbConnected = false;
+  
 #ifdef BOARD_TRMNL_X
   inputs.usbConnected = check_usb_power();
   inputs.batteryCount = battery_count;
@@ -1658,23 +1673,7 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
     inputs.currentBatteryCapacity = -1;
     inputs.maxBatteryCapacity = -1;
   }
-#else
-  inputs.usbConnected = false;
 #endif // BOARD_TRMNL_X
-
-  inputs.firmwareVersion = String(FW_VERSION_STRING);
-
-#ifdef BOARD_TRMNL_X
-  inputs.rssi = conn_mgr_is_eth() ? 0 : WiFi.RSSI();
-#else
-  inputs.rssi = WiFi.RSSI();
-#endif
-  inputs.displayWidth = display_width();
-  inputs.displayHeight = display_height();
-  inputs.model = DEVICE_MODEL;
-  inputs.specialFunction = special_function;
-  inputs.imageCached = bUsedCachedImage;
-  inputs.prevWakeTime = iPrevWakeTime;
 
   return inputs;
 }
@@ -1728,7 +1727,7 @@ static https_request_err_e downloadAndShow()
       if (apiDisplayResult.error != HTTPS_UNABLE_TO_CONNECT &&
           apiDisplayResult.error != HTTPS_RESPONSE_CODE_INVALID)
         break;
-      Log_error("Connection attempt %d/5 failed: %s", attempt, apiDisplayResult.error_detail.c_str());
+      Log_error_serial("Connection attempt %d/5 failed: %s", attempt, apiDisplayResult.error_detail.c_str());
       if (attempt < 5) delay(2000);
     }
   }
@@ -3358,9 +3357,10 @@ void goToSleep(void)
 #if CONFIG_IDF_TARGET_ESP32
   #define BUTTON_PIN_BITMASK(GPIO) (1ULL << GPIO)  // 2 ^ GPIO_NUMBER in hex
   esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK(PIN_INTERRUPT), ESP_EXT1_WAKEUP_ALL_LOW);
-#elif CONFIG_IDF_TARGET_ESP32C3
+#elif defined(CONFIG_IDF_TARGET_ESP32C3) || defined (CONFIG_IDF_TARGET_ESP32C5)
+  pinMode(PIN_INTERRUPT, INPUT); // needed to not immediately wake up
   esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
-#elif CONFIG_IDF_TARGET_ESP32S3
+#elif defined(CONFIG_IDF_TARGET_ESP32S3)
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
@@ -3384,7 +3384,7 @@ static void goToSleepButtonOnly(void)
 #if CONFIG_IDF_TARGET_ESP32
   #define BUTTON_PIN_BITMASK_BTN(GPIO) (1ULL << GPIO)
   esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK_BTN(PIN_INTERRUPT), ESP_EXT1_WAKEUP_ALL_LOW);
-#elif CONFIG_IDF_TARGET_ESP32C3
+#elif defined( CONFIG_IDF_TARGET_ESP32C3 ) || defined ( CONFIG_IDF_TARGET_ESP32C5 )
   esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
 #elif CONFIG_IDF_TARGET_ESP32S3
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
@@ -3503,8 +3503,18 @@ static bool setClock()
   }
 #endif
 
-  configTime(0, 0, ntp.c_str(), "time.cloudflare.com");
-  
+  configTime(0, 0, ntp.c_str(), "pool.ntp.org"); //"time.cloudflare.com");
+
+#ifdef BOARD_TRMNL_GEN2
+  // This seems to be necessary only on the ESP32-C5, otherwise NTP will fail 100% of the time
+  // Wait until a valid time is received from the NTP server
+  // 1577836800 is the Unix time for Jan 1, 2020
+  time_t now = 0;
+  while (time(&now) < 1577836800) {
+    vTaskDelay(50);
+  }
+#endif
+
   for (int i = 0; i < SNTP_MAX_SERVERS; i++)
   {
     const char *srv = esp_sntp_getservername(i);

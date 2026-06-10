@@ -150,6 +150,30 @@ void test_display_headers_special_function_present_when_set(void)
   TEST_ASSERT_EQUAL_STRING("true", valueOf(headers, "special_function").c_str());
 }
 
+void test_display_headers_wifi_band_2_4(void)
+{
+  auto inputs = makeDisplayInputs();
+  inputs.wifiBand = "2.4";
+  auto headers = buildDisplayHeaders(inputs);
+  TEST_ASSERT_EQUAL_STRING("2.4", valueOf(headers, "WiFi-Band").c_str());
+}
+
+void test_display_headers_wifi_band_5(void)
+{
+  auto inputs = makeDisplayInputs();
+  inputs.wifiBand = "5";
+  auto headers = buildDisplayHeaders(inputs);
+  TEST_ASSERT_EQUAL_STRING("5", valueOf(headers, "WiFi-Band").c_str());
+}
+
+void test_display_headers_wifi_band_omitted_when_empty(void)
+{
+  auto inputs = makeDisplayInputs();
+  inputs.wifiBand = "";
+  auto headers = buildDisplayHeaders(inputs);
+  TEST_ASSERT_FALSE(has(headers, "WiFi-Band"));
+}
+
 // --- formatHeaders ---------------------------------------------------------
 
 void test_format_headers_newline_separated_no_trailing_newline(void)
@@ -198,6 +222,9 @@ void process()
   RUN_TEST(test_display_headers_image_cached_reflects_input);
   RUN_TEST(test_display_headers_special_function_omitted_when_none);
   RUN_TEST(test_display_headers_special_function_present_when_set);
+  RUN_TEST(test_display_headers_wifi_band_2_4);
+  RUN_TEST(test_display_headers_wifi_band_5);
+  RUN_TEST(test_display_headers_wifi_band_omitted_when_empty);
   RUN_TEST(test_format_headers_newline_separated_no_trailing_newline);
   RUN_TEST(test_format_headers_empty_list_is_empty_string);
   RUN_TEST(test_format_setup_headers_round_trip);

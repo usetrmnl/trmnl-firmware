@@ -59,4 +59,7 @@ public:
 
   // Returns the MAC address of the ESP32-C5 station, or empty string on failure.
   String getMacAddress();
+
+  // Returns the RSSI (dBm) of the currently joined AP, (replaces WiFi.RSSI() on TRMNL_X)
+  int32_t getSignalRssi();
 };

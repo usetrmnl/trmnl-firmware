@@ -3,7 +3,7 @@
 
 #define FW_MAJOR_VERSION 1
 #define FW_MINOR_VERSION 8
-#define FW_PATCH_VERSION 5
+#define FW_PATCH_VERSION 6
 
 // Helper macros for stringification
 #define STRINGIFY(x) #x
@@ -81,6 +81,9 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #if defined(BOARD_TRMNL) || defined(BOARD_TRMNL_4CLR)
 #define PIN_INTERRUPT 2
 #define DEVICE_MODEL "og"
+#elif defined(BOARD_TRMNL_GEN2)
+#define PIN_INTERRUPT 3
+#define DEVICE_MODEL "og_gen2"
 #elif defined(BOARD_XTEINK_X4)
 #define DEVICE_MODEL "XTEINK_X4"
 #define PIN_INTERRUPT 3
