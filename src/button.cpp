@@ -2,10 +2,16 @@
 #include "trmnl_log.h"
 #include <config.h>
 #include "button.h"
+#include "buzzer.h"
 
 static unsigned long wait_for_button_release(unsigned long start_time) {
   pinMode(PIN_INTERRUPT, INPUT);
+  bool hold_buzzer_fired = false;
   while (digitalRead(PIN_INTERRUPT) == LOW && millis() - start_time < BUTTON_SOFT_RESET_TIME) {
+    if (!hold_buzzer_fired && millis() - start_time >= BUTTON_HOLD_TIME) {
+      buzzer_beep_pattern(2, 100, 100);
+      hold_buzzer_fired = true;
+    }
     delay(10);
   }
   return millis() - start_time;
