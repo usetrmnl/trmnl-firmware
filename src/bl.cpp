@@ -815,10 +815,6 @@ void bl_init(void)
     WifiCredentials lastCreds = WifiCaptivePortal.getLastCredentials();
     bModemNeeded = lastCreds.is5GHz;
     Log.info("%s [%d]: modem needed = %d\n\r", __FILE__, __LINE__, bModemNeeded);
-    if (bModemNeeded) {
-        modem_reset_target(); // reset it here so that it will be ready when we need it
-        // No need to add an extra delay since the other systems add delay before WiFi is activated
-    }
   }
 #endif // X
   pins_init();
@@ -1180,6 +1176,7 @@ void bl_init(void)
   // wifiErrorDeepSleep();
 #ifdef BOARD_TRMNL_X
   if (bModemNeeded) {
+    modem_reset_target(); // Must be done BEFORE the instantiation of the class since it expects the modem to be ready
     static Modem modemInstance(115200);
     if (modemInstance.isInitialized()) {
       g_modem = &modemInstance;
