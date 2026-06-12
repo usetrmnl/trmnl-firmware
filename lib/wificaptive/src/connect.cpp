@@ -180,6 +180,16 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
     // always start with a clean state - disable any previous configuration
     disableWpa2Enterprise();
 
+    // Pick the strongest AP when an SSID is broadcast by multiple access points
+    // (mesh/roaming networks). The arduino-esp32 default is WIFI_FAST_SCAN, which
+    // associates with the FIRST AP found for the SSID regardless of signal strength,
+    // so the device can latch onto a weak/distant AP. WIFI_ALL_CHANNEL_SCAN scans
+    // every channel first, then WIFI_CONNECT_AP_BY_SIGNAL connects to the AP with the
+    // highest RSSI. Trade-off: a full-channel scan adds ~1-2s to each connect, which is
+    // an acceptable cost for reliably joining the nearest AP. See issue #285.
+    WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
+    WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
+
     wl_status_t beginResult;
 
     if (credentials.isEnterprise)
