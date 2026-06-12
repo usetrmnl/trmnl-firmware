@@ -53,6 +53,13 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
 		response->addHeader("Content-Type", "image/svg+xml");
     	request->send(response); });
 
+    server.on("/restart", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+                request->send(200);
+                delay(100);
+                ESP.restart();
+              });
+
     server.on("/soft-reset", HTTP_ANY, [callbacks](AsyncWebServerRequest *request)
               {
 		callbacks.resetSettings();
@@ -69,6 +76,25 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
                 Serial.println("Running sensor test from web...");
                 String json = testTemperature();
                 request->send(200, "application/json", json);
+              });
+
+    server.on("/get-ethernet", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+                Preferences prefs;
+                prefs.begin("data", true);
+                bool enabled = prefs.getBool("eth_enabled", false);
+                prefs.end();
+                request->send(200, "application/json", enabled ? "{\"enabled\":true}" : "{\"enabled\":false}");
+              });
+
+    server.on("/set-ethernet", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+                bool enabled = request->hasParam("enabled") && request->getParam("enabled")->value() == "1";
+                Preferences prefs;
+                prefs.begin("data", false);
+                prefs.putBool("eth_enabled", enabled);
+                prefs.end();
+                request->send(200, "application/json", enabled ? "{\"enabled\":true}" : "{\"enabled\":false}");
               });
 
     auto scanGET = server.on("/scan", HTTP_GET, [callbacks, modemMac](AsyncWebServerRequest *request)

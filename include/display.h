@@ -41,6 +41,8 @@ enum MSG
   FILL_WHITE,
   WIFI_RETRY_LIMIT,
   CAPTIVE_WIFI_TIMEOUT,
+  ETH_NOT_DETECTED,
+  ETH_DHCP_FAILED,
 };
 
 typedef struct dp_tag
