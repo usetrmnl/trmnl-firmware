@@ -2,6 +2,7 @@
 #include <WiFi.h>
 #include <bl.h>
 #include <wifi_network.h>
+#include <power.h>
 #include <device_id.h>
 #include <trmnl_log.h>
 #include <types.h>
@@ -1057,7 +1058,7 @@ void bl_init(void)
   }
 #ifdef BOARD_TRMNL_X
   battery_count = detect_battery_count();
-  battery_charging = is_charging();
+  battery_charging = (get_charging_status() == ChargingStatus::CHARGING);
   Log_info("BATTERY COUNT: %d", battery_count);
   Log_info("BATTERY CHARGING: %s", battery_charging ? "YES" : "NO");
 
@@ -1593,12 +1594,11 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   inputs.specialFunction = special_function;
   inputs.imageCached = bUsedCachedImage;
   inputs.prevWakeTime = iPrevWakeTime;
-  inputs.usbConnected = false;
-  
+  inputs.usbStatus = get_usb_status();
+  inputs.chargingStatus = get_charging_status();
+
 #ifdef BOARD_TRMNL_X
-  inputs.usbConnected = check_usb_power();
   inputs.batteryCount = battery_count;
-  inputs.batteryCharging = battery_charging; // 1 charging, 0 not charging
   if (lipo._initialized) { // only report SoC if battery was detected and BQ27427 initialized successfully
     inputs.stateOfCharge = lipo.soc();
     inputs.stateOfHealth = lipo.soh();

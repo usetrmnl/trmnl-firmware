@@ -10,10 +10,15 @@ HttpHeaderList buildDisplayHeaders(const ApiDisplayInputs &inputs)
   headers.push_back({"Access-Token", inputs.apiKey});
   headers.push_back({"Refresh-Rate", String(inputs.refreshRate)});
   headers.push_back({"Battery-Voltage", String(inputs.batteryVoltage)});
+
+  if (inputs.chargingStatus != ChargingStatus::UNKNOWN)
+    headers.push_back({"Battery-Charging", String(inputs.chargingStatus == ChargingStatus::CHARGING ? "1" : "0")});
+
+  if (inputs.usbStatus != UsbStatus::UNKNOWN)
+    headers.push_back({"USB-Connected", inputs.usbStatus == UsbStatus::CONNECTED ? "true" : "false"});
+
 #ifdef BOARD_TRMNL_X
   headers.push_back({"Battery-Count", String(inputs.batteryCount)});
-  headers.push_back({"Battery-Charging", String(inputs.batteryCharging)});
-  headers.push_back({"USB-Connected", inputs.usbConnected ? "true" : "false"});
   headers.push_back({"Percent-Charged", String(inputs.stateOfCharge)});
   headers.push_back({"Battery-Health", String(inputs.stateOfHealth)});
   headers.push_back({"Battery-Current", String(inputs.batteryCurrent)});
