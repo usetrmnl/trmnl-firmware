@@ -91,6 +91,9 @@ RTC_DATA_ATTR int iUpdateCount = 0;
 #include <ctype.h> //iscntrl()
 #include <api-client/display.h>
 #include <trmnl_log.h>
+#include "png.h"
+extern image_err_e png_res;
+#include "webp_decode.h"
 #include "png_flip.h"
 #include "nicoclean_8.h"
 #include "Inter_18.h"
@@ -1630,6 +1633,14 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     else if (MOTOSHORT(image_buffer) == 0xffd8) {
         Log_info("Drawing JPEG");
         iRefreshMode = jpeg_to_epd(image_buffer, data_size);
+    }
+    else if (is_webp_buffer(image_buffer, data_size)) {
+        Log_info("Drawing WebP");
+        int wrc = webp_to_epd(image_buffer, data_size, 0);
+        if (wrc != 0) {
+            Log_error("%s [%d]: webp_to_epd failed (%d)\r\n", __FILE__, __LINE__, wrc);
+            png_res = PNG_DECODE_ERR;
+        }
     }
     else // uncompressed BMP or Group5 compressed image
     {
