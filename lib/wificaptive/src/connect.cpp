@@ -278,7 +278,13 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
     {
         // regular connection
         WiFi.mode(WIFI_STA);
-
+#ifdef CONFIG_IDF_TARGET_ESP32C5
+        if (credentials.is5GHz) {
+            // Enable 5GHz network
+            Log_info("Configuring for 5GHz only");
+            esp_wifi_set_band_mode(WIFI_BAND_MODE_5G_ONLY);
+        }
+#endif
         // Configure static IP if specified (must be before WiFi.begin)
         configureStaticIP(credentials);
 
@@ -300,7 +306,9 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
     {
         WiFi.removeEvent(i);
     }
-
+    if (result == WL_CONNECTED) {
+        Log_info("Connected to %s network\n", (WiFi.channel() >= 36) ? "5GHz" : "2.4GHz");
+    }
     return {result, eventData};
 }
 

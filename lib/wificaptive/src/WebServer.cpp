@@ -144,6 +144,7 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
 		String pswd = data["pswd"];
         String api_server = data["server"];
         bool isEnterprise = data["isEnterprise"].is<bool>() && data["isEnterprise"].as<bool>();
+        bool is5GHz = data["is5GHz"].is<bool>() && data["is5GHz"].as<bool>();
         String username = data["username"].is<String>() ? data["username"].as<String>() : "";
         String identity = data["identity"].is<String>() ? data["identity"].as<String>() : "";
 
@@ -158,6 +159,7 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
         credentials.ssid = ssid;
         credentials.pswd = pswd;
         credentials.isEnterprise = isEnterprise;
+        credentials.is5GHz = is5GHz;
         credentials.username = username;
         credentials.identity = identity;
         // Static IP settings
@@ -177,7 +179,7 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
             Log_info("WebServer: Saved NTP server: %s", ntpServer.c_str());
         }
 
-        Log_info("WebServer: Received SSID: %s, Static IP: %s", ssid.c_str(), useStaticIP ? "yes" : "no");
+        Log_info("WebServer: Received SSID: %s, Static IP: %s, is5GHz: %s", ssid.c_str(), useStaticIP ? "yes" : "no", is5GHz ? "yes" : "no");
 
         callbacks.setConnectionCredentials(credentials, api_server);
         String mac = WiFi.macAddress();
