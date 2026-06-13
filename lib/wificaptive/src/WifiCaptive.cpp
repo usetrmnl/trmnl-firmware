@@ -154,14 +154,12 @@ bool WifiCaptive::startPortal()
                      credentials.useStaticIP ? "yes" : "no",
                      credentials.staticIP.c_str());
 
-            // Detect 5 GHz from the external network list
-            bool is5GHz = false;
-            for (auto& n : _networks)
-                if (n.ssid == credentials.ssid) { is5GHz = n.is5GHz; break; }
-            credentials.is5GHz = is5GHz;
-
+            // Detect 5GHz from what the user chose in the captive portal
+            // If we check the first matching ssid from our saved list, it might not be the band
+            // that the user chose in the captive portal (AP with 2.4GHz and 5GHz enabled)
+            Log_info("credentials.is5GHz: %s", credentials.is5GHz ? "yes" : "no");
             bool res = false;
-            if (is5GHz && _modemConnectCallback)
+            if (credentials.is5GHz && _modemConnectCallback)
             {
                 res = _modemConnectCallback(credentials.ssid, credentials.pswd);
                 if (res) connected_via_modem = true;
@@ -350,7 +348,7 @@ void WifiCaptive::readWifiCredentials()
 
 void WifiCaptive::saveWifiCredentials(const WifiCredentials credentials)
 {
-    Log_info("Saving wifi credentials: %s (Enterprise: %s)", credentials.ssid.c_str(), credentials.isEnterprise ? "yes" : "no");
+    Log_info("Saving wifi credentials: %s Enterprise: %s, is5GHz: %s", credentials.ssid.c_str(), credentials.isEnterprise ? "yes" : "no", credentials.is5GHz ? "yes" : "no");
 
     // Check if the credentials already exist
     for (u16_t i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
@@ -649,6 +647,9 @@ bool WifiCaptive::autoConnect()
 
         if (tryConnectWithRetries(_savedWifis[last_used_index], last_used_index))
         {
+            if (WiFi.channel() >= 36) {
+                Log_info("Connected to 5GHz network");
+            }
             return true;
         }
     }
@@ -694,10 +695,11 @@ bool WifiCaptive::tryConnectWithRetries(const WifiCredentials creds, int last_us
 {
     for (int attempt = 0; attempt < WIFI_CONNECTION_ATTEMPTS; attempt++)
     {
-        Log_info("Attempt %d to connect to %s (Enterprise: %s, Static IP: %s, IP: %s)",
+        Log_info("Attempt %d to connect to %s (Enterprise: %s, Static IP: %s, 5GHz: %s, IP: %s)",
                  attempt + 1, creds.ssid.c_str(),
                  creds.isEnterprise ? "yes" : "no",
                  creds.useStaticIP ? "yes" : "no",
+                 creds.is5GHz ? "yes" : "no",
                  creds.staticIP.c_str());
         connect(creds);
         if (WiFi.status() == WL_CONNECTED)
