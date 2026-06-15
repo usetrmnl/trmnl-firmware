@@ -70,5 +70,5 @@ bool submitLogToApi(LogApiInput &input, const char *api_url)
                     // HTTP header has been send and Server response header has been handled
                     Log_info("[HTTPS] POST OK, code: %d", httpCode);
 
-                    return true; });
+                    return true; }, /*resumable=*/true);
 }

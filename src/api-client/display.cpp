@@ -147,5 +147,5 @@ ApiDisplayResult fetchApiDisplay(ApiDisplayInputs &apiDisplayInputs)
               .response = apiResponse,
               .error_detail = ""};
         }
-      });
+      }, /*resumable=*/true);
 }
