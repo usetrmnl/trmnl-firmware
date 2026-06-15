@@ -93,3 +93,15 @@ jobs:
           aws s3 cp "$OTA_FILE" "${DEST}/${OTA_FILE}"
           aws s3 cp "$FLASH_FILE" "${DEST}/${FLASH_FILE}"
           aws s3 cp latest.json "${DEST}/latest.json" --content-type application/json --cache-control no-cache
+
+      - name: Prune old firmware (keep 50 newest .bin)
+        run: |
+          PREFIX="${{ matrix.folder }}/dev/"
+          # Newest-first list of .bin keys (latest.json is left untouched).
+          aws s3api list-objects-v2 --bucket trmnl-fw --prefix "$PREFIX" \
+            --query "reverse(sort_by(Contents[?ends_with(Key, '.bin')], &LastModified))[].Key" \
+            --output text | tr '\t' '\n' | tail -n +51 | while read -r key; do
+              [ -z "$key" ] && continue
+              echo "Deleting old firmware: $key"
+              aws s3 rm "s3://trmnl-fw/${key}"
+            done
