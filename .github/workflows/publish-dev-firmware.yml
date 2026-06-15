@@ -1,14 +1,10 @@
 name: publish-dev-firmware
 
 on:
-  # Called by build.yml after build-test passes on pushes to main.
-  workflow_call:
-  # TODO: remove this push trigger after merge — it exists only so we can test
-  # dev publishing on the branch before it lands on main (workflow_dispatch is
-  # invisible until the workflow exists on the default branch). On a branch push
-  # this runs standalone, skipping build.yml's build-test gate.
-  push:
-    branches: [add-dev-builds]
+  # triggered by build.yml only if the tests pass:
+  workflow_call: {}
+  # or triggered manually:
+  workflow_dispatch: {}
 
 jobs:
   publish:
