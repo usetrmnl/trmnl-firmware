@@ -35,6 +35,9 @@
 #include <api-client/display.h>
 #include <api-client/request_headers.h>
 #include "driver/gpio.h"
+#ifdef BOARD_SEEED_RETERMINAL_E1004
+#include "driver/rtc_io.h"
+#endif
 #include "esp_ota_ops.h"
 #include "esp_sntp.h"
 #include "esp_flash.h"
@@ -803,7 +806,11 @@ void bl_init(void)
 #endif
   startup_time = init_time/1000L; // convert to milliseconds
 #ifdef DEV_FIRMWARE
+  #ifdef BOARD_SEEED_RETERMINAL_E1004
+  Serial.begin(115200, SERIAL_8N1, 44, 43);
+  #else
   Serial.begin(115200);
+  #endif
   wait_for_serial();
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
 #endif
@@ -3204,6 +3211,15 @@ static bool checkAndPerformFirmwareUpdate(void)
     return false; // if we got here, it failed
 }
 
+#ifdef BOARD_SEEED_RETERMINAL_E1004
+static void configureWakeButtonForSleep(void)
+{
+  pinMode(PIN_INTERRUPT, INPUT_PULLUP);
+  rtc_gpio_pullup_en(static_cast<gpio_num_t>(PIN_INTERRUPT));
+  rtc_gpio_pulldown_dis(static_cast<gpio_num_t>(PIN_INTERRUPT));
+}
+#endif
+
 /**
  * @brief Function to sleep preparing and go to sleep
  * @param none
@@ -3264,6 +3280,9 @@ void goToSleep(void)
   pinMode(PIN_INTERRUPT, INPUT); // needed to not immediately wake up
   esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
 #elif defined(CONFIG_IDF_TARGET_ESP32S3)
+  #ifdef BOARD_SEEED_RETERMINAL_E1004
+  configureWakeButtonForSleep();
+  #endif
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
@@ -3290,6 +3309,9 @@ static void goToSleepButtonOnly(void)
 #elif defined( CONFIG_IDF_TARGET_ESP32C3 ) || defined ( CONFIG_IDF_TARGET_ESP32C5 )
   esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
 #elif CONFIG_IDF_TARGET_ESP32S3
+  #ifdef BOARD_SEEED_RETERMINAL_E1004
+  configureWakeButtonForSleep();
+  #endif
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
@@ -3470,7 +3492,7 @@ static float readBatteryVoltage(void)
     return -1.0;
   }
 #else
-  #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002)
+  #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002) || defined(BOARD_SEEED_RETERMINAL_E1004)
     pinMode(PIN_VBAT_SWITCH, OUTPUT);
     digitalWrite(PIN_VBAT_SWITCH, VBAT_SWITCH_LEVEL);
     delay(10); // Wait for the switch to stabilize
