@@ -1726,8 +1726,7 @@ static https_request_err_e downloadAndShow()
 
   #ifdef BOARD_TRMNL_X
 // Special logic (TRMNL-X only) to download and disply the image if using a 5GHz AP
-  if (status && !update_firmware && !reset_firmware &&
-      WifiCaptivePortal.getLastCredentials().is5GHz && g_modem)
+  if (status && !reset_firmware && WifiCaptivePortal.getLastCredentials().is5GHz && g_modem)
   {
     Log_info("Downloading image via modem (5 GHz path)");
 
@@ -1797,7 +1796,7 @@ static https_request_err_e downloadAndShow()
           https.addHeader("Access-Token", apiDisplayInputs.apiKey);
         }
 
-        if (status && !update_firmware && !reset_firmware)
+        if (status && !reset_firmware)
         {
           status = false;
 
