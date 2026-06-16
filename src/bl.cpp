@@ -3269,8 +3269,17 @@ void goToSleep(void)
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
 #endif
 #ifdef BOARD_XTEINK_X4
+// The Xteink X4 has a high current draw in deep sleep (3-4mA), so allow the user to select
+// if they want to completely shut down the power and only update with a physical button press
+// or have short battery life (5-7 days) in the normal TRMNL wakeup mode
+#ifdef X4_WAKE_ON_BUTTON
+  pinMode(13, OUTPUT);
+  digitalWrite(13, 0); // cut off the battery power
+  delay(100); // allow it to settle before going into power-off
+#else // Keep the battery power on and allow timed wakeup
   gpio_hold_en(GPIO_NUM_13); // MOSFET enabling the battery power
   gpio_deep_sleep_hold_en(); // Needed to keep the battery power enabled during RTC sleep
+#endif
 #endif
   esp_deep_sleep_start();
 }
