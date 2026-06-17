@@ -28,7 +28,7 @@
 #include "api-client/submit_log.h"
 #include <api-client/setup.h>
 #include <special_function.h>
-#include <ota_schedule.h>
+#include <firmware_update.h>
 #include <api_response_parsing.h>
 #include "logging_parcers.h"
 #include <SPIFFS.h>
@@ -36,7 +36,6 @@
 #include <api-client/display.h>
 #include <api-client/request_headers.h>
 #include "driver/gpio.h"
-#include "esp_ota_ops.h"
 #include "esp_sntp.h"
 #include "esp_flash.h"
 #include <nvs.h>
@@ -81,14 +80,12 @@ String new_filename = "";
 ApiDisplayResult apiDisplayResult;
 uint8_t *buffer = nullptr;
 char filename[1024];      // image URL
-char binUrl[1024];        // update URL
 char message_buffer[128]; // message to show on the screen
 uint32_t time_since_sleep;
 image_err_e png_res = PNG_DECODE_ERR;
 bmp_err_e bmp_res = BMP_NOT_BMP;
 static float vBatt;
 bool status = false;          // need to download a new image
-bool update_firmware = false; // need to download a new firmware
 bool reset_firmware = false;  // need to reset credentials
 bool send_log = false;        // need to send logs
 bool double_click = false;
@@ -113,7 +110,6 @@ static void getDeviceCredentials();                  // receiveing API key and F
 static bool performApiSetup();     // perform API setup call and return success
 static void downloadSetupImage();                    // download and display setup image
 static void resetDeviceCredentials(void);            // reset device credentials API key, Friendly ID, Wi-Fi SSID and password
-static bool checkAndPerformFirmwareUpdate(void);     // OTA update
 void goToSleep(void);                         // sleep preparing
 static void goToSleepButtonOnly(void);               // sleep until button press, no timer
 static bool setClock(void);                          // clock synchronization
@@ -124,6 +120,10 @@ static void writeImageToFile(const char *name, uint8_t *in_buffer, size_t size);
 void showMessageWithLogo(MSG message_type);
 static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, const char *fw_version, String message);
 static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiResponse);
+FirmwareUpdateService firmwareUpdateService(
+    preferencesPersistence,
+    getTime,
+    WIFI_CONNECTION_RSSI);
 static void wifiErrorDeepSleep();
 static uint8_t *storedLogoOrDefault(int iType);
 static bool checkCurrentFileName(String &newName);
@@ -1427,21 +1427,11 @@ void bl_init(void)
   }
 
   // OTA update checking
-  if (update_firmware)
-  {
-    uint32_t now = getTime();
-    if (otaAttemptDue(now, otaLastAttempt(preferencesPersistence))) {
-      Log.info("%s [%d]: Last OTA attempt was > 24h ago, proceeding with download...\r\n", __FILE__, __LINE__);
-      if (!checkAndPerformFirmwareUpdate()) {
-        Log.info("%s [%d]: OTA update failed, storing the timestamp to prevent boot looping.\r\n", __FILE__, __LINE__);
-        otaRecordAttempt(preferencesPersistence, now);
-        update_firmware = false;
-      }
-    } else {
-      Log.info("%s [%d]: Last OTA attempt was < 24h ago, skipping...\r\n", __FILE__, __LINE__);
-      update_firmware = false; // logic further down will use this to decide to sleep vs reboot
-    }
-  }
+  FirmwareUpdateResult firmwareUpdateResult = firmwareUpdateService.tryUpdate(
+      apiDisplayResult.response.update_firmware,
+      apiDisplayResult.response.firmware_url);
+  if (firmwareUpdateResult.failureMessage != NONE)
+    showMessageWithLogo(firmwareUpdateResult.failureMessage);
 
   // error handling
   switch (request_result)
@@ -1519,10 +1509,13 @@ void bl_init(void)
   // display go to sleep
   Log_info("%s [%d]: BL done, going to sleep...", __FILE__, __LINE__);
   display_sleep();
-  if (!update_firmware)
-    goToSleep();
-  else
+  if (firmwareUpdateResult.updated)
+  {
+    showMessageWithLogo(FW_UPDATE_SUCCESS);
     ESP.restart();
+  }
+  else
+    goToSleep();
 } /* bl_init() */
 
 /**
@@ -2165,8 +2158,6 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
     case 0:
     {
       String image_url = apiResponse.image_url;
-      update_firmware = apiResponse.update_firmware;
-      String firmware_url = apiResponse.firmware_url;
       uint64_t rate = apiResponse.refresh_rate;
       reset_firmware = apiResponse.reset_firmware;
 
@@ -2174,15 +2165,6 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
 
       writeSpecialFunction(apiResponse.special_function);
 
-      if (update_firmware)
-      {
-        Log.info("%s [%d]: update firmware. Check URL\r\n", __FILE__, __LINE__);
-        if (firmware_url.length() == 0)
-        {
-          Log.error("%s [%d]: Empty URL\r\n", __FILE__, __LINE__);
-          update_firmware = false;
-        }
-      }
       if (image_url.length() > 0)
       {
         Log.info("%s [%d]: image_url: %s\r\n", __FILE__, __LINE__, image_url.c_str());
@@ -2252,12 +2234,6 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           }
         }
       }
-      Log.info("%s [%d]: update_firmware: %d\r\n", __FILE__, __LINE__, update_firmware);
-      if (firmware_url.length() > 0)
-      {
-        Log.info("%s [%d]: firmware_url: %s\r\n", __FILE__, __LINE__, firmware_url.c_str());
-        firmware_url.toCharArray(binUrl, firmware_url.length() + 1);
-      }
       Log.info("%s [%d]: refresh_rate: %d\r\n", __FILE__, __LINE__, rate);
       if (rate != preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP))
       {
@@ -2270,7 +2246,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
         Log.info("%s [%d]: Reset status is true\r\n", __FILE__, __LINE__);
       }
 
-      if (update_firmware)
+      if (apiResponse.update_firmware && apiResponse.firmware_url.length() > 0)
         result = HTTPS_SUCCESS;
       if (reset_firmware)
         result = HTTPS_RESET;
@@ -3076,142 +3052,6 @@ static void resetDeviceCredentials(void)
     Log.error("%s [%d]: The device reseting error. The device will be reset now...\r\n", __FILE__, __LINE__);
   preferences.end();
   ESP.restart();
-}
-
-/**
- * @brief Function to check and performing OTA update
- * @param none
- * @return true for success, false for failure
- */
-static bool checkAndPerformFirmwareUpdate(void)
-{
-#ifdef BOARD_TRMNL_X
-  if (g_modem && WifiCaptivePortal.getLastCredentials().is5GHz)
-  {
-    Log.info("%s [%d]: Starting modem OTA download...\r\n", __FILE__, __LINE__);
-
-    const esp_partition_t* update_partition = esp_ota_get_next_update_partition(nullptr);
-    if (!update_partition) {
-      Log.fatal("%s [%d]: No OTA partition available\r\n", __FILE__, __LINE__);
-      showMessageWithLogo(FW_UPDATE_FAILED);
-      return false;
-    }
-
-    esp_ota_handle_t ota_handle = 0;
-    esp_err_t err = esp_ota_begin(update_partition, OTA_SIZE_UNKNOWN, &ota_handle);
-    if (err != ESP_OK) {
-      Log.fatal("%s [%d]: esp_ota_begin failed: %s\r\n", __FILE__, __LINE__, esp_err_to_name(err));
-      showMessageWithLogo(FW_UPDATE_FAILED);
-      return false;
-    }
-
-    showMessageWithLogo(FW_UPDATE);
-
-    bool write_ok = true;
-    auto result = g_modem->httpGet(
-      String(binUrl),
-      [&](const uint8_t* data, size_t len) -> bool {
-        esp_err_t e = esp_ota_write(ota_handle, data, len);
-        if (e != ESP_OK) {
-          Log.fatal("%s [%d]: esp_ota_write failed: %s\r\n", __FILE__, __LINE__, esp_err_to_name(e));
-          write_ok = false;
-          return false;
-        }
-        return true;
-      }
-    );
-
-    if (!result.ok || !write_ok) {
-      esp_ota_abort(ota_handle);
-      Log.fatal("%s [%d]: Modem OTA download failed\r\n", __FILE__, __LINE__);
-      showMessageWithLogo(FW_UPDATE_FAILED);
-      return false;
-    }
-
-    err = esp_ota_end(ota_handle);
-    if (err != ESP_OK) {
-      Log.fatal("%s [%d]: esp_ota_end failed: %s\r\n", __FILE__, __LINE__, esp_err_to_name(err));
-      showMessageWithLogo(FW_UPDATE_FAILED);
-      return false;
-    }
-
-    err = esp_ota_set_boot_partition(update_partition);
-    if (err != ESP_OK) {
-      Log.fatal("%s [%d]: esp_ota_set_boot_partition failed: %s\r\n", __FILE__, __LINE__, esp_err_to_name(err));
-      showMessageWithLogo(FW_UPDATE_FAILED);
-      return false;
-    }
-
-    Log.info("%s [%d]: Modem OTA successful. Rebooting...\r\n", __FILE__, __LINE__);
-    showMessageWithLogo(FW_UPDATE_SUCCESS);
-    esp_restart();
-    return true;
-  }
-#endif
-
-  bool ota_ok = false;
-  withHttp(binUrl, [&](HTTPClient *https, HttpError errorCode) -> bool
-           {
-             if (errorCode != HttpError::HTTPCLIENT_SUCCESS || !https)
-             {
-               Log.fatal("%s [%d]: Unable to connect for firmware update\r\n", __FILE__, __LINE__);
-               if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
-               {
-                 showMessageWithLogo(API_FIRMWARE_UPDATE_ERROR);
-               }
-               else
-               {
-                 showMessageWithLogo(WIFI_WEAK);
-               }
-               return false;
-             }
-
-             int httpCode = https->GET();
-             if (httpCode == HTTP_CODE_OK)
-             {
-               Log.info("%s [%d]: Downloading .bin file...\r\n", __FILE__, __LINE__);
-
-               size_t contentLength = https->getSize();
-               // Perform firmware update
-               if (Update.begin(contentLength))
-               {
-                 Log.info("%s [%d]: Firmware update start\r\n", __FILE__, __LINE__);
-                 showMessageWithLogo(FW_UPDATE);
-
-                 if (Update.writeStream(https->getStream()))
-                 {
-                   if (Update.end(true))
-                   {
-                     Log.info("%s [%d]: Firmware update successful. Rebooting...\r\n", __FILE__, __LINE__);
-                     showMessageWithLogo(FW_UPDATE_SUCCESS);
-                     ota_ok = true;
-                   }
-                   else
-                   {
-                     Log.fatal("%s [%d]: Firmware update failed!\r\n", __FILE__, __LINE__);
-                     showMessageWithLogo(FW_UPDATE_FAILED);
-                   }
-                 }
-                 else
-                 {
-                   Log.fatal("%s [%d]: Write to firmware update stream failed!\r\n", __FILE__, __LINE__);
-                   showMessageWithLogo(FW_UPDATE_FAILED);
-                 }
-               }
-               else
-               {
-                 Log.fatal("%s [%d]: Begin firmware update failed!\r\n", __FILE__, __LINE__);
-                 showMessageWithLogo(FW_UPDATE_FAILED);
-               }
-             }
-             else
-             {
-               Log.fatal("%s [%d]: Firmware GET failed, code: %d\r\n", __FILE__, __LINE__, httpCode);
-               showMessageWithLogo(API_FIRMWARE_UPDATE_ERROR);
-             }
-             return false;
-           });
-  return ota_ok;
 }
 
 /**
