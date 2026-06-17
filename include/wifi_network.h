@@ -12,4 +12,10 @@ struct WiFiStatus
 /// @brief Resolve the current Wi-Fi status
 WiFiStatus getWiFiStatus(void);
 
+/// @brief Connect using credentials saved in WifiCaptivePortal
+bool connectWithSavedCredentials(void);
+
+/// @brief Ensure WiFi is connected, reconnecting with saved credentials if needed.
+bool ensureWifiConnected(void);
+
 #endif // WIFI_NETWORK_H
