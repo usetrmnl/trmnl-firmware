@@ -3135,7 +3135,7 @@ static bool checkAndPerformFirmwareUpdate(void)
   }
 #endif
 
-	showMessageWithLogo(FW_UPDATE);
+  showMessageWithLogo(FW_UPDATE);
 
   if (!ensureWifiConnected())
   {
