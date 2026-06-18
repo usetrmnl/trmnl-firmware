@@ -4,6 +4,7 @@
 #include <trmnl_log.h>
 #include <Update.h>
 #include <WiFi.h>
+#include <wifi_network.h>
 #include <HTTPClient.h>
 #include "esp_ota_ops.h"
 
@@ -117,6 +118,13 @@ bool FirmwareUpdateService::performFirmwareUpdate()
     return true;
   }
 #endif
+
+  if (!ensureWifiConnected())
+  {
+    Log_fatal("%s [%d]: Unable to reconnect WiFi for firmware update\r\n", __FILE__, __LINE__);
+    _failureMessage = API_FIRMWARE_UPDATE_ERROR;
+    return false;
+  }
 
   bool ota_ok = false;
   withHttp(_firmwareUrl, [&](HTTPClient *https, HttpError errorCode) -> bool
