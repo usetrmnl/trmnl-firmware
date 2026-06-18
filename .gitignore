@@ -8,7 +8,11 @@
 .vscode/ipch
 .idea
 .vscode/settings.json
-sdkconfig.*
-!sdkconfig.defaults
+# Per-target ESP-IDF sdkconfigs are committed under sdkconfigs/.
+# Ignore any sdkconfig.* generated at the repo root (legacy / non-redirected envs).
+/sdkconfig.*
+# These per-target configs are build-generated and intentionally not committed.
+/sdkconfigs/sdkconfig.trmnl
+/sdkconfigs/sdkconfig.local
 managed_components/
 test/integration/test_config.h
