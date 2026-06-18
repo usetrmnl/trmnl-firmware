@@ -512,6 +512,63 @@ uint16_t display_width()
     return bbep.width();
 }
 
+void display_draw_touchbar_indicator(touchbar_side_t side, bool filled)
+{
+    const int radius = 24;
+    const int margin_bottom = 20;
+    int w = bbep.width();
+    int h = bbep.height();
+    int x;
+    switch (side) {
+        case TOUCHBAR_LEFT:   x = w / 6;     break;
+        case TOUCHBAR_MIDDLE: x = w / 2;     break;
+        case TOUCHBAR_RIGHT:  x = w * 5 / 6; break;
+        default: return;
+    }
+    int y = h - margin_bottom - radius;
+#ifdef BOARD_X_CLASS
+    int cur_mode = bbep.getMode();
+    int prev_mode = bbep.getPreviousMode();
+    if (prev_mode == BB_MODE_NONE) {
+        // pCurrent is uninitialized (black). Fill both buffers with white so
+        // only the indicator pixels produce a diff in partialUpdate.
+        bbep.fillScreen(BBEP_WHITE);
+        int sz = bbep.width() * bbep.height() / 8; // 1BPP bytes
+        memcpy(bbep.previousBuffer(), bbep.currentBuffer(), sz);
+        bbep.setPreviousMode(cur_mode);
+    }
+    {
+        const int rect_h = radius * 2;
+        const int rect_w = rect_h * 4;
+        const int border = 3;
+        int rx = x - rect_w / 2;
+        int ry = y - rect_h / 2;
+        uint8_t fill_color   = filled ? BBEP_BLACK : BBEP_WHITE;
+        uint8_t border_color = filled ? BBEP_WHITE : BBEP_BLACK;
+        bbep.fillRect(rx, ry, rect_w, rect_h, fill_color);
+        for (int b = 0; b < border; b++) {
+            bbep.drawRect(rx + b, ry + b, rect_w - b * 2, rect_h - b * 2, border_color);
+        }
+    }
+    bbep.partialUpdate(true);
+#else
+    {
+        const int rect_h = radius * 2;
+        const int rect_w = rect_h * 4;
+        const int border = 3;
+        int rx = x - rect_w / 2;
+        int ry = y - rect_h / 2;
+        uint8_t fill_color   = filled ? BBEP_BLACK : BBEP_WHITE;
+        uint8_t border_color = filled ? BBEP_WHITE : BBEP_BLACK;
+        bbep.fillRect(rx, ry, rect_w, rect_h, fill_color);
+        for (int b = 0; b < border; b++) {
+            bbep.drawRect(rx + b, ry + b, rect_w - b * 2, rect_h - b * 2, border_color);
+        }
+    }
+    bbep.refresh(REFRESH_PARTIAL, true);
+#endif
+}
+
 /**
  * @brief Function to draw multi-line text onto the display
  * @param x_start X coordinate to start drawing

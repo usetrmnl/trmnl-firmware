@@ -175,6 +175,10 @@ iqs323_ch_states button_states[3];
 uint16_t slider_position = 65535;
 iqs323_gesture_events slider_event = IQS323_GESTURE_NONE;
 bool otg_message = false;
+// Touchbar indicator to redraw after a full-refresh (e.g. logo screen)
+static touchbar_side_t pending_indicator_side = TOUCHBAR_LEFT;
+static bool pending_indicator_filled = false;
+static bool has_pending_indicator = false;
 
 #define SENSOR_SDA_PIN 39
 #define SENSOR_SCL_PIN 40
@@ -542,12 +546,25 @@ void check_channel_states(void)
         switch (i) {
         case 0:
           if (!hold) {
+            display_draw_touchbar_indicator(TOUCHBAR_LEFT, false);
             Log_info("Back button tapped");
             show_cached_image_by_offset(-1);
+          } else {
+            display_draw_touchbar_indicator(TOUCHBAR_LEFT, true);
+            Log_info("Back button hold");
+            show_cached_image_by_offset(-1);
+            // pending_indicator_side = TOUCHBAR_LEFT;
+            // pending_indicator_filled = true;
+            // has_pending_indicator = true;
           }
           break;
         case 1:
           if (hold) {
+            display_draw_touchbar_indicator(TOUCHBAR_MIDDLE, true);
+            Log_info("Middle button hold");
+            pending_indicator_side = TOUCHBAR_MIDDLE;
+            pending_indicator_filled = true;
+            has_pending_indicator = true;
             // Log_info("Middle button held - OTG toggle");
             // if (otg_state) {
             //   otg_turn_off();
@@ -560,13 +577,26 @@ void check_channel_states(void)
             // }
             // delay(1000);
             // showLastImageAndSleep();
+          } else {
+            display_draw_touchbar_indicator(TOUCHBAR_MIDDLE, false);
+            Log_info("Middle button tapped");
+            pending_indicator_side = TOUCHBAR_MIDDLE;
+            pending_indicator_filled = false;
+            has_pending_indicator = true;
           }
-          // No action - update on tap
           break;
         case 2:
           if (!hold) {
+            display_draw_touchbar_indicator(TOUCHBAR_RIGHT, false);
             Log_info("Next button tapped");
             show_cached_image_by_offset(+1);
+          } else {
+            display_draw_touchbar_indicator(TOUCHBAR_RIGHT, true);
+            Log_info("Next button hold");
+            show_cached_image_by_offset(+1);
+            // pending_indicator_side = TOUCHBAR_RIGHT;
+            // pending_indicator_filled = true;
+            // has_pending_indicator = true;
           }
           break;
         }
@@ -577,9 +607,11 @@ void check_channel_states(void)
           printf("CH: %d: Touch\n", i);
           switch (i) {
           case 0:
+            display_draw_touchbar_indicator(TOUCHBAR_LEFT, slider_event == IQS323_GESTURE_HOLD);
             Log_info("Back button pressed");
             break;
           case 1:
+            display_draw_touchbar_indicator(TOUCHBAR_MIDDLE, slider_event == IQS323_GESTURE_HOLD);
             Log_info("Middle button pressed");
             // if (otg_state) {
             //   otg_turn_off();
@@ -594,6 +626,7 @@ void check_channel_states(void)
             // showLastImageAndSleep();
             break;
           case 2:
+            display_draw_touchbar_indicator(TOUCHBAR_RIGHT, slider_event == IQS323_GESTURE_HOLD);
             Log_info("Next button pressed");
             break;
           }
@@ -1039,6 +1072,10 @@ void bl_init(void)
 
     if (!otg_message && WifiCaptivePortal.isSaved()) {
       display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false);
+      if (has_pending_indicator) {
+        display_draw_touchbar_indicator(pending_indicator_side, pending_indicator_filled);
+        has_pending_indicator = false;
+      }
     }
     else if (!WifiCaptivePortal.isSaved()) {
       showMessageWithLogo(NONE);
