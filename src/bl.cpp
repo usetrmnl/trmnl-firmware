@@ -318,7 +318,9 @@ static bool handle_confirmation_flow(bool &in_flag, MSG message, void (*on_confi
       }
 
       if (iqs323.channel_touchState(IQS323_CH0) || iqs323.channel_touchState(IQS323_CH2)) {
+        bool left_cancel = iqs323.channel_touchState(IQS323_CH0);
         Log_info("Confirmation cancelled - outer button in tap mode, status: left=%d right=%d", iqs323.channel_touchState(IQS323_CH0), iqs323.channel_touchState(IQS323_CH2));
+        display_draw_touchbar_indicator(left_cancel ? TOUCHBAR_LEFT : TOUCHBAR_RIGHT, false);
         in_flag = false;
         return false;
       }
@@ -332,10 +334,12 @@ static bool handle_confirmation_flow(bool &in_flag, MSG message, void (*on_confi
           }
           if (!iqs323.channel_touchState(IQS323_CH1)) {
             Log_info("Confirmation cancelled - tap on middle button in tap mode");
+            display_draw_touchbar_indicator(TOUCHBAR_MIDDLE, false);
             in_flag = false;
             return false;
           }
         }
+        display_draw_touchbar_indicator(TOUCHBAR_MIDDLE, true);
         Log_info("Confirmed - holding middle button in tap mode");
         in_flag = false;
         on_confirm();
