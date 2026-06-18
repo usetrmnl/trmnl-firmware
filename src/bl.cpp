@@ -1217,21 +1217,7 @@ void bl_init(void)
   {
     // WiFi saved, connection
     Log.info("%s [%d]: WiFi saved\r\n", __FILE__, __LINE__);
-#ifdef BOARD_TRMNL_X
-    WifiCredentials lastCreds = WifiCaptivePortal.getLastCredentials();
-    int connection_res;
-    if (lastCreds.is5GHz && g_modem)
-    {
-      Log.info("%s [%d]: 5 GHz network saved — connecting via modem\r\n", __FILE__, __LINE__);
-      connection_res = g_modem->connectToNetwork(lastCreds.ssid, lastCreds.pswd) ? 1 : 0;
-    }
-    else
-    {
-      connection_res = WifiCaptivePortal.autoConnect();
-    }
-#else
-    int connection_res = WifiCaptivePortal.autoConnect();
-#endif // BOARD_TRMNL_X
+    int connection_res = connectWithSavedCredentials() ? 1 : 0;
 
     Log.info("%s [%d]: Connection result: %d, WiFI Status: %d\r\n", __FILE__, __LINE__, connection_res, WiFi.status());
 
