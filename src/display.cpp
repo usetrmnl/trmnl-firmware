@@ -2275,6 +2275,30 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         bbep.println(string2);
     }
         break;
+    case ETH_NOT_DETECTED:
+    {
+        const char string1[] = "Ethernet adapter not detected. Check connection or";
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - (rect.h * 2));
+        bbep.println(string1);
+        const char string2[] = "hold left and right corners of touch bar to reset network settings.";
+        bbep.getStringBox(string2, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+        bbep.print(string2);
+    }
+    break;
+    case ETH_DHCP_FAILED:
+    {
+        const char string1[] = "Ethernet connected, but DHCP failed.";
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - (rect.h * 2));
+        bbep.println(string1);
+        const char string2[] = "Hold left and right corners of touch bar to reset network settings.";
+        bbep.getStringBox(string2, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+        bbep.print(string2);
+    }
+    break;
     default:
         break;
     }
