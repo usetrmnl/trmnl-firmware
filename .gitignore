@@ -13,6 +13,8 @@
 /sdkconfig.*
 # These per-target configs are build-generated and intentionally not committed.
 /sdkconfigs/sdkconfig.trmnl
+/sdkconfigs/sdkconfig.trmnl_4clr
+/sdkconfigs/sdkconfig.trmnl_gen2
 /sdkconfigs/sdkconfig.local
 managed_components/
 test/integration/test_config.h
