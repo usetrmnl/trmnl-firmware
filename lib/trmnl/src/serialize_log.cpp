@@ -23,6 +23,25 @@ String serialize_log(const LogWithDetails &input)
   json_log["free_heap_size"] = input.deviceStatusStamp.free_heap_size;
   json_log["max_alloc_size"] = input.deviceStatusStamp.max_alloc_size;
 
+  switch (input.level)
+  {
+  case LOG_VERBOSE:
+    json_log["level"] = "verbose";
+    break;
+  case LOG_INFO:
+    json_log["level"] = "info";
+    break;
+  case LOG_ERROR:
+    json_log["level"] = "error";
+    break;
+  case LOG_FATAL:
+    json_log["level"] = "fatal";
+    break;
+  default:
+    json_log["level"] = "info";
+    break;
+  }
+
   if (input.logRetry)
   {
     json_log["retry"] = input.retryAttempt;
