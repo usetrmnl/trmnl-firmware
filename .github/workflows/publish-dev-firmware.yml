@@ -16,7 +16,7 @@ jobs:
         include:
           - { env: trmnl, folder: trmnl_og }
           - { env: TRMNL_X, folder: trmnl_x }
-          - { env: trmnl_gen2, folder: trmnl_gen2 }
+          # - { env: trmnl_gen2, folder: trmnl_gen2 }
           - { env: trmnl_4clr, folder: trmnl_bwry }
 
     steps:
