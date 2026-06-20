@@ -1,6 +1,18 @@
 #pragma once
 #include <WiFiType.h>
 #include <Arduino.h>
+#include "../../../include/config.h"
+#include <WiFi.h>
+#include "esp_netif.h"
+
+inline void configureWifiHostname(void)
+{
+  WiFi.setHostname(WIFI_CLIENT_HOSTNAME);
+  esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+  if (netif != nullptr) {
+    esp_netif_set_hostname(netif, WIFI_CLIENT_HOSTNAME);
+  }
+}
 
 struct WifiStatusNode
 {

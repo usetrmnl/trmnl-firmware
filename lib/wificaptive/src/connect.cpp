@@ -209,6 +209,7 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
 
         // configure WPA2 Enterprise
         WiFi.mode(WIFI_STA);
+        configureWifiHostname();
         WiFi.disconnect();
         delay(100);
 
@@ -288,6 +289,7 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
     {
         // regular connection
         WiFi.mode(WIFI_STA);
+        configureWifiHostname();
 
         // Configure static IP if specified (must be before WiFi.begin)
         configureStaticIP(credentials);

@@ -10,6 +10,7 @@
 #include "esp_loader_io.h"
 #include "esp32_port.h"
 #include "modem.h"
+#include "../../../include/config.h"
 
 #if defined (BOARD_TRMNL_X) || defined (BOARD_TRLML_X_EPDIY)
 #include <LittleFS.h>
@@ -449,6 +450,9 @@ bool Modem::connectToNetwork(const String& ssid, const String& password) {
     Serial.println("[MODEM] connectToNetwork: AT+CWMODE=1 failed");
     return false;
   }
+
+  sendCommand("AT+CWHOSTNAME=\"" WIFI_CLIENT_HOSTNAME "\"");
+  waitForResponse("OK", 3000);
 
   String cmd = "AT+CWJAP=\"" + s + "\",\"" + p + "\"";
   sendCommand(cmd.c_str());
