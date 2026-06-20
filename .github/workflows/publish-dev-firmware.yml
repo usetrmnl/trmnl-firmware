@@ -16,7 +16,7 @@ jobs:
         include:
           - { env: trmnl, folder: trmnl_og }
           - { env: TRMNL_X, folder: trmnl_x }
-          - { env: trmnl_gen2, folder: trmnl_gen2 }
+          # - { env: trmnl_gen2, folder: trmnl_gen2 }
           - { env: trmnl_4clr, folder: trmnl_bwry }
 
     steps:
@@ -93,6 +93,16 @@ jobs:
           aws s3 cp "$OTA_FILE" "${DEST}/${OTA_FILE}"
           aws s3 cp "$FLASH_FILE" "${DEST}/${FLASH_FILE}"
           aws s3 cp latest.json "${DEST}/latest.json" --content-type application/json --cache-control no-cache
+
+      - name: Notify TRMNL of new dev firmware
+        env:
+          TRMNL_ADMIN_API_TOKEN: ${{ secrets.TRMNL_ADMIN_API_TOKEN }}
+        run: |
+          curl --fail-with-body -sS -X POST \
+            -H "Access-Token: ${TRMNL_ADMIN_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data @latest.json \
+            https://trmnl.com/admin_api/development_firmwares
 
       - name: Prune old firmware (keep 50 newest .bin)
         run: |
