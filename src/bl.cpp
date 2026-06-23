@@ -1591,6 +1591,7 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   inputs.wifiBand = wifi.band;
   inputs.batteryVoltage = vBatt; //readBatteryVoltage();
   inputs.firmwareVersion = String(FW_VERSION_STRING);
+  inputs.firmwareCommit = String(FW_COMMIT);
   inputs.displayWidth = display_width();
   inputs.displayHeight = display_height();
   inputs.model = DEVICE_MODEL;

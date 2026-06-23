@@ -76,6 +76,7 @@ struct ApiDisplayInputs
   int stateOfHealth;
 #endif
   String firmwareVersion;
+  String firmwareCommit;
   String model;
   int rssi;
   String wifiBand;
