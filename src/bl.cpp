@@ -3119,8 +3119,10 @@ static bool checkAndPerformFirmwareUpdate(void)
           return false;
         }
         return true;
-      }
-    );
+      },
+      0,
+      "",
+      120000UL);
 
     if (!result.ok || !write_ok) {
       esp_ota_abort(ota_handle);
