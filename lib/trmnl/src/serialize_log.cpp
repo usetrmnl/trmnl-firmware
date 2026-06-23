@@ -26,7 +26,7 @@ String serialize_log(const LogWithDetails &input)
   switch (input.level)
   {
   case LOG_VERBOSE:
-    json_log["level"] = "verbose";
+    json_log["level"] = "debug";
     break;
   case LOG_INFO:
     json_log["level"] = "info";
