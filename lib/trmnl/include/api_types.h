@@ -3,6 +3,8 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include "special_function.h"
+#include "hardware_types.h"
+#include "trmnl_log.h"
 
 enum class ApiSetupOutcome
 {
@@ -63,9 +65,9 @@ struct ApiDisplayInputs
   uint32_t refreshRate;
   String macAddress;
   float batteryVoltage;
+  ChargingStatus chargingStatus;
 #ifdef BOARD_TRMNL_X
   int batteryCount;
-  int batteryCharging;
   int batteryCurrent;
   int currentBatteryCapacity;
   int maxBatteryCapacity;
@@ -74,13 +76,14 @@ struct ApiDisplayInputs
   int stateOfHealth;
 #endif
   String firmwareVersion;
+  String firmwareCommit;
   String model;
   int rssi;
   String wifiBand;
   int displayWidth;
   int displayHeight;
   SPECIAL_FUNCTION specialFunction;
-  bool usbConnected;
+  UsbStatus usbStatus;
   bool imageCached;
   int prevWakeTime;
 };
@@ -126,4 +129,5 @@ struct LogWithDetails
   String filenameNew;
   bool logRetry;
   int retryAttempt;
+  LogLevel level;
 };

@@ -1,6 +1,8 @@
 #ifndef BL_H
 #define BL_H
 
+#include "trmnl_log.h"
+
 /**
  * @brief Function to init business logic module
  * @param none
@@ -23,7 +25,7 @@ enum LogAction {
   LOG_ACTION_SUBMIT_OR_STORE
 };
 
-void logWithAction(LogAction action, const char *message, time_t time, int line, const char *file);
+void logWithAction(LogAction action, LogLevel level, const char *message, time_t time, int line, const char *file);
 
 bool submitLogString(const char *log_buffer);
 bool storeLogString(const char *log_buffer);
