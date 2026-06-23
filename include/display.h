@@ -65,8 +65,6 @@ uint8_t tca9535_interrupt_clear();
 void config_bma530_interrupt();
 void config_tca95535_pins_for_lp();
 void enter_shipment_sleep();
-bool check_usb_power();
-bool is_charging();
 void BQ27427_reset();
 void otg_turn_on();
 void otg_turn_off();
@@ -125,7 +123,7 @@ uint16_t display_width();
  */
 void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message,
                              uint16_t max_width, uint16_t font_width,
-                             UWORD color_fg, UWORD color_bg, void *font,
+                             UWORD color_fg, UWORD color_bg, const void *font,
                              bool is_center_aligned);
 
 /**

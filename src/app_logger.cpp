@@ -16,9 +16,9 @@ static void handle_store_submit(LogLevel level, const char *clean_message, const
     if (level >= store_submit_threshold)
     {
         if (mode == LOG_STORE_ONLY) {
-            logWithAction(LOG_ACTION_STORE, clean_message, getTime(), line, file);
+            logWithAction(LOG_ACTION_STORE, level, clean_message, getTime(), line, file);
         } else {
-            logWithAction(LOG_ACTION_SUBMIT_OR_STORE, clean_message, getTime(), line, file);
+            logWithAction(LOG_ACTION_SUBMIT_OR_STORE, level, clean_message, getTime(), line, file);
         }
     }
 }
@@ -54,6 +54,9 @@ void log_impl(LogLevel level, LogMode mode, const char* file, int line, const ch
         break;
     case LOG_INFO:
         Log.infoln(serial_buffer);
+        break;
+    case LOG_WARN:
+        Log.warningln(serial_buffer);
         break;
     case LOG_ERROR:
         Log.errorln(serial_buffer);

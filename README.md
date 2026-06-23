@@ -2,6 +2,11 @@
 
 created for the [TRMNL](https://trmnl.com) e-ink display.
 
+> [!IMPORTANT]
+> the `main` branch is under constant development and may contain breaking changes. flash at your own risk.
+>
+> to access production-ready firmware, check out the [tagged releases](https://github.com/usetrmnl/trmnl-firmware/releases/)
+ or use the [Flash Assistant](https://trmnl.com/flash).
 ## **Algorithm block scheme**
 
 ```mermaid

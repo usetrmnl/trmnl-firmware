@@ -78,6 +78,7 @@
   #define SENSOR_SDA 11
   #define SENSOR_SCL 12
   #define BQ25616_STAT_PIN 24
+  #define BQ25616_PG_PIN 25
 #elif defined(BOARD_XTEINK_X4)
   #define EPD_SCK_PIN  8
   #define EPD_MOSI_PIN 10

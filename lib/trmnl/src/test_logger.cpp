@@ -11,6 +11,7 @@ void log_impl(LogLevel level, LogMode mode, const char* file, int line, const ch
     
     const char* level_str = (level == LOG_VERBOSE) ? "verbose" : 
                            (level == LOG_INFO) ? "info" : 
+                           (level == LOG_WARN) ? "warn" :
                            (level == LOG_ERROR) ? "error" : "fatal";
     
     printf("  [test log:%s] %s:%d ", level_str, file, line);

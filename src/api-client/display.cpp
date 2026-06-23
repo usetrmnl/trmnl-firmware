@@ -14,7 +14,6 @@ extern int lastCO2, lastSCDTemp, lastTemp, lastSCDHumid, lastHumid, lastPressure
 const char *szDevices[] = {"None", "AHT20", "BMP180", "BME280", "BMP388", "SHT3X", "HDC1080", "HTS221", "MCP9808","BME68x","SHTC3"};
 const char *szMakers[] = {"None", "ASAIR", "Bosch", "Bosch", "Bosch", "Sensirion", "TI", "STMicro","MicroChip","Bosch","Sensirion"};
 #endif // SENSOR_SDA
-bool check_usb_power();
 
 void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
 {

@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include "bl.h"
-#include "esp_ota_ops.h" 
+#include "power.h"
+#include "esp_ota_ops.h"
 #include "qa.h"
 
 #ifdef BOARD_TRMNL_X
@@ -21,7 +22,7 @@ void setup()
    
    display_init();
 
-   if (shipmentStarted && check_usb_power()) {
+   if (shipmentStarted && get_usb_status() == UsbStatus::CONNECTED) {
       // USB connected (e.g. battery died in transit and USB revived the device)
       enter_shipment_sleep();
       saveShipmentDone();

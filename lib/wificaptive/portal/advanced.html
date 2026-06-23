@@ -462,11 +462,38 @@
       displayAlert(ntp ? 'NTP server saved.' : 'Using default NTP (time.google.com).', 'primary');
     }
 
+    function loadHostnameFromStorage() {
+      document.getElementById('customHostname').value = localStorage.getItem('customHostname') || '';
+    }
+
+    function saveHostname() {
+      const hostname = document.getElementById('customHostname').value.trim();
+      const hostnamePattern = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/;
+      if (hostname && !hostnamePattern.test(hostname)) {
+        displayAlert('Invalid hostname. Use letters, numbers, and hyphens only (no leading/trailing hyphens).', 'warning');
+        return;
+      }
+      if (hostname) {
+        localStorage.setItem('customHostname', hostname);
+        displayAlert('Hostname saved. Will be applied on next WiFi connection.', 'primary');
+      } else {
+        localStorage.removeItem('customHostname');
+        displayAlert('Custom hostname cleared. Default (trmnl-xxxx) will be used.', 'primary');
+      }
+    }
+
+    function clearHostname() {
+      localStorage.removeItem('customHostname');
+      document.getElementById('customHostname').value = '';
+      displayAlert('Custom hostname cleared. Default (trmnl-xxxx) will be used.', 'primary');
+    }
+
     // Load server value when page loads
     window.onload = function() {
       loadServerFromStorage();
       loadStaticIPFromStorage();
       loadNTPFromStorage();
+      loadHostnameFromStorage();
     };
 
   </script>
@@ -532,6 +559,19 @@
         <input type="text" id="ntpServer1" name="ntpServer1" placeholder="e.g., time.nist.gov">
       </div>
       <button class="button button-primary" onclick="saveNTP()" style="margin-top:5px;">Save</button>
+    </div>
+
+    <!-- Device Hostname -->
+    <div style="width: 100%; margin-top: 20px; border-top: 1px solid #ccc; padding-top: 15px;">
+      <h3 style="margin-bottom: 10px;">Device Hostname</h3>
+      <div class="form-group">
+        <label for="customHostname">Custom hostname (default: trmnl-xxxx based on MAC)</label>
+        <input type="text" id="customHostname" name="customHostname" placeholder="e.g., trmnl-living-room">
+      </div>
+      <span style="margin-top: 5px;">
+        <button class="button button-success" onclick="saveHostname()">Save</button>
+        <button class="button button-primary" onclick="clearHostname()">Reset to default</button>
+      </span>
     </div>
     <div class="form-group">
       <div class="alert alert-primary" id="test-output" role="alert" style="display: none;"></div>

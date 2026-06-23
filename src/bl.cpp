@@ -1,7 +1,9 @@
 #include <Arduino.h>
 #include <WiFi.h>
+#include <ESPmDNS.h>
 #include <bl.h>
 #include <wifi_network.h>
+#include <power.h>
 #include <device_id.h>
 #include <trmnl_log.h>
 #include <types.h>
@@ -27,6 +29,7 @@
 #include "api-client/submit_log.h"
 #include <api-client/setup.h>
 #include <special_function.h>
+#include <ota_schedule.h>
 #include <api_response_parsing.h>
 #include "logging_parcers.h"
 #include <SPIFFS.h>
@@ -75,6 +78,7 @@ const char *szHTTPErrors[] = {
 };
 
 bool pref_clear = false;
+bool bModemNeeded = false;
 String new_filename = "";
 ApiDisplayResult apiDisplayResult;
 uint8_t *buffer = nullptr;
@@ -807,6 +811,17 @@ void bl_init(void)
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
 #endif
   Log_info("BL init success");
+#ifdef BOARD_TRMNL_X
+  Log.info("%s [%d]: Checking if we need to use the ESP32-C5 modem...\r\n", __FILE__, __LINE__);
+  if (WifiCaptivePortal.isSaved()) {
+    // WiFi saved, connection
+    WifiCredentials lastCreds = WifiCaptivePortal.getLastCredentials();
+    bModemNeeded = lastCreds.is5GHz;
+  } else {
+    bModemNeeded = true; // captive portal needs modem for 5 GHz
+  }
+  Log.info("%s [%d]: modem needed = %d\n\r", __FILE__, __LINE__, bModemNeeded);
+#endif // X
   pins_init();
   sensor_init();
 #ifdef BOARD_TRMNL_X
@@ -1057,7 +1072,7 @@ void bl_init(void)
   }
 #ifdef BOARD_TRMNL_X
   battery_count = detect_battery_count();
-  battery_charging = is_charging();
+  battery_charging = (get_charging_status() == ChargingStatus::CHARGING);
   Log_info("BATTERY COUNT: %d", battery_count);
   Log_info("BATTERY CHARGING: %s", battery_charging ? "YES" : "NO");
 
@@ -1099,7 +1114,6 @@ void bl_init(void)
         lipo._initialized = true;
       }
     }
-
     uint8_t energyScale = lipo.designEnergyScale();
     unsigned int soc = lipo.soc();                               // State-of-charge (%) — use this for battery level display
     unsigned int volts = lipo.voltage();                         // Battery voltage (mV)
@@ -1166,15 +1180,18 @@ void bl_init(void)
   // display_show_msg(storedLogoOrDefault(1), WIFI_CONNECT, "ABCDEF", true, FW_VERSION_STRING, "Hello World!");
   // wifiErrorDeepSleep();
 #ifdef BOARD_TRMNL_X
-  modem_reset_target();
-  delay(500);  // give modem time to boot before UART init
-  static Modem modemInstance(115200);
-  if (modemInstance.isInitialized()) {
-    g_modem = &modemInstance;
+  if (bModemNeeded) {
+    modem_reset_target(); // Must be done BEFORE the instantiation of the class since it expects the modem to be ready
+    static Modem modemInstance(115200);
+    if (modemInstance.isInitialized()) {
+      g_modem = &modemInstance;
+    } else {
+      Log_info("Modem init failed — falling back to 2.4 GHz mode");
+      g_modem = nullptr;
+    }
   } else {
-    Log_info("Modem init failed — falling back to 2.4 GHz mode");
     g_modem = nullptr;
-  } 
+  }
     
   // Only scan when no credentials are saved (i.e. captive portal will be shown). 
   if (g_modem && !WifiCaptivePortal.isSaved())
@@ -1215,21 +1232,7 @@ void bl_init(void)
   {
     // WiFi saved, connection
     Log.info("%s [%d]: WiFi saved\r\n", __FILE__, __LINE__);
-#ifdef BOARD_TRMNL_X
-    WifiCredentials lastCreds = WifiCaptivePortal.getLastCredentials();
-    int connection_res;
-    if (lastCreds.is5GHz && g_modem)
-    {
-      Log.info("%s [%d]: 5 GHz network saved — connecting via modem\r\n", __FILE__, __LINE__);
-      connection_res = g_modem->connectToNetwork(lastCreds.ssid, lastCreds.pswd) ? 1 : 0;
-    }
-    else
-    {
-      connection_res = WifiCaptivePortal.autoConnect();
-    }
-#else
-    int connection_res = WifiCaptivePortal.autoConnect();
-#endif // BOARD_TRMNL_X
+    int connection_res = connectWithSavedCredentials() ? 1 : 0;
 
     Log.info("%s [%d]: Connection result: %d, WiFI Status: %d\r\n", __FILE__, __LINE__, connection_res, WiFi.status());
 
@@ -1428,11 +1431,12 @@ void bl_init(void)
   if (update_firmware)
   {
     uint32_t now = getTime();
-    if (now - preferences.getUInt(PREFERENCES_LAST_OTA) >= 24*60*60) {
+    if (otaAttemptDue(now, otaLastAttempt(preferencesPersistence))) {
       Log.info("%s [%d]: Last OTA attempt was > 24h ago, proceeding with download...\r\n", __FILE__, __LINE__);
       if (!checkAndPerformFirmwareUpdate()) {
         Log.info("%s [%d]: OTA update failed, storing the timestamp to prevent boot looping.\r\n", __FILE__, __LINE__);
-        preferences.putUInt(PREFERENCES_LAST_OTA, now); // store new time
+        otaRecordAttempt(preferencesPersistence, now);
+        update_firmware = false;
       }
     } else {
       Log.info("%s [%d]: Last OTA attempt was < 24h ago, skipping...\r\n", __FILE__, __LINE__);
@@ -1593,12 +1597,11 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   inputs.specialFunction = special_function;
   inputs.imageCached = bUsedCachedImage;
   inputs.prevWakeTime = iPrevWakeTime;
-  inputs.usbConnected = false;
-  
+  inputs.usbStatus = get_usb_status();
+  inputs.chargingStatus = get_charging_status();
+
 #ifdef BOARD_TRMNL_X
-  inputs.usbConnected = check_usb_power();
   inputs.batteryCount = battery_count;
-  inputs.batteryCharging = battery_charging; // 1 charging, 0 not charging
   if (lipo._initialized) { // only report SoC if battery was detected and BQ27427 initialized successfully
     inputs.stateOfCharge = lipo.soc();
     inputs.stateOfHealth = lipo.soh();
@@ -1724,8 +1727,7 @@ static https_request_err_e downloadAndShow()
 
   #ifdef BOARD_TRMNL_X
 // Special logic (TRMNL-X only) to download and disply the image if using a 5GHz AP
-  if (status && !update_firmware && !reset_firmware &&
-      WifiCaptivePortal.getLastCredentials().is5GHz && g_modem)
+  if (status && !reset_firmware && WifiCaptivePortal.getLastCredentials().is5GHz && g_modem)
   {
     Log_info("Downloading image via modem (5 GHz path)");
 
@@ -1795,7 +1797,7 @@ static https_request_err_e downloadAndShow()
           https.addHeader("Access-Token", apiDisplayInputs.apiKey);
         }
 
-        if (status && !update_firmware && !reset_firmware)
+        if (status && !reset_firmware)
         {
           status = false;
 
@@ -3117,8 +3119,10 @@ static bool checkAndPerformFirmwareUpdate(void)
           return false;
         }
         return true;
-      }
-    );
+      },
+      0,
+      "",
+      120000UL);
 
     if (!result.ok || !write_ok) {
       esp_ota_abort(ota_handle);
@@ -3148,6 +3152,16 @@ static bool checkAndPerformFirmwareUpdate(void)
   }
 #endif
 
+  showMessageWithLogo(FW_UPDATE);
+
+  if (!ensureWifiConnected())
+  {
+    Log.fatal("%s [%d]: Unable to reconnect WiFi for firmware update\r\n", __FILE__, __LINE__);
+    showMessageWithLogo(API_FIRMWARE_UPDATE_ERROR);
+    return false;
+  }
+
+  bool ota_ok = false;
   withHttp(binUrl, [&](HTTPClient *https, HttpError errorCode) -> bool
            {
              if (errorCode != HttpError::HTTPCLIENT_SUCCESS || !https)
@@ -3161,6 +3175,7 @@ static bool checkAndPerformFirmwareUpdate(void)
                {
                  showMessageWithLogo(WIFI_WEAK);
                }
+               return false;
              }
 
              int httpCode = https->GET();
@@ -3173,7 +3188,6 @@ static bool checkAndPerformFirmwareUpdate(void)
                if (Update.begin(contentLength))
                {
                  Log.info("%s [%d]: Firmware update start\r\n", __FILE__, __LINE__);
-                 showMessageWithLogo(FW_UPDATE);
 
                  if (Update.writeStream(https->getStream()))
                  {
@@ -3181,6 +3195,7 @@ static bool checkAndPerformFirmwareUpdate(void)
                    {
                      Log.info("%s [%d]: Firmware update successful. Rebooting...\r\n", __FILE__, __LINE__);
                      showMessageWithLogo(FW_UPDATE_SUCCESS);
+                     ota_ok = true;
                    }
                    else
                    {
@@ -3200,8 +3215,14 @@ static bool checkAndPerformFirmwareUpdate(void)
                  showMessageWithLogo(FW_UPDATE_FAILED);
                }
              }
-             return true; });
-    return false; // if we got here, it failed
+             else
+             {
+               Log.fatal("%s [%d]: Firmware GET failed, code: %d\r\n", __FILE__, __LINE__, httpCode);
+               showMessageWithLogo(API_FIRMWARE_UPDATE_ERROR);
+             }
+             return false;
+           });
+  return ota_ok;
 }
 
 /**
@@ -3793,7 +3814,7 @@ DeviceStatusStamp getDeviceStatusStamp()
   return deviceStatus;
 }
 
-void logWithAction(LogAction action, const char *message, time_t time, int line, const char *file)
+void logWithAction(LogAction action, LogLevel level, const char *message, time_t time, int line, const char *file)
 {
   uint32_t log_id = preferences.getUInt(PREFERENCES_LOG_ID_KEY, 1);
 
@@ -3807,7 +3828,8 @@ void logWithAction(LogAction action, const char *message, time_t time, int line,
       .filenameCurrent = preferences.getString(PREFERENCES_FILENAME_KEY, ""),
       .filenameNew = new_filename,
       .logRetry = log_retry,
-      .retryAttempt = log_retry ? preferences.getInt(PREFERENCES_CONNECT_API_RETRY_COUNT) : 0};
+      .retryAttempt = log_retry ? preferences.getInt(PREFERENCES_CONNECT_API_RETRY_COUNT) : 0,
+      .level = level};
 
   String json_string = serialize_log(input);
 
