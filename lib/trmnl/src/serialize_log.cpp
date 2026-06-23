@@ -31,6 +31,9 @@ String serialize_log(const LogWithDetails &input)
   case LOG_INFO:
     json_log["level"] = "info";
     break;
+  case LOG_WARN:
+    json_log["level"] = "warn";
+    break;
   case LOG_ERROR:
     json_log["level"] = "error";
     break;

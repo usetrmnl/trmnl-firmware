@@ -55,6 +55,9 @@ void log_impl(LogLevel level, LogMode mode, const char* file, int line, const ch
     case LOG_INFO:
         Log.infoln(serial_buffer);
         break;
+    case LOG_WARN:
+        Log.warningln(serial_buffer);
+        break;
     case LOG_ERROR:
         Log.errorln(serial_buffer);
         break;
