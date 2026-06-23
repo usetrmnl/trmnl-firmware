@@ -10,7 +10,7 @@
 #include "esp_loader_io.h"
 #include "esp32_port.h"
 #include "modem.h"
-#include "../../../include/config.h"
+#include "../../wificaptive/src/wifi-helpers.h"
 
 #if defined (BOARD_TRMNL_X) || defined (BOARD_TRLML_X_EPDIY)
 #include <LittleFS.h>
@@ -451,7 +451,8 @@ bool Modem::connectToNetwork(const String& ssid, const String& password) {
     return false;
   }
 
-  sendCommand("AT+CWHOSTNAME=\"" WIFI_CLIENT_HOSTNAME "\"");
+  String hostname = getWifiClientHostname();
+  sendCommand(("AT+CWHOSTNAME=\"" + hostname + "\"").c_str());
   waitForResponse("OK", 3000);
 
   String cmd = "AT+CWJAP=\"" + s + "\",\"" + p + "\"";

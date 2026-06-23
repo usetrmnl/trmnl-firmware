@@ -163,15 +163,15 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #define DEVICE_MODEL "reTerminal E1003"
 #endif
 
-// DHCP hostname reported to the router (hyphens instead of spaces — DHCP hostnames cannot contain spaces)
+// DHCP hostname prefix (hyphens instead of spaces).
 #if defined(BOARD_X_CLASS)
-#define WIFI_CLIENT_HOSTNAME "TRMNL-X"
+#define WIFI_CLIENT_HOSTNAME_PREFIX "TRMNL-X"
 #elif defined(BOARD_TRMNL) || defined(BOARD_TRMNL_GEN2)
-#define WIFI_CLIENT_HOSTNAME "TRMNL-OG"
+#define WIFI_CLIENT_HOSTNAME_PREFIX "TRMNL-OG"
 #elif defined(BOARD_TRMNL_4CLR)
-#define WIFI_CLIENT_HOSTNAME "TRMNL-BWRY"
+#define WIFI_CLIENT_HOSTNAME_PREFIX "TRMNL-BWRY"
 #else
-#define WIFI_CLIENT_HOSTNAME "TRMNL"
+#define WIFI_CLIENT_HOSTNAME_PREFIX "TRMNL"
 #endif
 
 #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002)
