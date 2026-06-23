@@ -817,8 +817,10 @@ void bl_init(void)
     // WiFi saved, connection
     WifiCredentials lastCreds = WifiCaptivePortal.getLastCredentials();
     bModemNeeded = lastCreds.is5GHz;
-    Log.info("%s [%d]: modem needed = %d\n\r", __FILE__, __LINE__, bModemNeeded);
+  } else {
+    bModemNeeded = true; // captive portal needs modem for 5 GHz
   }
+  Log.info("%s [%d]: modem needed = %d\n\r", __FILE__, __LINE__, bModemNeeded);
 #endif // X
   pins_init();
   sensor_init();
