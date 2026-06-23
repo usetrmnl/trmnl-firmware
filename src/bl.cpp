@@ -55,7 +55,6 @@ SCD41 scd41;
 BBTemp bbt;
 bool bCO2 = false;
 int iSensorType = -1;
-long lSampleTime;
 int lastCO2 = 0, lastSCDTemp = 0, lastTemp = 0, lastSCDHumid = 0, lastHumid = 0, lastPressure = 0, lastType = -1, lastTime = 0;
 #endif // SENSOR_SDA
 const char *szHTTPErrors[] = {
@@ -77,7 +76,6 @@ const char *szHTTPErrors[] = {
     "HTTPS_OUT_OF_MEMORY"
 };
 
-bool pref_clear = false;
 String new_filename = "";
 ApiDisplayResult apiDisplayResult;
 uint8_t *buffer = nullptr;
@@ -89,7 +87,6 @@ static float vBatt;
 bool status = false;          // need to download a new image
 bool update_firmware = false; // need to download a new firmware
 bool reset_firmware = false;  // need to reset credentials
-bool send_log = false;        // need to send logs
 bool log_retry = false;                                              // need to log connection retry
 esp_sleep_wakeup_cause_t wakeup_reason = ESP_SLEEP_WAKEUP_UNDEFINED; // wake-up reason
 SPECIAL_FUNCTION special_function = SF_NONE;
@@ -170,7 +167,6 @@ void process_iqs323_data(void);
 IQS323 iqs323;
 #define IQS323_I2C_ADDRESS 0x44
 // Sensor states
-iqs323_ch_states button_states[3];
 uint16_t slider_position = 65535;
 iqs323_gesture_events slider_event = IQS323_GESTURE_NONE;
 bool otg_message = false;
@@ -569,7 +565,6 @@ void check_channel_states(void)
           }
           break;
         }
-        button_states[i] = IQS323_CH_TOUCH;
       } else {
         // Slide mode
         if ((slider_event == IQS323_GESTURE_TAP || slider_event == IQS323_GESTURE_HOLD)) {
@@ -596,7 +591,6 @@ void check_channel_states(void)
             Log_info("Next button pressed");
             break;
           }
-          button_states[i] = IQS323_CH_TOUCH;
         }
       }
     }
@@ -763,7 +757,6 @@ void sensor_init(void)
         lastSCDTemp = scd41.temperature();
         lastSCDHumid = scd41.humidity();
         Log.info("%s [%d]: Got SCD41 sample: CO2 = %dppm\r\n", __FILE__, __LINE__, lastCO2);
-        lSampleTime = millis(); // measure the time - it needs 5 seconds to generate a sample
     } else {
         Log.info("%s [%d]: SCD41 sample failed\r\n", __FILE__, __LINE__);
         lastCO2 = 0;
@@ -851,14 +844,6 @@ void bl_init(void)
   if (res)
   {
     Log_info("preferences init success (%d free entries)", preferences.freeEntries());
-    if (pref_clear)
-    {
-      res = preferences.clear(); // if needed to clear the saved data
-      if (res)
-        Log_info("preferences cleared success");
-      else
-        Log_fatal("preferences clearing error");
-    }
   }
   else
   {
@@ -2101,11 +2086,6 @@ static https_request_err_e downloadAndShow()
   if (result == HTTPS_UNABLE_TO_CONNECT)
   {
     Log_error_submit("unable to connect");
-  }
-
-  if (send_log)
-  {
-    send_log = false;
   }
 
   Log_info("Returned result - %s", szHTTPErrors[result]);
