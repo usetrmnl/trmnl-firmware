@@ -4,6 +4,7 @@
 #include <ArduinoJson.h>
 #include "special_function.h"
 #include "hardware_types.h"
+#include "trmnl_log.h"
 
 enum class ApiSetupOutcome
 {
@@ -127,4 +128,5 @@ struct LogWithDetails
   String filenameNew;
   bool logRetry;
   int retryAttempt;
+  LogLevel level;
 };
