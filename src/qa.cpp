@@ -21,7 +21,6 @@ const int samples = 1000;
 const int intervalMs = 7000; // 7s
 const int sample_interval = 1; //1 ms
 const int temperature_threshold = 35; // 35 by Celsium
-float initialTemp = 0;
 static bool radioOn = false;
 
 volatile bool stopRequested = false;
