@@ -78,7 +78,6 @@ const char *szHTTPErrors[] = {
 };
 
 bool pref_clear = false;
-bool bModemNeeded = false;
 String new_filename = "";
 ApiDisplayResult apiDisplayResult;
 uint8_t *buffer = nullptr;
@@ -86,17 +85,13 @@ char filename[1024];      // image URL
 char binUrl[1024];        // update URL
 char message_buffer[128]; // message to show on the screen
 uint32_t time_since_sleep;
-image_err_e png_res = PNG_DECODE_ERR;
-bmp_err_e bmp_res = BMP_NOT_BMP;
 static float vBatt;
 bool status = false;          // need to download a new image
 bool update_firmware = false; // need to download a new firmware
 bool reset_firmware = false;  // need to reset credentials
 bool send_log = false;        // need to send logs
-bool double_click = false;
 bool log_retry = false;                                              // need to log connection retry
 esp_sleep_wakeup_cause_t wakeup_reason = ESP_SLEEP_WAKEUP_UNDEFINED; // wake-up reason
-MSG current_msg = NONE;
 SPECIAL_FUNCTION special_function = SF_NONE;
 RTC_DATA_ATTR int iPrevWakeTime = 0; // total wake time of the last cycle (for statistics collection)
 RTC_DATA_ATTR bool bUsedCachedImage = false; // if the last image displayed was read from cache (for statistics collection)
@@ -812,6 +807,7 @@ void bl_init(void)
 #endif
   Log_info("BL init success");
 #ifdef BOARD_TRMNL_X
+  bool bModemNeeded = false;
   Log.info("%s [%d]: Checking if we need to use the ESP32-C5 modem...\r\n", __FILE__, __LINE__);
   if (WifiCaptivePortal.isSaved()) {
     // WiFi saved, connection
@@ -871,6 +867,7 @@ void bl_init(void)
   }
   Log_info("preferences end");
   #ifndef BOARD_TRMNL_X
+  bool double_click = false;
   if (gpio_wakeup)
   {
     Log_info("GPIO wakeup detected (%d)", wakeup_reason);
@@ -1217,6 +1214,8 @@ void bl_init(void)
 #endif // BOARD_TRMNL_X
 
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
+
+  MSG current_msg = NONE;
 
 // uncdcomment this to hardcode WiFi credentials (useful for testing wifi errors, etc.)
 // #define HARDCODED_WIFI
@@ -1641,6 +1640,8 @@ void load_prev_image(void)
  */
 static https_request_err_e downloadAndShow()
 {
+  image_err_e png_res = PNG_DECODE_ERR;
+  bmp_err_e bmp_res = BMP_NOT_BMP;
   auto apiDisplayInputs = loadApiDisplayInputs(preferences);
 
 #ifdef BOARD_TRMNL_X
