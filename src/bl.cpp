@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <WiFi.h>
+#include <ESPmDNS.h>
 #include <bl.h>
 #include <wifi_network.h>
 #include <power.h>

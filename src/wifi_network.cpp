@@ -2,6 +2,8 @@
 #include <WiFi.h>
 #include <WifiCaptive.h>
 #include <trmnl_log.h>
+#include <ESPmDNS.h>
+#include <Preferences.h>
 
 #ifdef BOARD_TRMNL_X
 // Defined in bl.cpp; set once during bl_init(). Only used on the 5 GHz path.
@@ -45,7 +47,28 @@ bool connectWithSavedCredentials(void) {
   }
 #endif
 
-  return WifiCaptivePortal.autoConnect();
+  bool connected = WifiCaptivePortal.autoConnect();
+  if (connected) {
+    Preferences prefs;
+    prefs.begin("data", true);
+    String saved = prefs.getString("hostname", "");
+    prefs.end();
+    String hostname;
+    if (saved.length() > 0) {
+      hostname = saved;
+    } else {
+      String mac = WiFi.macAddress();
+      String suffix = mac.substring(12, 14) + mac.substring(15, 17);
+      suffix.toLowerCase();
+      hostname = "trmnl-" + suffix;
+    }
+    if (MDNS.begin(hostname.c_str())) {
+      Log_info("mDNS started: %s.local", hostname.c_str());
+    } else {
+      Log_error("mDNS failed to start");
+    }
+  }
+  return connected;
 }
 
 bool ensureWifiConnected(void) {

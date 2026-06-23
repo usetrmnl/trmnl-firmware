@@ -446,6 +446,9 @@
       var ntp = localStorage.getItem('ntpServer1');
       if (ntp) body.ntpServer1 = ntp;
 
+      var hostname = localStorage.getItem('customHostname');
+      if (hostname) body.hostname = hostname;
+
       var btn = document.getElementById("btnConnect");
       btn.disabled = true;
       btn.textContent = "Connecting...";
