@@ -462,6 +462,18 @@ void WifiCaptive::saveApiServer(String url)
         return;
     Preferences preferences;
     preferences.begin("data", false);
+
+    // If the server URL is changing, invalidate the cached credentials so the
+    // /api/setup handshake re-runs against the new server. Otherwise the stale
+    // API key/friendly ID from the previous server are reused and pairing fails.
+    String currentUrl = preferences.getString("api_url", "");
+    if (currentUrl != url)
+    {
+        Log_info("API server changed, clearing cached credentials to force re-pairing");
+        preferences.remove("api_key");
+        preferences.remove("friendly_id");
+    }
+
     preferences.putString("api_url", url);
     preferences.end();
 }
