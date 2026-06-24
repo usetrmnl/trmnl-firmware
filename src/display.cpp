@@ -1174,6 +1174,25 @@ int png_draw(PNGDRAW *pDraw)
     return 1;
 } /* png_draw() */
 #else // TRMNL_X version
+// Map 2-bit gray (0-3) to 4-bit nibbles for the calibrated 4bpp refresh path
+static const uint8_t u8G2ToG4[4] = {0x00, 0x05, 0x0a, 0x0f};
+
+static void Expand2bppLineTo4bpp(const uint8_t *src, uint8_t *dest, int width)
+{
+    int x;
+    uint8_t b = 0;
+
+    for (x = 0; x < width; x++) {
+        if ((x & 3) == 0) b = *src++;
+        uint8_t nibble = u8G2ToG4[(b >> (6 - (x & 3) * 2)) & 3];
+        if (x & 1) {
+            dest[x / 2] |= nibble;
+        } else {
+            dest[x / 2] = nibble << 4;
+        }
+    }
+}
+
 int png_draw(PNGDRAW *pDraw)
 {
     int x, y = pDraw->y;
@@ -1185,6 +1204,7 @@ int png_draw(PNGDRAW *pDraw)
     if (pDraw->iPixelType == PNG_PIXEL_INDEXED || pDraw->iBpp > 4) { // need to convert through the palette and/or reduce the bpp
         s = bbep.tempBuffer(); // temp space we can use
         iBpp = (pDraw->iBpp > 4) ? 4 : pDraw->iBpp;
+        if (iBpp == 2) iBpp = 4; // 2-bit indexed images -> 4bpp for calibrated gray refresh
         ReduceBpp(iBpp, pDraw->iPixelType, pDraw->pPalette, pDraw->pPixels, s, pDraw->iWidth, pDraw->iBpp);
     } else { // for grayscale images of 1/2/4-bpp we can directly use the pixels as-is
         iBpp = pDraw->iBpp;
@@ -1195,9 +1215,6 @@ int png_draw(PNGDRAW *pDraw)
         switch (iBpp) { // if this matches the new image we can do a non-flickering update
             case 1:
                 bbep.setPreviousMode(BB_MODE_1BPP);
-                break;
-            case 2:
-                bbep.setPreviousMode(BB_MODE_2BPP);
                 break;
             default:
                 bbep.setPreviousMode(BB_MODE_4BPP);
@@ -1226,25 +1243,13 @@ int png_draw(PNGDRAW *pDraw)
                 d -= iPitch;
             }
         }
-    } else if (iBpp == 2) {
-        iPitch = bbep.width()/4;
-        d += y * iPitch; // point to the correct line
-        if (bbep.width() == pDraw->iWidth) { // normal orientation
-            memcpy(d, s, (pDraw->iWidth+3)/4);
-        } else { // rotated
-            d += (bbep.height() - 1) * iPitch;
-            d += (y / 4);
-            ucMask = 0xc0 >> ((y & 3)*2); // destination mask
-            for (x=0; x<pDraw->iWidth; x++) {
-                if ((x & 3) == 0) uc = *s++;
-                ucPixel = d[0] & ~ucMask; // unset old pixel
-                ucPixel |= (uc & 0xc0) >> ((y & 3)*2);
-                d[0] = ucPixel;
-                uc <<= 2;
-                d -= iPitch;
-            } // for x
-        } // rotated 90 degrees
-    } else { // must be 4-bit, the native format
+    } else {
+        if (iBpp == 2) { // expand 2-bit grayscale to 4-bit for calibrated refresh
+            Expand2bppLineTo4bpp(s, bbep.tempBuffer(), pDraw->iWidth);
+            s = bbep.tempBuffer();
+            iBpp = 4;
+        }
+        // 4-bit native format (includes expanded 2-bit)
         if (bbep.width() == pDraw->iWidth) { // normal orientation
             d += y * iPitch; // point to the correct line
             memcpy(d, s, (pDraw->iWidth+1)/2);
@@ -1558,7 +1563,8 @@ PNG *png = new PNG();
                     bbep.setMode(BB_MODE_1BPP);
                 break;
                 case 2:
-                    bbep.setMode(BB_MODE_2BPP);
+                    // 2-bit PNGs are expanded to 4bpp in png_draw() so refresh uses u8_graytable
+                    bbep.setMode(BB_MODE_4BPP);
                 break;
                 default:
                     bbep.setMode(BB_MODE_4BPP);
