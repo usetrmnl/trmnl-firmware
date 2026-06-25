@@ -414,6 +414,6 @@ direct_dependencies:
 - espressif/usb_host_cp210x_vcp
 - idf
 - joltwallet/littlefs
-manifest_hash: 0f7cfff62ca57d0d29f698457da843026e779e4ff6b25c17513af0ad6a745950
+manifest_hash: 45774476908c437a0cc6e2e11b25bbac17566aa759e578b6b41dc5131975bbdb
 target: esp32s3
 version: 2.0.0
