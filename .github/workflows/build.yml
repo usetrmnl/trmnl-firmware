@@ -95,7 +95,7 @@ jobs:
           path: |
             ~/.cache/pip
             ~/.platformio
-          key: ubuntu-latest-pio-locks-${{ hashFiles('platformio.ini', 'src/idf_component.yml', 'lockfiles/*') }}
+          key: ubuntu-latest-pio-locks-${{ hashFiles('platformio.ini', 'src/idf_component.yml', 'scripts/ci/lockfiles/*') }}
           restore-keys: |
             ubuntu-latest-pio-locks-
 
@@ -110,13 +110,13 @@ jobs:
         run: |
           pio pkg install -e TRMNL_X_dev
           pio run -e TRMNL_X_dev -j 4
-          python scripts/ci/check_idf_lock.py lockfiles/dependencies.esp32s3.lock dependencies.lock
+          python scripts/ci/check_idf_lock.py scripts/ci/lockfiles/dependencies.esp32s3.lock dependencies.lock
 
       - name: Verify esp32c3 dependency lock (TRMNL OG)
         run: |
           pio pkg install -e trmnl
           pio run -e trmnl -j 4
-          python scripts/ci/check_idf_lock.py lockfiles/dependencies.esp32c3.lock dependencies.lock
+          python scripts/ci/check_idf_lock.py scripts/ci/lockfiles/dependencies.esp32c3.lock dependencies.lock
 
   publish-engineering-build:
     needs: [build-test, check-idf-locks]
