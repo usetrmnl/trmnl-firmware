@@ -151,6 +151,8 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #define PIN_INTERRUPT 3        // the green button
 #define PIN_VBAT_SWITCH 21     // load switch enable pin for battery voltage measurement
 #define VBAT_SWITCH_LEVEL HIGH // load switch enable pin active level
+#define PIN_BUZZER 45          // passive buzzer (MLT-8530) via NPN transistor
+#define BUZZER_FREQ 2700       // resonant frequency of MLT-8530 in Hz
 #elif defined(BOARD_SEEED_RETERMINAL_E1002)
 #define DEVICE_MODEL "reterminal_e1002"
 #define PIN_INTERRUPT 3        // the green button

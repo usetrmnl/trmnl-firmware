@@ -48,6 +48,7 @@
 #include "loading.h"
 #include <wifi-helpers.h>
 #include <sys/time.h>
+#include <buzzer.h>
 #ifdef SENSOR_SDA
 #include <bb_scd41.h>
 #include <bb_temperature.h>
@@ -823,6 +824,7 @@ void bl_init(void)
   Log.info("%s [%d]: modem needed = %d\n\r", __FILE__, __LINE__, bModemNeeded);
 #endif // X
   pins_init();
+  buzzer_init();
   sensor_init();
 #ifdef BOARD_TRMNL_X
   // Debug: Print all wakeup_stub_iqs_status structure fields
