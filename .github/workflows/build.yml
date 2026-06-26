@@ -104,19 +104,20 @@ jobs:
           python-version: "3.13"
 
       - name: Install PlatformIO Core
-        run: pip install --upgrade platformio
-
-      - name: Verify esp32s3 dependency lock (TRMNL X)
-        run: |
-          pio pkg install -e TRMNL_X_dev
-          pio run -e TRMNL_X_dev -j 4
-          python scripts/ci/check_idf_lock.py scripts/ci/lockfiles/dependencies.esp32s3.lock dependencies.lock
+        run: pip install --upgrade platformio intelhex
 
       - name: Verify esp32c3 dependency lock (TRMNL OG)
         run: |
           pio pkg install -e trmnl
           pio run -e trmnl -j 4
           python scripts/ci/check_idf_lock.py scripts/ci/lockfiles/dependencies.esp32c3.lock dependencies.lock
+
+      - name: Verify esp32s3 dependency lock (TRMNL X)
+        run: |
+          rm -rf ~/.platformio/packages/framework-arduinoespressif32
+          pio pkg install -e TRMNL_X_dev
+          pio run -e TRMNL_X_dev -j 4
+          python scripts/ci/check_idf_lock.py scripts/ci/lockfiles/dependencies.esp32s3.lock dependencies.lock
 
   publish-engineering-build:
     needs: [build-test, check-idf-locks]
