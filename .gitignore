@@ -18,3 +18,4 @@
 /sdkconfigs/sdkconfig.local
 managed_components/
 test/integration/test_config.h
+dependencies.lock

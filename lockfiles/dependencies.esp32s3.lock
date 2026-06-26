@@ -12,7 +12,7 @@ dependencies:
   esp-serial-flasher:
     dependencies: []
     source:
-      path: C:\Work\trmnl\firmware\components\esp-serial-flasher
+      path: components/esp-serial-flasher
       type: local
     version: 1.11.0
   espressif/cbor:
@@ -414,6 +414,6 @@ direct_dependencies:
 - espressif/usb_host_cp210x_vcp
 - idf
 - joltwallet/littlefs
-manifest_hash: 45774476908c437a0cc6e2e11b25bbac17566aa759e578b6b41dc5131975bbdb
+manifest_hash: 8b9d532708841b19b5c603bc25aab51c1bf4b36efd6b36f39dbd4a08c35e47e9
 target: esp32s3
 version: 2.0.0

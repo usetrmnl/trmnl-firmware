@@ -1,37 +1,49 @@
-# Pin ESP-IDF Component Registry versions for reproducible builds across
-# macOS, Linux, and Windows. Without these, the Arduino framework manifest
-# uses caret (^) ranges and the component manager may resolve newer versions
-# when dependencies.lock is re-validated (common on macOS due to local paths).
+# Pin ESP-IDF Component Registry versions for reproducible TRMNL X (ESP32-S3)
+# builds across macOS, Linux, and Windows. Without these, the Arduino framework
+# manifest uses caret (^) ranges and the component manager may resolve newer
+# versions when dependencies.lock is re-validated.
 #
-# Versions match dependencies.lock on main (target: esp32s3 / TRMNL X).
+# Scoped to esp32s3 only — OG/BWRY (esp32c3) and other envs use ESP-IDF 4.x and
+# must not inherit these IDF 5.x component requirements.
+# Versions match dependencies.lock on main (target: esp32s3).
 dependencies:
   espressif/mdns:
     version: "==1.11.1"
+    rules:
+      - if: "target == esp32s3"
   espressif/esp_modem:
     version: "==2.0.1"
+    rules:
+      - if: "target == esp32s3"
   espressif/esp-dsp:
     version: "==1.8.0"
     rules:
-      - if: "target not in [esp32c2, esp32c61]"
+      - if: "target == esp32s3"
   espressif/esp-sr:
     version: "==2.4.4"
     rules:
-      - if: "target in [esp32s3, esp32p4]"
+      - if: "target == esp32s3"
   espressif/libsodium:
     version: "==1.0.22"
+    rules:
+      - if: "target == esp32s3"
   espressif/esp-modbus:
     version: "==1.0.18"
+    rules:
+      - if: "target == esp32s3"
   joltwallet/littlefs:
     version: "==1.21.1"
+    rules:
+      - if: "target == esp32s3"
   espressif/usb_host_cdc_acm:
     version: "==2.4.0"
     rules:
-      - if: "target in [esp32s2, esp32s3, esp32p4]"
+      - if: "target == esp32s3"
   espressif/usb_host_cp210x_vcp:
     version: "==2.2.0"
     rules:
-      - if: "target in [esp32s2, esp32s3, esp32p4]"
+      - if: "target == esp32s3"
   espressif/usb_host_ch34x_vcp:
     version: "==2.2.0"
     rules:
-      - if: "target in [esp32s2, esp32s3, esp32p4]"
+      - if: "target == esp32s3"
