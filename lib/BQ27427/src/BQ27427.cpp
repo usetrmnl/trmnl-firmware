@@ -994,14 +994,15 @@ bool BQ27427::applyGoldenFile(bool twoCell)
 		uint8_t cmd[] = {0x02, 0x00};
 		i2cWriteBytes(0x00, cmd, 2);
 		const uint8_t exp[] = {0x02, 0x02};
-		if (!goldenFileVerify(0x00, exp, 2))
+		if (!goldenFileVerify(0x00, exp, 2)) {
 			Serial.printf("BQ27427 golden file [%s]: WARNING — FW version != 2.02, continuing anyway\n", tag);
-		else
+		} else {
 			Serial.printf("BQ27427 golden file [%s]: FW version 2.02 confirmed\n", tag);
-			if (!flags() && BQ27427_FLAG_ITPOR) {
+			if (!(flags() & BQ27427_FLAG_ITPOR)) {
 				Serial.printf("BQ27427 No need to re-apply golden file, the power was not reset. Exiting...");
 				return true;
 			}
+		}
 	}
 
 	//------------------------------------------------------------------
