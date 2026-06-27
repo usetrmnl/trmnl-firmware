@@ -37,6 +37,9 @@
 #include <api-client/display.h>
 #include <api-client/request_headers.h>
 #include "driver/gpio.h"
+#ifdef HAS_NEXT_BUTTONS
+#include "driver/rtc_io.h"
+#endif
 #include "esp_ota_ops.h"
 #include "esp_sntp.h"
 #include "esp_flash.h"
@@ -850,6 +853,23 @@ void bl_init(void)
                       wakeup_reason == ESP_SLEEP_WAKEUP_EXT1);
   Log.info("%s [%d]: Wake reason: %d\r\n", __FILE__, __LINE__, (int)wakeup_reason);
 
+#ifdef HAS_NEXT_BUTTONS
+  // Detect whether one of the extra "next" buttons (not PIN_INTERRUPT) woke us.
+  // Those boards use ext1 (any-low) wakeup over all button GPIOs, so the source
+  // pin is reported in the ext1 wakeup status bitmask.
+  bool next_button_wakeup = false;
+  if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT1)
+  {
+    uint64_t ext1_status = esp_sleep_get_ext1_wakeup_status();
+    if (ext1_status & ((1ULL << PIN_BUTTON_NEXT_LEFT) | (1ULL << PIN_BUTTON_NEXT_RIGHT)))
+    {
+      next_button_wakeup = true;
+      Log_info("Next button wakeup (ext1 status=0x%llx) -> will refresh to next screen",
+               (unsigned long long)ext1_status);
+    }
+  }
+#endif
+
   Log_info("preferences start");
   bool res = preferences.begin("data", false);
   if (res)
@@ -874,6 +894,18 @@ void bl_init(void)
   if (gpio_wakeup)
   {
     Log_info("GPIO wakeup detected (%d)", wakeup_reason);
+#ifdef HAS_NEXT_BUTTONS
+    if (next_button_wakeup)
+    {
+      // A "next" button was pressed: skip the green-button press classification
+      // (and its double-click wait) and fall through to the normal refresh,
+      // which fetches the next playlist item.
+      wait_for_serial();
+      Log_info("GPIO wakeup (%d) -> next button, refreshing to next screen", wakeup_reason);
+    }
+    else
+#endif
+    {
     auto button = read_button_presses();
     wait_for_serial();
     Log_info("GPIO wakeup (%d) -> button was read (%s)", wakeup_reason, ButtonPressResultNames[button]);
@@ -893,6 +925,7 @@ void bl_init(void)
       resetDeviceCredentials();
     }
     Log_info("button handling end");
+    }
   }
   else
   {
@@ -3226,6 +3259,26 @@ static bool checkAndPerformFirmwareUpdate(void)
   return ota_ok;
 }
 
+#ifdef HAS_NEXT_BUTTONS
+// Configure deep-sleep wakeup on any of the button GPIOs (PIN_INTERRUPT plus the
+// extra "next" buttons). ext1 with ANY_LOW lets several active-low buttons wake
+// the device; the source pin is later read via esp_sleep_get_ext1_wakeup_status().
+static void configure_button_wakeup_ext1(void)
+{
+  const uint64_t mask = (1ULL << PIN_INTERRUPT) |
+                        (1ULL << PIN_BUTTON_NEXT_LEFT) |
+                        (1ULL << PIN_BUTTON_NEXT_RIGHT);
+  // Ensure the active-low buttons read high while idle during deep sleep.
+  rtc_gpio_pullup_en((gpio_num_t)PIN_INTERRUPT);
+  rtc_gpio_pulldown_dis((gpio_num_t)PIN_INTERRUPT);
+  rtc_gpio_pullup_en((gpio_num_t)PIN_BUTTON_NEXT_LEFT);
+  rtc_gpio_pulldown_dis((gpio_num_t)PIN_BUTTON_NEXT_LEFT);
+  rtc_gpio_pullup_en((gpio_num_t)PIN_BUTTON_NEXT_RIGHT);
+  rtc_gpio_pulldown_dis((gpio_num_t)PIN_BUTTON_NEXT_RIGHT);
+  esp_sleep_enable_ext1_wakeup(mask, ESP_EXT1_WAKEUP_ANY_LOW);
+}
+#endif
+
 /**
  * @brief Function to sleep preparing and go to sleep
  * @param none
@@ -3286,7 +3339,11 @@ void goToSleep(void)
   pinMode(PIN_INTERRUPT, INPUT); // needed to not immediately wake up
   esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
 #elif defined(CONFIG_IDF_TARGET_ESP32S3)
+#ifdef HAS_NEXT_BUTTONS
+  configure_button_wakeup_ext1();
+#else
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
+#endif
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
 #endif
@@ -3312,7 +3369,11 @@ static void goToSleepButtonOnly(void)
 #elif defined( CONFIG_IDF_TARGET_ESP32C3 ) || defined ( CONFIG_IDF_TARGET_ESP32C5 )
   esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
 #elif CONFIG_IDF_TARGET_ESP32S3
+#ifdef HAS_NEXT_BUTTONS
+  configure_button_wakeup_ext1();
+#else
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
+#endif
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
 #endif

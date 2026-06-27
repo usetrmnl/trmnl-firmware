@@ -163,6 +163,17 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #define DEVICE_MODEL "reterminal_e1003"
 #endif
 
+// Optional extra "next" navigation buttons in addition to the PIN_INTERRUPT
+// wake button. The reTerminal E1001/E1002 expose two more front buttons next to
+// the green button: Left (GPIO4) and Right (GPIO5), both active-low. Pressing
+// either wakes the device and triggers a normal refresh, which advances to the
+// next playlist item ("next" screen).
+#if defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002)
+#define HAS_NEXT_BUTTONS 1
+#define PIN_BUTTON_NEXT_LEFT 4  // white button, silkscreen "Left"
+#define PIN_BUTTON_NEXT_RIGHT 5 // white button, silkscreen "Right"
+#endif
+
 #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002)
 #define PIN_BATTERY 1
 #elif defined(BOARD_XTEINK_X4)
