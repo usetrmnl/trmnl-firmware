@@ -14,6 +14,11 @@ extern int lastCO2, lastSCDTemp, lastTemp, lastSCDHumid, lastHumid, lastPressure
 const char *szDevices[] = {"None", "AHT20", "BMP180", "BME280", "BMP388", "SHT3X", "HDC1080", "HTS221", "MCP9808","BME68x","SHTC3"};
 const char *szMakers[] = {"None", "ASAIR", "Bosch", "Bosch", "Bosch", "Sensirion", "TI", "STMicro","MicroChip","Bosch","Sensirion"};
 #endif // SENSOR_SDA
+#ifdef HAS_ONBOARD_SHT4X
+extern float sht4xTempC, sht4xHumidity;
+extern int   sht4xTime;
+extern bool  sht4xValid;
+#endif
 
 void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
 {
@@ -53,6 +58,19 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
   }
   free(szTemp);
 #endif // SENSOR_SDA
+#ifdef HAS_ONBOARD_SHT4X
+  if (sht4xValid) {
+    char buf[256];
+    snprintf(buf, sizeof(buf),
+      "make=Sensirion;model=SHT4x;kind=temperature;value=%.2f;unit=celsius;created_at=%d,"
+      "make=Sensirion;model=SHT4x;kind=humidity;value=%.1f;unit=percent;created_at=%d",
+      sht4xTempC, sht4xTime, sht4xHumidity, sht4xTime);
+    headers.push_back({"SENSORS", buf});
+    Log_info("%s [%d] Adding SHT4x data to api request: %.2fC %.1f%%", __FILE__, __LINE__, sht4xTempC, sht4xHumidity);
+  } else {
+    Log_info("%s [%d] SHT4x data not available", __FILE__, __LINE__);
+  }
+#endif // HAS_ONBOARD_SHT4X
 
   applyHeaders(https, headers);
   logHeaders(headers);

@@ -40,6 +40,7 @@
 #ifdef BOARD_SEEED_RETERMINAL_E1004
 #include "driver/rtc_io.h"
 #endif
+#include <sht4x_read.h>
 #include "esp_ota_ops.h"
 #include "esp_sntp.h"
 #include "esp_flash.h"
@@ -61,6 +62,12 @@ int iSensorType = -1;
 long lSampleTime;
 int lastCO2 = 0, lastSCDTemp = 0, lastTemp = 0, lastSCDHumid = 0, lastHumid = 0, lastPressure = 0, lastType = -1, lastTime = 0;
 #endif // SENSOR_SDA
+#ifdef HAS_ONBOARD_SHT4X
+float sht4xTempC = 0.0f;
+float sht4xHumidity = 0.0f;
+int   sht4xTime = 0;
+bool  sht4xValid = false;
+#endif // HAS_ONBOARD_SHT4X
 const char *szHTTPErrors[] = {
     "HTTPS_NO_ERR",
     "HTTPS_RESET",
@@ -795,6 +802,16 @@ void sensor_init(void)
       bbt.stop(); // turn off the sensor to conserve power
   }
 #endif // SENSOR_SDA
+#ifdef HAS_ONBOARD_SHT4X
+  if (sht4x_read(sht4xTempC, sht4xHumidity)) {
+    time((time_t *)&sht4xTime);
+    sht4xValid = true;
+    Log.info("%s [%d]: SHT4x: %.2fC %.1f%%\r\n", __FILE__, __LINE__, sht4xTempC, sht4xHumidity);
+  } else {
+    sht4xValid = false;
+    Log.info("%s [%d]: SHT4x read failed\r\n", __FILE__, __LINE__);
+  }
+#endif // HAS_ONBOARD_SHT4X
 } /* sensor_init() */
 /**
  * @brief Function to init business logic module
