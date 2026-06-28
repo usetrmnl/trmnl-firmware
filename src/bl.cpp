@@ -106,6 +106,7 @@ RTC_DATA_ATTR bool bUsedCachedImage = false; // if the last image displayed was 
 RTC_DATA_ATTR uint8_t need_to_refresh_display = 1;
 RTC_DATA_ATTR bool otg_state = false;  // Track OTG state across deep sleep
 RTC_DATA_ATTR char szPrevFile[36] = {0};
+RTC_DATA_ATTR bool last_display_ok = false; // previous cycle put a real image on the panel (for E1004 silent button reload)
 bool touchbar_tap_mode = true;  // false = "slide", true = "tap" (default)
 Preferences preferences;
 PreferencesPersistence preferencesPersistence(preferences);
@@ -1053,7 +1054,16 @@ void bl_init(void)
 
 // #endif
 
-  if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
+  bool show_boot_logo = (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER);
+#ifdef BOARD_SEEED_RETERMINAL_E1004
+  // On the E1004 a back-button press should silently reload the next image, like
+  // a timer wake, instead of flashing the TRMNL logo. Only do so when a real
+  // image is already on the panel (the previous cycle succeeded); cold boot and
+  // error/setup screens still show the logo.
+  if (gpio_wakeup && last_display_ok)
+    show_boot_logo = false;
+#endif
+  if (show_boot_logo)
   {
     Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
 
@@ -1358,6 +1368,9 @@ void bl_init(void)
   // OTA checking, image checking and drawing
   https_request_err_e request_result = downloadAndShow();
   Log.info("%s [%d]: request result - %s\r\n", __FILE__, __LINE__, szHTTPErrors[request_result]);
+  // Remember whether a real image reached the panel, so the next E1004 button
+  // wake can decide between a silent reload and the normal logo flow.
+  last_display_ok = (request_result == HTTPS_SUCCESS);
 
   if (request_result == HTTPS_IMAGE_FILE_TOO_BIG)
   {
