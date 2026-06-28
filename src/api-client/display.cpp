@@ -16,7 +16,6 @@ const char *szMakers[] = {"None", "ASAIR", "Bosch", "Bosch", "Bosch", "Sensirion
 #endif // SENSOR_SDA
 #ifdef HAS_ONBOARD_SHT4X
 extern float sht4xTempC, sht4xHumidity;
-extern int   sht4xTime;
 extern bool  sht4xValid;
 #endif // HAS_ONBOARD_SHT4X
 
@@ -60,13 +59,17 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
 #endif // SENSOR_SDA
 #ifdef HAS_ONBOARD_SHT4X
   if (sht4xValid) {
+    // Stamp at send time: sensor_init() runs before SNTP on a cold boot, so
+    // time() is only valid here (after WiFi/clock sync). On normal timer-wake
+    // cycles the RTC retains the synced time, so this is the true sample time.
+    int createdAt = (int)time(NULL);
     char buf[256];
     snprintf(buf, sizeof(buf),
       "make=Sensirion;model=SHT4x;kind=temperature;value=%.2f;unit=celsius;created_at=%d,"
       "make=Sensirion;model=SHT4x;kind=humidity;value=%.1f;unit=percent;created_at=%d",
-      sht4xTempC, sht4xTime, sht4xHumidity, sht4xTime);
+      sht4xTempC, createdAt, sht4xHumidity, createdAt);
     headers.push_back({"SENSORS", buf});
-    Log_info("%s [%d] Adding SHT4x data to api request: %.2fC %.1f%%", __FILE__, __LINE__, sht4xTempC, sht4xHumidity);
+    Log_info("%s [%d] Adding SHT4x to request: temp=%.2f humidity=%.2f created_at=%d", __FILE__, __LINE__, sht4xTempC, sht4xHumidity, createdAt);
   } else {
     Log_info("%s [%d] SHT4x data not available", __FILE__, __LINE__);
   }

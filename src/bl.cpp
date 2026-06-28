@@ -65,7 +65,6 @@ int lastCO2 = 0, lastSCDTemp = 0, lastTemp = 0, lastSCDHumid = 0, lastHumid = 0,
 #ifdef HAS_ONBOARD_SHT4X
 float sht4xTempC = 0.0f;
 float sht4xHumidity = 0.0f;
-int   sht4xTime = 0;
 bool  sht4xValid = false;
 #endif // HAS_ONBOARD_SHT4X
 const char *szHTTPErrors[] = {
@@ -804,9 +803,9 @@ void sensor_init(void)
 #endif // SENSOR_SDA
 #ifdef HAS_ONBOARD_SHT4X
   if (sht4x_read(sht4xTempC, sht4xHumidity)) {
-    time((time_t *)&sht4xTime);
     sht4xValid = true;
-    Log.info("%s [%d]: SHT4x: %.2fC %.1f%%\r\n", __FILE__, __LINE__, sht4xTempC, sht4xHumidity);
+    // ArduinoLog uses %F for float (%f is not supported and prints literally)
+    Log.info("%s [%d]: SHT4x temp=%F humidity=%F\r\n", __FILE__, __LINE__, sht4xTempC, sht4xHumidity);
   } else {
     sht4xValid = false;
     Log.info("%s [%d]: SHT4x read failed\r\n", __FILE__, __LINE__);
