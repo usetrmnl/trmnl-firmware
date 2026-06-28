@@ -48,6 +48,15 @@ void test_sht4x_convert_rejects_bad_crc(void)
   TEST_ASSERT_FALSE(sht4x_convert(raw, t, h));
 }
 
+void test_sht4x_convert_rejects_bad_humidity_crc(void)
+{
+  uint8_t raw[6];
+  make_frame(raw, 0x6667, 0x8000);
+  raw[5] ^= 0xFF; // corrupt humidity CRC
+  float t = 0.0f, h = 0.0f;
+  TEST_ASSERT_FALSE(sht4x_convert(raw, t, h));
+}
+
 void setUp(void) {}
 void tearDown(void) {}
 
@@ -58,6 +67,7 @@ void process(void)
   RUN_TEST(test_sht4x_convert_valid);
   RUN_TEST(test_sht4x_convert_humidity_clamps_low_and_high);
   RUN_TEST(test_sht4x_convert_rejects_bad_crc);
+  RUN_TEST(test_sht4x_convert_rejects_bad_humidity_crc);
   UNITY_END();
 }
 

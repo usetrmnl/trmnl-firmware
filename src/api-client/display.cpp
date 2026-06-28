@@ -18,7 +18,7 @@ const char *szMakers[] = {"None", "ASAIR", "Bosch", "Bosch", "Bosch", "Sensirion
 extern float sht4xTempC, sht4xHumidity;
 extern int   sht4xTime;
 extern bool  sht4xValid;
-#endif
+#endif // HAS_ONBOARD_SHT4X
 
 void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
 {
