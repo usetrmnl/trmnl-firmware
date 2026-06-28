@@ -166,6 +166,10 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #define PIN_INTERRUPT 4        // wake button (GPIO4)
 #define PIN_VBAT_SWITCH 21     // battery measurement load switch enable
 #define VBAT_SWITCH_LEVEL HIGH // load switch enable pin active level
+#define HAS_ONBOARD_SHT4X
+#define SHT4X_SDA_PIN   19   // onboard SHT4x I2C (ESP32-S3 native USB pins, repurposed)
+#define SHT4X_SCL_PIN   20
+#define SHT4X_I2C_ADDR  0x44
 #endif
 
 #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002) || defined(BOARD_SEEED_RETERMINAL_E1004)
