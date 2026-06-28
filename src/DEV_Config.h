@@ -152,6 +152,19 @@
    #define EPD_EN_PIN   11
    #define EPD_BUSY_PIN 13
    #define EPD_VCC_EN   21
+#elif defined (BOARD_SEEED_RETERMINAL_E1004)
+   // Pin definition for reTerminal E1004 (13.3" T133A01, dual-chip Spectra6).
+   // The panel itself is driven by Seeed_GFX via Setup523; these mirror that
+   // wiring so this header does not fall through to the #error below.
+   #define EPD_SCK_PIN    7
+   #define EPD_MISO_PIN   8
+   #define EPD_MOSI_PIN   9
+   #define EPD_CS_PIN     10
+   #define EPD_CS1_PIN    2   // second chip-select (dual-chip controller)
+   #define EPD_DC_PIN     11
+   #define EPD_BUSY_PIN   13
+   #define EPD_RST_PIN    38
+   #define EPD_EN_PIN     12  // panel power enable
 #elif defined (BOARD_X_CLASS)
 // Parallel Eink devices don't explicitly define GPIO pins for the display here
 #else

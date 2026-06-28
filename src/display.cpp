@@ -44,6 +44,12 @@ BBEPAPER bbep(EP75YR_800x480);
     {EP73_SPECTRA_800x480, EP73_SPECTRA_800x480}, // b = darker grays
 };
 BBEPAPER bbep(EP73_SPECTRA_800x480);
+#elif defined(BOARD_SEEED_RETERMINAL_E1004)
+    {EP133A_SPECTRA_1200x1600, EP133A_SPECTRA_1200x1600}, // 13.3" dual-chip Spectra6
+    {EP133A_SPECTRA_1200x1600, EP133A_SPECTRA_1200x1600},
+    {EP133A_SPECTRA_1200x1600, EP133A_SPECTRA_1200x1600},
+};
+BBEPAPER bbep(EP133A_SPECTRA_1200x1600);
 #else // TRMNL OG and GEN2
     {EP75_800x480, EP75_800x480_4GRAY}, // default (for original EPD)
     {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, // a = uses built-in fast + 4-gray
@@ -51,9 +57,9 @@ BBEPAPER bbep(EP73_SPECTRA_800x480);
 };
 BBEPAPER bbep(EP75_800x480);
 #endif
-#ifdef BOARD_SEEED_RETERMINAL_E1002
+#if defined(BOARD_SEEED_RETERMINAL_E1002) || defined(BOARD_SEEED_RETERMINAL_E1004)
 uint8_t u8SpectraPal[512]; // RGB333 mapped to closest Spectra6 color
-#endif // E1002
+#endif // E1002 || E1004
 
 #else // BOARD_X_CLASS
 #include "esp_sleep.h"
@@ -118,6 +124,13 @@ void display_init(void)
 #ifdef BB_EPAPER
     bbep.setPanelType(dpList[iTempProfile].OneBit); // must be set BEFORE calling initio
     Log_info("BB e-Paper init");
+#ifdef BOARD_SEEED_RETERMINAL_E1004
+    // E1004 (13.3" dual-chip): enable panel power and register the second
+    // controller's chip-select BEFORE initIO so both controllers get initialised.
+    pinMode(EPD_EN_PIN, OUTPUT);
+    digitalWrite(EPD_EN_PIN, HIGH);
+    bbep.setCS2(EPD_CS1_PIN);
+#endif
     bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
 #else
 #ifdef BOARD_TRMNL_X
@@ -430,6 +443,17 @@ void display_set_light_sleep(uint8_t enabled)
 #endif
 }
 
+#ifdef BB_EPAPER
+static void display_apply_light_sleep_setting(void)
+{
+#ifdef DO_NOT_LIGHT_SLEEP
+    bbep.setLightSleep(false);
+#else
+    bbep.setLightSleep(true);
+#endif
+}
+#endif
+
 /**
  * @brief Function to sleep the ESP32 while saving power
  * @param u32Millis represents the sleep time in milliseconds
@@ -459,7 +483,7 @@ void display_reset(void)
     Log_info("e-Paper Clear start");
     bbep.fillScreen(BBEP_WHITE);
 #ifdef BB_EPAPER
-    bbep.setLightSleep(true);
+    display_apply_light_sleep_setting();
     if (!apiDisplayResult.response.maximum_compatibility) {
         bbep.refresh(REFRESH_FAST, true);
     } else {
@@ -815,7 +839,7 @@ unsigned char GetBWYRPixel(int r, int g, int b)
 } /* GetBWYRPixel() */
 #endif // BB_EPAPER
 
-#ifdef BOARD_SEEED_RETERMINAL_E1002
+#if defined(BOARD_SEEED_RETERMINAL_E1002) || defined(BOARD_SEEED_RETERMINAL_E1004)
 //
 // bb_epaper colors to map to Spectra6 colors
 // The RGB values are not correct for the panel, but for simple mapping
@@ -861,23 +885,25 @@ void CreateSpectra6Pal(void)
 //
 // Convert the RGB value into one of 6 Spectra6 colors
 //
+#endif // E1002 || E1004
+//
+// Convert an RGB pixel to a panel colour.
+// E1002 and E1004 map to the nearest of 6 Spectra colours.
+//
+#if defined(BOARD_SEEED_RETERMINAL_E1002) || defined(BOARD_SEEED_RETERMINAL_E1004)
 uint8_t GetSpectraPixel(int r, int g, int b)
 {
-uint8_t c;
-uint16_t rgb333;
-
-    rgb333 = (r>>5) + ((g & 0xe0) >> 2) + ((b & 0xe0) << 1);
-    c = u8SpectraPal[rgb333];
-    return c;
+    uint16_t rgb333 = (r>>5) + ((g & 0xe0) >> 2) + ((b & 0xe0) << 1);
+    return u8SpectraPal[rgb333];
 } /* GetSpectraPixel() */
-#endif // E1002
+#endif // E1002 || E1004
 /**
  * @brief Callback function for each line of PNG decoded
  * @param PNGDRAW structure containing the current line and relevant info
  * @return none
  */
 #ifdef BB_EPAPER
-#ifdef BOARD_SEEED_RETERMINAL_E1002
+#if defined(BOARD_SEEED_RETERMINAL_E1002) || defined(BOARD_SEEED_RETERMINAL_E1004)
 //
 // Draw the PNG image into the local framebuffer memory using the drawPixel() method
 // to do color translation and to properly format the memory layout
@@ -977,7 +1003,7 @@ int png_draw_6clr(PNGDRAW *pDraw)
         } // for x
     return 1; // continue decoding
 } /* png_draw_6clr() */
-#endif // E1002 (Spectra6 only)
+#endif // E1002 || E1004 (Spectra6)
 
 #ifdef BOARD_TRMNL_4CLR
 //
@@ -1485,20 +1511,20 @@ PNG *png = new PNG();
             Log_info("%s [%d]: Decoding %d-bpp png (current)\r\n", __FILE__, __LINE__, png->getBpp());
             // Prepare target memory window (entire display)
 #ifdef BB_EPAPER
-#ifdef BOARD_SEEED_RETERMINAL_E1002
-            CreateSpectra6Pal(); // create a fast color matching palette
+#if defined(BOARD_SEEED_RETERMINAL_E1002) || defined(BOARD_SEEED_RETERMINAL_E1004)
+            CreateSpectra6Pal(); // create a fast color matching palette (6-color only)
             if (bbep.allocBuffer() != BBEP_SUCCESS) {
                 Log_error("%s [%d]: bbep.AllocBuffer failed!\n\r", __FILE__, __LINE__);
                 return -1;
             }
-            Log_info("%s [%d]: decoding for 6-color EPD\r\n", __FILE__, __LINE__);
+            Log_info("%s [%d]: decoding for Spectra6 EPD\r\n", __FILE__, __LINE__);
             png->openRAM((uint8_t *)pPNG, iDataSize, png_draw_6clr);
             png->decode(NULL, 0);
             png->close();
             bbep.writePlane();
             delete(png); // free the decoder instance
             return REFRESH_FULL;
-#endif // E1002
+#endif // E1002 || E1004
 #ifdef BOARD_TRMNL_4CLR
             Log_info("%s [%d]: decoding for 4-color EPD\r\n", __FILE__, __LINE__);
             png->openRAM((uint8_t *)pPNG, iDataSize, png_draw_4clr);
@@ -1696,11 +1722,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     if (bbep.capabilities() & (BBEP_4COLOR | BBEP_3COLOR | BBEP_7COLOR)) bWait = 1;
     if (!bWait) iRefreshMode = REFRESH_PARTIAL; // fast update when showing loading screen
     Log_info("%s [%d]: EPD refresh mode: %d\r\n", __FILE__, __LINE__, iRefreshMode);
-#ifdef DO_NOT_LIGHT_SLEEP
-    bbep.setLightSleep(false);
-#else
-    bbep.setLightSleep(true);
-#endif
+    display_apply_light_sleep_setting();
     bbep.refresh(iRefreshMode, bWait);
     if ((bbep.getPanelType() == EP426_800x480 || bbep.getPanelType() == EP397_800x480) && iRefreshMode == REFRESH_PARTIAL) {
         i426Workaround = 1; // need to re-initialize the controller for another update before sleeping
@@ -2280,6 +2302,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
     }
 #ifdef BB_EPAPER
     bbep.writePlane(PLANE_0);
+    display_apply_light_sleep_setting();
     bbep.refresh(REFRESH_FULL, true);
     bbep.freeBuffer();
 #else
@@ -2372,6 +2395,7 @@ void display_show_msg_qa(uint8_t *image_buffer, const float *voltage, const floa
 
     #ifdef BB_EPAPER
         bbep.writePlane(PLANE_0);
+        display_apply_light_sleep_setting();
         bbep.refresh(REFRESH_FULL, true);
         bbep.freeBuffer();
     #else
@@ -2415,6 +2439,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         bbep.fillScreen(BBEP_WHITE);
 #ifdef BB_EPAPER
         bbep.writePlane(PLANE_0);
+        display_apply_light_sleep_setting();
         if (!apiDisplayResult.response.maximum_compatibility) {
             bbep.refresh(REFRESH_FAST, true); // newer panel can handle the fast refresh
         } else {
@@ -2529,6 +2554,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     Log_info("Start drawing...");
 #ifdef BB_EPAPER
     bbep.writePlane(PLANE_0);
+    display_apply_light_sleep_setting();
     bbep.refresh(REFRESH_FULL, true);
     bbep.freeBuffer();
 #else
