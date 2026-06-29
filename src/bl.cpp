@@ -20,6 +20,7 @@
 #include <Preferences.h>
 #include <cstdint>
 #include "png.h"
+#include "webp_decode.h"
 #include <bmp.h>
 #include <Update.h>
 #include <math.h>
@@ -126,6 +127,15 @@ void log_nvs_usage();
 void fixFileName(const char *src, char *dest);
 void config_gpio_for_lp();
 int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious);
+
+/** Trim, lowercase; true if Content-Type starts with @p lower_prefix (e.g. image/webp;charset=utf-8). */
+static bool http_content_type_lower_starts_with(const String &hdr, const char *lower_prefix)
+{
+  String s = hdr;
+  s.trim();
+  s.toLowerCase();
+  return s.startsWith(lower_prefix);
+}
 
 static unsigned long startup_time = 0;
 
@@ -1610,13 +1620,39 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
 
 void load_prev_image(void)
 {
-  uint8_t *buffer;
-  size_t content_size = 0; //filesystem_read_and_allocate(szPrevFile, &buffer);
-  if (content_size > 0) {
-    // Decode it into the previous buffer
-    Log.info("%s [%d]: Decoding previous image (%s) into FastEPD previous buffer\r\n", __FILE__, __LINE__, szPrevFile);
-    png_to_epd(buffer, content_size, true);
+  if (!szPrevFile[0])
+    return;
+
+  uint8_t *buffer = nullptr;
+  size_t content_size = filesystem_read_and_allocate(szPrevFile, &buffer);
+  if (!buffer || content_size == 0)
+  {
+    Log.info("%s [%d]: load_prev_image: missing or empty %s\r\n", __FILE__, __LINE__, szPrevFile);
+    return;
   }
+
+  const int n = (int)content_size;
+  Log.info("%s [%d]: Decoding previous image (%s, %d bytes) into FastEPD previous buffer\r\n", __FILE__, __LINE__,
+           szPrevFile, n);
+
+  if (n >= 12 && is_webp_buffer(buffer, n))
+  {
+    int wrc = webp_to_epd(buffer, n, 1);
+    if (wrc != 0)
+      Log.error("%s [%d]: load_prev_image WebP decode failed (%d)\r\n", __FILE__, __LINE__, wrc);
+  }
+  else if (n >= 4 && buffer[0] == 0x89 && buffer[1] == 'P' && buffer[2] == 'N' && buffer[3] == 'G')
+  {
+    png_to_epd(buffer, n, true);
+  }
+  else if (n >= 2 && buffer[0] == (char)0xff && buffer[1] == (char)0xd8)
+  {
+    Log.info("%s [%d]: load_prev_image: JPEG not loaded into previous buffer\r\n", __FILE__, __LINE__);
+  }
+  else
+    Log.info("%s [%d]: load_prev_image: unknown format for %s\r\n", __FILE__, __LINE__, szPrevFile);
+
+  free(buffer);
 } /* load_prev_image() */
 
 /**
@@ -1872,8 +1908,11 @@ static https_request_err_e downloadAndShow()
             Log.warning("%s [%d]: Content-Length not provided, using getString()\r\n", __FILE__, __LINE__);
           }
 
-          bool isPNG = https.header("Content-Type") == "image/png";
-          bool isJPEG = https.header("Content-Type") == "image/jpeg";
+          // Plugin image from /api/display: PNG, JPEG, or WebP (Content-Type prefix + RIFF/WEBP sniff).
+          const String content_type = https.header("Content-Type");
+          bool isPNG = http_content_type_lower_starts_with(content_type, "image/png");
+          bool isJPEG = http_content_type_lower_starts_with(content_type, "image/jpeg");
+          bool isWebP = http_content_type_lower_starts_with(content_type, "image/webp");
 
           Log.info("%s [%d]: Starting a download at: %d\r\n", __FILE__, __LINE__, getTime());
           heap_caps_check_integrity_all(true);
@@ -1941,27 +1980,36 @@ static https_request_err_e downloadAndShow()
             Log.info("BMP file detected");
           }
 
+          if (counter >= 12 && is_webp_buffer(buffer, (int)counter))
+          {
+            isWebP = true;
+            isPNG = false;
+            isJPEG = false;
+            Log.info("WebP file detected (RIFF/WEBP signature)");
+          }
+
           submitStoredLogs();
 
           WiFi.disconnect(true); // no need for WiFi, save power starting here
           Log.info("%s [%d]: Received successfully; WiFi off.\r\n", __FILE__, __LINE__);
 
           bool image_reverse = false;
-          if (isPNG || isJPEG)
+          if (isPNG || isJPEG || isWebP)
           {
             char szTemp[36];
             fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
             Log.info("%s [%d]: Writing %s to SPIFFS\r\n", __FILE__, __LINE__, szTemp);
             filesystem_purge_old_file(szTemp); // try to delete the old version or older than 24h
             writeImageToFile(szTemp, buffer, content_size);
-            Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
+            const char *fmt = isPNG ? "png" : (isJPEG ? "jpeg" : "webp");
+            Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, fmt);
+            png_res = PNG_NO_ERR; /* WebP/PNG failures may set this inside display_show_image */
             display_show_image(buffer, content_size, true);
             if (buffer_malloc) {
               Log.info("%s [%d]: Freeing the image buffer we allocated\r\n", __FILE__, __LINE__);
               free(buffer);
             }
             buffer = nullptr;
-            png_res = PNG_NO_ERR; // DEBUG
             String _curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
             String _lastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
             if (!_curPath.isEmpty() && (_curPath != String(szTemp) || _lastPath.isEmpty()))
@@ -2029,7 +2077,8 @@ static https_request_err_e downloadAndShow()
           {
           case BMP_NO_ERR:
           {
-            if (!filesystem_file_exists("/current.png"))
+            if (!filesystem_file_exists("/current.png") &&
+                !filesystem_file_exists("/current.webp"))
             {
               writeImageToFile("/current.bmp", buffer, content_size);
             }
@@ -2076,7 +2125,7 @@ static https_request_err_e downloadAndShow()
             break;
           }
 
-          if (isPNG && png_res != PNG_NO_ERR)
+          if ((isPNG || isWebP) && png_res != PNG_NO_ERR)
           {
             char szTemp[36];
             fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
@@ -2555,7 +2604,8 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
 
           bool image_reverse = false;
 
-          if (!filesystem_file_exists("/current.bmp") && !filesystem_file_exists("/current.png"))
+          if (!filesystem_file_exists("/current.bmp") && !filesystem_file_exists("/current.png") &&
+              !filesystem_file_exists("/current.webp"))
           {
             Log.info("%s [%d]: No current image!\r\n", __FILE__, __LINE__);
             if (buffer) {
@@ -2586,6 +2636,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
               Log_error_submit("Error parsing BMP header, code: %d", bmp_parse_result);
               return HTTPS_WRONG_IMAGE_FORMAT;
             }
+            file_size = DISPLAY_BMP_IMAGE_SIZE;
           }
           else if (filesystem_file_exists("/current.png"))
           {
@@ -2600,6 +2651,20 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
             if (png_parse_result != PNG_NO_ERR)
             {
               Log_error_submit("Error parsing PNG header, code: %d", png_parse_result);
+              if (buffer) {
+                free(buffer);
+                buffer = nullptr;
+              }
+              return HTTPS_WRONG_IMAGE_FORMAT;
+            }
+          }
+          else if (filesystem_file_exists("/current.webp"))
+          {
+            Log.info("%s [%d]: send_to_me WebP\r\n", __FILE__, __LINE__);
+            buffer = display_read_file("/current.webp", &file_size);
+            if (!buffer || file_size <= 0)
+            {
+              Log_error_submit("Error reading WebP image");
               if (buffer) {
                 free(buffer);
                 buffer = nullptr;
