@@ -10,20 +10,6 @@
 #include "esp_netif.h"
 #include "esp_sntp.h"
 #include <vector>
-#include <Preferences.h>
-
-String getDeviceHostname() {
-    Preferences prefs;
-    prefs.begin("data", true);
-    String saved = prefs.getString("hostname", "");
-    prefs.end();
-    if (saved.length() > 0) return saved;
-
-    String mac = WiFi.macAddress(); // "AA:BB:CC:DD:EE:FF"
-    String suffix = mac.substring(12, 14) + mac.substring(15, 17);
-    suffix.toLowerCase();
-    return "trmnl-" + suffix;
-}
 
 /**
  * @brief Configure static IP with smart defaults
@@ -300,9 +286,8 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
         // Configure static IP if specified (must be before WiFi.begin)
         configureStaticIP(credentials);
 
-        String hostname = getDeviceHostname();
-        WiFi.setHostname(hostname.c_str());
-        Log_info("WiFi: hostname set to %s", hostname.c_str());
+        configureWifiHostname();
+        Log_info("WiFi: hostname set to %s", getWifiClientHostname().c_str());
 
         WiFi.begin(credentials.ssid.c_str());
 
@@ -318,9 +303,7 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
         // Configure static IP if specified (must be before WiFi.begin)
         configureStaticIP(credentials);
 
-        String hostname = getDeviceHostname();
-        WiFi.setHostname(hostname.c_str());
-        Log_info("WiFi: hostname set to %s", hostname.c_str());
+        Log_info("WiFi: hostname set to %s", getWifiClientHostname().c_str());
 
         beginResult = WiFi.begin(credentials.ssid.c_str(), credentials.pswd.c_str());
         Log_info("WiFi: begin (WPA2-Personal), starting from status %s", wifiStatusStr(beginResult));

@@ -33,14 +33,27 @@ const char *wifiStatusStr(wl_status_t wifi_status)
 
 String getWifiClientHostname(void)
 {
-  String hostname = WIFI_CLIENT_HOSTNAME_PREFIX;
   Preferences prefs;
   if (!prefs.begin("data", true))
-    return hostname;
+    return String(WIFI_CLIENT_HOSTNAME_PREFIX);
+
+  String customHostName = prefs.getString(PREFERENCES_HOSTNAME, "");
+  if (customHostName.length() > 0)
+  {
+    prefs.end();
+    return customHostName;
+  }
+
+  String hostname = WIFI_CLIENT_HOSTNAME_PREFIX;
   String friendly_id = prefs.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
   prefs.end();
   if (friendly_id.length() > 0)
     hostname += "-" + friendly_id;
+  // Alternative solution
+  // String mac = WiFi.macAddress(); // "AA:BB:CC:DD:EE:FF"
+  // String suffix = mac.substring(12, 14) + mac.substring(15, 17);
+  // suffix.toLowerCase();
+  // hostname += "-" + suffix;
   return hostname;
 }
 

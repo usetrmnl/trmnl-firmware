@@ -23,6 +23,7 @@
 #define PREFERENCES_API_URL "api_url"
 #define PREFERENCES_FRIENDLY_ID "friendly_id"
 #define PREFERENCES_FRIENDLY_ID_DEFAULT ""
+#define PREFERENCES_HOSTNAME "hostname"
 #define PREFERENCES_SLEEP_TIME_KEY "refresh_rate"
 #define PREFERENCES_TEMP_PROFILE "temp_profile"
 #define PREFERENCES_LOG_KEY "log_"
