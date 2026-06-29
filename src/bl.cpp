@@ -1893,6 +1893,7 @@ static https_request_err_e downloadAndShow()
           heap_caps_check_integrity_all(true);
 
           buffer = nullptr;
+          bool buffer_malloc = false;
           if (content_size <= 0) {
           // getString() handles lack of content size and chunked transfer encoding automatically
             Log.info("%s [%d]: Downloading image with getString\r\n", __FILE__, __LINE__);
@@ -1908,6 +1909,7 @@ static https_request_err_e downloadAndShow()
 
               buffer = (uint8_t *)malloc(counter);
               if (buffer) {
+                buffer_malloc = true;
                 while (iCount < counter && millis() < (lStartTime + API_FIRST_RETRY*1000)) {
                   if (stream->available()) {
                     buffer[iCount++] = stream->read();
@@ -1968,10 +1970,10 @@ static https_request_err_e downloadAndShow()
             writeImageToFile(szTemp, buffer, content_size);
             Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
             display_show_image(buffer, content_size, true);
-//            if (payload.length() != content_size) { // we allocated this buffer
-//                Log.info("%s [%d]: Freeing the image payload we allocated\r\n", __FILE__, __LINE__, szTemp);
-//                free(buffer);
-//            }
+            if (buffer_malloc) {
+              Log.info("%s [%d]: Freeing the image buffer we allocated\r\n", __FILE__, __LINE__);
+              free(buffer);
+            }
             buffer = nullptr;
             png_res = PNG_NO_ERR; // DEBUG
             String _curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
@@ -2047,7 +2049,11 @@ static https_request_err_e downloadAndShow()
             }
             Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
             display_show_image(buffer, content_size, true);
-            free(buffer);
+            
+            if (buffer_malloc) {
+              Log.info("%s [%d]: Freeing the image buffer we allocated\r\n", __FILE__, __LINE__);
+              free(buffer);
+            }
             buffer = nullptr;
 
             // Using filename from API response
