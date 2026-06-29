@@ -21,12 +21,7 @@ const int samples = 1000;
 const int intervalMs = 7000; // 7s
 const int sample_interval = 1; //1 ms
 const int temperature_threshold = 35; // 35 by Celsium
-bool result = false;
-float initialTemp = 0;
 static bool radioOn = false;
-
-float tempDiff = 0;
-float voltageDiff = 0;
 
 volatile bool stopRequested = false;
 
@@ -196,7 +191,10 @@ static void loadCPUAndRadio(uint32_t ms) {
 
 #ifdef BOARD_TRMNL_X
 bool startQA(){
-  
+  bool result = false;
+  float tempDiff = 0;
+  float voltageDiff = 0;
+
   bool wifiSaved = checkForSavedCredentials();
 
   if(wifiSaved){
@@ -282,6 +280,9 @@ bool startQA(){
 }
 #else
 bool startQA(){
+  bool result = false;
+  float tempDiff = 0;
+  float voltageDiff = 0;
 
   int32_t rssi = 0;
   if (findNetwork("TRMNL_QA", &rssi)) {
