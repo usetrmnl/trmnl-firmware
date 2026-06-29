@@ -177,6 +177,15 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
             Log_info("WebServer: Saved NTP server: %s", ntpServer.c_str());
         }
 
+        String hostname = data["hostname"].is<String>() ? data["hostname"].as<String>() : "";
+        if (hostname.length() > 0) {
+            Preferences prefs;
+            prefs.begin("data", false);
+            prefs.putString("hostname", hostname);
+            prefs.end();
+            Log_info("WebServer: Saved hostname: %s", hostname.c_str());
+        }
+
         Log_info("WebServer: Received SSID: %s, Static IP: %s", ssid.c_str(), useStaticIP ? "yes" : "no");
 
         callbacks.setConnectionCredentials(credentials, api_server);

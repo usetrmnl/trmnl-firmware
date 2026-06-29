@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <WiFi.h>
+#include <ESPmDNS.h>
 #include <bl.h>
 #include <wifi_network.h>
 #include <power.h>
@@ -816,8 +817,10 @@ void bl_init(void)
     // WiFi saved, connection
     WifiCredentials lastCreds = WifiCaptivePortal.getLastCredentials();
     bModemNeeded = lastCreds.is5GHz;
-    Log.info("%s [%d]: modem needed = %d\n\r", __FILE__, __LINE__, bModemNeeded);
+  } else {
+    bModemNeeded = true; // captive portal needs modem for 5 GHz
   }
+  Log.info("%s [%d]: modem needed = %d\n\r", __FILE__, __LINE__, bModemNeeded);
 #endif // X
   pins_init();
   sensor_init();
@@ -1588,6 +1591,7 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   inputs.wifiBand = wifi.band;
   inputs.batteryVoltage = vBatt; //readBatteryVoltage();
   inputs.firmwareVersion = String(FW_VERSION_STRING);
+  inputs.firmwareCommit = String(FW_COMMIT);
   inputs.displayWidth = display_width();
   inputs.displayHeight = display_height();
   inputs.model = DEVICE_MODEL;
@@ -3116,8 +3120,10 @@ static bool checkAndPerformFirmwareUpdate(void)
           return false;
         }
         return true;
-      }
-    );
+      },
+      0,
+      "",
+      120000UL);
 
     if (!result.ok || !write_ok) {
       esp_ota_abort(ota_handle);
@@ -3809,7 +3815,7 @@ DeviceStatusStamp getDeviceStatusStamp()
   return deviceStatus;
 }
 
-void logWithAction(LogAction action, const char *message, time_t time, int line, const char *file)
+void logWithAction(LogAction action, LogLevel level, const char *message, time_t time, int line, const char *file)
 {
   uint32_t log_id = preferences.getUInt(PREFERENCES_LOG_ID_KEY, 1);
 
@@ -3823,7 +3829,8 @@ void logWithAction(LogAction action, const char *message, time_t time, int line,
       .filenameCurrent = preferences.getString(PREFERENCES_FILENAME_KEY, ""),
       .filenameNew = new_filename,
       .logRetry = log_retry,
-      .retryAttempt = log_retry ? preferences.getInt(PREFERENCES_CONNECT_API_RETRY_COUNT) : 0};
+      .retryAttempt = log_retry ? preferences.getInt(PREFERENCES_CONNECT_API_RETRY_COUNT) : 0,
+      .level = level};
 
   String json_string = serialize_log(input);
 

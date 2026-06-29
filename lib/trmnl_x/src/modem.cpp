@@ -739,7 +739,7 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, const String& saveToFil
 // ---------------------------------------------------------------------------
 // httpGet() — chunk-callback overload: calls chunkCb(data, len) per chunk
 // ---------------------------------------------------------------------------
-Modem::ModemHttpResult Modem::httpGet(const String& url, std::function<bool(const uint8_t*, size_t)> chunkCb, size_t contentLength, const String& reqHeaders) {
+Modem::ModemHttpResult Modem::httpGet(const String& url, std::function<bool(const uint8_t*, size_t)> chunkCb, size_t contentLength, const String& reqHeaders, unsigned long timeoutMs) {
   while (ModemSerial.available()) ModemSerial.read();  // flush
 
   if (!reqHeaders.isEmpty()) {
@@ -802,7 +802,7 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, std::function<bool(cons
 
   unsigned long downloadStart  = 0;
   unsigned long lastProgressMs = 0;
-  unsigned long deadline = millis() + 60000;
+  unsigned long deadline = millis() + timeoutMs;
 
   while (!done && !error && !cbAbort && millis() < deadline) {
     esp_task_wdt_reset();
