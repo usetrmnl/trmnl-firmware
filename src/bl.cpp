@@ -1955,8 +1955,7 @@ static https_request_err_e downloadAndShow()
 
           submitStoredLogs();
 
-          WiFi.disconnect(true); // no need for WiFi, save power starting here
-          Log.info("%s [%d]: Received successfully; WiFi off.\r\n", __FILE__, __LINE__);
+          Log.info("%s [%d]: Received successfully.\r\n", __FILE__, __LINE__);
 
           bool image_reverse = false;
           if (isPNG || isJPEG)
@@ -2097,6 +2096,12 @@ static https_request_err_e downloadAndShow()
 
         return result;
       });
+
+  // Disconnect WiFi here, after withHttp() has destroyed the HTTPClient.
+  // Calling WiFi.disconnect(true) inside the lambda crashes the HTTPClient
+  // destructor because it tears down the transport before the object is gone.
+  WiFi.disconnect(true);
+  Log.info("%s [%d]: WiFi off.\r\n", __FILE__, __LINE__);
 
   if (result == HTTPS_UNABLE_TO_CONNECT)
   {
