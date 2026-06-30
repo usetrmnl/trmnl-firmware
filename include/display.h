@@ -133,7 +133,7 @@ void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message,
  * @return none
  */
 
-void display_show_image(uint8_t *image_buffer, int data_size, bool bWait);
+void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool bSkipClear = false);
 
 /**
  * @brief Function to read an image from the file system
