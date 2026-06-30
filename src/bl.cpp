@@ -1041,13 +1041,13 @@ void bl_init(void)
 #ifdef BOARD_TRMNL_X
 
     if (!otg_message && WifiCaptivePortal.isSaved()) {
-      display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false);
+      display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false, true);
     }
     else if (!WifiCaptivePortal.isSaved()) {
       showMessageWithLogo(NONE);
     }
-#else 
-    display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false);
+#else
+    display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false, true);
 #endif // BOARD_TRMNL_X
     // Force the display to show the current playlist image after the loading screen
     // (even if it hasn't changed)
