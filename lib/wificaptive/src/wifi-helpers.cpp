@@ -1,14 +1,12 @@
-#include <WiFiType.h>
 #include <Arduino.h>
+#include <WiFiType.h>
 
-struct WifiStatusNode
-{
+struct WifiStatusNode {
   const char *name;
   wl_status_t value;
 };
 
-inline const char *wifiStatusStr(wl_status_t wifi_status)
-{
+inline const char *wifiStatusStr(wl_status_t wifi_status) {
   static const WifiStatusNode wifiStatusMap[] = {
     {"no_shield", WL_NO_SHIELD},
     {"idle_status", WL_IDLE_STATUS},
@@ -20,10 +18,8 @@ inline const char *wifiStatusStr(wl_status_t wifi_status)
     {"disconnected", WL_DISCONNECTED},
   };
 
-  for (const WifiStatusNode &entry : wifiStatusMap)
-  {
-    if (wifi_status == entry.value)
-    {
+  for (const WifiStatusNode &entry : wifiStatusMap) {
+    if (wifi_status == entry.value) {
       return entry.name;
     }
   }
