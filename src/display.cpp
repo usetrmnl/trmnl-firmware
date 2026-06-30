@@ -6,6 +6,11 @@
 #include <Preferences.h>
 #include <preferences_persistence.h>
 #include "DEV_Config.h"
+#ifdef BOARD_SEEED_RETERMINAL_E1002
+#include "driver/gpio.h"
+#include "driver/spi_master.h"
+#include "esp_err.h"
+#endif
 #include "battery_small.h"
 #define MAX_BIT_DEPTH 8
 #ifndef BOARD_X_CLASS
@@ -101,6 +106,230 @@ extern ApiDisplayResult apiDisplayResult;
 uint32_t iTempProfile;
 static uint8_t *pDither;
 
+#ifdef BOARD_SEEED_RETERMINAL_E1002
+static spi_device_handle_t spectra6Spi = nullptr;
+
+static bool spectra6_wait_busy(const char *label)
+{
+    delay(10);
+    uint32_t wait_count = 0;
+    while (gpio_get_level((gpio_num_t)EPD_BUSY_PIN) == 0) {
+        delay(10);
+        if (++wait_count > 6000) {
+            Log_error("spectra6 %s BUSY timeout", label);
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool spectra6_transmit(const uint8_t *data, size_t len)
+{
+    spi_transaction_t transaction = {};
+    transaction.length = len * 8;
+    transaction.tx_buffer = data;
+    return spi_device_polling_transmit(spectra6Spi, &transaction) == ESP_OK;
+}
+
+static bool spectra6_init_spi()
+{
+    if (spectra6Spi) return true;
+
+    gpio_config_t output_config = {};
+    output_config.pin_bit_mask = (1ULL << EPD_RST_PIN) | (1ULL << EPD_DC_PIN) | (1ULL << EPD_CS_PIN);
+    output_config.mode = GPIO_MODE_OUTPUT;
+    output_config.pull_up_en = GPIO_PULLUP_ENABLE;
+    gpio_config(&output_config);
+
+    gpio_config_t input_config = {};
+    input_config.pin_bit_mask = (1ULL << EPD_BUSY_PIN);
+    input_config.mode = GPIO_MODE_INPUT;
+    input_config.pull_up_en = GPIO_PULLUP_ENABLE;
+    gpio_config(&input_config);
+
+    gpio_set_level((gpio_num_t)EPD_CS_PIN, 1);
+    gpio_set_level((gpio_num_t)EPD_DC_PIN, 0);
+
+    spi_bus_config_t bus_config = {};
+    bus_config.mosi_io_num = EPD_MOSI_PIN;
+    bus_config.miso_io_num = -1;
+    bus_config.sclk_io_num = EPD_SCK_PIN;
+    bus_config.quadwp_io_num = -1;
+    bus_config.quadhd_io_num = -1;
+    bus_config.max_transfer_sz = 4096;
+
+    esp_err_t err = spi_bus_initialize(SPI2_HOST, &bus_config, SPI_DMA_CH_AUTO);
+    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+        Log_error("spectra6 spi_bus_initialize failed: %s", esp_err_to_name(err));
+        return false;
+    }
+
+    spi_device_interface_config_t device_config = {};
+    device_config.clock_speed_hz = 20 * 1000 * 1000;
+    device_config.mode = 0;
+    device_config.spics_io_num = -1;
+    device_config.queue_size = 1;
+    device_config.flags = SPI_DEVICE_HALFDUPLEX | SPI_DEVICE_NO_DUMMY;
+
+    err = spi_bus_add_device(SPI2_HOST, &device_config, &spectra6Spi);
+    if (err != ESP_OK) {
+        Log_error("spectra6 spi_bus_add_device failed: %s", esp_err_to_name(err));
+        spectra6Spi = nullptr;
+        return false;
+    }
+
+    Log_info("spectra6 SPI initialized");
+    return true;
+}
+
+static bool spectra6_command_data(uint8_t command, const uint8_t *data, size_t len)
+{
+    if (!spectra6Spi) return false;
+
+    spi_device_acquire_bus(spectra6Spi, portMAX_DELAY);
+    gpio_set_level((gpio_num_t)EPD_DC_PIN, 0);
+    gpio_set_level((gpio_num_t)EPD_CS_PIN, 0);
+
+    spi_transaction_ext_t command_transaction = {};
+    command_transaction.command_bits = 8;
+    command_transaction.base.flags = SPI_TRANS_VARIABLE_CMD;
+    command_transaction.base.cmd = command;
+    esp_err_t err = spi_device_polling_transmit(spectra6Spi, &command_transaction.base);
+
+    if (err == ESP_OK && data && len) {
+        gpio_set_level((gpio_num_t)EPD_DC_PIN, 1);
+        err = spectra6_transmit(data, len) ? ESP_OK : ESP_FAIL;
+    }
+
+    gpio_set_level((gpio_num_t)EPD_CS_PIN, 1);
+    spi_device_release_bus(spectra6Spi);
+
+    return err == ESP_OK;
+}
+
+static bool spectra6_command(uint8_t command)
+{
+    return spectra6_command_data(command, nullptr, 0);
+}
+
+static bool spectra6_send_buffer(const uint8_t *data, size_t len)
+{
+    if (!spectra6Spi) return false;
+
+    const uint8_t *cursor = data;
+    size_t remaining = len;
+    while (remaining) {
+        const size_t chunk = remaining > 128 ? 128 : remaining;
+
+        spi_device_acquire_bus(spectra6Spi, portMAX_DELAY);
+        gpio_set_level((gpio_num_t)EPD_DC_PIN, 1);
+        gpio_set_level((gpio_num_t)EPD_CS_PIN, 0);
+        const bool ok = spectra6_transmit(cursor, chunk);
+        gpio_set_level((gpio_num_t)EPD_CS_PIN, 1);
+        spi_device_release_bus(spectra6Spi);
+
+        if (!ok) return false;
+        cursor += chunk;
+        remaining -= chunk;
+    }
+
+    return true;
+}
+
+static void spectra6_reset_panel()
+{
+    gpio_set_level((gpio_num_t)EPD_RST_PIN, 1);
+    delay(50);
+    gpio_set_level((gpio_num_t)EPD_RST_PIN, 0);
+    delay(20);
+    gpio_set_level((gpio_num_t)EPD_RST_PIN, 1);
+    delay(50);
+}
+
+static bool spectra6_update()
+{
+    Log_info("spectra6_update start");
+
+    if (!spectra6_init_spi()) return false;
+
+    spectra6_reset_panel();
+    if (!spectra6_wait_busy("reset")) return false;
+
+    const uint8_t cmd_h[] = {0x49, 0x55, 0x20, 0x08, 0x09, 0x18};
+    const uint8_t pwr[] = {0x3f};
+    const uint8_t psr[] = {0x5f, 0x69};
+    const uint8_t pfs[] = {0x00, 0x54, 0x00, 0x44};
+    const uint8_t btst1[] = {0x40, 0x1f, 0x1f, 0x2c};
+    const uint8_t btst2[] = {0x6f, 0x1f, 0x17, 0x49};
+    const uint8_t btst3[] = {0x6f, 0x1f, 0x1f, 0x22};
+    const uint8_t pll[] = {0x03};
+    const uint8_t cdi[] = {0x3f};
+    const uint8_t tcon[] = {0x02, 0x00};
+    const uint8_t tres[] = {0x03, 0x20, 0x01, 0xe0};
+    const uint8_t tvdcs[] = {0x01};
+    const uint8_t pws[] = {0x2f};
+
+    if (!spectra6_command_data(0xaa, cmd_h, sizeof(cmd_h))) return false;
+    if (!spectra6_command_data(0x01, pwr, sizeof(pwr))) return false;
+    if (!spectra6_command_data(0x00, psr, sizeof(psr))) return false;
+    if (!spectra6_command_data(0x03, pfs, sizeof(pfs))) return false;
+    if (!spectra6_command_data(0x05, btst1, sizeof(btst1))) return false;
+    if (!spectra6_command_data(0x06, btst2, sizeof(btst2))) return false;
+    if (!spectra6_command_data(0x08, btst3, sizeof(btst3))) return false;
+    if (!spectra6_command_data(0x30, pll, sizeof(pll))) return false;
+    if (!spectra6_command_data(0x50, cdi, sizeof(cdi))) return false;
+    if (!spectra6_command_data(0x60, tcon, sizeof(tcon))) return false;
+    if (!spectra6_command_data(0x61, tres, sizeof(tres))) return false;
+    if (!spectra6_command_data(0x84, tvdcs, sizeof(tvdcs))) return false;
+    if (!spectra6_command_data(0xe3, pws, sizeof(pws))) return false;
+    if (!spectra6_wait_busy("init")) return false;
+
+    if (!spectra6_command(0x10)) return false;
+    uint8_t *framebuffer = (uint8_t *)bbep.getBuffer();
+    if (framebuffer) {
+        if (!spectra6_send_buffer(framebuffer, 800 * 480 / 2)) return false;
+    } else {
+        uint8_t white_row[800 / 2];
+        memset(white_row, 0x11, sizeof(white_row));
+        for (int y = 0; y < 480; y++) {
+            if (!spectra6_send_buffer(white_row, sizeof(white_row))) return false;
+        }
+    }
+    if (!spectra6_wait_busy("data")) return false;
+
+    if (!spectra6_command(0x04)) return false;
+    if (!spectra6_wait_busy("power on")) return false;
+
+    const uint8_t refresh_data[] = {0x00};
+    if (!spectra6_command_data(0x12, refresh_data, sizeof(refresh_data))) return false;
+    if (!spectra6_wait_busy("refresh")) return false;
+
+    const uint8_t power_off_data[] = {0x00};
+    const uint8_t deep_sleep_data[] = {0xa5};
+    if (!spectra6_command_data(0x02, power_off_data, sizeof(power_off_data))) return false;
+    if (!spectra6_wait_busy("power off")) return false;
+    if (!spectra6_command_data(0x07, deep_sleep_data, sizeof(deep_sleep_data))) return false;
+
+    Log_info("spectra6_update end");
+    return true;
+}
+#endif
+
+#ifdef BB_EPAPER
+static bool display_update_epaper(int refreshMode, bool wait, bool writePlane = false, uint8_t plane = PLANE_0)
+{
+#ifdef BOARD_SEEED_RETERMINAL_E1002
+    return spectra6_update();
+#else
+    if (writePlane) {
+        bbep.writePlane(plane);
+    }
+    bbep.refresh(refreshMode, wait);
+    return true;
+#endif
+}
+#endif
+
 /**
  * @brief Function to init the display
  * @param none
@@ -114,7 +343,11 @@ void display_init(void)
 #ifdef BB_EPAPER
     bbep.setPanelType(dpList[iTempProfile].OneBit); // must be set BEFORE calling initio
     Log_info("BB e-Paper init");
+#ifdef BOARD_SEEED_RETERMINAL_E1002
+    spectra6_init_spi();
+#else
     bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
+#endif
 #else
 #ifdef BOARD_TRMNL_X
     bbep.initPanel(BB_PANEL_TRMNL_X);
@@ -457,11 +690,11 @@ void display_reset(void)
     Log_info("e-Paper Clear start");
     bbep.fillScreen(BBEP_WHITE);
 #ifdef BB_EPAPER
+#ifndef BOARD_SEEED_RETERMINAL_E1002
     bbep.setLightSleep(true);
-    if (!apiDisplayResult.response.maximum_compatibility) {
-        bbep.refresh(REFRESH_FAST, true);
-    } else {
-        bbep.refresh(REFRESH_FULL, true); // incompatible panel
+#endif
+    if (!display_update_epaper(apiDisplayResult.response.maximum_compatibility ? REFRESH_FULL : REFRESH_FAST, true)) {
+        Log_error("display_reset: e-paper update failed");
     }
 #else
     bbep.fullUpdate();
@@ -1493,7 +1726,6 @@ PNG *png = new PNG();
             png->openRAM((uint8_t *)pPNG, iDataSize, png_draw_6clr);
             png->decode(NULL, 0);
             png->close();
-            bbep.writePlane();
             delete(png); // free the decoder instance
             return REFRESH_FULL;
 #endif // E1002
@@ -1662,17 +1894,29 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
          // This work-around is due to a lack of RAM; the correct method would be to use loadBMP()
             flip_image(image_buffer+62, bbep.width(), bbep.height(), false); // fix bottom-up bitmap images
 #ifdef BB_EPAPER
+#ifdef BOARD_SEEED_RETERMINAL_E1002
+            uint8_t *bitmap = image_buffer + 62;
+            if (bbep.allocBuffer() == BBEP_SUCCESS) {
+                for (int y = 0; y < bbep.height(); y++) {
+                    const uint8_t *row = bitmap + (y * ((bbep.width() + 7) / 8));
+                    for (int x = 0; x < bbep.width(); x++) {
+                        const uint8_t bit = row[x >> 3] & (0x80 >> (x & 7));
+                        bbep.drawPixel(x, y, bit ? BBEP_WHITE : BBEP_BLACK);
+                    }
+                }
+                bAlloc = true;
+            }
+#else
             bbep.setBuffer(image_buffer+62); // uncompressed 1-bpp bitmap
+#if defined( BOARD_XTEINK_X4 ) || defined( MINI_EPD )
+            bbep.writePlane(PLANE_FALSE_DIFF);
+#else
+            bbep.writePlane(); // send image data to the EPD
+#endif
+#endif
 #endif
         }
-#ifdef BB_EPAPER
-#if defined( BOARD_XTEINK_X4 ) || defined( MINI_EPD )
-        bbep.writePlane(PLANE_FALSE_DIFF);
-#else
-        bbep.writePlane(); // send image data to the EPD
-#endif
         iRefreshMode = REFRESH_PARTIAL;
-#endif
         iUpdateCount = 1; // use partial update
     }
     Log_info("Display refresh start");
@@ -1695,12 +1939,20 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     if (bbep.capabilities() & (BBEP_4COLOR | BBEP_3COLOR | BBEP_7COLOR)) bWait = 1;
     if (!bWait) iRefreshMode = REFRESH_PARTIAL; // fast update when showing loading screen
     Log_info("%s [%d]: EPD refresh mode: %d\r\n", __FILE__, __LINE__, iRefreshMode);
+#ifndef BOARD_SEEED_RETERMINAL_E1002
 #ifdef DO_NOT_LIGHT_SLEEP
     bbep.setLightSleep(false);
 #else
     bbep.setLightSleep(true);
 #endif
-    bbep.refresh(iRefreshMode, bWait);
+#endif
+    if (!display_update_epaper(iRefreshMode, bWait)) {
+        Log_error("display_show_image: e-paper update failed");
+        if (bAlloc) {
+            bbep.freeBuffer();
+        }
+        return;
+    }
     if ((bbep.getPanelType() == EP426_800x480 || bbep.getPanelType() == EP397_800x480) && iRefreshMode == REFRESH_PARTIAL) {
         i426Workaround = 1; // need to re-initialize the controller for another update before sleeping
     }
@@ -2278,8 +2530,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         break;
     }
 #ifdef BB_EPAPER
-    bbep.writePlane(PLANE_0);
-    bbep.refresh(REFRESH_FULL, true);
+    if (!display_update_epaper(REFRESH_FULL, true, true, PLANE_0)) {
+        Log_error("display_show_msg: e-paper update failed");
+        bbep.freeBuffer();
+        return;
+    }
     bbep.freeBuffer();
 #else
     Serial.println("FastEPD full update");
@@ -2370,8 +2625,11 @@ void display_show_msg_qa(uint8_t *image_buffer, const float *voltage, const floa
     bbep.print(qaResultString);
 
     #ifdef BB_EPAPER
-        bbep.writePlane(PLANE_0);
-        bbep.refresh(REFRESH_FULL, true);
+        if (!display_update_epaper(REFRESH_FULL, true, true, PLANE_0)) {
+            Log_error("display_show_msg_qa: e-paper update failed");
+            bbep.freeBuffer();
+            return;
+        }
         bbep.freeBuffer();
     #else
         bbep.fullUpdate();
@@ -2413,11 +2671,10 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         Log_info("Display set to white");
         bbep.fillScreen(BBEP_WHITE);
 #ifdef BB_EPAPER
-        bbep.writePlane(PLANE_0);
-        if (!apiDisplayResult.response.maximum_compatibility) {
-            bbep.refresh(REFRESH_FAST, true); // newer panel can handle the fast refresh
-        } else {
-            bbep.refresh(REFRESH_FULL, true); // incompatible panel (for now)
+        if (!display_update_epaper(apiDisplayResult.response.maximum_compatibility ? REFRESH_FULL : REFRESH_FAST, true, true, PLANE_0)) {
+            Log_error("display_show_msg: WiFi connect update failed");
+            bbep.freeBuffer();
+            return;
         }
 #else
         bbep.fullUpdate();
@@ -2527,8 +2784,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     }
     Log_info("Start drawing...");
 #ifdef BB_EPAPER
-    bbep.writePlane(PLANE_0);
-    bbep.refresh(REFRESH_FULL, true);
+    if (!display_update_epaper(REFRESH_FULL, true, true, PLANE_0)) {
+        Log_error("display_show_msg2: e-paper update failed");
+        bbep.freeBuffer();
+        return;
+    }
     bbep.freeBuffer();
 #else
     bbep.fullUpdate();
