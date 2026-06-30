@@ -1077,91 +1077,86 @@ void bl_init(void)
   Log_info("BATTERY CHARGING: %s", battery_charging ? "YES" : "NO");
 
   if (battery_count != BATTERY_NONE) {
-    BQ27427_reset();
-    delay(300); // BQ27427 needs 250 ms to power up
+    // If ITPOR is clear the BQ27427 retained its golden file config from the
+    // previous boot (battery stayed connected). Skip the ~4.8 s reset +
+    // applyGoldenFile() sequence; it is only needed after a power-on reset.
+    bool bq_connected = lipo.begin(SENSOR_SDA_PIN, SENSOR_SCL_PIN);
+    bool needs_config  = !bq_connected || lipo.itporFlag();
 
-    if (!lipo.begin(SENSOR_SDA_PIN, SENSOR_SCL_PIN)) {
-    // If communication fails, print an error message and loop forever.
-      Log_error("Error: Unable to communicate with BQ27427.");
-      gpio_dump_io_configuration(stdout, (1ULL << 39));
-      gpio_dump_io_configuration(stdout, (1ULL << 40));
-    }
-    else {
-    Log_info("Connected to BQ27427!");
+    if (!needs_config) {
+      Log_info("BQ27427: golden file retained (ITPOR clear), skipping reset");
+      lipo._initialized = true;
+    } else {
+      BQ27427_reset();
+      delay(300); // BQ27427 needs 250 ms to power up after hardware reset
 
-    if (battery_count == BATTERY_ONE) {
-      Log_info("One battery detected");
-      lipo.configureOneCell();
-    }
-    else if (battery_count == BATTERY_TWO) {
-      Log_info("Two batteries detected");
-      lipo.configureTwoCell();
-    }
-
-    // After SOFT_RESET the BQ27427 enters INITIALIZATION (ITPOR=1).
-    // The IT algorithm needs an OCV measurement (battery at rest) to
-    // transition to NORMAL mode and produce accurate capacity values.
-    // Poll for up to 5 s; under active load it may not clear until rest.
-    {
-      unsigned long t0 = millis();
-      while ((lipo.flags() & BQ27427_FLAG_ITPOR) && (millis() - t0 < 5000)) {
-        delay(100);
-      }
-      if (lipo.flags() & BQ27427_FLAG_ITPOR) {
-        Log_info("BQ27427: ITPOR still set — device in INITIALIZATION, capacity values may be stale");
+      bq_connected = lipo.begin(SENSOR_SDA_PIN, SENSOR_SCL_PIN);
+      if (!bq_connected) {
+        Log_error("Error: Unable to communicate with BQ27427.");
+        gpio_dump_io_configuration(stdout, (1ULL << 39));
+        gpio_dump_io_configuration(stdout, (1ULL << 40));
       } else {
-        Log_info("BQ27427: ITPOR cleared — device in NORMAL mode");
-        lipo._initialized = true;
+        Log_info("Connected to BQ27427!");
+
+        if (battery_count == BATTERY_ONE) {
+          Log_info("One battery detected");
+          lipo.configureOneCell();
+        } else if (battery_count == BATTERY_TWO) {
+          Log_info("Two batteries detected");
+          lipo.configureTwoCell();
+        }
+
+        // After SOFT_RESET the BQ27427 enters INITIALIZATION (ITPOR=1).
+        // The IT algorithm needs an OCV measurement (battery at rest) to
+        // transition to NORMAL mode and produce accurate capacity values.
+        // Poll for up to 5 s; under active load it may not clear until rest.
+        {
+          unsigned long t0 = millis();
+          while ((lipo.flags() & BQ27427_FLAG_ITPOR) && (millis() - t0 < 5000)) {
+            delay(100);
+          }
+          if (lipo.flags() & BQ27427_FLAG_ITPOR) {
+            Log_info("BQ27427: ITPOR still set — device in INITIALIZATION, capacity values may be stale");
+          } else {
+            Log_info("BQ27427: ITPOR cleared — device in NORMAL mode");
+            lipo._initialized = true;
+          }
+        }
       }
     }
-    uint8_t energyScale = lipo.designEnergyScale();
-    unsigned int soc = lipo.soc();                               // State-of-charge (%) — use this for battery level display
-    unsigned int volts = lipo.voltage();                         // Battery voltage (mV)
-    int current = lipo.current(AVG);                            // Average current (mA)
-    float temperature = float((lipo.temperature(BATTERY)) - 2732) / 10.0;         // Temperature (C)
-    unsigned int fullCapacity = lipo.capacity(FULL) * energyScale; // Full capacity (mAh) — valid only in NORMAL mode
-    unsigned int capacity = lipo.capacity(REMAIN) * energyScale;   // Remaining capacity (mAh) — valid only in NORMAL mode
-    int health = lipo.soh();                                     // State-of-health (%)
 
-    // Assemble a string to print
-    String toPrint = "[" + String(millis() / 1000) + "] ";
-    toPrint += String(soc) + "% | ";
-    toPrint += String(temperature, 1) + " C | ";
-    toPrint += String(volts) + " mV | ";
-    toPrint += String(current) + " mA | ";
-    toPrint += String(capacity) + " / ";
-    toPrint += String(fullCapacity) + " mAh | ";
-    toPrint += String(health) + "%";
-    //fast charging allowed
-    if (lipo.chgFlag())
-        toPrint += " CHG";
+    if (bq_connected) {
+      uint8_t energyScale = lipo.designEnergyScale();
+      unsigned int soc = lipo.soc();                               // State-of-charge (%)
+      unsigned int volts = lipo.voltage();                         // Battery voltage (mV)
+      int current = lipo.current(AVG);                            // Average current (mA)
+      float temperature = float((lipo.temperature(BATTERY)) - 2732) / 10.0; // Temperature (C)
+      unsigned int fullCapacity = lipo.capacity(FULL) * energyScale;   // Full capacity (mAh)
+      unsigned int capacity = lipo.capacity(REMAIN) * energyScale;     // Remaining capacity (mAh)
+      int health = lipo.soh();                                     // State-of-health (%)
 
-    //full charge detected
-    if (lipo.fcFlag())
-        toPrint += " FC";
+      String toPrint = "[" + String(millis() / 1000) + "] ";
+      toPrint += String(soc) + "% | ";
+      toPrint += String(temperature, 1) + " C | ";
+      toPrint += String(volts) + " mV | ";
+      toPrint += String(current) + " mA | ";
+      toPrint += String(capacity) + " / ";
+      toPrint += String(fullCapacity) + " mAh | ";
+      toPrint += String(health) + "%";
+      if (lipo.chgFlag())  toPrint += " CHG";
+      if (lipo.fcFlag())   toPrint += " FC";
+      if (lipo.dsgFlag())  toPrint += " DSG";
+      if (lipo.itporFlag()) toPrint += " INIT";
+      Serial.println(toPrint);
 
-    //battery is discharging
-    if (lipo.dsgFlag())
-        toPrint += " DSG";
-
-    // ITPOR flag: device still in INITIALIZATION, capacity values may be stale
-    if (lipo.itporFlag())
-        toPrint += " INIT";
-
-    // Print the string
-    Serial.println(toPrint);
-
-    if (lipo.fcFlag()) {
-      Log_info("BATTERY IS FULL");
-      // full, charger connected but not drawing current
-    } else if (lipo.chgFlag()) {
-      Log_info("BATTERY IS CHARGING");
-      // actively charging
-    } else if (lipo.dsgFlag()) {
-      Log_info("BATTERY IS DISCHARGING");
-      // discharging
+      if (lipo.fcFlag()) {
+        Log_info("BATTERY IS FULL");
+      } else if (lipo.chgFlag()) {
+        Log_info("BATTERY IS CHARGING");
+      } else if (lipo.dsgFlag()) {
+        Log_info("BATTERY IS DISCHARGING");
+      }
     }
-  }
   }
   else {
     Log_info("No battery detected - skipping BQ27427 initialization");
