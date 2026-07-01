@@ -647,10 +647,11 @@ bool WifiCaptive::autoConnect()
         WiFi.setMinSecurity(WIFI_AUTH_OPEN);
         WiFi.mode(WIFI_STA);
 
-        if (tryConnectWithRetries(_savedWifis[last_used_index], last_used_index))
-        {
-            return true;
-        }
+if (tryConnectWithRetries(_savedWifis[last_used_index], last_used_index))
+    {
+        saveLastUsedWifiIndex(last_used_index);
+        return true;
+    }
     }
 
     Log_info("Last used network unavailable, scanning for known networks...");
