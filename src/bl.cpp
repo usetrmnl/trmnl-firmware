@@ -855,6 +855,10 @@ void bl_init(void)
   bool double_click = false;
   if (gpio_wakeup)
   {
+#ifdef BOARD_ESP32_M075_GDP075FW1_NO_BUTTON
+    wait_for_serial();
+    Log_info("GPIO wakeup (%d) ignored; board has no configured button", wakeup_reason);
+#else
     Log_info("GPIO wakeup detected (%d)", wakeup_reason);
     auto button = read_button_presses();
     wait_for_serial();
@@ -875,6 +879,7 @@ void bl_init(void)
       resetDeviceCredentials();
     }
     Log_info("button handling end");
+#endif
   }
   else
   {
@@ -3266,6 +3271,7 @@ void goToSleep(void)
   preferences.end();
   esp_sleep_enable_timer_wakeup((uint64_t)time_to_sleep * SLEEP_uS_TO_S_FACTOR);
   // Configure GPIO pin for wakeup
+#ifndef BOARD_ESP32_M075_GDP075FW1_NO_BUTTON
 #if CONFIG_IDF_TARGET_ESP32
   #define BUTTON_PIN_BITMASK(GPIO) (1ULL << GPIO)  // 2 ^ GPIO_NUMBER in hex
   esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK(PIN_INTERRUPT), ESP_EXT1_WAKEUP_ALL_LOW);
@@ -3276,6 +3282,7 @@ void goToSleep(void)
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
+#endif
 #endif
 #ifdef BOARD_XTEINK_X4
   gpio_hold_en(GPIO_NUM_13); // MOSFET enabling the battery power
@@ -3293,6 +3300,7 @@ static void goToSleepButtonOnly(void)
   WiFi.mode(WIFI_OFF);
   filesystem_deinit();
   preferences.end();
+#ifndef BOARD_ESP32_M075_GDP075FW1_NO_BUTTON
 #if CONFIG_IDF_TARGET_ESP32
   #define BUTTON_PIN_BITMASK_BTN(GPIO) (1ULL << GPIO)
   esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK_BTN(PIN_INTERRUPT), ESP_EXT1_WAKEUP_ALL_LOW);
@@ -3302,6 +3310,9 @@ static void goToSleepButtonOnly(void)
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
+#endif
+#else
+  esp_sleep_enable_timer_wakeup((uint64_t)SLEEP_TIME_TO_SLEEP * SLEEP_uS_TO_S_FACTOR);
 #endif
 #ifdef BOARD_XTEINK_X4
   gpio_hold_en(GPIO_NUM_13);
