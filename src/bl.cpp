@@ -1728,7 +1728,12 @@ static https_request_err_e downloadAndShow()
     if (!_prevPath.isEmpty() && (_prevPath != String(szTemp) || _prevLastPath.isEmpty()))
       preferences.putString(PREFERENCES_LAST_PATH_KEY, _prevPath);
 
-    auto httpRes = g_modem->httpGet(String(filename), szTemp, 0);
+    // Include ID and Access Token if the image is hosted on the same server as the API
+    String imgHeaders;
+    if (strncmp(filename, apiDisplayInputs.baseUrl.c_str(), apiDisplayInputs.baseUrl.length()) == 0)
+      imgHeaders = formatHeaders(buildImageHeaders(apiDisplayInputs));
+
+    auto httpRes = g_modem->httpGet(String(filename), szTemp, 0, imgHeaders);
     if (!httpRes.ok)
     {
       Log_error_submit("Modem httpGet failed: %u bytes received", httpRes.bytesReceived);
@@ -1779,10 +1784,7 @@ static https_request_err_e downloadAndShow()
 
         // Include ID and Access Token if the image is hosted on the same server as the API
         if (strncmp(filename, apiDisplayInputs.baseUrl.c_str(), apiDisplayInputs.baseUrl.length()) == 0)
-        {
-          https.addHeader("ID", apiDisplayInputs.macAddress);
-          https.addHeader("Access-Token", apiDisplayInputs.apiKey);
-        }
+          applyHeaders(https, buildImageHeaders(apiDisplayInputs));
 
         if (status && !reset_firmware)
         {
