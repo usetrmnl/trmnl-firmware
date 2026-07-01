@@ -272,6 +272,8 @@ void WifiCaptive::resetSettings()
         preferences.remove(WIFI_STATIC_SN_KEY(i));
         preferences.remove(WIFI_STATIC_DNS1_KEY(i));
         preferences.remove(WIFI_STATIC_DNS2_KEY(i));
+        preferences.remove(WIFI_BSSID_KEY(i));
+        preferences.remove(WIFI_CHAN_KEY(i));
     }
     preferences.end();
 
@@ -338,6 +340,8 @@ void WifiCaptive::readWifiCredentials()
         _savedWifis[i].subnet = preferences.getString(WIFI_STATIC_SN_KEY(i), "");
         _savedWifis[i].dns1 = preferences.getString(WIFI_STATIC_DNS1_KEY(i), "");
         _savedWifis[i].dns2 = preferences.getString(WIFI_STATIC_DNS2_KEY(i), "");
+        _savedWifis[i].bssid = preferences.getString(WIFI_BSSID_KEY(i), "");
+        _savedWifis[i].channel = preferences.getUChar(WIFI_CHAN_KEY(i), 0);
     }
 
     int idx = preferences.getInt(WIFI_LAST_INDEX, 0);
@@ -402,6 +406,8 @@ void WifiCaptive::saveWifiCredentials(const WifiCredentials credentials)
         preferences.putString(WIFI_STATIC_SN_KEY(i), _savedWifis[i].subnet);
         preferences.putString(WIFI_STATIC_DNS1_KEY(i), _savedWifis[i].dns1);
         preferences.putString(WIFI_STATIC_DNS2_KEY(i), _savedWifis[i].dns2);
+        preferences.putString(WIFI_BSSID_KEY(i), _savedWifis[i].bssid);
+        preferences.putUChar(WIFI_CHAN_KEY(i), _savedWifis[i].channel);
     }
     preferences.putInt(WIFI_LAST_INDEX, 0);
     preferences.end();
@@ -703,6 +709,19 @@ bool WifiCaptive::tryConnectWithRetries(const WifiCredentials creds, int last_us
         if (WiFi.status() == WL_CONNECTED)
         {
             Log_info("Connected to %s", creds.ssid.c_str());
+            if (last_used_index >= 0 && last_used_index < WIFI_MAX_SAVED_CREDS && !creds.isEnterprise)
+            {
+                String connBssid = WiFi.BSSIDstr();
+                uint8_t connChannel = (uint8_t)WiFi.channel();
+                Log_info("Saving fast-connect hint: BSSID %s, channel %d", connBssid.c_str(), connChannel);
+                _savedWifis[last_used_index].bssid = connBssid;
+                _savedWifis[last_used_index].channel = connChannel;
+                Preferences prefs;
+                prefs.begin("wificaptive", false);
+                prefs.putString(WIFI_BSSID_KEY(last_used_index), connBssid);
+                prefs.putUChar(WIFI_CHAN_KEY(last_used_index), connChannel);
+                prefs.end();
+            }
             if (last_used_index >= 0)
             {
                 saveLastUsedWifiIndex(last_used_index);

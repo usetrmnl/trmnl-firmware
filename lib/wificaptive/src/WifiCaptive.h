@@ -28,6 +28,8 @@
 #define WIFI_CONNECTION_ATTEMPTS 3
 // Define max connection timeout
 #define CONNECTION_TIMEOUT 15000
+// Shorter timeout for fast-connect attempt (specific BSSID+channel); falls back to full scan on expiry
+#define WIFI_FAST_CONNECT_TIMEOUT 5000
 
 #define WIFI_SSID_KEY(i) ("wifi_" + String(i) + "_ssid").c_str()
 #define WIFI_PSWD_KEY(i) ("wifi_" + String(i) + "_pswd").c_str()
@@ -43,7 +45,13 @@
 #define WIFI_STATIC_DNS2_KEY(i) ("wifi_" + String(i) + "_dns2").c_str()
 #define WIFI_USE_STATIC_KEY(i) ("wifi_" + String(i) + "_usip").c_str()
 
+#define WIFI_BSSID_KEY(i) ("wifi_" + String(i) + "_bssid").c_str()
+#define WIFI_CHAN_KEY(i)   ("wifi_" + String(i) + "_chan").c_str()
+
 #define WIFI_LAST_INDEX "wifi_last_index"
+
+// Minimum RSSI (dBm) to keep a fast-connect result; weaker signal triggers a full scan
+#define WIFI_FAST_CONNECT_MIN_RSSI (-75)
 
 struct ExternalNetwork {
     String  ssid;

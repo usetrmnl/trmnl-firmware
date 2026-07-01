@@ -19,6 +19,9 @@ struct WifiCredentials
     String subnet;      // e.g., "255.255.255.0" (optional - defaults to 255.255.255.0)
     String dns1;        // optional - defaults to gateway
     String dns2;        // optional - defaults to 8.8.8.8
+    // Fast-connect hint: populated after each successful connection
+    String bssid;        // "AA:BB:CC:DD:EE:FF"; empty if not yet known
+    uint8_t channel = 0; // 0 if not yet known
     WifiCredentials() : is5GHz(false) {}
     WifiCredentials(String ssid, String pswd, bool is5GHz = false)
         : ssid(ssid), pswd(pswd), is5GHz(is5GHz) {}

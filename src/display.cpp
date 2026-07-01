@@ -1579,7 +1579,7 @@ PNG *png = new PNG();
  * @param reverse shows if the color scheme is reverse
  * @return none
  */
-void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
+void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool bSkipClear)
 
 {
     bool isPNG = data_size >= 4 && MOTOLONG(image_buffer) == (int32_t)0x89504e47;
@@ -1717,8 +1717,12 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
  //       bbep.setPasses(6,6);
  //       bbep.partialUpdate(false); // we have a previous image to diff against; use a non-flickering update
  //   } else {
-        int iClearMode = ((iUpdateCount & 7) == 0 || (iTempProfile > 0)) ? CLEAR_SLOW : CLEAR_FAST;
-        Log_info("fullUpdate clear mode = %d\n", iClearMode); 
+        // bWait=false means loading screen: skip clearing passes so it appears
+        // faster. Ghosting from the previous image is acceptable since the
+        // real content refresh (bWait=true) immediately follows.
+        int iClearMode = bSkipClear ? CLEAR_NONE
+                                   : ((iUpdateCount & 7) == 0 || (iTempProfile > 0)) ? CLEAR_SLOW : CLEAR_FAST;
+        Log_info("fullUpdate clear mode = %d\n", iClearMode);
         bbep.fullUpdate(iClearMode, false);
  //   }
  }
