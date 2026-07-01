@@ -519,6 +519,7 @@ void display_draw_touchbar_indicator(touchbar_side_t side, bool filled)
     int w = bbep.width();
     int h = bbep.height();
     int x;
+    Log_info("Drawing touchbar indicator %d\n", (int)side);
     switch (side) {
         case TOUCHBAR_LEFT:   x = w / 6;     break;
         case TOUCHBAR_MIDDLE: x = w / 2;     break;
@@ -527,17 +528,7 @@ void display_draw_touchbar_indicator(touchbar_side_t side, bool filled)
     }
     int y = h - margin_bottom - radius;
 #ifdef BOARD_X_CLASS
-    int cur_mode = bbep.getMode();
     int prev_mode = bbep.getPreviousMode();
-    if (prev_mode == BB_MODE_NONE) {
-        // pCurrent is uninitialized (black). Fill both buffers with white so
-        // only the indicator pixels produce a diff in partialUpdate.
-        bbep.fillScreen(BBEP_WHITE);
-        int sz = bbep.width() * bbep.height() / 8; // 1BPP bytes
-        memcpy(bbep.previousBuffer(), bbep.currentBuffer(), sz);
-        bbep.setPreviousMode(cur_mode);
-    }
-    {
         const int rect_h = radius * 2;
         const int rect_w = rect_h * 4;
         const int border = 3;
@@ -545,12 +536,23 @@ void display_draw_touchbar_indicator(touchbar_side_t side, bool filled)
         int ry = y - rect_h / 2;
         uint8_t fill_color   = filled ? BBEP_BLACK : BBEP_WHITE;
         uint8_t border_color = filled ? BBEP_WHITE : BBEP_BLACK;
-        bbep.fillRect(rx, ry, rect_w, rect_h, fill_color);
-        for (int b = 0; b < border; b++) {
-            bbep.drawRect(rx + b, ry + b, rect_w - b * 2, rect_h - b * 2, border_color);
+        if (prev_mode == BB_MODE_NONE) {
+            bbep.setMode(BB_MODE_1BPP);
+            // No previous image, so in order to get what we need in a partial update, we need to
+            // set the colors to the opposite of what we want drawn.
+            bbep.fillScreen(BBEP_WHITE);
+            bbep.drawRect(rx - border - 1, ry - border - 1, rect_w + 2 + (2*border), rect_h + 2 + (2*border), border_color);
+            bbep.fillRect(rx - border, ry - border, rect_w + (2*border), rect_h + (2*border), fill_color);
+            bbep.fillRect(rx, ry, rect_w, rect_h, border_color);
+            int sz = bbep.width() * bbep.height() / 8; // 1-bit per pixel
+            memcpy(bbep.previousBuffer(), bbep.currentBuffer(), sz);
+            bbep.setPreviousMode(BB_MODE_1BPP);
         }
-    }
-    bbep.partialUpdate(true);
+        // Draw outline, then larger filled rect for border color and inner for fill color
+        bbep.drawRect(rx - border - 1, ry - border - 1, rect_w + 2 + (2*border), rect_h + 2 + (2*border), fill_color);
+        bbep.fillRect(rx - border, ry - border, rect_w + (2*border), rect_h + (2*border), border_color);
+        bbep.fillRect(rx, ry, rect_w, rect_h, fill_color);
+        bbep.partialUpdate(false);
 #else
     {
         const int rect_h = radius * 2;
