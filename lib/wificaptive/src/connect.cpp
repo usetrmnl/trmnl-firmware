@@ -9,6 +9,7 @@
 #include "esp_err.h"
 #include "esp_netif.h"
 #include "esp_sntp.h"
+#include <vector>
 #include <Preferences.h>
 
 static bool parseBssid(const String &str, uint8_t out[6])
@@ -196,15 +197,26 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
 {
     WifiEventData eventData;
 
+    // Register WiFi event handlers and remember each registration id.
+    std::vector<wifi_event_id_t> handlerIds;
     for (int i = ARDUINO_EVENT_WIFI_READY; i < ARDUINO_EVENT_MAX; i++)
     {
-        WiFi.onEvent([i, &eventData](WiFiEvent_t event, WiFiEventInfo_t info)
+        wifi_event_id_t id = WiFi.onEvent([&eventData](WiFiEvent_t event, WiFiEventInfo_t info)
                      {
                          eventData.eventCount++;
 
                          captureEventData(event, info, &eventData); },
                      (arduino_event_id_t)i);
+        handlerIds.push_back(id);
     }
+
+    auto removeEventHandlers = [&handlerIds]()
+    {
+        for (wifi_event_id_t id : handlerIds)
+        {
+            WiFi.removeEvent(id);
+        }
+    };
 
     if (!credentials.useStaticIP)
     {
@@ -224,10 +236,7 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
         {
             Log_error("WiFi: Enterprise mode requires an identity");
             // clean up event handlers
-            for (int i = ARDUINO_EVENT_WIFI_READY; i < ARDUINO_EVENT_MAX; i++)
-            {
-                WiFi.removeEvent(i);
-            }
+            removeEventHandlers();
             return {WL_CONNECT_FAILED, eventData};
         }
 
@@ -293,10 +302,7 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
             Log_error("WiFi: Failed to enable WPA2 Enterprise, error: %d", err);
             disableWpa2Enterprise();
             // clean up event handlers
-            for (int i = ARDUINO_EVENT_WIFI_READY; i < ARDUINO_EVENT_MAX; i++)
-            {
-                WiFi.removeEvent(i);
-            }
+            removeEventHandlers();
             return {WL_CONNECT_FAILED, eventData};
         }
 
@@ -383,10 +389,7 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
     }
 
     // Clean up Arduino event handlers
-    for (int i = ARDUINO_EVENT_WIFI_READY; i < ARDUINO_EVENT_MAX; i++)
-    {
-        WiFi.removeEvent(i);
-    }
+    removeEventHandlers();
 
     return {result, eventData};
 }
