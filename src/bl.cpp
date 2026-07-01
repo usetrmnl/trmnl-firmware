@@ -103,6 +103,7 @@ RTC_DATA_ATTR bool bUsedCachedImage = false; // if the last image displayed was 
 RTC_DATA_ATTR uint8_t need_to_refresh_display = 1;
 RTC_DATA_ATTR bool otg_state = false;  // Track OTG state across deep sleep
 RTC_DATA_ATTR char szPrevFile[36] = {0};
+RTC_DATA_ATTR uint8_t g_bq27427EnergyScale = 0; // cached across deep sleep; 0 = not yet read
 bool touchbar_tap_mode = true;  // false = "slide", true = "tap" (default)
 Preferences preferences;
 PreferencesPersistence preferencesPersistence(preferences);
@@ -1126,7 +1127,8 @@ void bl_init(void)
     }
 
     if (bq_connected) {
-      uint8_t energyScale = lipo.designEnergyScale();
+      if (g_bq27427EnergyScale == 0) g_bq27427EnergyScale = lipo.designEnergyScale();
+      uint8_t energyScale = g_bq27427EnergyScale;
       unsigned int soc = lipo.soc();                               // State-of-charge (%)
       unsigned int volts = lipo.voltage();                         // Battery voltage (mV)
       int current = lipo.current(AVG);                            // Average current (mA)
@@ -1603,8 +1605,9 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
     inputs.stateOfHealth = lipo.soh();
     inputs.batteryCurrent = lipo.current(AVG);
     inputs.batteryTemperature = float((lipo.temperature(BATTERY)) - 2732) / 10.0; // convert from K to C
-    inputs.currentBatteryCapacity = lipo.capacity(REMAIN) * lipo.designEnergyScale();
-    inputs.maxBatteryCapacity = lipo.capacity(FULL) * lipo.designEnergyScale();
+    if (g_bq27427EnergyScale == 0) g_bq27427EnergyScale = lipo.designEnergyScale();
+    inputs.currentBatteryCapacity = lipo.capacity(REMAIN) * g_bq27427EnergyScale;
+    inputs.maxBatteryCapacity = lipo.capacity(FULL) * g_bq27427EnergyScale;
   }
   else {
     inputs.stateOfCharge = -1;
