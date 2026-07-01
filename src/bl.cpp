@@ -787,6 +787,13 @@ void sensor_init(void)
  */
 void bl_init(void)
 {
+#ifdef BOARD_SEEED_STICKY
+  pinMode(45, OUTPUT); // power hold (DATA)
+  pinMode(46, OUTPUT); // power lock (CLK)
+  digitalWrite(45, 1);
+  digitalWrite(46, 0);
+  digitalWrite(46, 1); // Hold the battery power enabled for after the user releases the power button
+#endif
 #ifdef BOARD_TRMNL_X
   uint32_t init_time = esp_cpu_get_cycle_count() / esp_rom_get_cpu_ticks_per_us();
 #else
