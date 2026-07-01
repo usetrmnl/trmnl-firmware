@@ -4,3 +4,9 @@ ContinuationIndentWidth: 2
 UseTab: Never
 ColumnLimit: 120
 AllowShortIfStatementsOnASingleLine: WithoutElse
+AlignConsecutiveMacros: AcrossEmptyLinesAndComments
+AlignAfterOpenBracket: Align
+BreakAfterOpenBracketBracedList: true
+BreakBeforeCloseBracketBracedList: true
+BreakAfterOpenBracketFunction: false
+BracedInitializerIndentWidth: 4
