@@ -218,6 +218,8 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
 
     wl_status_t beginResult;
 
+    WiFi.setAutoReconnect(false);
+
     if (credentials.isEnterprise)
     {
         Log_info("WiFi: Connecting to WPA2 Enterprise network: %s", credentials.ssid.c_str());
@@ -354,7 +356,7 @@ wl_status_t waitForConnectResult(uint32_t timeout)
         }
         status = newStatus;
         // @todo detect additional states, connect happens, then dhcp then get ip, there is some delay here, make sure not to timeout if waiting on IP
-        if (status == WL_CONNECTED || status == WL_CONNECT_FAILED)
+        if (status == WL_CONNECTED || status == WL_CONNECT_FAILED || status == WL_NO_SSID_AVAIL)
         {
             return status;
         }
