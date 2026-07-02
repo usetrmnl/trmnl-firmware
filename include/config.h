@@ -23,6 +23,7 @@
 #define PREFERENCES_API_URL "api_url"
 #define PREFERENCES_FRIENDLY_ID "friendly_id"
 #define PREFERENCES_FRIENDLY_ID_DEFAULT ""
+#define PREFERENCES_HOSTNAME "hostname"
 #define PREFERENCES_SLEEP_TIME_KEY "refresh_rate"
 #define PREFERENCES_TEMP_PROFILE "temp_profile"
 #define PREFERENCES_LOG_KEY "log_"
@@ -161,6 +162,17 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #define PIN_VBAT_SWITCH 40
 #define VBAT_SWITCH_LEVEL HIGH
 #define DEVICE_MODEL "reterminal_e1003"
+#endif
+
+// DHCP hostname prefix (hyphens instead of spaces).
+#if defined(BOARD_X_CLASS)
+#define WIFI_CLIENT_HOSTNAME_PREFIX "TRMNL-X"
+#elif defined(BOARD_TRMNL) || defined(BOARD_TRMNL_GEN2)
+#define WIFI_CLIENT_HOSTNAME_PREFIX "TRMNL-OG"
+#elif defined(BOARD_TRMNL_4CLR)
+#define WIFI_CLIENT_HOSTNAME_PREFIX "TRMNL-BWRY"
+#else
+#define WIFI_CLIENT_HOSTNAME_PREFIX "TRMNL"
 #endif
 
 #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002)
