@@ -10,6 +10,7 @@
 #include "esp_loader_io.h"
 #include "esp32_port.h"
 #include "modem.h"
+#include <at_escape.h>
 
 #if defined (BOARD_TRMNL_X) || defined (BOARD_TRLML_X_EPDIY)
 #include <LittleFS.h>
@@ -438,9 +439,12 @@ std::vector<Modem::ModemNetwork> Modem::scanNetworks() {
 // connectToNetwork() / disconnectFromNetwork()
 // ---------------------------------------------------------------------------
 bool Modem::connectToNetwork(const String& ssid, const String& password) {
-  // Escape backslash and double-quote in ssid/password
-  String s = ssid;      s.replace("\\", "\\\\"); s.replace("\"", "\\\"");
-  String p = password;  p.replace("\\", "\\\\"); p.replace("\"", "\\\"");
+  // Per the ESP-AT command reference, backslash, double-quote AND comma are
+  // special characters in string parameters and must be backslash-escaped;
+  // an unescaped comma is treated as a parameter delimiter even inside the
+  // quotes, so a password like "pass,word" would silently fail to join.
+  String s = escapeAtParam(ssid);
+  String p = escapeAtParam(password);
 
   while (ModemSerial.available()) ModemSerial.read();  // flush
 
@@ -509,8 +513,13 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, const String& saveToFil
     }
   }
 
+  // Inline URLs are quoted AT string parameters, so ESP-AT special characters
+  // must be escaped. AT+HTTPURLCFG instead takes length-prefixed raw bytes and
+  // uses the unescaped URL.
+  String urlParam = escapeAtParam(url);
+
   // Use AT+HTTPURLCFG only when the URL itself is too long to fit inline.
-  bool useUrlCfg = (url.length() + 24 > 256);
+  bool useUrlCfg = (urlParam.length() + 24 > 256);
 
   if (useUrlCfg) {
     Serial.printf("[HTTP] URL %u bytes — using AT+HTTPURLCFG\n", url.length());
@@ -541,7 +550,7 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, const String& saveToFil
     Serial.flush();
     sendCommand("AT+HTTPCLIENT=2,1,\"\",,,2");
   } else {
-    String httpCmd = "AT+HTTPCLIENT=2,1,\"" + url + "\",,,2";
+    String httpCmd = "AT+HTTPCLIENT=2,1,\"" + urlParam + "\",,,2";
     Serial.printf("[HTTP] cmd(%u): %s\n", httpCmd.length(), httpCmd.substring(0, 180).c_str());
     Serial.flush();
     sendCommand(httpCmd.c_str());
@@ -760,7 +769,12 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, std::function<bool(cons
     }
   }
 
-  bool useUrlCfg = (url.length() + 24 > 256);
+  // Inline URLs are quoted AT string parameters, so ESP-AT special characters
+  // must be escaped. AT+HTTPURLCFG instead takes length-prefixed raw bytes and
+  // uses the unescaped URL.
+  String urlParam = escapeAtParam(url);
+
+  bool useUrlCfg = (urlParam.length() + 24 > 256);
   if (useUrlCfg) {
     sendCommand(("AT+HTTPURLCFG=" + String(url.length())).c_str());
     if (waitForResponse(">", 5000).isEmpty()) return {false, 0, "", 0};
@@ -770,7 +784,7 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, std::function<bool(cons
     while (ModemSerial.available()) ModemSerial.read();
     sendCommand("AT+HTTPCLIENT=2,1,\"\",,,2");
   } else {
-    sendCommand(("AT+HTTPCLIENT=2,1,\"" + url + "\",,,2").c_str());
+    sendCommand(("AT+HTTPCLIENT=2,1,\"" + urlParam + "\",,,2").c_str());
   }
 
   enum class ParseState { SCAN, SIZE, DATA };
