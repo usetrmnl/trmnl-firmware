@@ -1,7 +1,7 @@
-#include <Arduino.h>
-#include "trmnl_log.h"
-#include <config.h>
 #include "button.h"
+#include "trmnl_log.h"
+#include <Arduino.h>
+#include <config.h>
 
 static unsigned long wait_for_button_release(unsigned long start_time) {
   pinMode(PIN_INTERRUPT, INPUT);
@@ -18,11 +18,11 @@ static ButtonPressResult classify_press_duration(unsigned long duration) {
   } else if (duration > BUTTON_HOLD_TIME) {
     Log_info("Button time=%lu detected long press", duration);
     return LongPress;
-  } else if(duration > BUTTON_MEDIUM_HOLD_TIME){
+  } else if (duration > BUTTON_MEDIUM_HOLD_TIME) {
     Log_info("Button time=%lu detected long press", duration);
     return DoubleClick;
   }
-  return NoAction; 
+  return NoAction;
 }
 
 static ButtonPressResult wait_for_second_press(unsigned long start_time) {
@@ -47,8 +47,7 @@ static ButtonPressResult wait_for_second_press(unsigned long start_time) {
   return ShortPress;
 }
 
-ButtonPressResult read_button_presses()
-{
+ButtonPressResult read_button_presses() {
   auto time_start = millis();
   Log_info("Button time=%lu: start", time_start);
   pinMode(PIN_INTERRUPT, INPUT);
@@ -80,8 +79,4 @@ ButtonPressResult read_button_presses()
   return NoAction;
 }
 
-const char *ButtonPressResultNames[] = {
-    "LongPress",
-    "DoubleClick",
-    "ShortPress",
-    "SoftReset"};
+const char *ButtonPressResultNames[] = {"LongPress", "DoubleClick", "ShortPress", "SoftReset"};
