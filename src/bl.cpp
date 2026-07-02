@@ -493,7 +493,7 @@ static void show_cached_image_by_offset(int offset) {
     if (path.isEmpty()) { Log_info("No cached image for gesture"); return; }
     int file_size = 0;
     buffer = display_read_file(path.c_str(), &file_size);
-    if (buffer && file_size > 0) { display_show_image(buffer, file_size, false); goToSleep(); }
+    if (buffer && file_size > 0) { display_show_image(buffer, file_size, true); goToSleep(); }
     return;
   }
 
@@ -535,7 +535,7 @@ static void show_cached_image_by_offset(int offset) {
   if (!buffer || file_size == 0) { Log_info("Failed to read %s", images[new_idx]); return; }
 
   preferences.putString(PREFERENCES_BROWSE_PATH_KEY, String(images[new_idx]));
-  display_show_image(buffer, file_size, false);
+  display_show_image(buffer, file_size, true);
   goToSleep();
 }
 
@@ -552,14 +552,17 @@ void check_channel_states(void)
           if (!hold) {
             display_draw_touchbar_indicator(TOUCHBAR_LEFT, false);
             Log_info("Back button tapped");
+            pending_indicator_side = TOUCHBAR_LEFT;
+            pending_indicator_filled = false;
+            has_pending_indicator = true;
             show_cached_image_by_offset(-1);
           } else {
             display_draw_touchbar_indicator(TOUCHBAR_LEFT, true);
             Log_info("Back button hold");
+            pending_indicator_side = TOUCHBAR_LEFT;
+            pending_indicator_filled = true;
+            has_pending_indicator = true;
             show_cached_image_by_offset(-1);
-            // pending_indicator_side = TOUCHBAR_LEFT;
-            // pending_indicator_filled = true;
-            // has_pending_indicator = true;
           }
           break;
         case 1:
@@ -593,14 +596,17 @@ void check_channel_states(void)
           if (!hold) {
             display_draw_touchbar_indicator(TOUCHBAR_RIGHT, false);
             Log_info("Next button tapped");
+            pending_indicator_side = TOUCHBAR_RIGHT;
+            pending_indicator_filled = false;
+            has_pending_indicator = true;
             show_cached_image_by_offset(+1);
           } else {
             display_draw_touchbar_indicator(TOUCHBAR_RIGHT, true);
             Log_info("Next button hold");
+            pending_indicator_side = TOUCHBAR_RIGHT;
+            pending_indicator_filled = true;
+            has_pending_indicator = true;
             show_cached_image_by_offset(+1);
-            // pending_indicator_side = TOUCHBAR_RIGHT;
-            // pending_indicator_filled = true;
-            // has_pending_indicator = true;
           }
           break;
         }
