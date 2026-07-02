@@ -130,8 +130,11 @@
    #define EPD_RST_PIN  38
    #define EPD_DC_PIN   10
    #define EPD_BUSY_PIN 4
-   // DEBUG - remove the fake battery line after testing
+   // Real battery reading works via PIN_VBAT_SWITCH=6 + PIN_BATTERY=1 (config.h);
+   // opt into the constant 4.2V fake only when explicitly requested.
+   #ifdef USE_FAKE_BATTERY_VOLTAGE
    #define FAKE_BATTERY_VOLTAGE
+   #endif
 #elif defined(BOARD_TRMNL_X)
 //   #define FAKE_BATTERY_VOLTAGE
 
