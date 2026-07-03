@@ -1,4 +1,5 @@
 #include "serialize_log.h"
+
 #include <ArduinoJson.h>
 #include <trmnl_log.h>
 

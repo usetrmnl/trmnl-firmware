@@ -1,12 +1,13 @@
 #ifndef HTTP_UTILS_H
 #define HTTP_UTILS_H
 
-#include "api-client/request_headers.h"
 #include <Arduino.h>
 #include <HTTPClient.h>
 #include <WiFiClient.h>
 #include <WiFiClientSecure.h>
 #include <trmnl_log.h>
+
+#include "api-client/request_headers.h"
 
 // Error codes for the HTTP utilities - using distinct values to avoid overlap
 enum HttpError {

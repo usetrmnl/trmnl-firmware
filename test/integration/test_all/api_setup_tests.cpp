@@ -4,12 +4,13 @@
 // in TEST_MAC_ADDRESS must be registered to a test account on that backend
 // for the success case to return 200.
 
-#include "tests.h"
 #include <Arduino.h>
 #include <api-client/setup.h>
 #include <config.h> // FW_VERSION_STRING, DEVICE_MODEL
 #include <test_helpers.h>
 #include <unity.h>
+
+#include "tests.h"
 
 static void test_setup_succeeds_with_registered_mac(void) {
   ApiSetupInputs inputs = {

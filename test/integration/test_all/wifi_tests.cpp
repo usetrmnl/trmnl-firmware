@@ -1,9 +1,10 @@
-#include "WifiCaptive.h"
-#include "tests.h"
-#include "wifi-types.h"
 #include <Arduino.h>
 #include <WiFi.h>
 #include <unity.h>
+
+#include "WifiCaptive.h"
+#include "tests.h"
+#include "wifi-types.h"
 
 #if !defined(TEST_WIFI_SSID) || !defined(TEST_WIFI_PASSWORD)
 #error "TEST_WIFI_SSID and TEST_WIFI_PASSWORD must be defined in test/integration/test_config.h"

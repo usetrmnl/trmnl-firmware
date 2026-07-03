@@ -1,10 +1,11 @@
 #pragma once
 
+#include <Arduino.h>
+#include <ArduinoJson.h>
+
 #include "hardware_types.h"
 #include "special_function.h"
 #include "trmnl_log.h"
-#include <Arduino.h>
-#include <ArduinoJson.h>
 
 enum class ApiSetupOutcome { Ok, DeserializationError, StatusError };
 

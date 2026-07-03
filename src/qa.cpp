@@ -1,14 +1,15 @@
+#include <Arduino.h>
+#include <ArduinoLog.h>
+#include <Preferences.h>
+#include <display.h>
+#include <power.h>
+
 #include "WifiCaptive.h"
 #include "button.h"
 #include "config.h"
 #include "logo_medium.h"
 #include "logo_small.h"
 #include "pins.h"
-#include <Arduino.h>
-#include <ArduinoLog.h>
-#include <Preferences.h>
-#include <display.h>
-#include <power.h>
 
 extern "C" {
 #include "esp_timer.h"   // esp_timer_get_time()
@@ -220,13 +221,13 @@ bool startQA() {
     Log.info("QA Test started\n");
 
     float initial_temp = measureTemperatureAverage();/*
-       if (initial_temp > temperature_threshold){
-         return false;
-       }*/
-    float initial_voltage = measureVoltageAverage();
-  /*if (initial_voltage > temperature_threshold){
+        if (initial_temp > temperature_threshold){
           return false;
         }*/
+    float initial_voltage = measureVoltageAverage();
+  /*if (initial_voltage > temperature_threshold){
+            return false;
+          }*/
 
     Log.info("Stress test started\n");
     startRadioRX();
@@ -310,13 +311,13 @@ bool startQA() {
     Log.info("QA Test started\n");
 
     float initial_temp = measureTemperatureAverage();/*
-       if (initial_temp > temperature_threshold){
-         return false;
-       }*/
-    float initial_voltage = measureVoltageAverage();
-  /*if (initial_voltage > temperature_threshold){
+        if (initial_temp > temperature_threshold){
           return false;
         }*/
+    float initial_voltage = measureVoltageAverage();
+  /*if (initial_voltage > temperature_threshold){
+            return false;
+          }*/
 
     Log.info("Stress test started\n");
     startRadioRX();

@@ -1,10 +1,11 @@
 #pragma once
-#include "WifiCaptivePage.h"
-#include "wifi-types.h"
 #include <AsyncJson.h>
 #include <ESPAsyncWebServer.h>
 #include <functional>
 #include <vector>
+
+#include "WifiCaptivePage.h"
+#include "wifi-types.h"
 
 #define LocalIPURL "http://4.3.2.1"
 

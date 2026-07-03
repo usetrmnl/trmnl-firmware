@@ -1,12 +1,14 @@
 #include "api-client/submit_log.h"
-#include "http_client.h"
-#include "trmnl_log.h"
+
 #include <WiFi.h>
 #include <api-client/request_headers.h>
 #include <api_request_serialization.h>
 #include <device_id.h>
 #include <memory>
 #include <stdio.h>
+
+#include "http_client.h"
+#include "trmnl_log.h"
 
 bool submitLogToApi(LogApiInput &input, const char *api_url) {
   String payload = serializeApiLogRequest(input.log_buffer);

@@ -1,8 +1,9 @@
 
-#include "api_response_parsing.h"
 #include <ArduinoJson.h>
 #include <special_function.h>
 #include <trmnl_log.h>
+
+#include "api_response_parsing.h"
 
 ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
   JsonDocument doc;

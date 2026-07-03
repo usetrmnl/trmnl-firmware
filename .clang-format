@@ -11,3 +11,12 @@ BreakAfterOpenBracketFunction: false
 BracedInitializerIndentWidth: 4
 IndentExternBlock: Indent
 AlignTrailingComments: Leave
+SortIncludes: CaseSensitive
+IncludeBlocks: Regroup
+IncludeIsMainRegex: ''
+IncludeCategories:
+  # Library/system headers (<Arduino.h>, <WiFi.h>, …) before project headers ("foo.h").
+  - Regex:           '^<'
+    Priority:        1
+  - Regex:           '^"'
+    Priority:        2

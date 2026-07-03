@@ -1,8 +1,9 @@
+#include <Arduino.h>
+
 #include "bl.h"
 #include "esp_ota_ops.h"
 #include "power.h"
 #include "qa.h"
-#include <Arduino.h>
 
 #ifdef BOARD_TRMNL_X
 #include "display.h"

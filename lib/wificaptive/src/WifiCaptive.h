@@ -1,9 +1,6 @@
 #ifndef WiFiCaptive_h
 #define WiFiCaptive_h
 
-#include "Preferences.h"
-#include "WifiCaptivePage.h"
-#include "wifi-types.h"
 #include <ArduinoJson.h>
 #include <AsyncJson.h>
 #include <AsyncTCP.h> //https://github.com/me-no-dev/AsyncTCP using the latest dev version from @me-no-dev
@@ -12,6 +9,10 @@
 #include <esp_wifi.h> //Used for mpdu_rx_disable android workaround
 #include <functional>
 #include <vector>
+
+#include "Preferences.h"
+#include "WifiCaptivePage.h"
+#include "wifi-types.h"
 
 #define WIFI_SSID                "TRMNL"
 #define WIFI_PASSWORD            NULL

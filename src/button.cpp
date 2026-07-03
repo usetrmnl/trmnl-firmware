@@ -1,7 +1,9 @@
 #include "button.h"
-#include "trmnl_log.h"
+
 #include <Arduino.h>
 #include <config.h>
+
+#include "trmnl_log.h"
 
 static unsigned long wait_for_button_release(unsigned long start_time) {
   pinMode(PIN_INTERRUPT, INPUT);

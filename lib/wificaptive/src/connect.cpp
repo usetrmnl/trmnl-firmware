@@ -1,4 +1,9 @@
 #include "connect.h"
+
+#include <Preferences.h>
+#include <trmnl_log.h>
+#include <vector>
+
 #include "WebServer.h"
 #include "WifiCaptive.h"
 #include "esp_err.h"
@@ -8,9 +13,6 @@
 #include "esp_wifi.h"
 #include "esp_wpa2.h"
 #include "wifi-helpers.h"
-#include <Preferences.h>
-#include <trmnl_log.h>
-#include <vector>
 
 String getDeviceHostname() {
   Preferences prefs;

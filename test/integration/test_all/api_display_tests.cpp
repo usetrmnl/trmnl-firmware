@@ -5,7 +5,6 @@
 // /api/setup once — see fetch_api_key_or_skip(). Avoids needing to hardcode
 // a key in test_config.h.
 
-#include "tests.h"
 #include <Arduino.h>
 #include <WiFi.h>
 #include <api-client/display.h>
@@ -15,6 +14,8 @@
 #include <special_function.h>
 #include <test_helpers.h>
 #include <unity.h>
+
+#include "tests.h"
 
 // Cached across tests so we only pay for one /api/setup round trip.
 static String s_api_key;

@@ -5,12 +5,13 @@
 // Add a new group: create <group>_tests.cpp with `void test_<group>(void)`,
 // declare it in tests.h, and call it from setup() between UNITY_BEGIN/END.
 
-#include "test_helpers.h"
-#include "tests.h"
 #include <Arduino.h>
 #include <Preferences.h>
 #include <device_id.h>
 #include <unity.h>
+
+#include "test_helpers.h"
+#include "tests.h"
 
 extern Preferences preferences; // from bl.cpp
 
