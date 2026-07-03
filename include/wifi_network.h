@@ -3,8 +3,7 @@
 
 #include <Arduino.h>
 
-struct WiFiStatus
-{
+struct WiFiStatus {
   int rssi;    // signal strength in dBm
   String band; // "2.4" or "5"
 };

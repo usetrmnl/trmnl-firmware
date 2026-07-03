@@ -1,11 +1,10 @@
 #include <unity.h>
 // #include <stored_logs.h>
-#include <unordered_map>
-#include <string>
 #include <persistence_interface.h>
+#include <string>
+#include <unordered_map>
 
-class MemoryPersistence : public Persistence
-{
+class MemoryPersistence : public Persistence {
 public:
   bool recordExists(const char *key) override;
   String readString(const char *key, const String defaultValue) override;

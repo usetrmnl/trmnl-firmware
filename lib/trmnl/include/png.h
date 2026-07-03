@@ -1,7 +1,6 @@
 #pragma once
 
-enum image_err_e
-{
+enum image_err_e {
   PNG_BAD_SIZE,
   PNG_WRONG_FORMAT,
   PNG_NO_ERR,

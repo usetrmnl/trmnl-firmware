@@ -1,17 +1,17 @@
-#include <Arduino.h>
-#include <display.h>
-#include <power.h>
+#include "WifiCaptive.h"
 #include "button.h"
-#include "pins.h"
 #include "config.h"
+#include "logo_medium.h"
+#include "logo_small.h"
+#include "pins.h"
+#include <Arduino.h>
 #include <ArduinoLog.h>
 #include <Preferences.h>
-#include "WifiCaptive.h"
-#include "logo_small.h"
-#include "logo_medium.h"
+#include <display.h>
+#include <power.h>
 
 extern "C" {
-  #include "esp_timer.h"   // esp_timer_get_time()
+#include "esp_timer.h"   // esp_timer_get_time()
 }
 
 Preferences preferencesQA;
@@ -19,38 +19,35 @@ Preferences preferencesQA;
 const int adcPin = 3; // ADC pin for voltage measurement
 const int samples = 1000;
 const int intervalMs = 7000; // 7s
-const int sample_interval = 1; //1 ms
+const int sample_interval = 1; // 1 ms
 const int temperature_threshold = 35; // 35 by Celsium
 static bool radioOn = false;
 
 volatile bool stopRequested = false;
 
-void IRAM_ATTR onBtnPress() {
-  stopRequested = true;
-}
+void IRAM_ATTR onBtnPress() { stopRequested = true; }
 
-
-bool checkIfAlreadyPassed(){
+bool checkIfAlreadyPassed() {
   preferencesQA.begin("qa", true);
   bool testPassed = preferencesQA.getBool("testPassed", false);
   preferencesQA.end();
   return testPassed;
 }
 
-void savePassedTest(){
+void savePassedTest() {
   preferencesQA.begin("qa", false);
   preferencesQA.putBool("testPassed", true);
   preferencesQA.end();
 }
 
-bool checkIfAlreadyShipped(){
+bool checkIfAlreadyShipped() {
   preferencesQA.begin("qa", true);
   bool status = preferencesQA.getBool("ship_done", false);
   preferencesQA.end();
   return status;
 }
 
-bool saveShipmentDone(){
+bool saveShipmentDone() {
   preferencesQA.begin("qa", false);
   preferencesQA.putBool("ship_done", true);
   preferencesQA.putBool("ship_started", false);  // Clear started flag
@@ -58,7 +55,7 @@ bool saveShipmentDone(){
   return true;
 }
 
-bool clearShipmentStatus(){
+bool clearShipmentStatus() {
   preferencesQA.begin("qa", false);
   preferencesQA.putBool("ship_done", false);
   preferencesQA.putBool("ship_started", false);
@@ -66,14 +63,14 @@ bool clearShipmentStatus(){
   return true;
 }
 
-bool checkIfShipmentStarted(){
+bool checkIfShipmentStarted() {
   preferencesQA.begin("qa", true);
   bool status = preferencesQA.getBool("ship_started", false);
   preferencesQA.end();
   return status;
 }
 
-bool saveShipmentStarted(){
+bool saveShipmentStarted() {
   preferencesQA.begin("qa", false);
   preferencesQA.putBool("ship_started", true);
   preferencesQA.end();
@@ -81,14 +78,14 @@ bool saveShipmentStarted(){
 }
 
 #ifdef BOARD_TRMNL_X
-bool checkIfModemFlashed(){
+bool checkIfModemFlashed() {
   preferencesQA.begin("qa", true);
   bool status = preferencesQA.getBool("modem_flashed", false);
   preferencesQA.end();
   return status;
 }
 
-bool saveModemFlashed(){
+bool saveModemFlashed() {
   preferencesQA.begin("qa", false);
   preferencesQA.putBool("modem_flashed", true);
   preferencesQA.end();
@@ -102,14 +99,14 @@ bool enableShipmentMode() {
   Serial.println("Waiting for USB plug-off to enter shipment mode...");
 
   if (get_usb_status() == UsbStatus::CONNECTED) {
-    display_show_msg(const_cast<uint8_t *>(logo_medium),READY_TO_SHIP);
+    display_show_msg(const_cast<uint8_t *>(logo_medium), READY_TO_SHIP);
     while (get_usb_status() == UsbStatus::CONNECTED) {
       Serial.println("USB power still detected, waiting...");
       delay(2000);
     }
   }
 
-  display_show_msg(const_cast<uint8_t *>(logo_medium),SHIPPING_MODE);
+  display_show_msg(const_cast<uint8_t *>(logo_medium), SHIPPING_MODE);
 
   // Save that we've started shipment mode (in case battery dies during shipping)
   saveShipmentStarted();
@@ -138,12 +135,11 @@ float measureVoltageAverage() {
   return (sum / samples) * (3.3 / 4095.0) * 2;
 }
 
-
 static inline void startRadioRX() {
   if (radioOn) return;
   WiFi.mode(WIFI_STA);
-  esp_wifi_set_ps(WIFI_PS_NONE);                
-  WiFi.scanNetworks(true, true, true, 120, 0);  
+  esp_wifi_set_ps(WIFI_PS_NONE);
+  WiFi.scanNetworks(true, true, true, 120, 0);
   radioOn = true;
 }
 
@@ -162,7 +158,8 @@ static inline void stopRadioRX() {
 
 static void loadCPUAndRadio(uint32_t ms) {
   static uint32_t scratch[128];
-  for (int i = 0; i < 128; ++i) scratch[i] = i * 2654435761u;
+  for (int i = 0; i < 128; ++i)
+    scratch[i] = i * 2654435761u;
 
   volatile uint32_t a = 0x1234567u, b = 0x89ABCDEFu;
   volatile float fx = 1.2345f, fy = 3.14159f;
@@ -170,19 +167,19 @@ static void loadCPUAndRadio(uint32_t ms) {
 
   uint32_t iters = 0;
   while (!stopRequested && esp_timer_get_time() < deadline) {
-    
-    a ^= b; b += a; a = (a << 5) | (a >> (27)); b = (b << 7) ^ (b >> 3);
 
-    
+    a ^= b;
+    b += a;
+    a = (a << 5) | (a >> (27));
+    b = (b << 7) ^ (b >> 3);
+
     fx = fx * 1.000123f + 0.000987f;
     fy = fy * 0.999771f - 0.000321f;
 
-    
     scratch[(a ^ b) & 127] ^= a + b;
     scratch[(a + b) & 127] += (uint32_t)(fx * 1000.0f);
 
-    
-    if ((++iters & 0x3FF) == 0) { 
+    if ((++iters & 0x3FF) == 0) {
       pumpRadioRX();
       yield();
     }
@@ -190,14 +187,14 @@ static void loadCPUAndRadio(uint32_t ms) {
 }
 
 #ifdef BOARD_TRMNL_X
-bool startQA(){
+bool startQA() {
   bool result = false;
   float tempDiff = 0;
   float voltageDiff = 0;
 
   bool wifiSaved = checkForSavedCredentials();
 
-  if(wifiSaved){
+  if (wifiSaved) {
 
     Serial.print("WiFi credentials found, skipping QA\n");
     return true;
@@ -205,81 +202,79 @@ bool startQA(){
     Serial.println("WiFi credentials not found, starting QA");
   }
 
-  while(!stopRequested){
+  while (!stopRequested) {
 
-  Serial.begin(115200);
-  
-  Log.begin(LOG_LEVEL_VERBOSE, &Serial);
-  pins_init();
-  Log.info("QA Test started\n");
-  attachInterrupt(digitalPinToInterrupt(PIN_INTERRUPT), onBtnPress, FALLING);
+    Serial.begin(115200);
 
-  uint8_t *buffer = (uint8_t *)malloc(48000);
-  memset(buffer, 255, 48000);
-  display_init();
+    Log.begin(LOG_LEVEL_VERBOSE, &Serial);
+    pins_init();
+    Log.info("QA Test started\n");
+    attachInterrupt(digitalPinToInterrupt(PIN_INTERRUPT), onBtnPress, FALLING);
 
-  display_show_msg(const_cast<uint8_t *>(logo_small),QA_START);
+    uint8_t *buffer = (uint8_t *)malloc(48000);
+    memset(buffer, 255, 48000);
+    display_init();
 
-  Log.info("QA Test started\n");
+    display_show_msg(const_cast<uint8_t *>(logo_small), QA_START);
 
-  float initial_temp = measureTemperatureAverage();/*
-  if (initial_temp > temperature_threshold){
-    return false;
-  }*/
-  float initial_voltage = measureVoltageAverage();
+    Log.info("QA Test started\n");
+
+    float initial_temp = measureTemperatureAverage();/*
+     if (initial_temp > temperature_threshold){
+       return false;
+     }*/
+    float initial_voltage = measureVoltageAverage();
   /*if (initial_voltage > temperature_threshold){
-    return false;
-  }*/
+      return false;
+    }*/
 
-  Log.info("Stress test started\n");
-  startRadioRX();
-  loadCPUAndRadio(intervalMs);
-  stopRadioRX();
-  Log.info("Stress test ended\n");
-  if(stopRequested){
+    Log.info("Stress test started\n");
+    startRadioRX();
+    loadCPUAndRadio(intervalMs);
+    stopRadioRX();
+    Log.info("Stress test ended\n");
+    if (stopRequested) {
+      break;
+    }
+
+    float last_temp = measureTemperatureAverage();
+    float last_voltage = measureVoltageAverage();
+
+    Log.info("QA test ended\n");
+
+    tempDiff = last_temp - initial_temp;
+    voltageDiff = last_voltage - initial_voltage;
+
+    float temperature[3] = {initial_temp, last_temp, tempDiff};
+    float voltage[3] = {initial_voltage, last_voltage, voltageDiff};
+
+    result = last_temp - initial_temp < 3;
+
+    Log.info("Displaying results\n");
+    display_init();
+    display_show_msg_qa(buffer, voltage, temperature, result);
     break;
   }
- 
-  float last_temp = measureTemperatureAverage();
-  float last_voltage = measureVoltageAverage();
 
-  Log.info("QA test ended\n");
-
-  tempDiff = last_temp - initial_temp;
-  voltageDiff = last_voltage - initial_voltage;
-
-  float temperature[3] = {initial_temp, last_temp, tempDiff};
-  float voltage[3] = {initial_voltage, last_voltage, voltageDiff};
-
-  result = last_temp - initial_temp < 3;
-
-  Log.info("Displaying results\n");
-  display_init();
-  display_show_msg_qa(buffer,voltage,temperature,result);
-  break;
-
-  }
-
-  if(!stopRequested){
+  if (!stopRequested) {
     savePassedTest();
-    while (1){
+    while (1) {
       Serial.println("QA Test Passed. Long press the button to continue...");
       auto button = read_long_press();
 
-      if(button == LongPress){
+      if (button == LongPress) {
         Serial.println("Long press detected, painting screen white");
         display_show_msg(NULL, FILL_WHITE);
         delay(10000);
         result = true;
         break;
       }
-
     }
   }
   return result;
 }
 #else
-bool startQA(){
+bool startQA() {
   bool result = false;
   float tempDiff = 0;
   float voltageDiff = 0;
@@ -301,116 +296,109 @@ bool startQA(){
   Log.info("QA Test started\n");
   attachInterrupt(digitalPinToInterrupt(PIN_INTERRUPT), onBtnPress, FALLING);
 
-  while(!stopRequested){
-  
-  uint8_t *buffer = (uint8_t *)malloc(48000);
-  memset(buffer, 255, 48000);
-  display_init();
+  while (!stopRequested) {
+
+    uint8_t *buffer = (uint8_t *)malloc(48000);
+    memset(buffer, 255, 48000);
+    display_init();
 
   // Disable light sleep before display operation to prevent workflow interruption
-  display_set_light_sleep(false);
-  
-  display_show_msg(const_cast<uint8_t *>(logo_small),QA_START);
+    display_set_light_sleep(false);
 
-  Log.info("QA Test started\n");
+    display_show_msg(const_cast<uint8_t *>(logo_small), QA_START);
 
-  float initial_temp = measureTemperatureAverage();/*
-  if (initial_temp > temperature_threshold){
-    return false;
-  }*/
-  float initial_voltage = measureVoltageAverage();
+    Log.info("QA Test started\n");
+
+    float initial_temp = measureTemperatureAverage();/*
+     if (initial_temp > temperature_threshold){
+       return false;
+     }*/
+    float initial_voltage = measureVoltageAverage();
   /*if (initial_voltage > temperature_threshold){
-    return false;
-  }*/
+      return false;
+    }*/
 
-  Log.info("Stress test started\n");
-  startRadioRX();
-  loadCPUAndRadio(intervalMs);
-  stopRadioRX();
-  Log.info("Stress test ended\n");
+    Log.info("Stress test started\n");
+    startRadioRX();
+    loadCPUAndRadio(intervalMs);
+    stopRadioRX();
+    Log.info("Stress test ended\n");
 
-  if (stopRequested) {
-    Log.info("QA test stopped by user\n");
+    if (stopRequested) {
+      Log.info("QA test stopped by user\n");
+      free(buffer);
+      savePassedTest();
+      return true;
+    }
+
+    float last_temp = measureTemperatureAverage();
+    if (stopRequested) {
+      Log.info("QA test stopped by user\n");
+      free(buffer);
+      savePassedTest();
+      return true;
+    }
+
+    float last_voltage = measureVoltageAverage();
+    if (stopRequested) {
+      Log.info("QA test stopped by user\n");
+      free(buffer);
+      savePassedTest();
+      return true;
+    }
+
+    Log.info("QA test ended\n");
+
+    tempDiff = last_temp - initial_temp;
+    voltageDiff = last_voltage - initial_voltage;
+
+    float temperature[3] = {initial_temp, last_temp, tempDiff};
+    float voltage[3] = {initial_voltage, last_voltage, voltageDiff};
+
+    result = last_temp - initial_temp < 3;
+
+    Log.info("Displaying results\n");
+    display_init();
+    display_show_msg_qa(buffer, voltage, temperature, result);
     free(buffer);
-    savePassedTest();
-    return true;
-  }
-
-  float last_temp = measureTemperatureAverage();
-  if (stopRequested) {
-    Log.info("QA test stopped by user\n");
-    free(buffer);
-    savePassedTest();
-    return true;
-  }
-
-  float last_voltage = measureVoltageAverage();
-  if (stopRequested) {
-    Log.info("QA test stopped by user\n");
-    free(buffer);
-    savePassedTest();
-    return true;
-  }
-
-  Log.info("QA test ended\n");
-
-  tempDiff = last_temp - initial_temp;
-  voltageDiff = last_voltage - initial_voltage;
-
-  float temperature[3] = {initial_temp, last_temp, tempDiff};
-  float voltage[3] = {initial_voltage, last_voltage, voltageDiff};
-
-  result = last_temp - initial_temp < 3;
-
-  Log.info("Displaying results\n");
-  display_init();
-  display_show_msg_qa(buffer,voltage,temperature,result);
-  free(buffer);
-  break;
-
+    break;
   }
 
   // Re-enable light sleep after QA test completes
   display_set_light_sleep(true);
 
   savePassedTest();
-    while (1){
-      Serial.println("QA Test Passed. Long press the button to continue...");
-      auto button = read_button_presses();
+  while (1) {
+    Serial.println("QA Test Passed. Long press the button to continue...");
+    auto button = read_button_presses();
 
-      if(button == ShortPress){
-        Serial.println("Long press detected, painting screen white");
-        display_show_msg(NULL, FILL_WHITE);
-        delay(10000);
-        result = true;
-        break;
-      }
-
+    if (button == ShortPress) {
+      Serial.println("Long press detected, painting screen white");
+      display_show_msg(NULL, FILL_WHITE);
+      delay(10000);
+      result = true;
+      break;
     }
-
+  }
 
   return result;
 }
 #endif // !BOARD_TRMNL_X
 
-void testLoadScreen(){
+void testLoadScreen() {
   display_init();
   uint8_t *buffer = (uint8_t *)malloc(48000);
   memset(buffer, 255, 48000);
-  display_show_msg(const_cast<uint8_t *>(logo_small),QA_START);
+  display_show_msg(const_cast<uint8_t *>(logo_small), QA_START);
   free(buffer);
 }
 
-void testResultScreen(bool result){
+void testResultScreen(bool result) {
   display_init();
   uint8_t *buffer = (uint8_t *)malloc(48000);
   memset(buffer, 255, 48000);
-  float temperature[3] = {0,0,0};
-  float voltage[3] = {0,0,0};
-  display_show_msg_qa(buffer,voltage,temperature,result);
+  float temperature[3] = {0, 0, 0};
+  float voltage[3] = {0, 0, 0};
+  display_show_msg_qa(buffer, voltage, temperature, result);
   free(buffer);
 }
-
-
-
-

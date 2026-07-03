@@ -1,9 +1,9 @@
-#include <wifi_network.h>
+#include <ESPmDNS.h>
+#include <Preferences.h>
 #include <WiFi.h>
 #include <WifiCaptive.h>
 #include <trmnl_log.h>
-#include <ESPmDNS.h>
-#include <Preferences.h>
+#include <wifi_network.h>
 
 #ifdef BOARD_TRMNL_X
 // Defined in bl.cpp; set once during bl_init(). Only used on the 5 GHz path.
@@ -15,8 +15,7 @@ namespace {
 constexpr unsigned long WIFI_RECONNECT_TIMEOUT_MS = 10000;
 }
 
-WiFiStatus getWiFiStatus(void)
-{
+WiFiStatus getWiFiStatus(void) {
   WiFiStatus status;
   status.rssi = WiFi.RSSI();
   status.band = WiFi.channel() >= 36 ? "5" : "2.4";
@@ -24,8 +23,7 @@ WiFiStatus getWiFiStatus(void)
 #ifdef BOARD_TRMNL_X
   // On the 5 GHz path the ESP32-C5 modem owns the Wi-Fi link, so the host's
   // WiFi.RSSI() reads 0; query the modem for the real signal strength.
-  if (g_modem && WifiCaptivePortal.getLastCredentials().is5GHz)
-  {
+  if (g_modem && WifiCaptivePortal.getLastCredentials().is5GHz) {
     status.rssi = g_modem->getSignalRssi();
     status.band = "5";
   }
@@ -35,15 +33,12 @@ WiFiStatus getWiFiStatus(void)
 }
 
 bool connectWithSavedCredentials(void) {
-  if (!WifiCaptivePortal.isSaved())
-    return false;
+  if (!WifiCaptivePortal.isSaved()) return false;
 
 #ifdef BOARD_TRMNL_X
-  if (g_modem)
-  {
+  if (g_modem) {
     WifiCredentials creds = WifiCaptivePortal.getLastCredentials();
-    if (creds.is5GHz)
-      return g_modem->connectToNetwork(creds.ssid, creds.pswd);
+    if (creds.is5GHz) return g_modem->connectToNetwork(creds.ssid, creds.pswd);
   }
 #endif
 
@@ -72,13 +67,11 @@ bool connectWithSavedCredentials(void) {
 }
 
 bool ensureWifiConnected(void) {
-  if (WiFi.status() == WL_CONNECTED)
-    return true;
+  if (WiFi.status() == WL_CONNECTED) return true;
 
   Log_info("%s [%d]: WiFi disconnected, reconnecting...\r\n", __FILE__, __LINE__);
 
-  if (!WifiCaptivePortal.isSaved())
-  {
+  if (!WifiCaptivePortal.isSaved()) {
     Log_error("%s [%d]: No saved WiFi credentials\r\n", __FILE__, __LINE__);
     return false;
   }
@@ -88,8 +81,7 @@ bool ensureWifiConnected(void) {
   while (WiFi.status() != WL_CONNECTED && millis() - start < WIFI_RECONNECT_TIMEOUT_MS)
     delay(100);
 
-  if (WiFi.status() == WL_CONNECTED)
-    return true;
+  if (WiFi.status() == WL_CONNECTED) return true;
 
   return connectWithSavedCredentials();
 }

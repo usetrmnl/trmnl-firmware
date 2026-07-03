@@ -5,25 +5,23 @@
 // /api/setup once — see fetch_api_key_or_skip(). Avoids needing to hardcode
 // a key in test_config.h.
 
+#include "tests.h"
 #include <Arduino.h>
-#include <unity.h>
 #include <WiFi.h>
 #include <api-client/display.h>
 #include <api-client/setup.h>
-#include <special_function.h>
 #include <config.h>  // FW_VERSION_STRING, DEVICE_MODEL
 #include <display.h> // display_width(), display_height()
+#include <special_function.h>
 #include <test_helpers.h>
-#include "tests.h"
+#include <unity.h>
 
 // Cached across tests so we only pay for one /api/setup round trip.
 static String s_api_key;
 static String s_friendly_id;
 
-static void fetch_api_key_or_skip()
-{
-  if (!s_api_key.isEmpty())
-    return;
+static void fetch_api_key_or_skip() {
+  if (!s_api_key.isEmpty()) return;
 
   ApiSetupInputs setupInputs = {
       .baseUrl = TEST_BACKEND_URL,
@@ -33,21 +31,18 @@ static void fetch_api_key_or_skip()
   };
 
   ApiSetupResult r = fetchApiSetup(setupInputs);
-  TEST_ASSERT_EQUAL_MESSAGE(HTTPS_NO_ERR, r.error,
-                            "Pre-test /api/setup call failed at the transport layer");
+  TEST_ASSERT_EQUAL_MESSAGE(HTTPS_NO_ERR, r.error, "Pre-test /api/setup call failed at the transport layer");
   TEST_ASSERT_EQUAL_MESSAGE((int)ApiSetupOutcome::Ok, (int)r.response.outcome,
                             "Pre-test /api/setup returned non-Ok — is the test MAC registered?");
-  TEST_ASSERT_FALSE_MESSAGE(r.response.api_key.isEmpty(),
-                            "Pre-test /api/setup returned an empty api_key");
+  TEST_ASSERT_FALSE_MESSAGE(r.response.api_key.isEmpty(), "Pre-test /api/setup returned an empty api_key");
 
   s_api_key = r.response.api_key;
   s_friendly_id = r.response.friendly_id;
-  Serial.printf("cached api_key (len=%d) + friendly_id=%s from /api/setup\n",
-                s_api_key.length(), s_friendly_id.c_str());
+  Serial.printf("cached api_key (len=%d) + friendly_id=%s from /api/setup\n", s_api_key.length(),
+                s_friendly_id.c_str());
 }
 
-static ApiDisplayInputs make_display_inputs(float battery_voltage)
-{
+static ApiDisplayInputs make_display_inputs(float battery_voltage) {
   // Mirrors the inputs production assembles in bl.cpp around line 1400-1475.
   // Anything that's not under test gets a value the real device would send.
   ApiDisplayInputs inputs = {};
@@ -68,8 +63,7 @@ static ApiDisplayInputs make_display_inputs(float battery_voltage)
   return inputs;
 }
 
-static void test_low_battery_returns_low_battery_image(void)
-{
+static void test_low_battery_returns_low_battery_image(void) {
   // 3.0V is well below the device's empty threshold — the backend should
   // respond with the low-battery placeholder image.
   ApiDisplayInputs inputs = make_display_inputs(3.0f);
@@ -78,8 +72,7 @@ static void test_low_battery_returns_low_battery_image(void)
 
   ApiDisplayResult result = fetchApiDisplay(inputs);
 
-  TEST_ASSERT_EQUAL_MESSAGE(HTTPS_NO_ERR, result.error,
-                            "fetchApiDisplay returned a transport error");
+  TEST_ASSERT_EQUAL_MESSAGE(HTTPS_NO_ERR, result.error, "fetchApiDisplay returned a transport error");
   TEST_ASSERT_EQUAL_MESSAGE((int)ApiDisplayOutcome::Ok, (int)result.response.outcome,
                             "Expected Ok outcome from /api/display");
 
@@ -89,8 +82,7 @@ static void test_low_battery_returns_low_battery_image(void)
                                        "filename should contain 'low_battery' for a low-battery request");
 }
 
-void test_api_display(void)
-{
+void test_api_display(void) {
   // Setup
   fetch_api_key_or_skip();
 

@@ -1,25 +1,23 @@
-#include <unity.h>
 #include "stored_logs.h"
-#include <unordered_map>
-#include <string>
 #include "memory_persistence.h"
+#include <string>
+#include <unity.h>
+#include <unordered_map>
 
-void test_stores_several_strings()
-{
+void test_stores_several_strings() {
   MemoryPersistence persistence;
   StoredLogs subject(0, 3, "log_", "log_head", persistence);
-  
+
   subject.store_log("asdf");
   subject.store_log("qwer");
   subject.store_log("zxcv");
   TEST_ASSERT_EQUAL_STRING("asdf,qwer,zxcv", subject.gather_stored_logs().c_str());
 }
 
-void test_circular_buffer_overwrites_oldest()
-{
+void test_circular_buffer_overwrites_oldest() {
   MemoryPersistence persistence;
   StoredLogs subject(0, 3, "log_", "log_head", persistence);
-  
+
   subject.store_log("log1");
   subject.store_log("log2");
   subject.store_log("log3");
@@ -29,11 +27,10 @@ void test_circular_buffer_overwrites_oldest()
   TEST_ASSERT_EQUAL_STRING("log2,log3,log4", subject.gather_stored_logs().c_str());
 }
 
-void test_overwrite_counter()
-{
+void test_overwrite_counter() {
   MemoryPersistence persistence;
   StoredLogs subject(0, 3, "log_", "log_head", persistence);
-  
+
   TEST_ASSERT_EQUAL(0, subject.get_overwrite_count());
 
   // Fill all slots - no overwrites yet
@@ -54,8 +51,7 @@ void test_overwrite_counter()
   TEST_ASSERT_EQUAL(0, subject.get_overwrite_count());
 }
 
-void test_keeps_oldest_only()
-{
+void test_keeps_oldest_only() {
   MemoryPersistence persistence;
   StoredLogs subject(3, 0, "log_", "log_head", persistence);
 
@@ -71,8 +67,7 @@ void test_keeps_oldest_only()
   TEST_ASSERT_EQUAL_STRING("first,second,third", subject.gather_stored_logs().c_str());
 }
 
-void test_mixed_mode_1_oldest_2_newest()
-{
+void test_mixed_mode_1_oldest_2_newest() {
   MemoryPersistence persistence;
   StoredLogs subject(1, 2, "log_", "log_head", persistence);
 
@@ -92,8 +87,7 @@ void test_mixed_mode_1_oldest_2_newest()
   TEST_ASSERT_EQUAL(0, subject.get_overwrite_count());
 }
 
-void test_mixed_mode_2_oldest_1_newest()
-{
+void test_mixed_mode_2_oldest_1_newest() {
   MemoryPersistence persistence;
   StoredLogs subject(2, 1, "log_", "log_head", persistence);
 
@@ -109,13 +103,11 @@ void test_mixed_mode_2_oldest_1_newest()
   TEST_ASSERT_EQUAL_STRING("first,second,fifth", subject.gather_stored_logs().c_str());
 }
 
-void test_several_overwrites()
-{
+void test_several_overwrites() {
   MemoryPersistence persistence;
   StoredLogs subject(3, 5, "log_", "log_head", persistence);
 
-  for (int i = 0; i < 15; i++)
-  {
+  for (int i = 0; i < 15; i++) {
     subject.store_log(String(i));
   }
 
@@ -127,8 +119,7 @@ void setUp(void) {}
 
 void tearDown(void) {}
 
-void process()
-{
+void process() {
   UNITY_BEGIN();
   RUN_TEST(test_stores_several_strings);
   RUN_TEST(test_circular_buffer_overwrites_oldest);
@@ -140,8 +131,7 @@ void process()
   UNITY_END();
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
   process();
   return 0;
 }

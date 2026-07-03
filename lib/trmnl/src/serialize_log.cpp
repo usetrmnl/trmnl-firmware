@@ -1,9 +1,8 @@
-#include <ArduinoJson.h>
 #include "serialize_log.h"
+#include <ArduinoJson.h>
 #include <trmnl_log.h>
 
-String serialize_log(const LogWithDetails &input)
-{
+String serialize_log(const LogWithDetails &input) {
   JsonDocument json_log;
 
   json_log["created_at"] = input.timestamp;
@@ -23,8 +22,7 @@ String serialize_log(const LogWithDetails &input)
   json_log["free_heap_size"] = input.deviceStatusStamp.free_heap_size;
   json_log["max_alloc_size"] = input.deviceStatusStamp.max_alloc_size;
 
-  switch (input.level)
-  {
+  switch (input.level) {
   case LOG_VERBOSE:
     json_log["level"] = "debug";
     break;
@@ -45,8 +43,7 @@ String serialize_log(const LogWithDetails &input)
     break;
   }
 
-  if (input.logRetry)
-  {
+  if (input.logRetry) {
     json_log["retry"] = input.retryAttempt;
   }
 

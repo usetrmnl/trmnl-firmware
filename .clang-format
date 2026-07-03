@@ -7,6 +7,6 @@ AllowShortIfStatementsOnASingleLine: WithoutElse
 AlignConsecutiveMacros: AcrossEmptyLinesAndComments
 AlignAfterOpenBracket: Align
 BreakAfterOpenBracketBracedList: true
-BreakBeforeCloseBracketBracedList: true
 BreakAfterOpenBracketFunction: false
 BracedInitializerIndentWidth: 4
+AlignTrailingComments: Leave

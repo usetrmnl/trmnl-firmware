@@ -19,11 +19,7 @@ void bl_process(void);
 
 uint32_t getTime(void);
 
-enum LogAction {
-  LOG_ACTION_STORE,
-  LOG_ACTION_SUBMIT,
-  LOG_ACTION_SUBMIT_OR_STORE
-};
+enum LogAction { LOG_ACTION_STORE, LOG_ACTION_SUBMIT, LOG_ACTION_SUBMIT_OR_STORE };
 
 void logWithAction(LogAction action, LogLevel level, const char *message, time_t time, int line, const char *file);
 
