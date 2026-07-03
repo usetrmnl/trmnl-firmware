@@ -10,20 +10,20 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
     // WARNING IOS (and maybe macos) WILL NOT POP UP IF IT CONTAINS THE WORD "Success"
   // https://www.esp8266.com/viewtopic.php?f=34&t=4398 SAFARI (IOS) IS STUPID, G-ZIPPED FILES CAN'T END IN .GZ
   // https://github.com/homieiot/homie-esp8266/issues/476 this is fixed by the webserver serve static function. SAFARI
-    // (IOS) there is a 128KB limit to the size of the HTML. The HTML can reference external resources/images that bring
+  // (IOS) there is a 128KB limit to the size of the HTML. The HTML can reference external resources/images that bring
   // the total over 128KB SAFARI (IOS) popup browser has some severe limitations (javascript disabled, cookies disabled)
 
-    // Required
+  // Required
   server.on("/connecttest.txt", [](AsyncWebServerRequest *request) {
     request->redirect("http://logout.net");
   }); // windows 11 captive portal workaround
   server.on("/wpad.dat", [](AsyncWebServerRequest *request) {
     request->send(404);
   }); // Honestly don't understand what this is but a 404 stops win 10 keep calling this repeatedly and panicking the
-                                        // esp32 :)
+      // esp32 :)
 
-    // Background responses: Probably not all are Required, but some are. Others might speed things up?
-    // A Tier (commonly used by modern systems)
+  // Background responses: Probably not all are Required, but some are. Others might speed things up?
+  // A Tier (commonly used by modern systems)
   server.on("/generate_204",
             [](AsyncWebServerRequest *request) { request->redirect(LocalIPURL); }); // android captive portal redirect
   server.on("/redirect", [](AsyncWebServerRequest *request) { request->redirect(LocalIPURL); }); // microsoft redirect

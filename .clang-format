@@ -9,4 +9,5 @@ AlignAfterOpenBracket: Align
 BreakAfterOpenBracketBracedList: true
 BreakAfterOpenBracketFunction: false
 BracedInitializerIndentWidth: 4
+IndentExternBlock: Indent
 AlignTrailingComments: Leave
