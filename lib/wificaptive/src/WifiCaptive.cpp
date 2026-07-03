@@ -22,6 +22,15 @@ void WifiCaptive::setUpDNSServer(DNSServer &dnsServer, const IPAddress &localIP)
     dnsServer.start(53, "*", localIP);
 }
 
+String WifiCaptive::getAPSSID()
+{
+    uint64_t mac = ESP.getEfuseMac();
+    char macSuffix[7];
+    snprintf(macSuffix, sizeof(macSuffix), "%02X%02X%02X",
+        (uint8_t)(mac >> 24), (uint8_t)(mac >> 32), (uint8_t)(mac >> 40));
+    return String(WIFI_SSID) + "-" + String(macSuffix);
+}
+
 bool WifiCaptive::startPortal()
 {
     _dnsServer = new DNSServer();
@@ -42,11 +51,7 @@ bool WifiCaptive::startPortal()
     WiFi.softAPConfig(localIP, gatewayIP, subnetMask);
     delay(50);
 
-    uint64_t mac = ESP.getEfuseMac();
-    char macSuffix[7];
-    snprintf(macSuffix, sizeof(macSuffix), "%02X%02X%02X",
-        (uint8_t)(mac >> 24), (uint8_t)(mac >> 32), (uint8_t)(mac >> 40));
-    String SSID = String(WIFI_SSID) + "-" + String(macSuffix);
+    String SSID = getAPSSID();
 
     // Start the soft access point with the given ssid, password, channel, max number of clients
     WiFi.softAP(SSID.c_str(), WIFI_PASSWORD, WIFI_CHANNEL, 0, MAX_CLIENTS);
