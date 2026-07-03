@@ -1,133 +1,135 @@
 #ifndef WiFiCaptive_h
 #define WiFiCaptive_h
 
-#include "Preferences.h"
-#include "WifiCaptivePage.h"
-#include "wifi-types.h"
-#include <ArduinoJson.h>
-#include <AsyncJson.h>
 #include <AsyncTCP.h> //https://github.com/me-no-dev/AsyncTCP using the latest dev version from @me-no-dev
 #include <DNSServer.h>
 #include <ESPAsyncWebServer.h> //https://github.com/me-no-dev/ESPAsyncWebServer using the latest dev version from @me-no-dev
-#include <esp_wifi.h> //Used for mpdu_rx_disable android workaround
+#include <esp_wifi.h>          //Used for mpdu_rx_disable android workaround
+#include <AsyncJson.h>
+#include "Preferences.h"
+#include "WifiCaptivePage.h"
+#include <ArduinoJson.h>
 #include <functional>
 #include <vector>
+#include "wifi-types.h"
 
-#define WIFI_SSID                "TRMNL"
-#define WIFI_PASSWORD            NULL
+#define WIFI_SSID "TRMNL"
+#define WIFI_PASSWORD NULL
 
 // Define the DNS interval in milliseconds between processing DNS requests
-#define DNS_INTERVAL             60
+#define DNS_INTERVAL 60
 // Define the maximum number of clients that can connect to the server
-#define MAX_CLIENTS              4
+#define MAX_CLIENTS 4
 // Define the WiFi channel to be used (channel 6 in this case)
-#define WIFI_CHANNEL             6
+#define WIFI_CHANNEL 6
 // Define the maximum number of possible saved credentials
-#define WIFI_MAX_SAVED_CREDS     5
+#define WIFI_MAX_SAVED_CREDS 5
 // Define the maximum number of connection attempts
 #define WIFI_CONNECTION_ATTEMPTS 3
 // Define max connection timeout
-#define CONNECTION_TIMEOUT       15000
+#define CONNECTION_TIMEOUT 15000
 
-#define WIFI_SSID_KEY(i)         ("wifi_" + String(i) + "_ssid").c_str()
-#define WIFI_PSWD_KEY(i)         ("wifi_" + String(i) + "_pswd").c_str()
-#define WIFI_5GHZ_KEY(i)         ("wifi_" + String(i) + "_5g").c_str()
-#define WIFI_ENT_KEY(i)          ("wifi_" + String(i) + "_ent").c_str()
-#define WIFI_USERNAME_KEY(i)     ("wifi_" + String(i) + "_username").c_str()
-#define WIFI_IDENTITY_KEY(i)     ("wifi_" + String(i) + "_identity").c_str()
+#define WIFI_SSID_KEY(i) ("wifi_" + String(i) + "_ssid").c_str()
+#define WIFI_PSWD_KEY(i) ("wifi_" + String(i) + "_pswd").c_str()
+#define WIFI_5GHZ_KEY(i) ("wifi_" + String(i) + "_5g").c_str()
+#define WIFI_ENT_KEY(i) ("wifi_" + String(i) + "_ent").c_str()
+#define WIFI_USERNAME_KEY(i) ("wifi_" + String(i) + "_username").c_str()
+#define WIFI_IDENTITY_KEY(i) ("wifi_" + String(i) + "_identity").c_str()
 // Static IP keys
-#define WIFI_STATIC_IP_KEY(i)    ("wifi_" + String(i) + "_sip").c_str()
-#define WIFI_STATIC_GW_KEY(i)    ("wifi_" + String(i) + "_sgw").c_str()
-#define WIFI_STATIC_SN_KEY(i)    ("wifi_" + String(i) + "_ssn").c_str()
-#define WIFI_STATIC_DNS1_KEY(i)  ("wifi_" + String(i) + "_dns1").c_str()
-#define WIFI_STATIC_DNS2_KEY(i)  ("wifi_" + String(i) + "_dns2").c_str()
-#define WIFI_USE_STATIC_KEY(i)   ("wifi_" + String(i) + "_usip").c_str()
+#define WIFI_STATIC_IP_KEY(i) ("wifi_" + String(i) + "_sip").c_str()
+#define WIFI_STATIC_GW_KEY(i) ("wifi_" + String(i) + "_sgw").c_str()
+#define WIFI_STATIC_SN_KEY(i) ("wifi_" + String(i) + "_ssn").c_str()
+#define WIFI_STATIC_DNS1_KEY(i) ("wifi_" + String(i) + "_dns1").c_str()
+#define WIFI_STATIC_DNS2_KEY(i) ("wifi_" + String(i) + "_dns2").c_str()
+#define WIFI_USE_STATIC_KEY(i) ("wifi_" + String(i) + "_usip").c_str()
 
-#define WIFI_LAST_INDEX          "wifi_last_index"
+#define WIFI_LAST_INDEX "wifi_last_index"
 
 struct ExternalNetwork {
-  String ssid;
-  int32_t rssi;
-  bool open;
-  bool is5GHz;
+    String  ssid;
+    int32_t rssi;
+    bool    open;
+    bool    is5GHz;
 };
 
-class WifiCaptive {
+class WifiCaptive
+{
 private:
-  DNSServer *_dnsServer;
-  AsyncWebServer *_server;
-  String _ssid = "";
-  String _password = "";
-  String _api_server = "";
-  WifiCredentials _enterprise_credentials;
+    DNSServer *_dnsServer;
+    AsyncWebServer *_server;
+    String _ssid = "";
+    String _password = "";
+    String _band = "";
+    String _api_server = "";
+    WifiCredentials _enterprise_credentials;
 
-  std::function<void()> _resetcallback;
-  std::function<void()> _tickCallback = nullptr;
+    std::function<void()> _resetcallback;
+    std::function<void()> _tickCallback = nullptr;
 
-  WifiCredentials _savedWifis[WIFI_MAX_SAVED_CREDS];
-  int _lastIndex = 0;
+    WifiCredentials _savedWifis[WIFI_MAX_SAVED_CREDS];
+    int _lastIndex = 0;
 
-  std::vector<ExternalNetwork> _networks;
+    std::vector<ExternalNetwork> _networks;
 
-  using ModemConnectCallback = std::function<bool(const String &ssid, const String &pass)>;
-  ModemConnectCallback _modemConnectCallback;
+    using ModemConnectCallback = std::function<bool(const String& ssid, const String& pass)>;
+    ModemConnectCallback _modemConnectCallback;
 #ifdef BOARD_TRMNL_X
-  String _modemMac;
+    String _modemMac;
 #endif
 
-  void setUpDNSServer(DNSServer &dnsServer, const IPAddress &localIP);
-  void readWifiCredentials();
-  void saveWifiCredentials(const WifiCredentials credentials);
-  void saveLastUsedWifiIndex(int index);
-  int readLastUsedWifiIndex();
-  void saveApiServer(String url);
-  bool tryConnectWithRetries(const WifiCredentials creds, int last_used_index);
-  std::vector<WifiCredentials> matchNetworks(std::vector<WifiNetwork> &scanResults, WifiCredentials wifiCredentials[]);
-  std::vector<WifiNetwork> getScannedUniqueNetworks(bool runScan);
-  std::vector<WifiNetwork> combineNetworks(std::vector<WifiNetwork> &scanResults, WifiCredentials wifiCredentials[]);
+    void setUpDNSServer(DNSServer &dnsServer, const IPAddress &localIP);
+    void readWifiCredentials();
+    void saveWifiCredentials(const WifiCredentials credentials);
+    void saveLastUsedWifiIndex(int index);
+    int readLastUsedWifiIndex();
+    void saveApiServer(String url);
+    bool tryConnectWithRetries(const WifiCredentials creds, int last_used_index);
+    std::vector<WifiCredentials> matchNetworks(std::vector<WifiNetwork> &scanResults, WifiCredentials wifiCredentials[]);
+    std::vector<WifiNetwork> getScannedUniqueNetworks(bool runScan);
+    std::vector<WifiNetwork> combineNetworks(std::vector<WifiNetwork> &scanResults, WifiCredentials wifiCredentials[]);
 
 public:
-  wl_status_t connect(const WifiCredentials credentials);
+    wl_status_t connect(const WifiCredentials credentials);
 
-  /// @brief Starts WiFi configuration portal.
-  /// @return True if successfully connected to provided SSID, false otherwise.
-  bool startPortal();
+    /// @brief Starts WiFi configuration portal.
+    /// @return True if successfully connected to provided SSID, false otherwise.
+    bool startPortal();
 
-  /// @brief Checks if any ssid is saved
-  /// @return True if any ssis is saved, false otherwise
-  bool isSaved();
+    /// @brief Checks if any ssid is saved
+    /// @return True if any ssis is saved, false otherwise
+    bool isSaved();
 
-  /// @brief Resets all saved credentials
-  void resetSettings();
+    /// @brief Resets all saved credentials
+    void resetSettings();
 
-  /// @brief sets the function callback that is triggered when uses performs soft reset
-  /// @param func reset callback
-  void setResetSettingsCallback(std::function<void()> func);
+    /// @brief sets the function callback that is triggered when uses performs soft reset
+    /// @param func reset callback
+    void setResetSettingsCallback(std::function<void()> func);
 
-  /// @brief Connects to the saved SSID with the best signal strength
-  /// @return True if successfully connected to saved SSID, false otherwise.
-  bool autoConnect();
+    /// @brief Connects to the saved SSID with the best signal strength
+    /// @return True if successfully connected to saved SSID, false otherwise.
+    bool autoConnect();
 
-  /// @brief Replaces the internal WiFi scan list with an externally provided one.
-  ///        Call before startPortal() so the portal shows these networks exclusively.
-  void setNetworks(const std::vector<ExternalNetwork> &nets);
+    /// @brief Replaces the internal WiFi scan list with an externally provided one.
+    ///        Call before startPortal() so the portal shows these networks exclusively.
+    void setNetworks(const std::vector<ExternalNetwork>& nets);
 
-  /// @brief Returns the last successfully used WiFi credentials (including is5GHz flag).
-  WifiCredentials getLastCredentials();
+    /// @brief Returns the last successfully used WiFi credentials (including is5GHz flag).
+    WifiCredentials getLastCredentials();
 
-  /// @brief Registers a callback used to connect to 5 GHz networks via the modem.
-  void setModemConnectCallback(ModemConnectCallback cb);
+    /// @brief Registers a callback used to connect to 5 GHz networks via the modem.
+    void setModemConnectCallback(ModemConnectCallback cb);
 #ifdef BOARD_TRMNL_X
-  /// @brief Sets the modem (5 GHz) MAC address shown in the captive portal.
-  void setModemMac(const String &mac);
+    /// @brief Sets the modem (5 GHz) MAC address shown in the captive portal.
+    void setModemMac(const String& mac);
 #endif
 
-  /// @brief Sets a callback invoked every portal loop iteration (approx. every 60 ms).
-  ///        Use to poll hardware (e.g., touchbar) while the portal is blocking.
-  void setPortalTickCallback(std::function<void()> func);
+    /// @brief Sets a callback invoked every portal loop iteration (approx. every 60 ms).
+    ///        Use to poll hardware (e.g., touchbar) while the portal is blocking.
+    void setPortalTickCallback(std::function<void()> func);
 
-  /// @brief Checks if there are saved WiFi credentials
-  /// @return True if there are saved credentials, false otherwise.
+    /// @brief Checks if there are saved WiFi credentials
+    /// @return True if there are saved credentials, false otherwise.
 };
 
 bool checkForSavedCredentials();
@@ -136,7 +138,7 @@ bool checkForSavedCredentials();
 /// @param ssid The SSID to search for
 /// @param rssi_out Optional pointer to receive signal strength (RSSI in dBm, -100 to 0)
 /// @return True if network is found, false otherwise
-bool findNetwork(const char *ssid, int32_t *rssi_out = nullptr);
+bool findNetwork(const char* ssid, int32_t* rssi_out = nullptr);
 
 extern WifiCaptive WifiCaptivePortal;
 

@@ -157,6 +157,23 @@ void test_display_headers_wifi_band_omitted_when_empty(void) {
   TEST_ASSERT_FALSE(has(headers, "WiFi-Band"));
 }
 
+// --- buildImageHeaders -----------------------------------------------------
+
+// The image request carries only auth headers (ID + Access-Token), shared by
+// the Wi-Fi and modem (5 GHz) image-download paths.
+void test_image_headers_names_order_and_values(void)
+{
+  auto inputs = makeDisplayInputs();
+  auto headers = buildImageHeaders(inputs);
+
+  TEST_ASSERT_EQUAL_UINT32(2, headers.size());
+  TEST_ASSERT_EQUAL_STRING("ID", headers[0].first.c_str());
+  TEST_ASSERT_EQUAL_STRING("Access-Token", headers[1].first.c_str());
+
+  TEST_ASSERT_EQUAL_STRING("AA:BB:CC:DD:EE:FF", valueOf(headers, "ID").c_str());
+  TEST_ASSERT_EQUAL_STRING("test-token", valueOf(headers, "Access-Token").c_str());
+}
+
 // --- formatHeaders ---------------------------------------------------------
 
 void test_format_headers_newline_separated_no_trailing_newline(void) {
@@ -202,6 +219,7 @@ void process() {
   RUN_TEST(test_display_headers_wifi_band_2_4);
   RUN_TEST(test_display_headers_wifi_band_5);
   RUN_TEST(test_display_headers_wifi_band_omitted_when_empty);
+  RUN_TEST(test_image_headers_names_order_and_values);
   RUN_TEST(test_format_headers_newline_separated_no_trailing_newline);
   RUN_TEST(test_format_headers_empty_list_is_empty_string);
   RUN_TEST(test_format_setup_headers_round_trip);

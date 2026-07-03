@@ -1059,42 +1059,51 @@ void bl_init(void)
   Log_info("BATTERY CHARGING: %s", battery_charging ? "YES" : "NO");
 
   if (battery_count != BATTERY_NONE) {
-    BQ27427_reset();
-    delay(300); // BQ27427 needs 250 ms to power up
-
+    bool bBQ27Alive = false;
     if (!lipo.begin(SENSOR_SDA_PIN, SENSOR_SCL_PIN)) {
-    // If communication fails, print an error message and loop forever.
-      Log_error("Error: Unable to communicate with BQ27427.");
-      gpio_dump_io_configuration(stdout, (1ULL << 39));
-      gpio_dump_io_configuration(stdout, (1ULL << 40));
-    }
-    else {
-    Log_info("Connected to BQ27427!");
-
-    if (battery_count == BATTERY_ONE) {
-      Log_info("One battery detected");
-      lipo.configureOneCell();
-    }
-    else if (battery_count == BATTERY_TWO) {
-      Log_info("Two batteries detected");
-      lipo.configureTwoCell();
-    }
-
-    // After SOFT_RESET the BQ27427 enters INITIALIZATION (ITPOR=1).
-    // The IT algorithm needs an OCV measurement (battery at rest) to
-    // transition to NORMAL mode and produce accurate capacity values.
-    // Poll for up to 5 s; under active load it may not clear until rest.
-    {
-      unsigned long t0 = millis();
-      while ((lipo.flags() & BQ27427_FLAG_ITPOR) && (millis() - t0 < 5000)) {
-        delay(100);
-      }
-      if (lipo.flags() & BQ27427_FLAG_ITPOR) {
-        Log_info("BQ27427: ITPOR still set — device in INITIALIZATION, capacity values may be stale");
+      BQ27427_reset(); // try resetting the chip
+      delay(300); // BQ27427 needs 250 ms to power up
+      if (!lipo.begin(SENSOR_SDA_PIN, SENSOR_SCL_PIN)) { // try again
+      // If communication fails, print an error message and loop forever.
+        Log_error("Error: Unable to communicate with BQ27427.");
+        gpio_dump_io_configuration(stdout, (1ULL << 39));
+        gpio_dump_io_configuration(stdout, (1ULL << 40));
       } else {
+        bBQ27Alive = true;
+      }
+    } else {
+      bBQ27Alive = true;
+    }
+    if (bBQ27Alive) {
+    Log_info("Connected to BQ27427!");
+    if (lipo.flags() & BQ27427_FLAG_ITPOR) { // it got reset, reload the 'golden file' data
+      if (battery_count == BATTERY_ONE) {
+        Log_info("One battery detected");
+        lipo.configureOneCell();
+      } else if (battery_count == BATTERY_TWO) {
+        Log_info("Two batteries detected");
+        lipo.configureTwoCell();
+      }
+
+      // After SOFT_RESET the BQ27427 enters INITIALIZATION (ITPOR=1).
+      // The IT algorithm needs an OCV measurement (battery at rest) to
+      // transition to NORMAL mode and produce accurate capacity values.
+      // Poll for up to 5 s; under active load it may not clear until rest.
+      {
+        unsigned long t0 = millis();
+        while ((lipo.flags() & BQ27427_FLAG_ITPOR) && (millis() - t0 < 5000)) {
+          delay(100);
+        }
+        if (lipo.flags() & BQ27427_FLAG_ITPOR) {
+          Log_info("BQ27427: ITPOR still set — device in INITIALIZATION, capacity values may be stale");
+        } else {
+          Log_info("BQ27427: ITPOR cleared — device in NORMAL mode");
+          lipo._initialized = true;
+        }
+      }
+    } else {
         Log_info("BQ27427: ITPOR cleared — device in NORMAL mode");
         lipo._initialized = true;
-      }
     }
     uint8_t energyScale = lipo.designEnergyScale();
     unsigned int soc = lipo.soc();                               // State-of-charge (%) — use this for battery level display
@@ -1728,7 +1737,12 @@ static https_request_err_e downloadAndShow()
     if (!_prevPath.isEmpty() && (_prevPath != String(szTemp) || _prevLastPath.isEmpty()))
       preferences.putString(PREFERENCES_LAST_PATH_KEY, _prevPath);
 
-    auto httpRes = g_modem->httpGet(String(filename), szTemp, 0);
+    // Include ID and Access Token if the image is hosted on the same server as the API
+    String imgHeaders;
+    if (strncmp(filename, apiDisplayInputs.baseUrl.c_str(), apiDisplayInputs.baseUrl.length()) == 0)
+      imgHeaders = formatHeaders(buildImageHeaders(apiDisplayInputs));
+
+    auto httpRes = g_modem->httpGet(String(filename), szTemp, 0, imgHeaders);
     if (!httpRes.ok)
     {
       Log_error_submit("Modem httpGet failed: %u bytes received", httpRes.bytesReceived);
@@ -1779,10 +1793,7 @@ static https_request_err_e downloadAndShow()
 
         // Include ID and Access Token if the image is hosted on the same server as the API
         if (strncmp(filename, apiDisplayInputs.baseUrl.c_str(), apiDisplayInputs.baseUrl.length()) == 0)
-        {
-          https.addHeader("ID", apiDisplayInputs.macAddress);
-          https.addHeader("Access-Token", apiDisplayInputs.apiKey);
-        }
+          applyHeaders(https, buildImageHeaders(apiDisplayInputs));
 
         if (status && !reset_firmware)
         {
