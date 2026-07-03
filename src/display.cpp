@@ -1174,24 +1174,25 @@ int png_draw(PNGDRAW *pDraw)
     return 1;
 } /* png_draw() */
 #else // TRMNL_X version
-// Map 2-bit gray (0-3) to 4-bit nibbles for the calibrated 4bpp refresh path
-static const uint8_t u8G2ToG4[4] = {0x00, 0x05, 0x0a, 0x0f};
-
+// The generic 2-bit gray update procedure is too dark on the X's 10.3" panel, so
+// we need to use the more complex 4-bit update method which has a custom pattern
+// specifically for that panel's characteristics. This loop maps 2-bit pixels to
+// 4-bit pixels by converting the values 0/1/2/3 to 0/5/10/15
 static void Expand2bppLineTo4bpp(const uint8_t *src, uint8_t *dest, int width)
 {
-    int x;
-    uint8_t b = 0;
+    uint8_t b;
+    uint16_t u16=0, *d16 = (uint16_t *)dest;
 
-    for (x = 0; x < width; x++) {
-        if ((x & 3) == 0) b = *src++;
-        uint8_t nibble = u8G2ToG4[(b >> (6 - (x & 3) * 2)) & 3];
-        if (x & 1) {
-            dest[x / 2] |= nibble;
-        } else {
-            dest[x / 2] = nibble << 4;
-        }
-    }
-}
+    for (int x = 0; x < width; x+=4) {
+        b = *src++;
+        for (int j=0; j<4; j++) {
+            u16 <<= 4;
+            u16 |= (((b >> 6) & 3) * 5);
+            b <<= 2;
+        } // for j
+        *d16++ = u16;
+    } // for x
+} /* Expand2bppLineTo4bpp() */
 
 int png_draw(PNGDRAW *pDraw)
 {
