@@ -123,7 +123,7 @@ uint16_t display_width();
  */
 void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message,
                              uint16_t max_width, uint16_t font_width,
-                             UWORD color_fg, UWORD color_bg, void *font,
+                             UWORD color_fg, UWORD color_bg, const void *font,
                              bool is_center_aligned);
 
 /**

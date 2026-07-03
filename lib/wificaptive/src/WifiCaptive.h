@@ -67,6 +67,7 @@ private:
     AsyncWebServer *_server;
     String _ssid = "";
     String _password = "";
+    String _band = "";
     String _api_server = "";
     WifiCredentials _enterprise_credentials;
 

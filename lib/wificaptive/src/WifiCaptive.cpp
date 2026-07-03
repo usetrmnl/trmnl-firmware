@@ -72,10 +72,11 @@ bool WifiCaptive::startPortal()
             {
                 _resetcallback(); // @CALLBACK
             } },
-        .setConnectionCredentials = [this](const WifiCredentials credentials, const String api_server)
+        .setConnectionCredentials = [this](const WifiCredentials credentials, const String api_server, const String band)
         {
             _ssid = credentials.ssid;
             _password = credentials.pswd;
+            _band = band;
             _api_server = api_server;
             _enterprise_credentials = credentials; },
         .getAnnotatedNetworks = [this](bool runScan)
@@ -154,14 +155,29 @@ bool WifiCaptive::startPortal()
                      credentials.useStaticIP ? "yes" : "no",
                      credentials.staticIP.c_str());
 
-            // Detect 5 GHz from the external network list
-            bool is5GHz = false;
-            for (auto& n : _networks)
-                if (n.ssid == credentials.ssid) { is5GHz = n.is5GHz; break; }
-            credentials.is5GHz = is5GHz;
+            // Honor an explicit band choice from the portal; fallback to prioritizing 5 GHz
+            if (_band == "5GHz")
+            {
+                credentials.is5GHz = true;
+            }
+            else if (_band == "2.4GHz")
+            {
+                credentials.is5GHz = false;
+            }
+            else
+            {
+                for (auto& n : _networks)
+                {
+                    if (n.ssid == credentials.ssid)
+                    {
+                        credentials.is5GHz = n.is5GHz;
+                        break;
+                    }
+                }
+            }
 
             bool res = false;
-            if (is5GHz && _modemConnectCallback)
+            if (credentials.is5GHz && _modemConnectCallback)
             {
                 res = _modemConnectCallback(credentials.ssid, credentials.pswd);
                 if (res) connected_via_modem = true;
@@ -182,6 +198,7 @@ bool WifiCaptive::startPortal()
             {
                 _ssid = "";
                 _password = "";
+                _band = "";
                 _enterprise_credentials = WifiCredentials{};
 
                 WiFi.disconnect();

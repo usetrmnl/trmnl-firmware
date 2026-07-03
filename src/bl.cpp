@@ -55,7 +55,6 @@ SCD41 scd41;
 BBTemp bbt;
 bool bCO2 = false;
 int iSensorType = -1;
-long lSampleTime;
 int lastCO2 = 0, lastSCDTemp = 0, lastTemp = 0, lastSCDHumid = 0, lastHumid = 0, lastPressure = 0, lastType = -1, lastTime = 0;
 #endif // SENSOR_SDA
 const char *szHTTPErrors[] = {
@@ -77,7 +76,6 @@ const char *szHTTPErrors[] = {
     "HTTPS_OUT_OF_MEMORY"
 };
 
-bool pref_clear = false;
 String new_filename = "";
 ApiDisplayResult apiDisplayResult;
 uint8_t *buffer = nullptr;
@@ -85,17 +83,12 @@ char filename[1024];      // image URL
 char binUrl[1024];        // update URL
 char message_buffer[128]; // message to show on the screen
 uint32_t time_since_sleep;
-image_err_e png_res = PNG_DECODE_ERR;
-bmp_err_e bmp_res = BMP_NOT_BMP;
 static float vBatt;
 bool status = false;          // need to download a new image
 bool update_firmware = false; // need to download a new firmware
 bool reset_firmware = false;  // need to reset credentials
-bool send_log = false;        // need to send logs
-bool double_click = false;
 bool log_retry = false;                                              // need to log connection retry
 esp_sleep_wakeup_cause_t wakeup_reason = ESP_SLEEP_WAKEUP_UNDEFINED; // wake-up reason
-MSG current_msg = NONE;
 SPECIAL_FUNCTION special_function = SF_NONE;
 RTC_DATA_ATTR int iPrevWakeTime = 0; // total wake time of the last cycle (for statistics collection)
 RTC_DATA_ATTR bool bUsedCachedImage = false; // if the last image displayed was read from cache (for statistics collection)
@@ -174,7 +167,6 @@ void process_iqs323_data(void);
 IQS323 iqs323;
 #define IQS323_I2C_ADDRESS 0x44
 // Sensor states
-iqs323_ch_states button_states[3];
 uint16_t slider_position = 65535;
 iqs323_gesture_events slider_event = IQS323_GESTURE_NONE;
 bool otg_message = false;
@@ -573,7 +565,6 @@ void check_channel_states(void)
           }
           break;
         }
-        button_states[i] = IQS323_CH_TOUCH;
       } else {
         // Slide mode
         if ((slider_event == IQS323_GESTURE_TAP || slider_event == IQS323_GESTURE_HOLD)) {
@@ -600,7 +591,6 @@ void check_channel_states(void)
             Log_info("Next button pressed");
             break;
           }
-          button_states[i] = IQS323_CH_TOUCH;
         }
       }
     }
@@ -767,7 +757,6 @@ void sensor_init(void)
         lastSCDTemp = scd41.temperature();
         lastSCDHumid = scd41.humidity();
         Log.info("%s [%d]: Got SCD41 sample: CO2 = %dppm\r\n", __FILE__, __LINE__, lastCO2);
-        lSampleTime = millis(); // measure the time - it needs 5 seconds to generate a sample
     } else {
         Log.info("%s [%d]: SCD41 sample failed\r\n", __FILE__, __LINE__);
         lastCO2 = 0;
@@ -810,6 +799,18 @@ void bl_init(void)
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
 #endif
   Log_info("BL init success");
+#ifdef BOARD_TRMNL_X
+  bool bModemNeeded = false;
+  Log.info("%s [%d]: Checking if we need to use the ESP32-C5 modem...\r\n", __FILE__, __LINE__);
+  if (WifiCaptivePortal.isSaved()) {
+    // WiFi saved, connection
+    WifiCredentials lastCreds = WifiCaptivePortal.getLastCredentials();
+    bModemNeeded = lastCreds.is5GHz;
+  } else {
+    bModemNeeded = true; // captive portal needs modem for 5 GHz
+  }
+  Log.info("%s [%d]: modem needed = %d\n\r", __FILE__, __LINE__, bModemNeeded);
+#endif // X
   pins_init();
   sensor_init();
 #ifdef BOARD_TRMNL_X
@@ -843,14 +844,6 @@ void bl_init(void)
   if (res)
   {
     Log_info("preferences init success (%d free entries)", preferences.freeEntries());
-    if (pref_clear)
-    {
-      res = preferences.clear(); // if needed to clear the saved data
-      if (res)
-        Log_info("preferences cleared success");
-      else
-        Log_fatal("preferences clearing error");
-    }
   }
   else
   {
@@ -859,6 +852,7 @@ void bl_init(void)
   }
   Log_info("preferences end");
   #ifndef BOARD_TRMNL_X
+  bool double_click = false;
   if (gpio_wakeup)
   {
     Log_info("GPIO wakeup detected (%d)", wakeup_reason);
@@ -1065,44 +1059,52 @@ void bl_init(void)
   Log_info("BATTERY CHARGING: %s", battery_charging ? "YES" : "NO");
 
   if (battery_count != BATTERY_NONE) {
-    BQ27427_reset();
-    delay(300); // BQ27427 needs 250 ms to power up
-
+    bool bBQ27Alive = false;
     if (!lipo.begin(SENSOR_SDA_PIN, SENSOR_SCL_PIN)) {
-    // If communication fails, print an error message and loop forever.
-      Log_error("Error: Unable to communicate with BQ27427.");
-      gpio_dump_io_configuration(stdout, (1ULL << 39));
-      gpio_dump_io_configuration(stdout, (1ULL << 40));
-    }
-    else {
-    Log_info("Connected to BQ27427!");
-
-    if (battery_count == BATTERY_ONE) {
-      Log_info("One battery detected");
-      lipo.configureOneCell();
-    }
-    else if (battery_count == BATTERY_TWO) {
-      Log_info("Two batteries detected");
-      lipo.configureTwoCell();
-    }
-
-    // After SOFT_RESET the BQ27427 enters INITIALIZATION (ITPOR=1).
-    // The IT algorithm needs an OCV measurement (battery at rest) to
-    // transition to NORMAL mode and produce accurate capacity values.
-    // Poll for up to 5 s; under active load it may not clear until rest.
-    {
-      unsigned long t0 = millis();
-      while ((lipo.flags() & BQ27427_FLAG_ITPOR) && (millis() - t0 < 5000)) {
-        delay(100);
-      }
-      if (lipo.flags() & BQ27427_FLAG_ITPOR) {
-        Log_info("BQ27427: ITPOR still set — device in INITIALIZATION, capacity values may be stale");
+      BQ27427_reset(); // try resetting the chip
+      delay(300); // BQ27427 needs 250 ms to power up
+      if (!lipo.begin(SENSOR_SDA_PIN, SENSOR_SCL_PIN)) { // try again
+      // If communication fails, print an error message and loop forever.
+        Log_error("Error: Unable to communicate with BQ27427.");
+        gpio_dump_io_configuration(stdout, (1ULL << 39));
+        gpio_dump_io_configuration(stdout, (1ULL << 40));
       } else {
+        bBQ27Alive = true;
+      }
+    } else {
+      bBQ27Alive = true;
+    }
+    if (bBQ27Alive) {
+    Log_info("Connected to BQ27427!");
+    if (lipo.flags() & BQ27427_FLAG_ITPOR) { // it got reset, reload the 'golden file' data
+      if (battery_count == BATTERY_ONE) {
+        Log_info("One battery detected");
+        lipo.configureOneCell();
+      } else if (battery_count == BATTERY_TWO) {
+        Log_info("Two batteries detected");
+        lipo.configureTwoCell();
+      }
+
+      // After SOFT_RESET the BQ27427 enters INITIALIZATION (ITPOR=1).
+      // The IT algorithm needs an OCV measurement (battery at rest) to
+      // transition to NORMAL mode and produce accurate capacity values.
+      // Poll for up to 5 s; under active load it may not clear until rest.
+      {
+        unsigned long t0 = millis();
+        while ((lipo.flags() & BQ27427_FLAG_ITPOR) && (millis() - t0 < 5000)) {
+          delay(100);
+        }
+        if (lipo.flags() & BQ27427_FLAG_ITPOR) {
+          Log_info("BQ27427: ITPOR still set — device in INITIALIZATION, capacity values may be stale");
+        } else {
+          Log_info("BQ27427: ITPOR cleared — device in NORMAL mode");
+          lipo._initialized = true;
+        }
+      }
+    } else {
         Log_info("BQ27427: ITPOR cleared — device in NORMAL mode");
         lipo._initialized = true;
-      }
     }
-
     uint8_t energyScale = lipo.designEnergyScale();
     unsigned int soc = lipo.soc();                               // State-of-charge (%) — use this for battery level display
     unsigned int volts = lipo.voltage();                         // Battery voltage (mV)
@@ -1169,15 +1171,18 @@ void bl_init(void)
   // display_show_msg(storedLogoOrDefault(1), WIFI_CONNECT, "ABCDEF", true, FW_VERSION_STRING, "Hello World!");
   // wifiErrorDeepSleep();
 #ifdef BOARD_TRMNL_X
-  modem_reset_target();
-  delay(500);  // give modem time to boot before UART init
-  static Modem modemInstance(115200);
-  if (modemInstance.isInitialized()) {
-    g_modem = &modemInstance;
+  if (bModemNeeded) {
+    modem_reset_target(); // Must be done BEFORE the instantiation of the class since it expects the modem to be ready
+    static Modem modemInstance(115200);
+    if (modemInstance.isInitialized()) {
+      g_modem = &modemInstance;
+    } else {
+      Log_info("Modem init failed — falling back to 2.4 GHz mode");
+      g_modem = nullptr;
+    }
   } else {
-    Log_info("Modem init failed — falling back to 2.4 GHz mode");
     g_modem = nullptr;
-  } 
+  }
     
   // Only scan when no credentials are saved (i.e. captive portal will be shown). 
   if (g_modem && !WifiCaptivePortal.isSaved())
@@ -1203,6 +1208,8 @@ void bl_init(void)
 #endif // BOARD_TRMNL_X
 
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
+
+  MSG current_msg = NONE;
 
 // uncdcomment this to hardcode WiFi credentials (useful for testing wifi errors, etc.)
 // #define HARDCODED_WIFI
@@ -1577,6 +1584,7 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   inputs.wifiBand = wifi.band;
   inputs.batteryVoltage = vBatt; //readBatteryVoltage();
   inputs.firmwareVersion = String(FW_VERSION_STRING);
+  inputs.firmwareCommit = String(FW_COMMIT);
   inputs.displayWidth = display_width();
   inputs.displayHeight = display_height();
   inputs.model = DEVICE_MODEL;
@@ -1627,6 +1635,8 @@ void load_prev_image(void)
  */
 static https_request_err_e downloadAndShow()
 {
+  image_err_e png_res = PNG_DECODE_ERR;
+  bmp_err_e bmp_res = BMP_NOT_BMP;
   auto apiDisplayInputs = loadApiDisplayInputs(preferences);
 
 #ifdef BOARD_TRMNL_X
@@ -1727,7 +1737,12 @@ static https_request_err_e downloadAndShow()
     if (!_prevPath.isEmpty() && (_prevPath != String(szTemp) || _prevLastPath.isEmpty()))
       preferences.putString(PREFERENCES_LAST_PATH_KEY, _prevPath);
 
-    auto httpRes = g_modem->httpGet(String(filename), szTemp, 0);
+    // Include ID and Access Token if the image is hosted on the same server as the API
+    String imgHeaders;
+    if (strncmp(filename, apiDisplayInputs.baseUrl.c_str(), apiDisplayInputs.baseUrl.length()) == 0)
+      imgHeaders = formatHeaders(buildImageHeaders(apiDisplayInputs));
+
+    auto httpRes = g_modem->httpGet(String(filename), szTemp, 0, imgHeaders);
     if (!httpRes.ok)
     {
       Log_error_submit("Modem httpGet failed: %u bytes received", httpRes.bytesReceived);
@@ -1778,10 +1793,7 @@ static https_request_err_e downloadAndShow()
 
         // Include ID and Access Token if the image is hosted on the same server as the API
         if (strncmp(filename, apiDisplayInputs.baseUrl.c_str(), apiDisplayInputs.baseUrl.length()) == 0)
-        {
-          https.addHeader("ID", apiDisplayInputs.macAddress);
-          https.addHeader("Access-Token", apiDisplayInputs.apiKey);
-        }
+          applyHeaders(https, buildImageHeaders(apiDisplayInputs));
 
         if (status && !reset_firmware)
         {
@@ -1878,6 +1890,7 @@ static https_request_err_e downloadAndShow()
           heap_caps_check_integrity_all(true);
 
           buffer = nullptr;
+          bool buffer_malloc = false;
           if (content_size <= 0) {
           // getString() handles lack of content size and chunked transfer encoding automatically
             Log.info("%s [%d]: Downloading image with getString\r\n", __FILE__, __LINE__);
@@ -1893,6 +1906,7 @@ static https_request_err_e downloadAndShow()
 
               buffer = (uint8_t *)malloc(counter);
               if (buffer) {
+                buffer_malloc = true;
                 while (iCount < counter && millis() < (lStartTime + API_FIRST_RETRY*1000)) {
                   if (stream->available()) {
                     buffer[iCount++] = stream->read();
@@ -1953,10 +1967,10 @@ static https_request_err_e downloadAndShow()
             writeImageToFile(szTemp, buffer, content_size);
             Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
             display_show_image(buffer, content_size, true);
-//            if (payload.length() != content_size) { // we allocated this buffer
-//                Log.info("%s [%d]: Freeing the image payload we allocated\r\n", __FILE__, __LINE__, szTemp);
-//                free(buffer);
-//            }
+            if (buffer_malloc) {
+              Log.info("%s [%d]: Freeing the image buffer we allocated\r\n", __FILE__, __LINE__);
+              free(buffer);
+            }
             buffer = nullptr;
             png_res = PNG_NO_ERR; // DEBUG
             String _curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
@@ -2032,7 +2046,11 @@ static https_request_err_e downloadAndShow()
             }
             Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
             display_show_image(buffer, content_size, true);
-            free(buffer);
+            
+            if (buffer_malloc) {
+              Log.info("%s [%d]: Freeing the image buffer we allocated\r\n", __FILE__, __LINE__);
+              free(buffer);
+            }
             buffer = nullptr;
 
             // Using filename from API response
@@ -2086,11 +2104,6 @@ static https_request_err_e downloadAndShow()
   if (result == HTTPS_UNABLE_TO_CONNECT)
   {
     Log_error_submit("unable to connect");
-  }
-
-  if (send_log)
-  {
-    send_log = false;
   }
 
   Log_info("Returned result - %s", szHTTPErrors[result]);
@@ -3105,8 +3118,10 @@ static bool checkAndPerformFirmwareUpdate(void)
           return false;
         }
         return true;
-      }
-    );
+      },
+      0,
+      "",
+      120000UL);
 
     if (!result.ok || !write_ok) {
       esp_ota_abort(ota_handle);
@@ -3798,7 +3813,7 @@ DeviceStatusStamp getDeviceStatusStamp()
   return deviceStatus;
 }
 
-void logWithAction(LogAction action, const char *message, time_t time, int line, const char *file)
+void logWithAction(LogAction action, LogLevel level, const char *message, time_t time, int line, const char *file)
 {
   uint32_t log_id = preferences.getUInt(PREFERENCES_LOG_ID_KEY, 1);
 
@@ -3812,7 +3827,8 @@ void logWithAction(LogAction action, const char *message, time_t time, int line,
       .filenameCurrent = preferences.getString(PREFERENCES_FILENAME_KEY, ""),
       .filenameNew = new_filename,
       .logRetry = log_retry,
-      .retryAttempt = log_retry ? preferences.getInt(PREFERENCES_CONNECT_API_RETRY_COUNT) : 0};
+      .retryAttempt = log_retry ? preferences.getInt(PREFERENCES_CONNECT_API_RETRY_COUNT) : 0,
+      .level = level};
 
   String json_string = serialize_log(input);
 
