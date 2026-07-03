@@ -63,48 +63,46 @@ bool WifiCaptive::startPortal() {
     // configure DSN and WEB server
   setUpDNSServer(*_dnsServer, localIP);
 
+  // clang-format off
   WifiOperationCallbacks callbacks = {
-      .resetSettings =
-        [this]() {
-          resetSettings();
-          if (_resetcallback != NULL) {
-            _resetcallback(); // @CALLBACK
+      .resetSettings = [this]() {
+        resetSettings();
+        if (_resetcallback != NULL) {
+          _resetcallback(); // @CALLBACK
+        }
+      },
+      .setConnectionCredentials = [this](const WifiCredentials credentials, const String api_server, const String band) {
+        _ssid = credentials.ssid;
+        _password = credentials.pswd;
+        _band = band;
+        _api_server = api_server;
+        _enterprise_credentials = credentials;
+      },
+      .getAnnotatedNetworks = [this](bool runScan) {
+        if (!_networks.empty()) {
+          std::vector<WifiNetwork> result;
+          for (auto &n : _networks) {
+            bool saved = false;
+            for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
+              if (_savedWifis[i].ssid == n.ssid) {
+                saved = true;
+                break;
+              }
+            result.push_back({n.ssid, n.rssi, n.open, saved, n.is5GHz});
           }
-        },
-      .setConnectionCredentials =
-        [this](const WifiCredentials credentials, const String api_server, const String band) {
-          _ssid = credentials.ssid;
-          _password = credentials.pswd;
-          _band = band;
-          _api_server = api_server;
-          _enterprise_credentials = credentials;
-        },
-      .getAnnotatedNetworks =
-        [this](bool runScan) {
-          if (!_networks.empty()) {
-            std::vector<WifiNetwork> result;
-            for (auto &n : _networks) {
-              bool saved = false;
-              for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
-                if (_savedWifis[i].ssid == n.ssid) {
-                  saved = true;
-                  break;
-                }
-              result.push_back({n.ssid, n.rssi, n.open, saved, n.is5GHz});
-            }
-            return result;
-          }
-            // Warning: DO NOT USE true on this function in an async context!
-          std::vector<WifiNetwork> uniqueNetworks = getScannedUniqueNetworks(false);
-          std::vector<WifiNetwork> combinedNetworks = combineNetworks(uniqueNetworks, _savedWifis);
-          return combinedNetworks;
-        },
-      .isNetworkListReady =
-        [this]() {
-          if (!_networks.empty()) return true;
-          int n = WiFi.scanComplete();
-          return n >= 0;
-        }};
+          return result;
+        }
+        // Warning: DO NOT USE true on this function in an async context!
+        std::vector<WifiNetwork> uniqueNetworks = getScannedUniqueNetworks(false);
+        std::vector<WifiNetwork> combinedNetworks = combineNetworks(uniqueNetworks, _savedWifis);
+        return combinedNetworks;
+      },
+      .isNetworkListReady = [this]() {
+        if (!_networks.empty()) return true;
+        int n = WiFi.scanComplete();
+        return n >= 0;
+      }};
+  // clang-format on
 
 #ifdef BOARD_TRMNL_X
   setUpWebserver(*_server, localIP, callbacks, _modemMac);
