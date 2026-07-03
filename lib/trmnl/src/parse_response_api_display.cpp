@@ -32,7 +32,7 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
       .filename = doc["filename"] | "",
       .update_firmware = doc["update_firmware"],
       // server doesn't return this flag if device.firmware_version <= 1.6.2
-			.maximum_compatibility = doc["maximum_compatibility"] | false,
+      .maximum_compatibility = doc["maximum_compatibility"] | false,
       .firmware_url = doc["firmware_url"] | "",
       .refresh_rate = doc["refresh_rate"],
       .temp_profile = u32TP,

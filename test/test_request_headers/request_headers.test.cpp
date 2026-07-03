@@ -161,8 +161,7 @@ void test_display_headers_wifi_band_omitted_when_empty(void) {
 
 // The image request carries only auth headers (ID + Access-Token), shared by
 // the Wi-Fi and modem (5 GHz) image-download paths.
-void test_image_headers_names_order_and_values(void)
-{
+void test_image_headers_names_order_and_values(void) {
   auto inputs = makeDisplayInputs();
   auto headers = buildImageHeaders(inputs);
 

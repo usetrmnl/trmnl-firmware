@@ -1,8 +1,7 @@
 #include <api-client/request_headers.h>
 #include <trmnl_log.h>
 
-HttpHeaderList buildDisplayHeaders(const ApiDisplayInputs &inputs)
-{
+HttpHeaderList buildDisplayHeaders(const ApiDisplayInputs &inputs) {
   HttpHeaderList headers;
   headers.push_back({"ID", inputs.macAddress});
   headers.push_back({"Content-Type", "application/json"});
@@ -23,29 +22,26 @@ HttpHeaderList buildDisplayHeaders(const ApiDisplayInputs &inputs)
   headers.push_back({"Battery-Health", String(inputs.stateOfHealth)});
   headers.push_back({"Battery-Current", String(inputs.batteryCurrent)});
   headers.push_back({"Battery-Temp", String(inputs.batteryTemperature)});
-  headers.push_back({"Battery-Capacity", String(inputs.currentBatteryCapacity) + "/" + String(inputs.maxBatteryCapacity)});
+  headers.push_back(
+    {"Battery-Capacity", String(inputs.currentBatteryCapacity) + "/" + String(inputs.maxBatteryCapacity)});
 #endif // BOARD_TRMNL_X
   headers.push_back({"FW-Version", inputs.firmwareVersion});
-  if (inputs.firmwareCommit.length() > 0)
-    headers.push_back({"FW-Commit", inputs.firmwareCommit});
+  if (inputs.firmwareCommit.length() > 0) headers.push_back({"FW-Commit", inputs.firmwareCommit});
   headers.push_back({"Model", String(inputs.model)});
   headers.push_back({"Image-Cached", inputs.imageCached ? "true" : "false"});
   headers.push_back({"Wake-Time", String(inputs.prevWakeTime)});
   headers.push_back({"RSSI", String(inputs.rssi)});
-  if (inputs.wifiBand.length() > 0)
-    headers.push_back({"WiFi-Band", inputs.wifiBand});
+  if (inputs.wifiBand.length() > 0) headers.push_back({"WiFi-Band", inputs.wifiBand});
   headers.push_back({"Temperature-Profile", "true"});
   headers.push_back({"Width", String(inputs.displayWidth)});
   headers.push_back({"Height", String(inputs.displayHeight)});
 
-  if (inputs.specialFunction != SF_NONE)
-    headers.push_back({"special_function", "true"});
+  if (inputs.specialFunction != SF_NONE) headers.push_back({"special_function", "true"});
 
   return headers;
 }
 
-HttpHeaderList buildSetupHeaders(const ApiSetupInputs &inputs)
-{
+HttpHeaderList buildSetupHeaders(const ApiSetupInputs &inputs) {
   HttpHeaderList headers;
   headers.push_back({"ID", inputs.macAddress});
   headers.push_back({"Content-Type", "application/json"});
@@ -54,16 +50,14 @@ HttpHeaderList buildSetupHeaders(const ApiSetupInputs &inputs)
   return headers;
 }
 
-HttpHeaderList buildImageHeaders(const ApiDisplayInputs &inputs)
-{
+HttpHeaderList buildImageHeaders(const ApiDisplayInputs &inputs) {
   HttpHeaderList headers;
   headers.push_back({"ID", inputs.macAddress});
   headers.push_back({"Access-Token", inputs.apiKey});
   return headers;
 }
 
-HttpHeaderList buildLogHeaders(const ApiLogInputs &inputs)
-{
+HttpHeaderList buildLogHeaders(const ApiLogInputs &inputs) {
   HttpHeaderList headers;
   headers.push_back({"ID", inputs.macAddress});
   headers.push_back({"Accept", "application/json, */*"});
@@ -72,19 +66,13 @@ HttpHeaderList buildLogHeaders(const ApiLogInputs &inputs)
   return headers;
 }
 
-String formatHeaders(const HttpHeaderList &headers)
-{
+String formatHeaders(const HttpHeaderList &headers) {
   String out;
-  for (size_t i = 0; i < headers.size(); ++i)
-  {
-    if (i > 0)
-      out += "\n";
+  for (size_t i = 0; i < headers.size(); ++i) {
+    if (i > 0) out += "\n";
     out += headers[i].first + ": " + headers[i].second;
   }
   return out;
 }
 
-void logHeaders(const HttpHeaderList &headers)
-{
-  Log_info("Added headers:\n%s", formatHeaders(headers).c_str());
-}
+void logHeaders(const HttpHeaderList &headers) { Log_info("Added headers:\n%s", formatHeaders(headers).c_str()); }
