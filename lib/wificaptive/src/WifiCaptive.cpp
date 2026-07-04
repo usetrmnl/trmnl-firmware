@@ -446,6 +446,7 @@ void WifiCaptive::saveLastUsedWifiIndex(int index)
     }
 
     preferences.putInt(WIFI_LAST_INDEX, index);
+    preferences.end();
 }
 
 int WifiCaptive::readLastUsedWifiIndex()
@@ -481,6 +482,31 @@ void WifiCaptive::saveApiServer(String url)
     preferences.begin("data", false);
     preferences.putString("api_url", url);
     preferences.end();
+}
+
+int WifiCaptive::findSavedWifiIndex(const WifiCredentials credentials)
+{
+    for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
+    {
+        if (_savedWifis[i].ssid != credentials.ssid ||
+            _savedWifis[i].pswd != credentials.pswd ||
+            _savedWifis[i].is5GHz != credentials.is5GHz ||
+            _savedWifis[i].isEnterprise != credentials.isEnterprise)
+        {
+            continue;
+        }
+
+        if (credentials.isEnterprise &&
+            (_savedWifis[i].username != credentials.username ||
+             _savedWifis[i].identity != credentials.identity))
+        {
+            continue;
+        }
+
+        return i;
+    }
+
+    return -1;
 }
 
 std::vector<WifiNetwork> WifiCaptive::getScannedUniqueNetworks(bool runScan)
@@ -682,21 +708,13 @@ bool WifiCaptive::autoConnect()
     WiFi.mode(WIFI_STA);
     for (auto &network : sortedNetworks)
     {
-        if (network.ssid == "" || (network.ssid == _savedWifis[last_used_index].ssid && network.pswd == _savedWifis[last_used_index].pswd))
+        int found_index = findSavedWifiIndex(network);
+        if (network.ssid == "" || found_index == last_used_index)
         {
             continue;
         }
 
         Log_info("Trying to connect to saved network %s...", network.ssid.c_str());
-        int found_index = -1;
-        for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
-        {
-            if (_savedWifis[i].ssid == network.ssid)
-            {
-                found_index = i;
-                break;
-            }
-        }
         if (tryConnectWithRetries(network, found_index))
         {
             return true;
