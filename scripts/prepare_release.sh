@@ -2,6 +2,14 @@
 
 set -e
 
+FORCE=0
+for arg in "$@"; do
+    case "$arg" in
+        --force|-f) FORCE=1 ;;
+        *) echo "Unknown option: $arg"; echo "Usage: $0 [--force]"; exit 1 ;;
+    esac
+done
+
 ENVS=(trmnl trmnl_4clr TRMNL_X)
 CONFIG="include/config.h"
 
@@ -23,15 +31,14 @@ echo
 
 HEAD_MSG=$(git log -1 --pretty=%s)
 if [ "$HEAD_MSG" != "$EXPECTED_MSG" ]; then
-    echo "Error: HEAD commit message is \"$HEAD_MSG\", expected \"$EXPECTED_MSG\""
-    exit 1
+    if [ "$FORCE" -eq 1 ]; then
+        echo "Warning: HEAD commit message is \"$HEAD_MSG\", expected \"$EXPECTED_MSG\" (bypassed with --force)"
+    else
+        echo "Error: HEAD commit message is \"$HEAD_MSG\", expected \"$EXPECTED_MSG\""
+        echo "Use --force to bypass this check."
+        exit 1
+    fi
 fi
-
-read -r -p "Build release for $EXPECTED_MSG? [y/N] " reply
-case "$reply" in
-    [yY]|[yY][eE][sS]) ;;
-    *) echo "Aborted."; exit 1 ;;
-esac
 
 for env in "${ENVS[@]}"; do
     echo

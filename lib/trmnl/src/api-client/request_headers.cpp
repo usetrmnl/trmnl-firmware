@@ -54,6 +54,14 @@ HttpHeaderList buildSetupHeaders(const ApiSetupInputs &inputs)
   return headers;
 }
 
+HttpHeaderList buildImageHeaders(const ApiDisplayInputs &inputs)
+{
+  HttpHeaderList headers;
+  headers.push_back({"ID", inputs.macAddress});
+  headers.push_back({"Access-Token", inputs.apiKey});
+  return headers;
+}
+
 HttpHeaderList buildLogHeaders(const ApiLogInputs &inputs)
 {
   HttpHeaderList headers;

@@ -99,11 +99,7 @@ extern char filename[];
 extern Preferences preferences;
 extern ApiDisplayResult apiDisplayResult;
 uint32_t iTempProfile;
-static int i426Workaround = 0;
 static uint8_t *pDither;
-
-// Runtime control for light sleep (true = enabled, false = disabled)
-static bool g_light_sleep_enabled = true;
 
 /**
  * @brief Function to init the display
@@ -440,7 +436,9 @@ void display_sleep(uint32_t u32Millis)
 #ifdef DO_NOT_LIGHT_SLEEP
     delay(u32Millis);
 #else
-    if (!g_light_sleep_enabled) {
+    // Runtime control for light sleep (true = enabled, false = disabled)
+    static bool light_sleep_enabled = true;
+    if (!light_sleep_enabled) {
         delay(u32Millis);
     } else {
         esp_sleep_enable_timer_wakeup(u32Millis * 1000L);
@@ -1596,6 +1594,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     auto height = display_height();
 //    uint32_t *d32;
     bool bAlloc = false;
+    static int i426Workaround = 0;
 #ifdef BB_EPAPER
     int iRefreshMode = REFRESH_FULL; // assume full (slow) refresh
 #else

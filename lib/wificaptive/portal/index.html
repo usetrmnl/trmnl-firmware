@@ -386,6 +386,7 @@
       var ssid = document.getElementById('ssid').value;
       var pswd = document.getElementById('password').value;
       var server = document.getElementById('server').value;
+      var band = document.getElementById('band').value;
       var isEnterprise = document.getElementById('isEnterpriseHidden').value === 'true';
 
       if (!ssid) {
@@ -425,6 +426,7 @@
         ssid: ssid,
         pswd: pswd,
         server: server,
+        band: band,
         isEnterprise: isEnterprise
       };
 
@@ -546,6 +548,7 @@
     function appendWifiToTable(table, name, open, rssi, enterprise, onClick, band) {
       var newRow = document.createElement('tr');
       newRow.setAttribute('data-enterprise', enterprise ? 'true' : 'false');
+      newRow.setAttribute('data-band', band || '');
       if (onClick) {
         newRow.onclick = function () {
           onClickItemTable(this);
@@ -596,6 +599,7 @@
 
       if (value) {
         document.getElementById('ssid').value = value;
+        document.getElementById('band').value = x.getAttribute('data-band') || '';
         var passwordTag = document.getElementById('password');
         passwordTag.value = '';
 
@@ -702,9 +706,10 @@
   <div class="div-container">
     <div class="form-group">
       <label for="ssid">SSID</label>
-      <input type="text" id="ssid" name="ssid" placeholder="Enter your Wi-Fi name">
+      <input type="text" id="ssid" name="ssid" placeholder="Enter your Wi-Fi name" oninput="document.getElementById('band').value = ''">
     </div>
     <input type="hidden" id="isEnterpriseHidden" value="false">
+    <input type="hidden" id="band" name="band" value="">
     <div class="form-group" id="enterprise_indicator" style="display: none;">
       <div class="alert alert-primary" style="margin-bottom: 0;">
         This network uses WPA2 Enterprise authentication. If you only have a username and password, use the identity field for your username.

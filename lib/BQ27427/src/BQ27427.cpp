@@ -787,22 +787,25 @@ bool BQ27427::writeBlockChecksum(uint8_t csum)
 uint8_t BQ27427::readExtendedData(uint8_t classID, uint8_t offset)
 {
 	uint8_t retData = 0;
-	if (!_userConfigControl) enterConfig(false);
-		
+//	if (!_userConfigControl) enterConfig(false);
+// Adds unnecessary delays since we're just reading data
+
 	if (!blockDataControl()) // // enable block data memory control
 		return false; // Return false if enable fails
 	if (!blockDataClass(classID)) // Write class ID using DataBlockClass()
 		return false;
 	
 	blockDataOffset(offset / 32); // Write 32-bit block offset (usually 0)
-	
-	computeBlockChecksum(); // Compute checksum going in
-	uint8_t oldCsum = blockDataChecksum();
+
+// No need to compute a checksum because we're READING data, not writing data
+//	computeBlockChecksum(); // Compute checksum going in
+//	uint8_t oldCsum = blockDataChecksum();
 	/*for (int i=0; i<32; i++)
 		Serial.print(String(readBlockData(i)) + " ");*/
 	retData = readBlockData(offset % 32); // Read from offset (limit to 0-31)
-	
-	if (!_userConfigControl) exitConfig();
+
+// Adds unnecessary delays since we're just reading data
+//	if (!_userConfigControl) exitConfig();
 	
 	return retData;
 }
@@ -991,10 +994,15 @@ bool BQ27427::applyGoldenFile(bool twoCell)
 		uint8_t cmd[] = {0x02, 0x00};
 		i2cWriteBytes(0x00, cmd, 2);
 		const uint8_t exp[] = {0x02, 0x02};
-		if (!goldenFileVerify(0x00, exp, 2))
+		if (!goldenFileVerify(0x00, exp, 2)) {
 			Serial.printf("BQ27427 golden file [%s]: WARNING — FW version != 2.02, continuing anyway\n", tag);
-		else
+		} else {
 			Serial.printf("BQ27427 golden file [%s]: FW version 2.02 confirmed\n", tag);
+			if (!(flags() & BQ27427_FLAG_ITPOR)) {
+				Serial.printf("BQ27427 No need to re-apply golden file, the power was not reset. Exiting...");
+				return true;
+			}
+		}
 	}
 
 	//------------------------------------------------------------------
