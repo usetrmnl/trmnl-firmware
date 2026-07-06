@@ -277,7 +277,6 @@ void WifiCaptive::resetSettings()
 
     Preferences preferences;
     preferences.begin("wificaptive", false);
-    preferences.remove("api_url");
     preferences.remove(WIFI_LAST_INDEX);
     for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
     {
