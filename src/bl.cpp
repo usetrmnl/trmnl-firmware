@@ -1257,7 +1257,7 @@ void bl_init(void)
 
     Log_info("FW version %s", Messages::firmware_version().c_str());
 
-    showMessageWithLogo(WIFI_CONNECT, "", false, Messages::firmware_version().c_str(), "");
+    showMessageWithLogo(WIFI_CONNECT, "", false, Messages::firmware_version().c_str(), WifiCaptivePortal.getAPSSID());
 #ifdef BOARD_TRMNL_X
     // set TAP mode as default
     iqs323_task_i2c_lock();
@@ -1285,7 +1285,7 @@ void bl_init(void)
           // Only reached on cancel — confirmed path calls ESP.restart()
           s_power_off_cooldown_until = millis() + 2000;
           iqs323_task_i2c_unlock();
-          showMessageWithLogo(WIFI_CONNECT, "", false, Messages::firmware_version().c_str(), "");
+          showMessageWithLogo(WIFI_CONNECT, "", false, Messages::firmware_version().c_str(), WifiCaptivePortal.getAPSSID());
           return;
         }
       } else {
