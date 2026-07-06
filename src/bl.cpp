@@ -37,6 +37,10 @@
 #include <api-client/display.h>
 #include <api-client/request_headers.h>
 #include "driver/gpio.h"
+#ifdef BOARD_SEEED_RETERMINAL_E1004
+#include "driver/rtc_io.h"
+#endif
+#include <sht4x_read.h>
 #include "esp_ota_ops.h"
 #include "esp_sntp.h"
 #include "esp_flash.h"
@@ -58,6 +62,11 @@ bool bCO2 = false;
 int iSensorType = -1;
 int lastCO2 = 0, lastSCDTemp = 0, lastTemp = 0, lastSCDHumid = 0, lastHumid = 0, lastPressure = 0, lastType = -1, lastTime = 0;
 #endif // SENSOR_SDA
+#ifdef HAS_ONBOARD_SHT4X
+float sht4xTempC = 0.0f;
+float sht4xHumidity = 0.0f;
+bool  sht4xValid = false;
+#endif // HAS_ONBOARD_SHT4X
 const char *szHTTPErrors[] = {
     "HTTPS_NO_ERR",
     "HTTPS_RESET",
@@ -96,6 +105,7 @@ RTC_DATA_ATTR bool bUsedCachedImage = false; // if the last image displayed was 
 RTC_DATA_ATTR uint8_t need_to_refresh_display = 1;
 RTC_DATA_ATTR bool otg_state = false;  // Track OTG state across deep sleep
 RTC_DATA_ATTR char szPrevFile[36] = {0};
+RTC_DATA_ATTR bool last_display_ok = false; // previous cycle put a real image on the panel (for E1004 silent button reload)
 bool touchbar_tap_mode = true;  // false = "slide", true = "tap" (default)
 Preferences preferences;
 PreferencesPersistence preferencesPersistence(preferences);
@@ -780,6 +790,16 @@ void sensor_init(void)
       bbt.stop(); // turn off the sensor to conserve power
   }
 #endif // SENSOR_SDA
+#ifdef HAS_ONBOARD_SHT4X
+  if (sht4x_read(sht4xTempC, sht4xHumidity)) {
+    sht4xValid = true;
+    // ArduinoLog uses %F for float (%f is not supported and prints literally)
+    Log.info("%s [%d]: SHT4x temp=%F humidity=%F\r\n", __FILE__, __LINE__, sht4xTempC, sht4xHumidity);
+  } else {
+    sht4xValid = false;
+    Log.info("%s [%d]: SHT4x read failed\r\n", __FILE__, __LINE__);
+  }
+#endif // HAS_ONBOARD_SHT4X
 } /* sensor_init() */
 /**
  * @brief Function to init business logic module
@@ -795,7 +815,11 @@ void bl_init(void)
 #endif
   startup_time = init_time/1000L; // convert to milliseconds
 #ifdef DEV_FIRMWARE
+  #ifdef BOARD_SEEED_RETERMINAL_E1004
+  Serial.begin(115200, SERIAL_8N1, 44, 43);
+  #else
   Serial.begin(115200);
+  #endif
   wait_for_serial();
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
 #endif
@@ -1029,7 +1053,16 @@ void bl_init(void)
 
 // #endif
 
-  if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
+  bool show_boot_logo = (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER);
+#ifdef BOARD_SEEED_RETERMINAL_E1004
+  // On the E1004 a back-button press should silently reload the next image, like
+  // a timer wake, instead of flashing the TRMNL logo. Only do so when a real
+  // image is already on the panel (the previous cycle succeeded); cold boot and
+  // error/setup screens still show the logo.
+  if (gpio_wakeup && last_display_ok)
+    show_boot_logo = false;
+#endif
+  if (show_boot_logo)
   {
     Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
 
@@ -1345,6 +1378,9 @@ void bl_init(void)
   // OTA checking, image checking and drawing
   https_request_err_e request_result = downloadAndShow();
   Log.info("%s [%d]: request result - %s\r\n", __FILE__, __LINE__, szHTTPErrors[request_result]);
+  // Remember whether a real image reached the panel, so the next E1004 button
+  // wake can decide between a silent reload and the normal logo flow.
+  last_display_ok = (request_result == HTTPS_SUCCESS);
 
   if (request_result == HTTPS_IMAGE_FILE_TOO_BIG)
   {
@@ -3225,6 +3261,15 @@ static bool checkAndPerformFirmwareUpdate(void)
   return ota_ok;
 }
 
+#ifdef BOARD_SEEED_RETERMINAL_E1004
+static void configureWakeButtonForSleep(void)
+{
+  pinMode(PIN_INTERRUPT, INPUT_PULLUP);
+  rtc_gpio_pullup_en(static_cast<gpio_num_t>(PIN_INTERRUPT));
+  rtc_gpio_pulldown_dis(static_cast<gpio_num_t>(PIN_INTERRUPT));
+}
+#endif
+
 /**
  * @brief Function to sleep preparing and go to sleep
  * @param none
@@ -3285,6 +3330,9 @@ void goToSleep(void)
   pinMode(PIN_INTERRUPT, INPUT); // needed to not immediately wake up
   esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
 #elif defined(CONFIG_IDF_TARGET_ESP32S3)
+  #ifdef BOARD_SEEED_RETERMINAL_E1004
+  configureWakeButtonForSleep();
+  #endif
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
@@ -3311,6 +3359,9 @@ static void goToSleepButtonOnly(void)
 #elif defined( CONFIG_IDF_TARGET_ESP32C3 ) || defined ( CONFIG_IDF_TARGET_ESP32C5 )
   esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
 #elif CONFIG_IDF_TARGET_ESP32S3
+  #ifdef BOARD_SEEED_RETERMINAL_E1004
+  configureWakeButtonForSleep();
+  #endif
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
@@ -3491,7 +3542,7 @@ static float readBatteryVoltage(void)
     return -1.0;
   }
 #else
-  #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002)
+  #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002) || defined(BOARD_SEEED_RETERMINAL_E1004)
     pinMode(PIN_VBAT_SWITCH, OUTPUT);
     digitalWrite(PIN_VBAT_SWITCH, VBAT_SWITCH_LEVEL);
     delay(10); // Wait for the switch to stabilize
