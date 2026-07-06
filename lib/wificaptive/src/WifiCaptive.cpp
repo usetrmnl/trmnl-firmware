@@ -479,15 +479,9 @@ int WifiCaptive::readLastUsedWifiIndex()
 
 void WifiCaptive::saveApiServer(String url)
 {
-    // if not URL is provided, don't save a preference and fall back to API_BASE_URL in config.h
-    if (url == "")
-        return;
     Preferences preferences;
     preferences.begin("data", false);
 
-    // If the server URL is changing, invalidate the cached credentials so the
-    // /api/setup handshake re-runs against the new server. Otherwise the stale
-    // API key/friendly ID from the previous server are reused and pairing fails.
     String currentUrl = preferences.getString("api_url", "");
     if (currentUrl != url)
     {
@@ -496,7 +490,12 @@ void WifiCaptive::saveApiServer(String url)
         preferences.remove("friendly_id");
     }
 
-    preferences.putString("api_url", url);
+    if (url == "") {
+        preferences.remove("api_url"); // falls back to API_BASE_URL
+    } else {
+        preferences.putString("api_url", url);
+    }
+
     preferences.end();
 }
 
