@@ -10,7 +10,7 @@
 #include "esp_loader_io.h"
 #include "esp32_port.h"
 #include "modem.h"
-#include <at_escape.h>
+#include <string_utils.h>
 
 #if defined (BOARD_TRMNL_X) || defined (BOARD_TRLML_X_EPDIY)
 #include <LittleFS.h>
@@ -439,12 +439,8 @@ std::vector<Modem::ModemNetwork> Modem::scanNetworks() {
 // connectToNetwork() / disconnectFromNetwork()
 // ---------------------------------------------------------------------------
 bool Modem::connectToNetwork(const String& ssid, const String& password) {
-  // Per the ESP-AT command reference, backslash, double-quote AND comma are
-  // special characters in string parameters and must be backslash-escaped;
-  // an unescaped comma is treated as a parameter delimiter even inside the
-  // quotes, so a password like "pass,word" would silently fail to join.
-  String s = escapeAtParam(ssid);
-  String p = escapeAtParam(password);
+  String s = escape_modem_param(ssid);
+  String p = escape_modem_param(password);
 
   while (ModemSerial.available()) ModemSerial.read();  // flush
 
@@ -513,10 +509,7 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, const String& saveToFil
     }
   }
 
-  // Inline URLs are quoted AT string parameters, so ESP-AT special characters
-  // must be escaped. AT+HTTPURLCFG instead takes length-prefixed raw bytes and
-  // uses the unescaped URL.
-  String urlParam = escapeAtParam(url);
+  String urlParam = escape_modem_param(url);
 
   // Use AT+HTTPURLCFG only when the URL itself is too long to fit inline.
   bool useUrlCfg = (urlParam.length() + 24 > 256);
@@ -769,10 +762,7 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, std::function<bool(cons
     }
   }
 
-  // Inline URLs are quoted AT string parameters, so ESP-AT special characters
-  // must be escaped. AT+HTTPURLCFG instead takes length-prefixed raw bytes and
-  // uses the unescaped URL.
-  String urlParam = escapeAtParam(url);
+  String urlParam = escape_modem_param(url);
 
   bool useUrlCfg = (urlParam.length() + 24 > 256);
   if (useUrlCfg) {
