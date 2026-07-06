@@ -2492,10 +2492,9 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         string1 += fw_version;
         bbep.setCursor(40, 48); // place in upper left corner
         bbep.println(string1);
-        // message carries the AP SSID (see WifiCaptive::getAPSSID()); empty for callers that don't pass one
         String string2 = "Connect your phone or computer to ";
         string2 += (message.length() > 0) ? "'" + message + "'" : String("the TRMNL");
-        string2 += " WiFi";
+        string2 += " Wi-Fi";
         bbep.getStringBox(string2, &rect);
 #ifdef __BB_EPAPER__
         bbep.setCursor((bbep.width() - rect.w) / 2, 386);
