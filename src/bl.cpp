@@ -48,6 +48,7 @@
 #include "loading.h"
 #include <wifi-helpers.h>
 #include <sys/time.h>
+#include "messages.h"
 #ifdef SENSOR_SDA
 #include <bb_scd41.h>
 #include <bb_temperature.h>
@@ -1160,7 +1161,7 @@ void bl_init(void)
 #endif // BOARD_TRMNL_X
   vBatt = readBatteryVoltage(); // Read the battery voltage BEFORE WiFi is turned on
 
-  Log_info("Firmware version %s", FW_VERSION_STRING);
+  Log_info("Firmware version %s", Messages::firmware_version().c_str());
   Log_info("Arduino version %d.%d.%d", ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH);
   Log_info("ESP-IDF version %d.%d.%d", ESP_IDF_VERSION_MAJOR, ESP_IDF_VERSION_MINOR, ESP_IDF_VERSION_PATCH);
   list_files();
@@ -1168,7 +1169,7 @@ void bl_init(void)
 
   // DEBUG - test message display
   // showMessageWithLogo(MSG_FORMAT_ERROR);
-  // display_show_msg(storedLogoOrDefault(1), WIFI_CONNECT, "ABCDEF", true, FW_VERSION_STRING, "Hello World!");
+  // display_show_msg(storedLogoOrDefault(1), WIFI_CONNECT, "ABCDEF", true, Messages::firmware_version().c_str(), "Hello World!");
   // wifiErrorDeepSleep();
 #ifdef BOARD_TRMNL_X
   if (bModemNeeded) {
@@ -1254,9 +1255,9 @@ void bl_init(void)
     // WiFi credentials are not saved - start captive portal
     Log.info("%s [%d]: WiFi NOT saved\r\n", __FILE__, __LINE__);
 
-    Log_info("FW version %s", FW_VERSION_STRING);
+    Log_info("FW version %s", Messages::firmware_version().c_str());
 
-    showMessageWithLogo(WIFI_CONNECT, "", false, FW_VERSION_STRING, WifiCaptivePortal.getAPSSID());
+    showMessageWithLogo(WIFI_CONNECT, "", false, Messages::firmware_version().c_str(), WifiCaptivePortal.getAPSSID());
 #ifdef BOARD_TRMNL_X
     // set TAP mode as default
     iqs323_task_i2c_lock();
@@ -1284,7 +1285,7 @@ void bl_init(void)
           // Only reached on cancel — confirmed path calls ESP.restart()
           s_power_off_cooldown_until = millis() + 2000;
           iqs323_task_i2c_unlock();
-          showMessageWithLogo(WIFI_CONNECT, "", false, FW_VERSION_STRING, WifiCaptivePortal.getAPSSID());
+          showMessageWithLogo(WIFI_CONNECT, "", false, Messages::firmware_version().c_str(), WifiCaptivePortal.getAPSSID());
           return;
         }
       } else {
