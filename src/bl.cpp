@@ -49,6 +49,7 @@
 #include <wifi-helpers.h>
 #include <sys/time.h>
 #include "messages.h"
+#include "displayed_image.h"
 #ifdef SENSOR_SDA
 #include <bb_scd41.h>
 #include <bb_temperature.h>
@@ -95,7 +96,6 @@ RTC_DATA_ATTR int iPrevWakeTime = 0; // total wake time of the last cycle (for s
 RTC_DATA_ATTR bool bUsedCachedImage = false; // if the last image displayed was read from cache (for statistics collection)
 RTC_DATA_ATTR uint8_t need_to_refresh_display = 1;
 RTC_DATA_ATTR bool otg_state = false;  // Track OTG state across deep sleep
-RTC_DATA_ATTR char szPrevFile[36] = {0};
 bool touchbar_tap_mode = true;  // false = "slide", true = "tap" (default)
 Preferences preferences;
 PreferencesPersistence preferencesPersistence(preferences);
@@ -1092,7 +1092,7 @@ void bl_init(void)
 #endif // BOARD_TRMNL_X
     // Force the display to show the current playlist image after the loading screen
     // (even if it hasn't changed)
-    szPrevFile[0] = 0;
+    DisplayedImage::clear();
 
     need_to_refresh_display = 1;
     preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
@@ -1667,10 +1667,10 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
 void load_prev_image(void)
 {
   uint8_t *buffer;
-  size_t content_size = 0; //filesystem_read_and_allocate(szPrevFile, &buffer);
+  size_t content_size = 0;
   if (content_size > 0) {
     // Decode it into the previous buffer
-    Log.info("%s [%d]: Decoding previous image (%s) into FastEPD previous buffer\r\n", __FILE__, __LINE__, szPrevFile);
+    Log.info("%s [%d]: Decoding previous image (%s) into FastEPD previous buffer\r\n", __FILE__, __LINE__, DisplayedImage::get());
     png_to_epd(buffer, content_size, true);
   }
 } /* load_prev_image() */
@@ -1731,18 +1731,18 @@ static https_request_err_e downloadAndShow()
   if (!status && result == HTTPS_SUCCESS) { // this means we already have this image stored in SPIFFS
       char szTemp[36];
 #if defined( BOARD_X_CLASS ) && !defined(BOARD_SEEED_RETERMINAL_E1003)
-      if (szPrevFile[0]) {
+      if (DisplayedImage::exists()) {
         load_prev_image(); // decode the older image into the previous buffer of FastEPD
       }
 #endif // BOARD_X_CLASS
       fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
-      if (strcmp(szTemp, szPrevFile) == 0) {
+      if (DisplayedImage::matches(szTemp)) {
         // We just displayed the same image, don't refresh the display
         Log.info("%s [%d]: The image hasn't changed since the last wakeup, don't refresh the display.\r\n", __FILE__, __LINE__);
         buffer = nullptr;
         return result;
       }
-      strcpy(szPrevFile, szTemp); // save the filename to compare on the next wakeup
+      DisplayedImage::remember(szTemp);
       Log.info("%s [%d]: Reading %s from SPIFFS\r\n", __FILE__, __LINE__, szTemp);
       size_t content_size = filesystem_read_and_allocate(szTemp, &buffer);
       if (!buffer || content_size == 0) {
@@ -1754,7 +1754,7 @@ static https_request_err_e downloadAndShow()
       display_show_image(buffer, content_size, true);
       free(buffer);
       buffer = nullptr;
-      strcpy(szPrevFile, szTemp); // current image becomes the previous image
+      DisplayedImage::remember(szTemp); // current image becomes the previous image
       // Rotate NVS path keys: last ← current ← szTemp
       String _curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
       String _lastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
