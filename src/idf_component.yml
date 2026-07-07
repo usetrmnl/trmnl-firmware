@@ -23,6 +23,10 @@ dependencies:
     version: "==2.4.4"
     rules:
       - if: "target == esp32s3"
+  espressif/dl_fft:
+    version: "==0.4.0"
+    rules:
+      - if: "target == esp32s3"
   espressif/libsodium:
     version: "==1.0.22"
     rules:

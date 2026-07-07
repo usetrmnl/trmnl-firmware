@@ -262,11 +262,6 @@ pio pkg install -e trmnl_4clr    # TRMNL BWRY
 
 If you skip this step, the build may fail with `Error: Missing Arduino framework directory 'None'`.
 
-IDF component versions for TRMNL X (`esp32s3`) and OG (`esp32c3`) are tracked in `scripts/ci/lockfiles/`. CI verifies these on every build. After changing IDF component dependencies, regenerate them with:
-
-```bash
-./scripts/ci/update_idf_locks.sh
-```
 
 ### **Using VSCode plugin**
 

@@ -42,7 +42,7 @@ dependencies:
       require: private
       version: '>=5.0'
     source:
-      registry_url: https://components.espressif.com
+      registry_url: https://components.espressif.com/
       type: service
     version: 0.4.0
   espressif/esp-dsp:
@@ -394,6 +394,7 @@ dependencies:
 direct_dependencies:
 - chmorgan/esp-libhelix-mp3
 - espressif/cbor
+- espressif/dl_fft
 - espressif/esp-dsp
 - espressif/esp-modbus
 - espressif/esp-sr
@@ -414,6 +415,6 @@ direct_dependencies:
 - espressif/usb_host_cp210x_vcp
 - idf
 - joltwallet/littlefs
-manifest_hash: 8b9d532708841b19b5c603bc25aab51c1bf4b36efd6b36f39dbd4a08c35e47e9
+manifest_hash: 4547f754dacaa852dfde4d11869ba301405f180f2902c988379fe33c26f66f1d
 target: esp32s3
-version: 2.0.0
+version: 3.0.0

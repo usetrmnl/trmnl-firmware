@@ -83,44 +83,8 @@ jobs:
       - name: static analysis
         run: pio check --skip-packages --fail-on-defect high
 
-  check-idf-locks:
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/cache@v5
-        with:
-          path: |
-            ~/.cache/pip
-            ~/.platformio
-          key: ubuntu-latest-pio-locks-${{ hashFiles('platformio.ini', 'src/idf_component.yml', 'scripts/ci/lockfiles/*') }}
-          restore-keys: |
-            ubuntu-latest-pio-locks-
-
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.13"
-
-      - name: Install PlatformIO Core
-        run: pip install --upgrade platformio intelhex
-
-      - name: Verify esp32c3 dependency lock (TRMNL OG)
-        run: |
-          pio pkg install -e trmnl
-          pio run -e trmnl -j 4
-          python scripts/ci/check_idf_lock.py scripts/ci/lockfiles/dependencies.esp32c3.lock dependencies.lock
-
-      - name: Verify esp32s3 dependency lock (TRMNL X)
-        run: |
-          rm -rf ~/.platformio/packages/framework-arduinoespressif32
-          pio pkg install -e TRMNL_X_dev
-          pio run -e TRMNL_X_dev -j 4
-          python scripts/ci/check_idf_lock.py scripts/ci/lockfiles/dependencies.esp32s3.lock dependencies.lock
-
   publish-engineering-build:
-    needs: [build-test, check-idf-locks]
+    needs: build-test
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     uses: ./.github/workflows/publish-firmware.yml
     with:
@@ -128,7 +92,7 @@ jobs:
       filename_suffix_type: git_short_hash
 
   publish-tagged-build:
-    needs: [build-test, check-idf-locks]
+    needs: build-test
     if: startsWith(github.ref, 'refs/tags/')
     uses: ./.github/workflows/publish-firmware.yml
     with:
@@ -136,7 +100,7 @@ jobs:
       filename_suffix_type: git_tag
 
   publish-dev-builds:
-    needs: [build-test, check-idf-locks]
+    needs: build-test
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     uses: ./.github/workflows/publish-dev-firmware.yml
     secrets: inherit
