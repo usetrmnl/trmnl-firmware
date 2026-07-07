@@ -7,6 +7,7 @@
 #include <preferences_persistence.h>
 #include "DEV_Config.h"
 #include "battery_small.h"
+#include "messages.h"
 #define MAX_BIT_DEPTH 8
 #ifndef BOARD_X_CLASS
 #define BB_EPAPER
@@ -486,6 +487,65 @@ uint16_t display_height()
 uint16_t display_width()
 {
     return bbep.width();
+}
+
+void display_draw_touchbar_indicator(touchbar_side_t side, bool filled)
+{
+    const int radius = 24;
+    const int margin_bottom = 20;
+    int w = bbep.width();
+    int h = bbep.height();
+    int x;
+    Log_info("Drawing touchbar indicator %d\n", (int)side);
+    switch (side) {
+        case TOUCHBAR_LEFT:   x = w / 6;     break;
+        case TOUCHBAR_MIDDLE: x = w / 2;     break;
+        case TOUCHBAR_RIGHT:  x = w * 5 / 6; break;
+        default: return;
+    }
+    int y = h - margin_bottom - radius;
+#ifdef BOARD_X_CLASS
+    int prev_mode = bbep.getPreviousMode();
+        const int rect_h = radius * 2;
+        const int rect_w = rect_h * 4;
+        const int border = 3;
+        int rx = x - rect_w / 2;
+        int ry = y - rect_h / 2;
+        uint8_t fill_color   = filled ? BBEP_BLACK : BBEP_WHITE;
+        uint8_t border_color = filled ? BBEP_WHITE : BBEP_BLACK;
+        if (prev_mode == BB_MODE_NONE) {
+            bbep.setMode(BB_MODE_1BPP);
+            // No previous image, so in order to get what we need in a partial update, we need to
+            // set the colors to the opposite of what we want drawn.
+            bbep.fillScreen(BBEP_WHITE);
+            bbep.drawRect(rx - border - 1, ry - border - 1, rect_w + 2 + (2*border), rect_h + 2 + (2*border), border_color);
+            bbep.fillRect(rx - border, ry - border, rect_w + (2*border), rect_h + (2*border), fill_color);
+            bbep.fillRect(rx, ry, rect_w, rect_h, border_color);
+            int sz = bbep.width() * bbep.height() / 8; // 1-bit per pixel
+            memcpy(bbep.previousBuffer(), bbep.currentBuffer(), sz);
+            bbep.setPreviousMode(BB_MODE_1BPP);
+        }
+        // Draw outline, then larger filled rect for border color and inner for fill color
+        bbep.drawRect(rx - border - 1, ry - border - 1, rect_w + 2 + (2*border), rect_h + 2 + (2*border), fill_color);
+        bbep.fillRect(rx - border, ry - border, rect_w + (2*border), rect_h + (2*border), border_color);
+        bbep.fillRect(rx, ry, rect_w, rect_h, fill_color);
+        bbep.partialUpdate(false);
+#else
+    {
+        const int rect_h = radius * 2;
+        const int rect_w = rect_h * 4;
+        const int border = 3;
+        int rx = x - rect_w / 2;
+        int ry = y - rect_h / 2;
+        uint8_t fill_color   = filled ? BBEP_BLACK : BBEP_WHITE;
+        uint8_t border_color = filled ? BBEP_WHITE : BBEP_BLACK;
+        bbep.fillRect(rx, ry, rect_w, rect_h, fill_color);
+        for (int b = 0; b < border; b++) {
+            bbep.drawRect(rx + b, ry + b, rect_w - b * 2, rect_h - b * 2, border_color);
+        }
+    }
+    bbep.refresh(REFRESH_PARTIAL, true);
+#endif
 }
 
 /**
@@ -1927,7 +1987,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
     case WIFI_FAILED:
     {
         String string0 = "TRMNL firmware ";
-        string0 += FW_VERSION_STRING;
+        string0 += Messages::firmware_version();
 #ifdef __BB_EPAPER__
         bbep.setCursor(40, 48); // place in upper left corner
 #else
@@ -2495,7 +2555,9 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         string1 += fw_version;
         bbep.setCursor(40, 48); // place in upper left corner
         bbep.println(string1);
-        const char string2[] = "Connect your phone or computer to the TRMNL WiFi";
+        String string2 = "Connect your phone or computer to ";
+        string2 += (message.length() > 0) ? "'" + message + "'" : String("the TRMNL");
+        string2 += " Wi-Fi";
         bbep.getStringBox(string2, &rect);
 #ifdef __BB_EPAPER__
         bbep.setCursor((bbep.width() - rect.w) / 2, 386);

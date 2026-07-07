@@ -23,6 +23,15 @@ void WifiCaptive::setUpDNSServer(DNSServer &dnsServer, const IPAddress &localIP)
     dnsServer.start(53, "*", localIP);
 }
 
+String WifiCaptive::getAPSSID()
+{
+    uint64_t mac = ESP.getEfuseMac();
+    char macSuffix[7];
+    snprintf(macSuffix, sizeof(macSuffix), "%02X%02X%02X",
+        (uint8_t)(mac >> 24), (uint8_t)(mac >> 32), (uint8_t)(mac >> 40));
+    return String(WIFI_SSID) + "-" + String(macSuffix);
+}
+
 bool WifiCaptive::startPortal()
 {
     _dnsServer = new DNSServer();
@@ -43,11 +52,7 @@ bool WifiCaptive::startPortal()
     WiFi.softAPConfig(localIP, gatewayIP, subnetMask);
     delay(50);
 
-    uint64_t mac = ESP.getEfuseMac();
-    char macSuffix[7];
-    snprintf(macSuffix, sizeof(macSuffix), "%02X%02X%02X",
-        (uint8_t)(mac >> 24), (uint8_t)(mac >> 32), (uint8_t)(mac >> 40));
-    String SSID = String(WIFI_SSID) + "-" + String(macSuffix);
+    String SSID = getAPSSID();
 
     // Start the soft access point with the given ssid, password, channel, max number of clients
     WiFi.softAP(SSID.c_str(), WIFI_PASSWORD, WIFI_CHANNEL, 0, MAX_CLIENTS);
@@ -273,7 +278,6 @@ void WifiCaptive::resetSettings()
 
     Preferences preferences;
     preferences.begin("wificaptive", false);
-    preferences.remove("api_url");
     preferences.remove(WIFI_LAST_INDEX);
     for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
     {
@@ -487,12 +491,23 @@ int WifiCaptive::readLastUsedWifiIndex()
 
 void WifiCaptive::saveApiServer(String url)
 {
-    // if not URL is provided, don't save a preference and fall back to API_BASE_URL in config.h
-    if (url == "")
-        return;
     Preferences preferences;
     preferences.begin("data", false);
-    preferences.putString("api_url", url);
+
+    String currentUrl = preferences.getString("api_url", "");
+    if (currentUrl != url)
+    {
+        Log_info("API server changed, clearing cached credentials to force re-pairing");
+        preferences.remove("api_key");
+        preferences.remove("friendly_id");
+    }
+
+    if (url == "") {
+        preferences.remove("api_url"); // falls back to API_BASE_URL
+    } else {
+        preferences.putString("api_url", url);
+    }
+
     preferences.end();
 }
 
