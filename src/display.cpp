@@ -7,6 +7,7 @@
 #include <preferences_persistence.h>
 #include "DEV_Config.h"
 #include "battery_small.h"
+#include "messages.h"
 #define MAX_BIT_DEPTH 8
 #ifndef BOARD_X_CLASS
 #define BB_EPAPER
@@ -99,11 +100,7 @@ extern char filename[];
 extern Preferences preferences;
 extern ApiDisplayResult apiDisplayResult;
 uint32_t iTempProfile;
-static int i426Workaround = 0;
 static uint8_t *pDither;
-
-// Runtime control for light sleep (true = enabled, false = disabled)
-static bool g_light_sleep_enabled = true;
 
 /**
  * @brief Function to init the display
@@ -440,7 +437,9 @@ void display_sleep(uint32_t u32Millis)
 #ifdef DO_NOT_LIGHT_SLEEP
     delay(u32Millis);
 #else
-    if (!g_light_sleep_enabled) {
+    // Runtime control for light sleep (true = enabled, false = disabled)
+    static bool light_sleep_enabled = true;
+    if (!light_sleep_enabled) {
         delay(u32Millis);
     } else {
         esp_sleep_enable_timer_wakeup(u32Millis * 1000L);
@@ -1589,6 +1588,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     auto height = display_height();
 //    uint32_t *d32;
     bool bAlloc = false;
+    static int i426Workaround = 0;
 #ifdef BB_EPAPER
     int iRefreshMode = REFRESH_FULL; // assume full (slow) refresh
 #else
@@ -1924,7 +1924,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
     case WIFI_FAILED:
     {
         String string0 = "TRMNL firmware ";
-        string0 += FW_VERSION_STRING;
+        string0 += Messages::firmware_version();
 #ifdef __BB_EPAPER__
         bbep.setCursor(40, 48); // place in upper left corner
 #else
@@ -2492,7 +2492,9 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         string1 += fw_version;
         bbep.setCursor(40, 48); // place in upper left corner
         bbep.println(string1);
-        const char string2[] = "Connect your phone or computer to the TRMNL WiFi";
+        String string2 = "Connect your phone or computer to ";
+        string2 += (message.length() > 0) ? "'" + message + "'" : String("the TRMNL");
+        string2 += " Wi-Fi";
         bbep.getStringBox(string2, &rect);
 #ifdef __BB_EPAPER__
         bbep.setCursor((bbep.width() - rect.w) / 2, 386);

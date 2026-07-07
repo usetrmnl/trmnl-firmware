@@ -12,7 +12,7 @@
 struct WifiOperationCallbacks
 {
     std::function<void()> resetSettings;
-    std::function<void(const WifiCredentials, const String)> setConnectionCredentials;
+    std::function<void(const WifiCredentials, const String, const String)> setConnectionCredentials;
     std::function<std::vector<WifiNetwork>(bool)> getAnnotatedNetworks;
     /// Returns true when the network list is ready to serve (external list populated or WiFi scan complete).
     std::function<bool()> isNetworkListReady;
