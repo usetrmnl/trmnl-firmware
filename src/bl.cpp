@@ -1865,7 +1865,7 @@ static https_request_err_e downloadAndShow()
           }
 
           // HTTP header has been send and Server response header has been handled
-          Log.error("%s [%d]: [HTTPS] GET... code: %d\r\n", __FILE__, __LINE__, httpCode);
+          Log.info("%s [%d]: [HTTPS] GET... code: %d\r\n", __FILE__, __LINE__, httpCode);
           Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
           // file found at server
           if (httpCode != HTTP_CODE_OK && httpCode != HTTP_CODE_MOVED_PERMANENTLY)
@@ -2933,7 +2933,7 @@ static void downloadSetupImage()
     }
 
     // HTTP header has been send and Server response header has been handled
-    Log.error("%s [%d]: [HTTPS] GET... code: %d\r\n", __FILE__, __LINE__, httpCode);
+    Log.info("%s [%d]: [HTTPS] GET... code: %d\r\n", __FILE__, __LINE__, httpCode);
     
     // file found at server
     if (httpCode != HTTP_CODE_OK && httpCode != HTTP_CODE_MOVED_PERMANENTLY)
@@ -3067,14 +3067,14 @@ static void getDeviceCredentials()
 static void resetDeviceCredentials(void)
 {
   Log.info("%s [%d]: The device will be reset now...\r\n", __FILE__, __LINE__);
-  Log.info("%s [%d]: WiFi reseting...\r\n", __FILE__, __LINE__);
+  Log.info("%s [%d]: WiFi resetting...\r\n", __FILE__, __LINE__);
   WifiCaptivePortal.resetSettings();
   need_to_refresh_display = 1;
   bool res = preferences.clear();
   if (res)
     Log.info("%s [%d]: The device reset success. Restarting...\r\n", __FILE__, __LINE__);
   else
-    Log.error("%s [%d]: The device reseting error. The device will be reset now...\r\n", __FILE__, __LINE__);
+    Log.error("%s [%d]: The device resetting error. The device will be reset now...\r\n", __FILE__, __LINE__);
   preferences.end();
   ESP.restart();
 }
