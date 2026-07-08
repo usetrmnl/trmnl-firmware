@@ -383,6 +383,7 @@ static void showLastImageAndSleep()
     if (buf && file_size > 0) {
       display_show_image(buf, file_size, true);
       free(buf);
+      DisplayedImage::remember(curPath.c_str());
     }
   }
   goToSleep();
@@ -488,7 +489,11 @@ static void show_cached_image_by_offset(int offset) {
     if (path.isEmpty()) { Log_info("No cached image for gesture"); return; }
     int file_size = 0;
     buffer = display_read_file(path.c_str(), &file_size);
-    if (buffer && file_size > 0) { display_show_image(buffer, file_size, true); goToSleep(); }
+    if (buffer && file_size > 0) {
+      display_show_image(buffer, file_size, true);
+      DisplayedImage::remember(path.c_str());
+      goToSleep();
+    }
     return;
   }
 
@@ -531,6 +536,7 @@ static void show_cached_image_by_offset(int offset) {
 
   preferences.putString(PREFERENCES_BROWSE_PATH_KEY, String(images[new_idx]));
   display_show_image(buffer, file_size, true);
+  DisplayedImage::remember(images[new_idx]);
   goToSleep();
 }
 
@@ -1807,6 +1813,7 @@ static https_request_err_e downloadAndShow()
 
     display_show_image(buf, fileSize, true);
     free(buf);
+    DisplayedImage::remember(szTemp); // current image becomes the previous image
 
     preferences.putString(PREFERENCES_CURRENT_PATH_KEY, String(szTemp));
     update_playlist_order(szTemp, _prevPath.c_str());
@@ -2014,6 +2021,7 @@ static https_request_err_e downloadAndShow()
             writeImageToFile(szTemp, buffer, content_size);
             Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
             display_show_image(buffer, content_size, true);
+            DisplayedImage::remember(szTemp); // current image becomes the previous image
             if (buffer_malloc) {
               Log.info("%s [%d]: Freeing the image buffer we allocated\r\n", __FILE__, __LINE__);
               free(buffer);
@@ -2093,6 +2101,11 @@ static https_request_err_e downloadAndShow()
             }
             Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
             display_show_image(buffer, content_size, true);
+            {
+              char szTemp[36];
+              fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
+              DisplayedImage::remember(szTemp);
+            }
             
             if (buffer_malloc) {
               Log.info("%s [%d]: Freeing the image buffer we allocated\r\n", __FILE__, __LINE__);
