@@ -1179,16 +1179,18 @@ int png_draw(PNGDRAW *pDraw)
 static void Expand2bppLineTo4bpp(const uint8_t *src, uint8_t *dest, int width)
 {
     uint8_t b;
-    uint16_t u16=0, *d16 = (uint16_t *)dest;
+    uint16_t u16;
 
     for (int x = 0; x < width; x+=4) {
+        u16 = 0;
         b = *src++;
         for (int j=0; j<4; j++) {
             u16 <<= 4;
             u16 |= (((b >> 6) & 3) * 5);
             b <<= 2;
         } // for j
-        *d16++ = u16;
+      *dest++ = (uint8_t)(u16 >> 8);
+      *dest++ = (uint8_t)(u16 & 0xff);
     } // for x
 } /* Expand2bppLineTo4bpp() */
 
