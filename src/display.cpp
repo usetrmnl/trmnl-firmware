@@ -7,7 +7,9 @@
 #include <preferences_persistence.h>
 #include "DEV_Config.h"
 #include "battery_small.h"
+#include "battery_hollow.h"
 #include "messages.h"
+#include "config.h"
 #define MAX_BIT_DEPTH 8
 #ifndef BOARD_X_CLASS
 #define BB_EPAPER
@@ -82,6 +84,8 @@ const uint8_t u8_graytable[] = {
 /* 14 */  0, 1, 1, 1, 2, 2, 2, 2, 2, 
 /* 15 */  0, 0, 0, 0, 0, 0, 0, 0, 2
 };
+#include "BQ27427.h"
+extern BQ27427 lipo; // Use lipo.[] to interact with the library in an Arduino 
 #endif
 // Counts the number of partial updates to know when to do a full update
 RTC_DATA_ATTR int iUpdateCount = 0;
@@ -1720,9 +1724,25 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
             }
             bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
 #ifdef BOARD_TRMNL_X
+#define SENSOR_SDA_PIN 39
+#define SENSOR_SCL_PIN 40
             // Show charging indicator if the USB power is connected (whether actually charging or not)
             if (get_usb_status() == UsbStatus::CONNECTED) {
+                Log_info("Displaying 'battery is charging' icon");
                 bbep.loadG5Image(battery_small, 40, bbep.height() - 120, BBEP_WHITE, BBEP_BLACK);
+            } else { // show battery level
+                y = bbep.height() - 120;
+                bbep.loadG5Image(battery_hollow, 40, y, BBEP_WHITE, BBEP_BLACK);
+                Log_info("Displaying 'battery charge level' icon");
+                if (lipo.begin(SENSOR_SDA_PIN, SENSOR_SCL_PIN)) { // only report SoC if battery was detected and BQ27427 initialized successfully
+                    int batt_percent = lipo.soc();
+                    if (batt_percent >= 97) batt_percent = 100; // can sometimes report 98% when full
+                    // Draw a black rectangle to represent the battery charge level
+                    bbep.fillRect(40+10, y+18, (97 * batt_percent)/100, 39, BBEP_BLACK);
+                } else {
+                    bbep.drawLine(40+10, y+18, 10+97, y+18+39, BBEP_BLACK);
+                    bbep.drawLine(40+10+97, y+18, 10, y+18+39, BBEP_BLACK);
+                }
             }
 #endif // BOARD_TRMNL_X
         }
