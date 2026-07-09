@@ -12,7 +12,7 @@ extern Modem *g_modem;
 #endif // BOARD_TRMNL_X
 
 namespace {
-constexpr unsigned long WIFI_RECONNECT_TIMEOUT_MS = 10000;
+  constexpr unsigned long WIFI_RECONNECT_TIMEOUT_MS = 10000;
 }
 
 WiFiStatus getWiFiStatus(void) {

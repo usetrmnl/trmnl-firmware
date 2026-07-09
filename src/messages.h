@@ -2,5 +2,5 @@
 #include <Arduino.h>
 
 namespace Messages {
-String firmware_version();
+  String firmware_version();
 }

@@ -1,6 +1,7 @@
 BasedOnStyle: LLVM
 IndentWidth: 2
 ContinuationIndentWidth: 2
+NamespaceIndentation: All
 UseTab: Never
 ColumnLimit: 120
 AllowShortIfStatementsOnASingleLine: WithoutElse
