@@ -221,13 +221,13 @@ bool startQA() {
     Log.info("QA Test started\n");
 
     float initial_temp = measureTemperatureAverage();/*
-         if (initial_temp > temperature_threshold){
-           return false;
-         }*/
+          if (initial_temp > temperature_threshold){
+            return false;
+          }*/
     float initial_voltage = measureVoltageAverage();
   /*if (initial_voltage > temperature_threshold){
-              return false;
-            }*/
+                return false;
+              }*/
 
     Log.info("Stress test started\n");
     startRadioRX();
@@ -311,13 +311,13 @@ bool startQA() {
     Log.info("QA Test started\n");
 
     float initial_temp = measureTemperatureAverage();/*
-         if (initial_temp > temperature_threshold){
-           return false;
-         }*/
+          if (initial_temp > temperature_threshold){
+            return false;
+          }*/
     float initial_voltage = measureVoltageAverage();
   /*if (initial_voltage > temperature_threshold){
-              return false;
-            }*/
+                return false;
+              }*/
 
     Log.info("Stress test started\n");
     startRadioRX();

@@ -95,9 +95,9 @@ void display_show_battery(float f);
 void display_reset(void);
 
 typedef enum {
-    TOUCHBAR_LEFT,
-    TOUCHBAR_MIDDLE,
-    TOUCHBAR_RIGHT,
+  TOUCHBAR_LEFT,
+  TOUCHBAR_MIDDLE,
+  TOUCHBAR_RIGHT,
 } touchbar_side_t;
 
 /**
