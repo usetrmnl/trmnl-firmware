@@ -175,10 +175,6 @@ static touchbar_side_t pending_indicator_side = TOUCHBAR_LEFT;
 static bool pending_indicator_filled = false;
 static bool has_pending_indicator = false;
 
-#define SENSOR_SDA_PIN 39
-#define SENSOR_SCL_PIN 40
-#define SENSOR_READY_PIN GPIO_NUM_3
-
 // WiFi reset confirmation constants
 #define WIFI_RESET_CONFIRMATION_TIMEOUT_MS 15000
 #define WIFI_RESET_POLL_INTERVAL_MS 100
@@ -1120,14 +1116,14 @@ void bl_init(void)
 
   if (battery_count != BATTERY_NONE) {
     bool bBQ27Alive = false;
-    if (!lipo.begin(SENSOR_SDA_PIN, SENSOR_SCL_PIN)) {
+    if (!lipo.begin(PIN_INTERNAL_SDA, PIN_INTERNAL_SCL)) {
       BQ27427_reset(); // try resetting the chip
       delay(300); // BQ27427 needs 250 ms to power up
-      if (!lipo.begin(SENSOR_SDA_PIN, SENSOR_SCL_PIN)) { // try again
+      if (!lipo.begin(PIN_INTERNAL_SDA, PIN_INTERNAL_SCL)) { // try again
       // If communication fails, print an error message and loop forever.
         Log_error("Error: Unable to communicate with BQ27427.");
-        gpio_dump_io_configuration(stdout, (1ULL << 39));
-        gpio_dump_io_configuration(stdout, (1ULL << 40));
+        gpio_dump_io_configuration(stdout, (1ULL << PIN_INTERNAL_SDA));
+        gpio_dump_io_configuration(stdout, (1ULL << PIN_INTERNAL_SCL));
       } else {
         bBQ27Alive = true;
       }
