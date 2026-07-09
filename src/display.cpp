@@ -15,13 +15,13 @@
 #include <SPIFFS.h>
 #define FS SPIFFS
 const DISPLAY_PROFILE dpList[4] = { // 1-bit and 2-bit display types for each profile
-#if defined ( BOARD_XTEINK_X4 ) || defined ( MINI_EPD )
+#ifdef MINI_EPD
     {EP426_800x480, EP426_800x480_4GRAY}, // default (for original EPD)
     {EP426_800x480, EP426_800x480_4GRAY}, // a = uses built-in fast + 4-gray
     {EP426_800x480, EP426_800x480_4GRAY}, // b = darker grays
 };
 BBEPAPER bbep(EP426_800x480);
-#elif defined(BOARD_WAVESHARE_397)
+#elif defined(MINI_EPD2)
     {EP397_800x480, EP397_800x480_4GRAY}, // default (for original EPD)
     {EP397_800x480, EP397_800x480_4GRAY}, // a = uses built-in fast + 4-gray
     {EP397_800x480, EP397_800x480_4GRAY}, // b = darker grays
@@ -113,6 +113,10 @@ void display_init(void)
     iTempProfile = preferences.getUInt(PREFERENCES_TEMP_PROFILE, TEMP_PROFILE_DEFAULT);
     Log_info("Saved temperature profile: %d", iTempProfile);
 #ifdef BB_EPAPER
+#ifdef BOARD_SEEED_STICKY
+    pinMode(47, OUTPUT); // enable EPD power
+    digitalWrite(47, 1);
+#endif
     bbep.setPanelType(dpList[iTempProfile].OneBit); // must be set BEFORE calling initio
     Log_info("BB e-Paper init");
     bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
@@ -1604,6 +1608,10 @@ PNG *png = new PNG();
                 } // temp profile needs the second plane written
             } else { // 2-bpp (or greater, but reduced to 2-bpp)
                 bbep.setPanelType(dpList[iTempProfile].TwoBit);
+#if defined( MINI_EPD ) || defined (MINI_EPD2)
+                Log_info("2-bit 4.26 re-init");
+                bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
+#endif
                 rc = REFRESH_FULL; // 4gray mode must be full refresh
                 iUpdateCount = 0; // grayscale mode resets the partial update counter
                 bbep.startWrite(PLANE_0); // start writing image data to plane 0
@@ -1683,12 +1691,10 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     }
 #endif
 #ifdef BB_EPAPER
-    if (i426Workaround) {
-        // After a partial update, the 4.26" 800x480 needs to be 'reset' to accept writes
-        // This is only needed if the user pressed the WAKE button and there will be 2 updates
-        // while the power is on
+#if defined( MINI_EPD ) || defined (MINI_EPD2)
+        Log_info("4.26 1-bit re-init");
         bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
-    }
+#endif // MINI_EPD
 #endif // BB_EPAPER
     if (isPNG == true && data_size < MAX_IMAGE_SIZE)
     {
@@ -1735,7 +1741,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
 #endif
         }
 #ifdef BB_EPAPER
-#if defined( BOARD_XTEINK_X4 ) || defined( MINI_EPD )
+#if defined( MINI_EPD ) || defined (MINI_EPD2)
         bbep.writePlane(PLANE_FALSE_DIFF);
 #else
         bbep.writePlane(); // send image data to the EPD
@@ -1761,7 +1767,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
         Log_info("%s [%d]: Forcing fast refresh (not partial) since the TRMNL refresh_rate is set to > 30 min\n", __FILE__, __LINE__);
         iRefreshMode = REFRESH_FAST;
     }
-    if (bbep.capabilities() & (BBEP_4COLOR | BBEP_3COLOR | BBEP_7COLOR)) bWait = 1;
+    if (bbep.capabilities() & (BBEP_4GRAY | BBEP_4COLOR | BBEP_3COLOR | BBEP_7COLOR)) bWait = 1;
     if (!bWait) iRefreshMode = REFRESH_PARTIAL; // fast update when showing loading screen
     Log_info("%s [%d]: EPD refresh mode: %d\r\n", __FILE__, __LINE__, iRefreshMode);
 #ifdef DO_NOT_LIGHT_SLEEP
@@ -1770,9 +1776,6 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     bbep.setLightSleep(true);
 #endif
     bbep.refresh(iRefreshMode, bWait);
-    if ((bbep.getPanelType() == EP426_800x480 || bbep.getPanelType() == EP397_800x480) && iRefreshMode == REFRESH_PARTIAL) {
-        i426Workaround = 1; // need to re-initialize the controller for another update before sleeping
-    }
     if (bAlloc) {
         bbep.freeBuffer();
     }
