@@ -420,8 +420,6 @@
       server = server.trim();
       server = server.replace(/\/+$/, '');
 
-      saveServerToStorage();
-
       var body = {
         ssid: ssid,
         pswd: pswd,
@@ -485,7 +483,6 @@
     function showCustomServerInput() {
       document.getElementById('custom_server_form_group').style.display = 'flex';
       closeCustomServerModal();
-      loadServerFromStorage();
     }
 
     function closeCustomServerModal() {
@@ -664,25 +661,24 @@
         });
     }
 
-    function loadServerFromStorage() {
-      const savedServer = localStorage.getItem('customServer');
-      if (savedServer) {
-        document.getElementById('server').value = savedServer;
+    async function loadServerFromDevice() {
+      // pull value from advanced.html, if present
+      let server = localStorage.getItem('customServer');
+      localStorage.removeItem('customServer');
+      if (!server) {
+        try {
+          const response = await fetch('/device-settings');
+          server = (await response.json()).api_url;
+        } catch (_) { }
+      }
+      if (server) {
+        document.getElementById('server').value = server;
         document.getElementById('custom_server_form_group').style.display = 'flex';
       }
     }
 
-    function saveServerToStorage() {
-      const serverValue = document.getElementById('server').value;
-      if (serverValue) {
-        localStorage.setItem('customServer', serverValue);
-      } else {
-        localStorage.removeItem('customServer');
-      }
-    }
-
     setTimeout(getInfo, 500);
-    setTimeout(loadServerFromStorage, 100);
+    setTimeout(loadServerFromDevice, 100);
   </script>
 </head>
 
