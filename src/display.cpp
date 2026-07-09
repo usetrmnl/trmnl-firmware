@@ -1724,8 +1724,6 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
             }
             bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
 #ifdef BOARD_TRMNL_X
-#define SENSOR_SDA_PIN 39
-#define SENSOR_SCL_PIN 40
             // Show charging indicator if the USB power is connected (whether actually charging or not)
             if (get_usb_status() == UsbStatus::CONNECTED) {
                 Log_info("Displaying 'battery is charging' icon");
@@ -1734,7 +1732,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
                 y = bbep.height() - 120;
                 bbep.loadG5Image(battery_hollow, 40, y, BBEP_WHITE, BBEP_BLACK);
                 Log_info("Displaying 'battery charge level' icon");
-                if (lipo.begin(SENSOR_SDA_PIN, SENSOR_SCL_PIN)) { // only report SoC if battery was detected and BQ27427 initialized successfully
+                if (lipo.begin(PIN_INTERNAL_SDA, PIN_INTERNAL_SCL)) { // only report SoC if battery was detected and BQ27427 initialized successfully
                     int batt_percent = lipo.soc();
                     if (batt_percent >= 97) batt_percent = 100; // can sometimes report 98% when full
                     // Draw a black rectangle to represent the battery charge level
