@@ -1240,17 +1240,35 @@ void bl_init(void)
   // Only scan when no credentials are saved (i.e. captive portal will be shown). 
   if (g_modem && !WifiCaptivePortal.isSaved())
   {
+    // The modem is a separate radio and can see the device's own captive-portal
+    // SoftAP over the air; exclude it so it never shows up as a connectable network.
+    String ownApSsid = WifiCaptivePortal.getAPSSID();
+
     Log_info("No saved credentials — scanning networks via modem...");
     auto modemNets = g_modem->scanNetworks();
     Log_info("Modem found %d network(s)", modemNets.size());
     std::vector<ExternalNetwork> nets;
-    for (auto& n : modemNets)
+    for (auto& n : modemNets) {
+      if (n.ssid == ownApSsid) continue;
       nets.push_back({n.ssid, n.rssi, n.open, n.is5GHz});
+    }
     WifiCaptivePortal.setNetworks(nets);
 
     // Register callback so captive portal can connect 5 GHz networks via modem
     WifiCaptivePortal.setModemConnectCallback([](const String& ssid, const String& pass) {
       return g_modem->connectToNetwork(ssid, pass);
+    });
+
+    // Register callback so the captive portal's Refresh button can trigger a fresh modem scan
+    WifiCaptivePortal.setModemScanCallback([ownApSsid]() {
+      auto modemNets = g_modem->scanNetworks();
+      Log_info("Modem re-scan found %d network(s)", modemNets.size());
+      std::vector<ExternalNetwork> nets;
+      for (auto& n : modemNets) {
+        if (n.ssid == ownApSsid) continue;
+        nets.push_back({n.ssid, n.rssi, n.open, n.is5GHz});
+      }
+      return nets;
     });
 
     String modemMac = g_modem->getMacAddress();
