@@ -1684,17 +1684,8 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
             flip_image(image_buffer+62, bbep.width(), bbep.height(), false); // fix bottom-up bitmap images
 #ifdef BB_EPAPER
 #ifdef BOARD_SEEED_RETERMINAL_E1002
-            uint8_t *bitmap = image_buffer + 62;
-            if (bbep.allocBuffer() == BBEP_SUCCESS) {
-                for (int y = 0; y < bbep.height(); y++) {
-                    const uint8_t *row = bitmap + (y * ((bbep.width() + 7) / 8));
-                    for (int x = 0; x < bbep.width(); x++) {
-                        const uint8_t bit = row[x >> 3] & (0x80 >> (x & 7));
-                        bbep.drawPixel(x, y, bit ? BBEP_WHITE : BBEP_BLACK);
-                    }
-                }
+            if (spectra6_render_1bpp_bitmap(image_buffer + 62)) // uncompressed 1-bpp bitmap
                 bAlloc = true;
-            }
 #else
             bbep.setBuffer(image_buffer+62); // uncompressed 1-bpp bitmap
 #if defined( BOARD_XTEINK_X4 ) || defined( MINI_EPD )

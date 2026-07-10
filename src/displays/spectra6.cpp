@@ -159,6 +159,26 @@ static void spectra6_reset_panel()
     delay(50);
 }
 
+bool spectra6_render_1bpp_bitmap(const uint8_t *bitmap)
+{
+    // The Spectra 6 framebuffer format differs from the raw 1-bpp source, so we
+    // unpack it pixel by pixel via drawPixel rather than pointing at it directly.
+    // `bitmap` points at the pixel rows (BMP header already skipped by the caller).
+    if (bbep.allocBuffer() != BBEP_SUCCESS)
+        return false;
+
+    for (int y = 0; y < bbep.height(); y++)
+    {
+        const uint8_t *row = bitmap + (y * ((bbep.width() + 7) / 8));
+        for (int x = 0; x < bbep.width(); x++)
+        {
+            const uint8_t bit = row[x >> 3] & (0x80 >> (x & 7)); // MSB-first, set = white
+            bbep.drawPixel(x, y, bit ? BBEP_WHITE : BBEP_BLACK);
+        }
+    }
+    return true;
+}
+
 bool spectra6_update()
 {
     Log_info("spectra6_update start");
