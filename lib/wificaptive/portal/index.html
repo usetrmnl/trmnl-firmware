@@ -358,8 +358,26 @@
     }
   </style>
   <script>
-    function refresh() {
-      location.reload();
+    function setRefreshButtonState(scanning) {
+      var btn = document.getElementById('btnRefresh');
+      btn.disabled = scanning;
+      btn.textContent = scanning ? 'Rescanning...' : 'Refresh';
+    }
+
+    async function refresh() {
+      setRefreshButtonState(true);
+
+      document.getElementById('table-saved').innerHTML = '';
+      document.getElementById('table-others').innerHTML = '';
+      document.getElementById('saved-networks').style.display = 'none';
+      document.getElementById('other-networks-caption').style.display = 'none';
+
+      let scanningInfoBox = document.getElementById('scanning-info');
+      scanningInfoBox.textContent = 'Scanning networks, please wait...';
+      scanningInfoBox.style.display = 'block';
+      document.getElementById('scanning-loader').style.display = 'block';
+
+      await getInfo(true);
     }
 
     function toggleEnterpriseFields(isEnterprise) {
@@ -507,22 +525,24 @@
       }
     }
 
-    async function getInfo() {
+    async function getInfo(force) {
       let scanningInfoBox = document.getElementById('scanning-info');
       let scanningLoader = document.getElementById('scanning-loader');
-      let response = await fetch('/scan', {
+      let response = await fetch('/scan' + (force ? '?force=1' : ''), {
         method: 'GET',
       })
         .catch(_ => {
           scanningLoader.style.display = 'none';
           scanningInfoBox.textContent =
             'There was an error while scanning networks. Please refresh the page or enter your wifi name manually';
+          setRefreshButtonState(false);
         });
 
       if (response && response.status == 200) {
         var json = await response.json();
         scanningInfoBox.style.display = 'none';
         scanningLoader.style.display = 'none';
+        setRefreshButtonState(false);
 
         displayInfo(json.mac_5ghz ? `2.4GHz MAC: ${json.mac}\n5GHz MAC: ${json.mac_5ghz.toUpperCase()}` : `MAC: ${json.mac}`);
         var knownNetworks = json.networks.filter((item) => item.saved);
