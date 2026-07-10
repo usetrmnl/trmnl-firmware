@@ -59,6 +59,7 @@ private:
     AsyncWebServer *_server;
     String _ssid = "";
     String _password = "";
+    String _band = "";
     String _api_server = "";
     WifiCredentials _enterprise_credentials;
 
@@ -93,6 +94,10 @@ public:
     /// @brief Starts WiFi configuration portal.
     /// @return True if successfully connected to provided SSID, false otherwise.
     bool startPortal();
+
+    /// @brief Returns the SSID broadcast by the setup access point (e.g. "TRMNL-4D4CF0").
+    ///        Derived from the eFuse MAC, so it is stable and available before startPortal().
+    String getAPSSID();
 
     /// @brief Checks if any ssid is saved
     /// @return True if any ssis is saved, false otherwise

@@ -22,6 +22,15 @@ void WifiCaptive::setUpDNSServer(DNSServer &dnsServer, const IPAddress &localIP)
     dnsServer.start(53, "*", localIP);
 }
 
+String WifiCaptive::getAPSSID()
+{
+    uint64_t mac = ESP.getEfuseMac();
+    char macSuffix[7];
+    snprintf(macSuffix, sizeof(macSuffix), "%02X%02X%02X",
+        (uint8_t)(mac >> 24), (uint8_t)(mac >> 32), (uint8_t)(mac >> 40));
+    return String(WIFI_SSID) + "-" + String(macSuffix);
+}
+
 bool WifiCaptive::startPortal()
 {
     _dnsServer = new DNSServer();
@@ -42,11 +51,7 @@ bool WifiCaptive::startPortal()
     WiFi.softAPConfig(localIP, gatewayIP, subnetMask);
     delay(50);
 
-    uint64_t mac = ESP.getEfuseMac();
-    char macSuffix[7];
-    snprintf(macSuffix, sizeof(macSuffix), "%02X%02X%02X",
-        (uint8_t)(mac >> 24), (uint8_t)(mac >> 32), (uint8_t)(mac >> 40));
-    String SSID = String(WIFI_SSID) + "-" + String(macSuffix);
+    String SSID = getAPSSID();
 
     // Start the soft access point with the given ssid, password, channel, max number of clients
     WiFi.softAP(SSID.c_str(), WIFI_PASSWORD, WIFI_CHANNEL, 0, MAX_CLIENTS);
@@ -72,10 +77,11 @@ bool WifiCaptive::startPortal()
             {
                 _resetcallback(); // @CALLBACK
             } },
-        .setConnectionCredentials = [this](const WifiCredentials credentials, const String api_server)
+        .setConnectionCredentials = [this](const WifiCredentials credentials, const String api_server, const String band)
         {
             _ssid = credentials.ssid;
             _password = credentials.pswd;
+            _band = band;
             _api_server = api_server;
             _enterprise_credentials = credentials; },
         .getAnnotatedNetworks = [this](bool runScan)
@@ -154,14 +160,29 @@ bool WifiCaptive::startPortal()
                      credentials.useStaticIP ? "yes" : "no",
                      credentials.staticIP.c_str());
 
-            // Detect 5 GHz from the external network list
-            bool is5GHz = false;
-            for (auto& n : _networks)
-                if (n.ssid == credentials.ssid) { is5GHz = n.is5GHz; break; }
-            credentials.is5GHz = is5GHz;
+            // Honor an explicit band choice from the portal; fallback to prioritizing 5 GHz
+            if (_band == "5GHz")
+            {
+                credentials.is5GHz = true;
+            }
+            else if (_band == "2.4GHz")
+            {
+                credentials.is5GHz = false;
+            }
+            else
+            {
+                for (auto& n : _networks)
+                {
+                    if (n.ssid == credentials.ssid)
+                    {
+                        credentials.is5GHz = n.is5GHz;
+                        break;
+                    }
+                }
+            }
 
             bool res = false;
-            if (is5GHz && _modemConnectCallback)
+            if (credentials.is5GHz && _modemConnectCallback)
             {
                 res = _modemConnectCallback(credentials.ssid, credentials.pswd);
                 if (res) connected_via_modem = true;
@@ -182,6 +203,7 @@ bool WifiCaptive::startPortal()
             {
                 _ssid = "";
                 _password = "";
+                _band = "";
                 _enterprise_credentials = WifiCredentials{};
 
                 WiFi.disconnect();
@@ -255,7 +277,6 @@ void WifiCaptive::resetSettings()
 
     Preferences preferences;
     preferences.begin("wificaptive", false);
-    preferences.remove("api_url");
     preferences.remove(WIFI_LAST_INDEX);
     for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
     {
@@ -457,12 +478,23 @@ int WifiCaptive::readLastUsedWifiIndex()
 
 void WifiCaptive::saveApiServer(String url)
 {
-    // if not URL is provided, don't save a preference and fall back to API_BASE_URL in config.h
-    if (url == "")
-        return;
     Preferences preferences;
     preferences.begin("data", false);
-    preferences.putString("api_url", url);
+
+    String currentUrl = preferences.getString("api_url", "");
+    if (currentUrl != url)
+    {
+        Log_info("API server changed, clearing cached credentials to force re-pairing");
+        preferences.remove("api_key");
+        preferences.remove("friendly_id");
+    }
+
+    if (url == "") {
+        preferences.remove("api_url"); // falls back to API_BASE_URL
+    } else {
+        preferences.putString("api_url", url);
+    }
+
     preferences.end();
 }
 
