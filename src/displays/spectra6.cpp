@@ -1,6 +1,6 @@
 #include "bb_epaper.h"
 #include "config.h"
-#include "DEV_config.h"
+#include "DEV_Config.h"
 #include "driver/gpio.h"
 #include "driver/spi_master.h"
 #include "esp_err.h"
