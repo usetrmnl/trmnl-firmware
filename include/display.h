@@ -186,6 +186,11 @@ void display_show_msg_qa(uint8_t *image_buffer, const float *voltage, const floa
  */
 void display_draw_touchbar_indicator(touchbar_side_t side, bool filled);
 
+#ifdef BOARD_X_CLASS
+// T6 — cache hit: repaint only the bottom indicator strip from a cached image.
+void display_restore_indicator_strip(uint8_t *image_buffer, int data_size);
+#endif
+
 void display_set_light_sleep(uint8_t enabled);
 
 /**

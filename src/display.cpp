@@ -99,6 +99,9 @@ RTC_DATA_ATTR int iUpdateCount = 0;
 extern char filename[];
 extern Preferences preferences;
 extern ApiDisplayResult apiDisplayResult;
+extern bool middle_tap_fresh_fetch;
+extern bool g_prev_used_fast_path;
+extern void trace(const char *name); // timing checkpoints (bl.cpp), persisted across deep sleep
 uint32_t iTempProfile;
 static uint8_t *pDither;
 
@@ -1619,12 +1622,13 @@ PNG *png = new PNG();
                 png->decode(&iPlane, 0); // decode it again to get plane 1 data
             }
 #else // FastEPD
+            { uint32_t t0 = millis();
+            trace(bPrevious ? "png decode(prev) begin" : "png decode begin");
             switch (png->getBpp()) {
                 case 1:
                     bbep.setMode(BB_MODE_1BPP);
                 break;
                 case 2:
-                    // 2-bit PNGs are expanded to 4bpp in png_draw() so refresh uses u8_graytable
                     bbep.setMode(BB_MODE_4BPP);
                 break;
                 default:
@@ -1634,6 +1638,8 @@ PNG *png = new PNG();
             Log_info("%s [%d]: FastEPD graphics mode set to: %d\n", __FILE__, __LINE__, bbep.getMode());
             png->decode((void *)bPrevious, 0);
             png->close();
+            Log_info("[TIMING] png_to_epd decode: %u ms", (unsigned)(millis() - t0));
+            trace(bPrevious ? "png decode(prev) end" : "png decode end"); }
 #endif
         }
     } else {
@@ -1786,15 +1792,65 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
  //       bbep.setPasses(6,6);
  //       bbep.partialUpdate(false); // we have a previous image to diff against; use a non-flickering update
  //   } else {
+        bool is_fast_path = (middle_tap_fresh_fetch && g_prev_used_fast_path);
+        if (is_fast_path) {
+            Log_info("Using fullUpdate(CLEAR_FAST) for middle-tap fast path");
+            // T17: setPasses(2,2) was a no-op here and has been removed. This
+            // panel updates in 4bpp grayscale, whose pass count FastEPD derives
+            // from panelDef.iMatrixSize/16 (FastEPD.inl bbepFullUpdate) — it
+            // never reads iFullPasses, so setPasses only affects 1bpp modes.
+            // Measured 1758 ms @ (2,2) vs 1764 ms @ (3,3): identical. The tap
+            // win here is forcing CLEAR_FAST (skips the periodic CLEAR_SLOW),
+            // not the pass count.
+            { uint32_t t0 = millis();
+            trace("fullUpdate(FAST) begin");
+            bbep.fullUpdate(CLEAR_FAST, false);
+            trace("fullUpdate(FAST) end");
+            Log_info("[TIMING] bbep.fullUpdate(CLEAR_FAST): %u ms", (unsigned)(millis() - t0)); }
+        } else {
         int iClearMode = ((iUpdateCount & 7) == 0 || (iTempProfile > 0)) ? CLEAR_SLOW : CLEAR_FAST;
-        Log_info("fullUpdate clear mode = %d\n", iClearMode); 
+        Log_info("fullUpdate clear mode = %d\n", iClearMode);
+        { uint32_t t0 = millis();
+        trace("fullUpdate begin");
         bbep.fullUpdate(iClearMode, false);
+        trace("fullUpdate end");
+        Log_info("[TIMING] bbep.fullUpdate: %u ms", (unsigned)(millis() - t0)); }
+        }
  //   }
  }
 #endif
     iUpdateCount++;
     Log_info("display_show_image end");
 }
+#ifdef BOARD_X_CLASS
+// T6 — cache hit: the panel image is unchanged; only the touchbar indicator
+// (drawn over it for tap feedback) needs to be wiped. Decode the cached image
+// into the framebuffer and drive ONLY the bottom strip via a rect fullUpdate,
+// not all ~1404 rows — ~0.3 s vs ~1.8 s. FastEPD only.
+// ponytail: fixed 160-row strip; the indicator sits ~72 px off the bottom.
+// Bump INDICATOR_STRIP_ROWS if a future indicator grows taller.
+void display_restore_indicator_strip(uint8_t *image_buffer, int data_size)
+{
+    bool isPNG = data_size >= 4 && MOTOLONG(image_buffer) == (int32_t)0x89504e47;
+    if (!isPNG) {
+        // Uncommon (non-PNG cache): fall back to a normal full refresh.
+        display_show_image(image_buffer, data_size, true);
+        return;
+    }
+    bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
+    png_to_epd(image_buffer, data_size, false); // fill framebuffer, no refresh
+    const int INDICATOR_STRIP_ROWS = 160;
+    int h = display_height();
+    int w = display_width();
+    BB_RECT rect = { 0, h - INDICATOR_STRIP_ROWS, w, INDICATOR_STRIP_ROWS };
+    Log_info("Restoring indicator strip: y=%d h=%d", rect.y, rect.h);
+    { uint32_t t0 = millis();
+    trace("strip restore begin");
+    bbep.fullUpdate(CLEAR_FAST, false, &rect);
+    trace("strip restore end");
+    Log_info("[TIMING] strip restore: %u ms", (unsigned)(millis() - t0)); }
+}
+#endif // BOARD_X_CLASS
 /**
  * @brief Function to read an image from the file system
  * @param filename

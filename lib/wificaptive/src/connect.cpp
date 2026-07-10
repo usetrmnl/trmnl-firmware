@@ -12,6 +12,16 @@
 #include <vector>
 #include <Preferences.h>
 
+extern void trace(const char *name); // timing checkpoints (bl.cpp), persisted across deep sleep
+
+// T1 — fast-connect cache: after any successful connect we remember the AP's
+// channel + BSSID (keyed by SSID) so an interactive tap can skip the ~1-2 s
+// WIFI_ALL_CHANNEL_SCAN and associate directly. Stored in the same
+// "wificaptive" NVS namespace as the saved creds. Invalidated on first failure
+// (router rebooted / AP moved channel) → one slow tap, then fast again.
+#define FC_NS "wificaptive"
+#define FAST_CONNECT_TIMEOUT 3000 // ms; fall back to full autoConnect after this
+
 String getDeviceHostname() {
     Preferences prefs;
     prefs.begin("data", true);
@@ -146,16 +156,163 @@ void disableWpa2Enterprise()
     esp_wifi_sta_wpa2_ent_clear_ca_cert();
 }
 
+// T2 — DHCP lease cache. Stored in the SAME single fast-connect entry, so it is
+// implicitly keyed by fc_bssid (we only ever keep the last AP we joined). Set
+// true when a cached lease was applied this wake, so the fetch path can detect
+// a stale lease (associated but can't route) and re-run DHCP.
+bool g_fast_lease_applied = false;
+
+void saveFastConnectCache(const String &ssid)
+{
+    if (WiFi.status() != WL_CONNECTED) return;
+    uint8_t *bssid = WiFi.BSSID();
+    if (!bssid) return;
+    Preferences p;
+    if (!p.begin(FC_NS, false)) return;
+    p.putString("fc_ssid", ssid);
+    p.putBytes("fc_bssid", bssid, 6);
+    p.putUChar("fc_ch", (uint8_t)WiFi.channel());
+    // T2: remember the current IP config so the next tap can skip DHCP.
+    p.putUInt("fc_ip", (uint32_t)WiFi.localIP());
+    p.putUInt("fc_gw", (uint32_t)WiFi.gatewayIP());
+    p.putUInt("fc_mask", (uint32_t)WiFi.subnetMask());
+    p.putUInt("fc_dns", (uint32_t)WiFi.dnsIP(0));
+    p.end();
+}
+
+static bool loadFastConnectCache(const String &ssid, uint8_t bssid[6], uint8_t *channel)
+{
+    Preferences p;
+    if (!p.begin(FC_NS, true)) return false;
+    bool ok = false;
+    if (p.getString("fc_ssid", "") == ssid && p.getBytesLength("fc_bssid") == 6)
+    {
+        p.getBytes("fc_bssid", bssid, 6);
+        *channel = p.getUChar("fc_ch", 0);
+        ok = (*channel > 0);
+    }
+    p.end();
+    return ok;
+}
+
+static void invalidateFastConnectCache()
+{
+    Preferences p;
+    if (!p.begin(FC_NS, false)) return;
+    p.remove("fc_ssid");
+    p.remove("fc_bssid");
+    p.remove("fc_ch");
+    p.remove("fc_ip");
+    p.remove("fc_gw");
+    p.remove("fc_mask");
+    p.remove("fc_dns");
+    p.end();
+}
+
+// T2 — apply the cached DHCP lease (static config + stop dhcpc) so association
+// skips the DHCP round trip. Returns true if a lease was applied. DHCP users
+// only — static-IP users are already handled by configureStaticIP.
+static bool applyCachedLease()
+{
+    Preferences p;
+    if (!p.begin(FC_NS, true)) return false;
+    uint32_t ip = p.getUInt("fc_ip", 0), gw = p.getUInt("fc_gw", 0),
+             mask = p.getUInt("fc_mask", 0), dns = p.getUInt("fc_dns", 0);
+    p.end();
+    if (!ip || !gw || !mask) return false;
+
+    IPAddress dnsAddr = dns ? IPAddress(dns) : IPAddress(gw);
+    if (!WiFi.config(IPAddress(ip), IPAddress(gw), IPAddress(mask), dnsAddr))
+        return false;
+    esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    if (netif) esp_netif_dhcpc_stop(netif);
+    trace("fastconnect lease");
+    return true;
+}
+
+// Direct BSSID/channel association for the tap fast path. Returns WL_CONNECTED
+// on success (cache refreshed) or WL_CONNECT_FAILED (cache invalidated) so the
+// caller can fall back to the full autoConnect() scan. WPA2-personal only —
+// enterprise/5 GHz keep the normal path.
+wl_status_t fastConnectAndWait(const WifiCredentials &credentials)
+{
+    uint8_t bssid[6];
+    uint8_t channel;
+    if (credentials.isEnterprise || credentials.is5GHz) return WL_CONNECT_FAILED;
+    if (!loadFastConnectCache(credentials.ssid, bssid, &channel)) return WL_CONNECT_FAILED;
+
+    trace("fastconnect begin");
+    if (!credentials.useStaticIP) sntp_servermode_dhcp(1);
+    WiFi.mode(WIFI_STA);
+    g_fast_lease_applied = false;
+    // Static-IP users keep configureStaticIP; DHCP users try the cached lease.
+    if (!configureStaticIP(credentials))
+        g_fast_lease_applied = applyCachedLease();
+    String hostname = getDeviceHostname();
+    WiFi.setHostname(hostname.c_str());
+    WiFi.setScanMethod(WIFI_FAST_SCAN);
+    WiFi.begin(credentials.ssid.c_str(), credentials.pswd.c_str(), channel, bssid);
+
+    wl_status_t res = waitForConnectResult(FAST_CONNECT_TIMEOUT, 10);
+    if (res == WL_CONNECTED)
+    {
+        saveFastConnectCache(credentials.ssid);
+        trace("fastconnect ok");
+    }
+    else
+    {
+        invalidateFastConnectCache();
+        if (g_fast_lease_applied)
+        {
+            // Undo the static lease + restart dhcpc so the fallback
+            // autoConnect() does a normal DHCP bind. WiFi.config(0,0,0)
+            // re-enables the DHCP client.
+            WiFi.config((uint32_t)0, (uint32_t)0, (uint32_t)0);
+            g_fast_lease_applied = false;
+        }
+        WiFi.disconnect();
+        trace("fastconnect fail");
+    }
+    return res;
+}
+
+// T2 — a cached DHCP lease turned out stale: association succeeded but the fetch
+// couldn't route (wrong/duplicate IP). Drop the lease, re-enable DHCP, and
+// reconnect so this SAME wake can still succeed. Returns true if a fresh lease
+// was obtained. WiFi.config(0,0,0) re-enables the DHCP client.
+bool recoverFromStaleLease(const WifiCredentials &credentials)
+{
+    trace("lease recover begin");
+    invalidateFastConnectCache();
+    g_fast_lease_applied = false;
+    WiFi.disconnect();
+    WiFi.config((uint32_t)0, (uint32_t)0, (uint32_t)0);
+    WiFi.mode(WIFI_STA);
+    WiFi.setScanMethod(WIFI_FAST_SCAN);
+    WiFi.begin(credentials.ssid.c_str(), credentials.pswd.c_str());
+    wl_status_t res = waitForConnectResult(CONNECTION_TIMEOUT, 10);
+    if (res == WL_CONNECTED)
+    {
+        saveFastConnectCache(credentials.ssid);
+        trace("lease recover ok");
+        return true;
+    }
+    trace("lease recover fail");
+    return false;
+}
+
 void captureEventData(WiFiEvent_t event, WiFiEventInfo_t info, WifiEventData *eventData)
 {
     switch (event)
     {
     case ARDUINO_EVENT_WIFI_STA_GOT_IP:
+        trace("wifi: GOT_IP");
         Log_info("Wifi: Event STA_GOT_IP, IP: %s, Gateway: %s",
                  (IPAddress(info.got_ip.ip_info.ip.addr)).toString().c_str(),
                  (IPAddress(info.got_ip.ip_info.gw.addr)).toString().c_str());
         break;
     case ARDUINO_EVENT_WIFI_STA_CONNECTED:
+        trace("wifi: STA_CONNECTED");
         Log_info("Wifi: Event STA_CONNECTED SSID: %s, BSSID: %s, channel: %d, authmode: %d",
                  String((char *)info.wifi_sta_connected.ssid).c_str(),
                  WiFi.BSSIDstr().c_str(),
@@ -326,6 +483,12 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
 
     auto result = waitForConnectResult(CONNECTION_TIMEOUT);
 
+    // Refresh the T1 fast-connect cache so the next tap can skip the full scan.
+    if (result == WL_CONNECTED && !credentials.isEnterprise && !credentials.is5GHz)
+    {
+        saveFastConnectCache(credentials.ssid);
+    }
+
     // if connection failed and we were using enterprise, clean up
     if (result != WL_CONNECTED && credentials.isEnterprise)
     {
@@ -339,7 +502,7 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
     return {result, eventData};
 }
 
-wl_status_t waitForConnectResult(uint32_t timeout)
+wl_status_t waitForConnectResult(uint32_t timeout, uint32_t pollMs)
 {
 
     unsigned long timeoutmillis = millis() + timeout;
@@ -358,7 +521,7 @@ wl_status_t waitForConnectResult(uint32_t timeout)
         {
             return status;
         }
-        delay(100);
+        delay(pollMs);
     }
 
     Log_info("WiFi: connect timed out after %d ms", timeout);

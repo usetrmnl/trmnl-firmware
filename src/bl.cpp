@@ -9,6 +9,7 @@
 #include <types.h>
 #include <ArduinoLog.h>
 #include <WifiCaptive.h>
+#include <connect.h>
 #include <pins.h>
 #include <config.h>
 #include <HTTPClient.h>
@@ -96,7 +97,73 @@ RTC_DATA_ATTR int iPrevWakeTime = 0; // total wake time of the last cycle (for s
 RTC_DATA_ATTR bool bUsedCachedImage = false; // if the last image displayed was read from cache (for statistics collection)
 RTC_DATA_ATTR uint8_t need_to_refresh_display = 1;
 RTC_DATA_ATTR bool otg_state = false;  // Track OTG state across deep sleep
+
+// Timing trace stored in RTC memory. Survives deep sleep AND the macOS
+// USB_UART_CHIP_RESET that fires when the CDC port re-enumerates after
+// sleep, so we can capture a real tap-wake cycle even when USB is unplugged
+// and then dump it on the next boot after re-plug.
+#define TRACE_MAX 48
+struct Checkpoint {
+    uint32_t ms;
+    char name[28];
+};
+RTC_DATA_ATTR Checkpoint g_trace[TRACE_MAX];
+RTC_DATA_ATTR uint8_t g_trace_count = 0;
+RTC_DATA_ATTR Checkpoint g_prev_trace[TRACE_MAX];
+RTC_DATA_ATTR uint8_t g_prev_trace_count = 0;
+RTC_DATA_ATTR uint32_t g_prev_wake_reason = 0;
+RTC_DATA_ATTR uint8_t g_prev_wake_status1 = 0;
+RTC_DATA_ATTR bool g_prev_used_fast_path = false;
+bool middle_tap_fresh_fetch = false;
+
+// Non-static: also called from display.cpp and api-client/display.cpp.
+// Gated behind TAP_TRACE (dev env only) — release builds get an empty function
+// so the extern callers still link, but no RTC/NVS writes or Serial spam.
+void trace(const char *name) {
+#ifdef TAP_TRACE
+    uint32_t now = (uint32_t)millis();
+    if (g_trace_count < TRACE_MAX) {
+        g_trace[g_trace_count].ms = now;
+        size_t n = 0;
+        while (name[n] && n < sizeof(g_trace[0].name) - 1) {
+            g_trace[g_trace_count].name[n] = name[n]; n++;
+        }
+        g_trace[g_trace_count].name[n] = 0;
+        g_trace_count++;
+    }
+    // Also stream live to Serial so we can watch the cycle even if RTC/NVS
+    // gets clobbered by a subsequent reset.
+    Serial.printf("[trace %6lums] %s\n", (unsigned long)now, name);
+#else
+    (void)name;
+#endif
+}
 bool touchbar_tap_mode = true;  // false = "slide", true = "tap" (default)
+// Set from check_channel_states() when a middle-tap wake is detected.
+// Signals bl_init() to take the lean fetch path: skip logo full-refresh,
+// battery gauge init, log flushing, OTA check — just fetch fresh and show.
+// Target < 2 s to fresh content on-screen (was 10-20 s).
+#ifdef BOARD_TRMNL_X
+// WiFi/modem pre-warm: on a middle-tap wake we can tell from the wake stub
+// (SYSTEM_STATUS[1] bit 3 = CH1_TOUCH) that the user hit middle *before*
+// we've done any display/IQS323 work. Kick radio bring-up NOW on core 0 so
+// it runs in parallel with display_init + iqs323_task + tap detection +
+// indicator refresh. Saves 1-2 s of serial wall time on the fetch path.
+static TaskHandle_t s_wifi_prewarm_task = NULL;
+static volatile bool s_wifi_prewarm_active = false;  // task was spawned
+static volatile bool s_wifi_prewarm_done = false;    // connect finished
+static volatile bool s_wifi_prewarm_success = false; // connect result
+// T4: the prewarm task also owns the /api/display fetch on the tap fast path,
+// starting it at connect-ok (~0.3 s before the main thread reaches
+// downloadAndShow). Handoff: task sets _started before _done (so the main
+// thread never races it with its own fetch), main reads _result only after
+// _fetch_done.
+static volatile bool s_prewarm_inputs_ready = false; // main: prefs/wakeup_reason/display dims valid
+static volatile bool s_prewarm_fetch_started = false;
+static volatile bool s_prewarm_fetch_done = false;
+static ApiDisplayResult s_prewarm_fetch_result;
+#endif // BOARD_TRMNL_X
+ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences, bool skipPowerIO = false);
 Preferences preferences;
 PreferencesPersistence preferencesPersistence(preferences);
 StoredLogs storedLogs(LOG_MAX_NOTES_NUMBER / 2, LOG_MAX_NOTES_NUMBER / 2, PREFERENCES_LOG_KEY, PREFERENCES_LOG_BUFFER_HEAD_KEY, preferencesPersistence);
@@ -542,8 +609,15 @@ static void show_cached_image_by_offset(int offset) {
 
 void check_channel_states(void)
 {
-  /* Loop through all the active channels */
-  for (uint8_t i = 0; i < 3; i++) {
+  // If CH1 (middle) is touched, treat the whole gesture as MIDDLE — the
+  // capacitive touchbar bleeds into adjacent channels on real taps, and
+  // seeing CH0+CH1 or CH1+CH2 lit up almost always means "user hit the
+  // middle." Otherwise the left/right offset-navigation path fires and
+  // the fast-fetch case never runs.
+  bool ch1_touched = iqs323.channel_touchState(IQS323_CH1);
+  uint8_t start = ch1_touched ? 1 : 0;
+  uint8_t end   = ch1_touched ? 2 : 3;
+  for (uint8_t i = start; i < end; i++) {
     if (iqs323.channel_touchState((iqs323_channel_e)(i))) {
       if (touchbar_tap_mode) {
         // Tap mode
@@ -567,31 +641,14 @@ void check_channel_states(void)
           }
           break;
         case 1:
-          if (hold) {
-            display_draw_touchbar_indicator(TOUCHBAR_MIDDLE, true);
-            Log_info("Middle button hold");
-            pending_indicator_side = TOUCHBAR_MIDDLE;
-            pending_indicator_filled = true;
-            has_pending_indicator = true;
-            // Log_info("Middle button held - OTG toggle");
-            // if (otg_state) {
-            //   otg_turn_off();
-            //   showMessageWithLogo(OTG_TURNED_OFF); otg_state = false;
-            // }
-            // else {
-            //   otg_turn_on();
-            //   showMessageWithLogo(OTG_TURNED_ON);
-            //   otg_state = true;
-            // }
-            // delay(1000);
-            // showLastImageAndSleep();
-          } else {
-            display_draw_touchbar_indicator(TOUCHBAR_MIDDLE, false);
-            Log_info("Middle button tapped");
-            pending_indicator_side = TOUCHBAR_MIDDLE;
-            pending_indicator_filled = false;
-            has_pending_indicator = true;
-          }
+          // Middle tap or hold both mean "force refresh from server".
+          // Take the lean fetch path (see middle_tap_fresh_fetch).
+          Log_info(hold ? "Middle button hold - fresh fetch" : "Middle button tapped - fresh fetch");
+          trace(hold ? "case1 middle HOLD" : "case1 middle TAP");
+          middle_tap_fresh_fetch = true;
+          pending_indicator_side = TOUCHBAR_MIDDLE;
+          pending_indicator_filled = hold;
+          has_pending_indicator = true;
           break;
         case 2:
           if (!hold) {
@@ -757,6 +814,81 @@ void process_iqs323_data(void)
 // here and by getWiFiStatus() in wifi_network.cpp (5 GHz path on TRMNL_X), so
 // it needs external linkage.
 Modem* g_modem = nullptr;
+
+// Middle-tap fast path: run WiFi/modem bring-up in parallel with display+
+// touch work on the main thread. Spawned very early in bl_init() when the
+// wake-stub captured state shows the middle channel was in touch at wake.
+// Pinned to core 0 (the "protocol" core where the WiFi driver lives), so it
+// doesn't fight the main thread on core 1 for scheduler time.
+static void wifi_prewarm_task(void *pvParameters)
+{
+  Log_info("[prewarm] task start @ %lu ms", (unsigned long)millis());
+  trace("prewarm: task start");
+
+  // Modem is required only for a 5 GHz saved network. Skip otherwise — the
+  // ESP32-S3's native radio handles 2.4 GHz directly.
+  bool need_modem = false;
+  if (WifiCaptivePortal.isSaved()) {
+    need_modem = WifiCaptivePortal.getLastCredentials().is5GHz;
+  }
+
+  if (need_modem) {
+    trace("prewarm: modem begin");
+    modem_reset_target();
+    static Modem prewarmModemInstance(115200);
+    if (prewarmModemInstance.isInitialized()) {
+      g_modem = &prewarmModemInstance;
+      Log_info("[prewarm] modem ready @ %lu ms", (unsigned long)millis());
+    } else {
+      Log_info("[prewarm] modem init failed — 2.4 GHz fallback");
+      g_modem = nullptr;
+    }
+    trace("prewarm: modem end");
+  }
+
+  trace("prewarm: connect begin");
+  // On the fast path, connect without mDNS — saves ~300ms
+  bool ok = false;
+  if (WifiCaptivePortal.isSaved()) {
+    // T1: try cached channel/BSSID association first (WIFI_FAST_SCAN + direct
+    // begin). Falls back to the full scan-and-connect if the cache is empty or
+    // the AP moved — one slow tap, then fast again.
+    WifiCredentials creds = WifiCaptivePortal.getLastCredentials();
+    if (creds.is5GHz) {
+      // 5 GHz can only be joined via the C5 modem — the native S3 radio
+      // (fastConnectAndWait / autoConnect) can't. Route through
+      // connectWithSavedCredentials(), which uses g_modem->connectToNetwork().
+      ok = connectWithSavedCredentials();
+    } else if (middle_tap_fresh_fetch && fastConnectAndWait(creds) == WL_CONNECTED) {
+      ok = true;
+    } else {
+      ok = WifiCaptivePortal.autoConnect();
+    }
+  }
+  trace("prewarm: connect end");
+  // T4: on the tap fast path, also run the /api/display fetch here so it
+  // starts at connect-ok instead of when the main thread reaches
+  // downloadAndShow (~0.3 s later). WiFi path only — the 5 GHz modem GET has
+  // its own branch in downloadAndShow. _started must be published before
+  // _done so the main thread can never miss it and start a duplicate fetch.
+  bool will_fetch = ok && middle_tap_fresh_fetch &&
+                    !WifiCaptivePortal.getLastCredentials().is5GHz;
+  s_prewarm_fetch_started = will_fetch;
+  s_wifi_prewarm_success = ok;
+  s_wifi_prewarm_done = true;
+  Log_info("[prewarm] connect done @ %lu ms: %d", (unsigned long)millis(), (int)ok);
+  if (will_fetch) {
+    while (!s_prewarm_inputs_ready) {
+      delay(5);
+    }
+    trace("prewarm: fetch begin");
+    ApiDisplayInputs prewarmInputs = loadApiDisplayInputs(preferences, /*skipPowerIO=*/true);
+    s_prewarm_fetch_result = fetchApiDisplayResumable(prewarmInputs);
+    trace("prewarm: fetch end");
+    s_prewarm_fetch_done = true;
+  }
+  vTaskDelete(NULL);
+}
 // ############################ esp32c5 modem #########################
 
 // ############################ Gas gauge #############################
@@ -844,26 +976,108 @@ void bl_init(void)
   startup_time = init_time/1000L; // convert to milliseconds
 #ifdef DEV_FIRMWARE
   Serial.begin(115200);
-  wait_for_serial();
+  // T15: on an untethered wake (no host reading the CDC port) every Serial
+  // write otherwise blocks until the USB-CDC TX timeout, which was adding
+  // ~2 s before `bl_init entry`. Make CDC writes non-blocking when nobody's
+  // listening. Standard fix for this S3 HWCDC symptom.
+  Serial.setTxTimeoutMs(0);
+  // wait_for_serial() blocks up to 2 s waiting for USB CDC. It exists so
+  // early boot logs land on the host after a fresh flash — useless on a
+  // deep-sleep wake where the user is watching a stopwatch. Skip for
+  // anything other than a cold/undefined boot.
+  esp_sleep_wakeup_cause_t _wr = esp_sleep_get_wakeup_cause();
+  if (_wr == ESP_SLEEP_WAKEUP_UNDEFINED) {
+    wait_for_serial();
+  }
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
 #endif
   Log_info("BL init success");
+
+  // T15: record our first checkpoint BEFORE dumping the previous cycle, so the
+  // dump's (dev-only, CDC) cost lands as a measurable delta after `bl_init
+  // entry` instead of silently inflating the apparent app-entry time. Snapshot
+  // the previous cycle's checkpoints first since trace() resets into g_trace.
+  // Use the write-only g_prev_trace RTC global as scratch — a stack-local
+  // Checkpoint[TRACE_MAX] here (1.5 KB) overflows loopTask's stack.
+#ifdef TAP_TRACE
+  uint8_t prev_boot_count = (g_trace_count < TRACE_MAX) ? g_trace_count : TRACE_MAX;
+  memcpy(g_prev_trace, g_trace, sizeof(Checkpoint) * prev_boot_count);
+#endif // TAP_TRACE
+  g_trace_count = 0;
+  trace("bl_init entry");
+
+#ifdef TAP_TRACE
+  // Dump the previous boot cycle's trace. Skip entirely when no USB host is
+  // attached — nothing reads it, and it's wasted work on the untethered tap
+  // path being optimized. RTC memory preserves it across USB_UART_CHIP_RESET.
+  if (Serial) {
+    Serial.printf("\n===== TRACE DUMP (count=%u wake_reason=%lu prev_wake=%lu status[1]=0x%02X fast=%d) =====\n",
+                  (unsigned)prev_boot_count, (unsigned long)esp_sleep_get_wakeup_cause(),
+                  (unsigned long)g_prev_wake_reason, g_prev_wake_status1, (int)g_prev_used_fast_path);
+    uint32_t last_ms = 0;
+    for (int i = 0; i < prev_boot_count; i++) {
+      uint32_t d = g_prev_trace[i].ms - last_ms;
+      Serial.printf("  t=%6lums (+%5lums)  %s\n",
+                    (unsigned long)g_prev_trace[i].ms,
+                    (unsigned long)d, g_prev_trace[i].name);
+      last_ms = g_prev_trace[i].ms;
+    }
+    Serial.printf("===== end trace dump =====\n\n");
+  }
+#endif // TAP_TRACE
+
+#ifdef BOARD_TRMNL_X
+  // Middle-tap fast path: peek at the wake-stub-captured IQS323 SYSTEM_STATUS
+  // to see if CH1 (middle, bit 3) was in touch at wake. If yes AND we have
+  // saved credentials, spawn WiFi/modem bring-up on core 0 NOW so it runs
+  // in parallel with pins_init + sensor_init + display_init + IQS323 init.
+  // This overlaps the ~1-3 s radio bring-up with the ~1-1.5 s of display work.
+  //
+  // LEFT/RIGHT taps (CH0/CH2) fall through the fast cached-image path and
+  // never need WiFi, so we don't pre-warm on those. Corner-hold (CH0+CH2
+  // without CH1) also skips this — WiFi reset doesn't need WiFi up first.
+  {
+    esp_sleep_wakeup_cause_t _wr = esp_sleep_get_wakeup_cause();
+    bool gpio_wakeup = (_wr == ESP_SLEEP_WAKEUP_GPIO ||
+                        _wr == ESP_SLEEP_WAKEUP_EXT0 ||
+                        _wr == ESP_SLEEP_WAKEUP_EXT1);
+    if (gpio_wakeup && WifiCaptivePortal.isSaved() &&
+        (wakeup_stub_iqs_status.status[1] & (1 << IQS323_CH1_TOUCH_BIT))) {
+      Log_info("[prewarm] middle channel touched at wake — kicking WiFi bring-up early");
+      middle_tap_fresh_fetch = true;
+      has_pending_indicator = true;
+      pending_indicator_side = TOUCHBAR_MIDDLE;
+      // T14c: tap/hold isn't known this early (process_iqs323_data is skipped
+      // on the fast path). Draw the unfilled (tap) variant — tap is the common
+      // case; both tap and hold trigger the same fresh fetch anyway.
+      pending_indicator_filled = false;
+      s_wifi_prewarm_active = true;
+      trace("prewarm spawn");
+      // 16 KB stack: the task runs the esp_tls fetch (T4), which needs ~10 KB.
+      xTaskCreatePinnedToCore(
+        wifi_prewarm_task, "wifi_prewarm", 16384, NULL,
+        4, &s_wifi_prewarm_task, 0);
+    }
+  }
+#endif // BOARD_TRMNL_X
+
 #ifdef BOARD_TRMNL_X
   bool bModemNeeded = false;
   Log.info("%s [%d]: Checking if we need to use the ESP32-C5 modem...\r\n", __FILE__, __LINE__);
   if (WifiCaptivePortal.isSaved()) {
-    // WiFi saved, connection
     WifiCredentials lastCreds = WifiCaptivePortal.getLastCredentials();
     bModemNeeded = lastCreds.is5GHz;
   } else {
-    bModemNeeded = true; // captive portal needs modem for 5 GHz
+    bModemNeeded = true;
   }
   Log.info("%s [%d]: modem needed = %d\n\r", __FILE__, __LINE__, bModemNeeded);
-#endif // X
+#endif
+  trace("pins_init begin");
   pins_init();
+  trace("pins_init end");
   sensor_init();
+  trace("sensor_init end");
 #ifdef BOARD_TRMNL_X
-  // Debug: Print all wakeup_stub_iqs_status structure fields
   Log_info("wakeup_stub_iqs_status.status: 0x%02X 0x%02X", wakeup_stub_iqs_status.status[0], wakeup_stub_iqs_status.status[1]);
   Log_info("wakeup_stub_iqs_status.gestures: 0x%02X 0x%02X", wakeup_stub_iqs_status.gestures[0], wakeup_stub_iqs_status.gestures[1]);
   Log_info("wakeup_stub_iqs_status.slider_cords: 0x%02X 0x%02X", wakeup_stub_iqs_status.slider_cords[0], wakeup_stub_iqs_status.slider_cords[1]);
@@ -887,6 +1101,13 @@ void bl_init(void)
                       wakeup_reason == ESP_SLEEP_WAKEUP_EXT0 ||
                       wakeup_reason == ESP_SLEEP_WAKEUP_EXT1);
   Log.info("%s [%d]: Wake reason: %d\r\n", __FILE__, __LINE__, (int)wakeup_reason);
+  g_prev_wake_reason = (uint32_t)wakeup_reason;
+#ifdef BOARD_TRMNL_X
+  // wake-stub state only exists on X; other boards keep the default 0
+  g_prev_wake_status1 = wakeup_stub_iqs_status.status[1];
+#endif
+  g_prev_used_fast_path = false;
+  trace(gpio_wakeup ? "wake=GPIO" : "wake=other");
 
   Log_info("preferences start");
   bool res = preferences.begin("data", false);
@@ -900,6 +1121,43 @@ void bl_init(void)
     ESP.restart();
   }
   Log_info("preferences end");
+
+#ifdef BOARD_TRMNL_X
+#ifdef TAP_TRACE
+  // Read + dump persisted trace from previous cycle (in NVS). T15: skip when
+  // no host is attached — leave the NVS data intact for the next tethered boot.
+  if (Serial) {
+    uint8_t saved_count = preferences.getUChar("dbg_tcount", 0);
+    if (saved_count > 0 && saved_count <= TRACE_MAX) {
+      Checkpoint tmp[TRACE_MAX];
+      size_t bytes = preferences.getBytes("dbg_trace", tmp, sizeof(Checkpoint) * saved_count);
+      uint32_t saved_wr = preferences.getULong("dbg_wr", 0);
+      uint8_t saved_st1 = preferences.getUChar("dbg_st1", 0);
+      bool saved_fast = preferences.getBool("dbg_fast", false);
+      Serial.printf("\n===== PREV CYCLE TRACE (wake_reason=%lu status[1]=0x%02X fast_path=%d count=%u bytes=%u) =====\n",
+                    (unsigned long)saved_wr, saved_st1, (int)saved_fast, saved_count, (unsigned)bytes);
+      uint32_t last_ms = 0;
+      for (int i = 0; i < saved_count; i++) {
+        uint32_t d = tmp[i].ms - last_ms;
+        Serial.printf("  t=%6lums (+%5lums)  %s\n",
+                      (unsigned long)tmp[i].ms,
+                      (unsigned long)d, tmp[i].name);
+        last_ms = tmp[i].ms;
+      }
+      Serial.printf("===== end prev trace =====\n\n");
+      preferences.remove("dbg_trace");
+      preferences.remove("dbg_tcount");
+      preferences.remove("dbg_wr");
+      preferences.remove("dbg_st1");
+      preferences.remove("dbg_fast");
+    } else {
+      Serial.printf("[trace] NVS has no dbg_tcount (saved_count=%u)\n", saved_count);
+    }
+  }
+#endif // TAP_TRACE
+  trace("prefs.begin end");
+#endif // BOARD_TRMNL_X
+
   #ifndef BOARD_TRMNL_X
   bool double_click = false;
   if (gpio_wakeup)
@@ -934,11 +1192,17 @@ void bl_init(void)
   // Notify IQS323 task about wakeup type BEFORE starting the task
 
   Log.info("%s [%d]: Display init\r\n", __FILE__, __LINE__);
+  trace("display_init start");
   iqs323_task_i2c_lock();
   display_init();
   otg_turn_off(); // Since OTG function was commented out, need to ensure that OTG is turned off
   iqs323_task_i2c_unlock();
+  trace("display_init end");
+  // T4: everything the prewarm fetch's inputs need is now valid (preferences
+  // begun, wakeup_reason set, display dimensions known) — unblock it.
+  s_prewarm_inputs_ready = true;
   filesystem_init();
+  trace("filesystem_init end");
 
   Wire.setClock(100000);
 
@@ -948,36 +1212,48 @@ void bl_init(void)
   } else {
     Log_info("Non-GPIO wakeup (%d)", wakeup_reason);
   }
-#endif // BOARD_TRMNL_X
 
-#ifdef BOARD_TRMNL_X
   touchbar_tap_mode = preferences.getBool(PREFERENCES_TOUCHBAR_MODE_KEY, true);
   Log_info("Touchbar mode from preferences: %s", touchbar_tap_mode ? "Tap" : "Slide");
 
+  // Fast path: on a middle-tap wake the stub already tells us it's a middle
+  // tap. Draw the indicator NOW (before IQS323 init) so the user gets
+  // feedback in ~200 ms instead of waiting for the full IQS323 init chain.
+  // IQS323 task starts below and runs in parallel with the rest of the boot.
+  if (middle_tap_fresh_fetch && has_pending_indicator) {
+    trace("early_indicator start");
+    display_draw_touchbar_indicator(pending_indicator_side, pending_indicator_filled);
+    trace("early_indicator end");
+    has_pending_indicator = false;
+  }
+
   // Start IQS323 task manager
+  trace("iqs323_task_init start");
   if (!iqs323_task_init(NULL)) {
     Log_error("IQS323 Task: Failed to start - rebooting");
     delay(1000);
     ESP.restart();
   }
 
-  // Wait for IQS323 initialization to complete
-  if (!iqs323_task_wait_ready(5000)) {
-    Log_error("IQS323 Task: Initialization timeout - rebooting");
-    delay(1000);
-    ESP.restart();
+  // On the fast path we already know it's a middle tap — don't block on
+  // IQS323 init. It will finish in the background.
+  if (!middle_tap_fresh_fetch) {
+    if (!iqs323_task_wait_ready(5000)) {
+      Log_error("IQS323 Task: Initialization timeout - rebooting");
+      delay(1000);
+      ESP.restart();
+    }
+    trace("iqs323_task_ready");
   }
 
-  if (gpio_wakeup) {
+  if (gpio_wakeup && !middle_tap_fresh_fetch) {
     process_iqs323_data();
+    trace("process_iqs323 end");
   }
 
-  // For future
-  // iqs323_task_set_data_callback(process_iqs323_data);
+  #endif // BOARD_TRMNL_X
 
-  Log_info("init time: %ld us", init_time);
-#else // BOARD_TRMNL_X
-
+#ifndef BOARD_TRMNL_X
   if (double_click)
   { // special function reading
     if (preferences.isKey(PREFERENCES_SF_KEY))
@@ -1083,27 +1359,52 @@ void bl_init(void)
 
 #ifdef BOARD_TRMNL_X
 
-    if (!otg_message && WifiCaptivePortal.isSaved()) {
+    if (middle_tap_fresh_fetch && WifiCaptivePortal.isSaved()) {
+      // Fast path: skip the logo full-refresh. Use a fast (non-blocking)
+      // partial update for the touchbar indicator so the user gets tactile
+      // feedback while WiFi/download runs — it's ~600 ms but overlaps with
+      // the download, not serial to it.
+      g_prev_used_fast_path = true;
+      trace("fast_path branch");
+      if (has_pending_indicator) {
+        trace("draw_indicator start");
+        display_draw_touchbar_indicator(pending_indicator_side, pending_indicator_filled);
+        trace("draw_indicator end");
+        has_pending_indicator = false;
+      }
+      need_to_refresh_display = 1;
+      // T6: do NOT clear DisplayedImage / FILENAME_KEY here. The old hack force-
+      // cleared them so a cache hit would still full-repaint (to wipe the
+      // indicator). Now downloadAndShow restores just the indicator strip on a
+      // cache hit (display_restore_indicator_strip), so keep the cache state
+      // honest and let the unchanged-image path stay a cache hit.
+    }
+    else if (!otg_message && WifiCaptivePortal.isSaved()) {
       display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false);
       if (has_pending_indicator) {
         display_draw_touchbar_indicator(pending_indicator_side, pending_indicator_filled);
         has_pending_indicator = false;
       }
+      DisplayedImage::clear();
+      need_to_refresh_display = 1;
+      preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
+      preferences.putString(PREFERENCES_FILENAME_KEY, "");
     }
     else if (!WifiCaptivePortal.isSaved()) {
       showMessageWithLogo(NONE);
+      DisplayedImage::clear();
+      need_to_refresh_display = 1;
+      preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
+      preferences.putString(PREFERENCES_FILENAME_KEY, "");
     }
-#else 
+#else
     display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false);
-#endif // BOARD_TRMNL_X
-    // Force the display to show the current playlist image after the loading screen
-    // (even if it hasn't changed)
     DisplayedImage::clear();
-
     need_to_refresh_display = 1;
     preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
-    Log.info("%s [%d]: Display TRMNL logo end\r\n", __FILE__, __LINE__);
     preferences.putString(PREFERENCES_FILENAME_KEY, "");
+#endif // BOARD_TRMNL_X
+    Log.info("%s [%d]: Display TRMNL logo end\r\n", __FILE__, __LINE__);
   }
 #ifdef BOARD_TRMNL_X
   battery_count = detect_battery_count();
@@ -1111,7 +1412,11 @@ void bl_init(void)
   Log_info("BATTERY COUNT: %d", battery_count);
   Log_info("BATTERY CHARGING: %s", battery_charging ? "YES" : "NO");
 
-  if (battery_count != BATTERY_NONE) {
+  // Fast path: skip BQ27427 init on middle-tap fetch. It can burn up to
+  // 5 s polling ITPOR after a reset, plus a 300 ms delay + retries.
+  // The API just receives -1 for battery telemetry this cycle; next
+  // timer wake will re-populate it.
+  if (battery_count != BATTERY_NONE && !middle_tap_fresh_fetch) {
     bool bBQ27Alive = false;
     if (!lipo.begin(SENSOR_SDA_PIN, SENSOR_SCL_PIN)) {
       BQ27427_reset(); // try resetting the chip
@@ -1216,15 +1521,23 @@ void bl_init(void)
   Log_info("Firmware version %s", Messages::firmware_version().c_str());
   Log_info("Arduino version %d.%d.%d", ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH);
   Log_info("ESP-IDF version %d.%d.%d", ESP_IDF_VERSION_MAJOR, ESP_IDF_VERSION_MINOR, ESP_IDF_VERSION_PATCH);
-  list_files();
-  log_nvs_usage();
+  // list_files() enumerates LittleFS and can take 100+ ms on a full FS.
+  // Skip on the fast path — it's diagnostic only.
+  if (!middle_tap_fresh_fetch) {
+    list_files();
+    log_nvs_usage();
+  }
 
   // DEBUG - test message display
   // showMessageWithLogo(MSG_FORMAT_ERROR);
   // display_show_msg(storedLogoOrDefault(1), WIFI_CONNECT, "ABCDEF", true, Messages::firmware_version().c_str(), "Hello World!");
   // wifiErrorDeepSleep();
 #ifdef BOARD_TRMNL_X
-  if (bModemNeeded) {
+  if (s_wifi_prewarm_active) {
+    // The pre-warm task on core 0 already owns modem/WiFi bring-up.
+    // It will set g_modem (or leave it null on 2.4 GHz / init failure).
+    Log_info("Modem init: skipping (owned by prewarm task)");
+  } else if (bModemNeeded) {
     modem_reset_target(); // Must be done BEFORE the instantiation of the class since it expects the modem to be ready
     static Modem modemInstance(115200);
     if (modemInstance.isInitialized()) {
@@ -1236,8 +1549,8 @@ void bl_init(void)
   } else {
     g_modem = nullptr;
   }
-    
-  // Only scan when no credentials are saved (i.e. captive portal will be shown). 
+
+  // Only scan when no credentials are saved (i.e. captive portal will be shown).
   if (g_modem && !WifiCaptivePortal.isSaved())
   {
     Log_info("No saved credentials — scanning networks via modem...");
@@ -1260,7 +1573,14 @@ void bl_init(void)
   }
 #endif // BOARD_TRMNL_X
 
-  WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
+  // The pre-warm task on core 0 sets the mode via autoConnect(); avoid
+  // touching WiFi state here or we race with the driver bringing up STA.
+#ifdef BOARD_TRMNL_X
+  if (!s_wifi_prewarm_active)
+#endif
+  {
+    WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
+  }
 
   MSG current_msg = NONE;
 
@@ -1278,7 +1598,28 @@ void bl_init(void)
   {
     // WiFi saved, connection
     Log.info("%s [%d]: WiFi saved\r\n", __FILE__, __LINE__);
-    int connection_res = connectWithSavedCredentials() ? 1 : 0;
+    int connection_res = 0;
+#ifdef BOARD_TRMNL_X
+    if (s_wifi_prewarm_active) {
+      // Radio bring-up was kicked at bl_init entry on core 0 in parallel
+      // with display/touch work. It's almost always done by now; wait if
+      // not (15 s ceiling matches the captive HTTP timeout budget).
+      trace("wait_prewarm start");
+      uint32_t t_wait_start = millis();
+      while (!s_wifi_prewarm_done && (millis() - t_wait_start) < 15000) {
+        delay(10);
+      }
+      Log_info("[prewarm] main waited %u ms; success=%d",
+               (unsigned)(millis() - t_wait_start), (int)s_wifi_prewarm_success);
+      connection_res = s_wifi_prewarm_success ? 1 : 0;
+      trace("wait_prewarm end");
+    } else
+#endif // BOARD_TRMNL_X
+    {
+      trace("seq connect start");
+      connection_res = connectWithSavedCredentials() ? 1 : 0;
+      trace("seq connect end");
+    }
 
     Log.info("%s [%d]: Connection result: %d, WiFI Status: %d\r\n", __FILE__, __LINE__, connection_res, WiFi.status());
 
@@ -1365,8 +1706,8 @@ void bl_init(void)
 
 #endif
 
-  // clock synchronization
-  if (setClock())
+  // clock synchronization (skip on middle-tap fast path — saves ~1-2 s of NTP wait)
+  if (!middle_tap_fresh_fetch && setClock())
   {
     time_since_sleep = preferences.getUInt(PREFERENCES_LAST_SLEEP_TIME, 0);
     time_since_sleep = time_since_sleep ? getTime() - time_since_sleep : 0; // may be can be used even if no sync
@@ -1390,12 +1731,18 @@ void bl_init(void)
     Log.info("%s [%d]: API key and friendly ID saved\r\n", __FILE__, __LINE__);
   }
 
-  submitStoredLogs();
+  // Log flush costs an HTTPS round-trip. Defer it to the next timer wake
+  // when the user isn't watching for the screen to update.
+  if (!middle_tap_fresh_fetch) {
+    submitStoredLogs();
+  }
 
   log_retry = true;
 
   // OTA checking, image checking and drawing
+  trace("downloadAndShow start");
   https_request_err_e request_result = downloadAndShow();
+  trace("downloadAndShow end");
   Log.info("%s [%d]: request result - %s\r\n", __FILE__, __LINE__, szHTTPErrors[request_result]);
 
   if (request_result == HTTPS_IMAGE_FILE_TOO_BIG)
@@ -1456,7 +1803,9 @@ void bl_init(void)
     preferences.putInt(PREFERENCES_CONNECT_API_RETRY_COUNT, 1);
   }
 
-  submitStoredLogs();
+  if (!middle_tap_fresh_fetch) {
+    submitStoredLogs();
+  }
 
   if (request_result == HTTPS_NO_REGISTER && need_to_refresh_display == 1)
   {
@@ -1473,7 +1822,12 @@ void bl_init(void)
     resetDeviceCredentials();
   }
 
-  // OTA update checking
+  // OTA update checking. Firmware updates are a multi-MB HTTPS download
+  // + flash write — never appropriate on an interactive tap wake.
+  // Defer to the next timer wake.
+  if (middle_tap_fresh_fetch) {
+    update_firmware = false;
+  }
   if (update_firmware)
   {
     uint32_t now = getTime();
@@ -1581,7 +1935,7 @@ void bl_process(void)
 {
 }
 
-ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
+ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences, bool skipPowerIO)
 {
   ApiDisplayInputs inputs;
 
@@ -1635,7 +1989,12 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   WiFiStatus wifi = getWiFiStatus();
   inputs.rssi = wifi.rssi;
   inputs.wifiBand = wifi.band;
-  inputs.batteryVoltage = vBatt; //readBatteryVoltage();
+  // T4 (skipPowerIO, prewarm fetch): the USB/charging reads below go through
+  // the TCA9535 on the shared I2C bus that the main thread is driving for the
+  // indicator update, and vBatt hasn't been read yet — report UNKNOWN/-1
+  // instead, like the fast path already does for the BQ27427 telemetry. The
+  // next timer wake repopulates everything.
+  inputs.batteryVoltage = skipPowerIO ? -1 : vBatt;
   inputs.firmwareVersion = String(FW_VERSION_STRING);
   inputs.firmwareCommit = String(FW_COMMIT);
   inputs.displayWidth = display_width();
@@ -1644,8 +2003,8 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   inputs.specialFunction = special_function;
   inputs.imageCached = bUsedCachedImage;
   inputs.prevWakeTime = iPrevWakeTime;
-  inputs.usbStatus = get_usb_status();
-  inputs.chargingStatus = get_charging_status();
+  inputs.usbStatus = skipPowerIO ? UsbStatus::UNKNOWN : get_usb_status();
+  inputs.chargingStatus = skipPowerIO ? ChargingStatus::UNKNOWN : get_charging_status();
 
 #ifdef BOARD_TRMNL_X
   inputs.batteryCount = battery_count;
@@ -1698,7 +2057,9 @@ static https_request_err_e downloadAndShow()
     Log_info("Fetching /api/display via modem (5 GHz path)");
     String reqHeaders = formatHeaders(buildDisplayHeaders(apiDisplayInputs));
 
+    trace("modem api GET begin");
     auto httpRes = g_modem->httpGet(apiDisplayInputs.baseUrl + "/api/display", "", 0, reqHeaders);
+    trace("modem api GET end");
     if (!httpRes.ok)
     {
       Log_error_submit("Modem /api/display request failed (%u bytes received)", httpRes.bytesReceived);
@@ -1715,15 +2076,55 @@ static https_request_err_e downloadAndShow()
   else 
 #endif // BOARD_TRMNL_X  
   {
-    for (int attempt = 1; attempt <= 5; ++attempt)
+    trace("api fetch begin");
+    bool got_fast = false;
+#ifdef BOARD_TRMNL_X
+    if (s_prewarm_fetch_started) {
+      // T4: the prewarm task kicked the resumable fetch at connect-ok, ~0.3 s
+      // before this thread got here — join on its result. The fetch's own
+      // 15 s esp_tls timeout bounds the wait; if it somehow never finishes,
+      // fall through to the HTTPClient retry loop below (which owns
+      // stale-lease recovery), same as any failed fetch.
+      trace("join prewarm fetch");
+      uint32_t t_fetch_wait = millis();
+      while (!s_prewarm_fetch_done && (millis() - t_fetch_wait) < 20000) {
+        delay(10);
+      }
+      trace("prewarm fetch joined");
+      if (s_prewarm_fetch_done) {
+        apiDisplayResult = s_prewarm_fetch_result;
+        got_fast = (apiDisplayResult.error == HTTPS_NO_ERR);
+      }
+    } else
+#endif // BOARD_TRMNL_X
+    {
+    // T3: try the resumed-TLS fetch first on EVERY wake (not just the tap fast
+    // path) so the RTC-RAM session cache is used regardless of wake type. It
+    // returns HTTPS_NO_ERR only on a clean 200; any error drops through to the
+    // proven HTTPClient loop below (which owns stale-lease recovery on attempt
+    // 1). Note: a true power-cycle clears RTC RAM, so resumption only kicks in
+    // between deep-sleep wakes; here it at least always runs and re-saves.
+    apiDisplayResult = fetchApiDisplayResumable(apiDisplayInputs);
+    got_fast = (apiDisplayResult.error == HTTPS_NO_ERR);
+    }
+    for (int attempt = 1; !got_fast && attempt <= 5; ++attempt)
     {
       apiDisplayResult = fetchApiDisplay(apiDisplayInputs);
       if (apiDisplayResult.error != HTTPS_UNABLE_TO_CONNECT &&
           apiDisplayResult.error != HTTPS_RESPONSE_CODE_INVALID)
         break;
       Log_error_serial("Connection attempt %d/5 failed: %s", attempt, apiDisplayResult.error_detail.c_str());
+      // T2: a stale cached DHCP lease associates fine but can't route. On the
+      // first failure, drop the lease and re-run DHCP once, then retry
+      // immediately (no 2 s backoff) so this same wake can still succeed.
+      if (attempt == 1 && g_fast_lease_applied) {
+        Log_error_serial("Cached DHCP lease may be stale — re-running DHCP");
+        recoverFromStaleLease(WifiCaptivePortal.getLastCredentials());
+        continue;
+      }
       if (attempt < 5) delay(2000);
     }
+    trace("api fetch end");
   }
 
   if (apiDisplayResult.error != HTTPS_NO_ERR)
@@ -1737,7 +2138,11 @@ static https_request_err_e downloadAndShow()
   if (!status && result == HTTPS_SUCCESS) { // this means we already have this image stored in SPIFFS
       char szTemp[36];
 #if defined( BOARD_X_CLASS ) && !defined(BOARD_SEEED_RETERMINAL_E1003)
-      if (DisplayedImage::exists()) {
+      // Skip load_prev_image() on the fast path — decoding the previous
+      // image from LittleFS (+ PNG decode) costs ~300 ms. FastEPD will do
+      // a clean fullUpdate instead of a non-flickering partial which is
+      // fine for the tap-to-show use case.
+      if (DisplayedImage::exists() && !middle_tap_fresh_fetch) {
         load_prev_image(); // decode the older image into the previous buffer of FastEPD
       }
 #endif // BOARD_X_CLASS
@@ -1745,19 +2150,39 @@ static https_request_err_e downloadAndShow()
       if (DisplayedImage::matches(szTemp)) {
         // We just displayed the same image, don't refresh the display
         Log.info("%s [%d]: The image hasn't changed since the last wakeup, don't refresh the display.\r\n", __FILE__, __LINE__);
+#if defined(BOARD_X_CLASS)
+        // T6: on the tap fast path we drew the touchbar indicator over the
+        // (unchanged) image. Restore just the indicator strip from the cached
+        // image instead of leaving the indicator stuck on the panel.
+        if (middle_tap_fresh_fetch && g_prev_used_fast_path) {
+          trace("fs read begin");
+          size_t content_size = filesystem_read_and_allocate(szTemp, &buffer);
+          trace("fs read end");
+          if (buffer && content_size) {
+            display_restore_indicator_strip(buffer, content_size);
+            free(buffer);
+          }
+        }
+#endif
         buffer = nullptr;
         return result;
       }
       DisplayedImage::remember(szTemp);
-      Log.info("%s [%d]: Reading %s from SPIFFS\r\n", __FILE__, __LINE__, szTemp);
+      Log.info("%s [%d]: Reading %s from LittleFS\r\n", __FILE__, __LINE__, szTemp);
+      trace("fs read begin");
+      uint32_t t0 = millis();
       size_t content_size = filesystem_read_and_allocate(szTemp, &buffer);
+      Log_info("[TIMING] FS read: %u ms", (unsigned)(millis() - t0));
+      trace("fs read end");
       if (!buffer || content_size == 0) {
         filesystem_file_delete(szTemp);
         Log_error_submit("Cached image is empty or unreadable: %s", szTemp);
         return HTTPS_WRONG_IMAGE_SIZE;
       }
       Log.info("%s [%d]: Decoding image...\r\n", __FILE__, __LINE__);
+      { uint32_t t0 = millis();
       display_show_image(buffer, content_size, true);
+      Log_info("[TIMING] display_show_image: %u ms", (unsigned)(millis() - t0)); }
       free(buffer);
       buffer = nullptr;
       DisplayedImage::remember(szTemp); // current image becomes the previous image
@@ -1795,7 +2220,9 @@ static https_request_err_e downloadAndShow()
     if (strncmp(filename, apiDisplayInputs.baseUrl.c_str(), apiDisplayInputs.baseUrl.length()) == 0)
       imgHeaders = formatHeaders(buildImageHeaders(apiDisplayInputs));
 
+    trace("modem img GET begin");
     auto httpRes = g_modem->httpGet(String(filename), szTemp, 0, imgHeaders);
+    trace("modem img GET end");
     if (!httpRes.ok)
     {
       Log_error_submit("Modem httpGet failed: %u bytes received", httpRes.bytesReceived);
@@ -1879,7 +2306,9 @@ static https_request_err_e downloadAndShow()
           Log_info("GET...");
           Log_info("RSSI: %d", WiFi.RSSI());
           // start connection and send HTTP header
+          trace("img GET begin");
           int httpCode = https.GET();
+          trace("img GET end");
           int content_size = https.getSize();
           if(httpCode == HTTP_CODE_PERMANENT_REDIRECT ||
             httpCode == HTTP_CODE_TEMPORARY_REDIRECT){
@@ -1956,28 +2385,41 @@ static https_request_err_e downloadAndShow()
             counter = https.getSize();
             if (counter && counter <= MAX_IMAGE_SIZE) {
               WiFiClient *stream = https.getStreamPtr();
-              int iLen, iCount = 0;
 
               buffer = (uint8_t *)malloc(counter);
+              int iCount = 0;
               if (buffer) {
                 buffer_malloc = true;
+                // Read in 4 KiB chunks instead of byte-by-byte — much faster.
                 while (iCount < counter && millis() < (lStartTime + API_FIRST_RETRY*1000)) {
-                  if (stream->available()) {
-                    buffer[iCount++] = stream->read();
-                    lStartTime = millis(); // reset start time
-                  } else { // 15 seconds with no activity => stop trying
-                    vTaskDelay(1); // yield to allow time for the data to arrive
+                  int avail = stream->available();
+                  if (avail > 0) {
+                    int chunk = (counter - iCount) < 4096 ? (counter - iCount) : 4096;
+                    if (avail < chunk) chunk = avail;
+                    int got = stream->readBytes(buffer + iCount, chunk);
+                    if (got <= 0) break;
+                    iCount += got;
+                    lStartTime = millis();
+                  } else {
+                    vTaskDelay(1);
                   }
                 }
               } // if buffer
-              stream->stop(); // Important! If you don't do this, WiFi will have a memory exception later
-              if (millis() > (lStartTime + API_FIRST_RETRY*1000)) { // we timed out
+              stream->stop();
+              if (millis() > (lStartTime + API_FIRST_RETRY*1000)) {
                   Log_error_submit("Receiving failed; download timed out. Image size = %d", counter);
                   return HTTPS_TIMED_OUT;
+              }
+              // T14b: a `got <= 0` early break leaves a partial buffer without
+              // tripping the timeout above — reject it instead of decoding garbage.
+              if (buffer && iCount < (int)counter) {
+                Log_error_submit("Receiving failed; incomplete download %d/%d bytes", iCount, counter);
+                return HTTPS_TIMED_OUT;
               }
             }
           } // if payload size is non-zero
           Log.info("%s [%d]: %d bytes received in %d milliseconds\r\n", __FILE__, __LINE__, counter, (int)(millis() - lStartTime));
+          trace("img recv end");
 
           if (counter == 0)
           {
@@ -2006,7 +2448,9 @@ static https_request_err_e downloadAndShow()
             Log.info("BMP file detected");
           }
 
-          submitStoredLogs();
+          if (!middle_tap_fresh_fetch) {
+            submitStoredLogs();
+          }
 
           WiFi.disconnect(true); // no need for WiFi, save power starting here
           Log.info("%s [%d]: Received successfully; WiFi off.\r\n", __FILE__, __LINE__);
@@ -2016,18 +2460,19 @@ static https_request_err_e downloadAndShow()
           {
             char szTemp[36];
             fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
-            Log.info("%s [%d]: Writing %s to SPIFFS\r\n", __FILE__, __LINE__, szTemp);
-            filesystem_purge_old_file(szTemp); // try to delete the old version or older than 24h
-            writeImageToFile(szTemp, buffer, content_size);
-            Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
+            Log.info("%s [%d]: Decoding %s from RAM (FS write deferred)\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
             display_show_image(buffer, content_size, true);
-            DisplayedImage::remember(szTemp); // current image becomes the previous image
+            DisplayedImage::remember(szTemp);
+            // Write to filesystem *after* decode so the user sees the image sooner.
+            // The buffer is still valid since display_show_image does not free it.
+            filesystem_purge_old_file(szTemp);
+            writeImageToFile(szTemp, buffer, content_size);
             if (buffer_malloc) {
               Log.info("%s [%d]: Freeing the image buffer we allocated\r\n", __FILE__, __LINE__);
               free(buffer);
             }
             buffer = nullptr;
-            png_res = PNG_NO_ERR; // DEBUG
+            png_res = PNG_NO_ERR;
             String _curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
             String _lastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
             if (!_curPath.isEmpty() && (_curPath != String(szTemp) || _lastPath.isEmpty()))
@@ -2226,6 +2671,14 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
     {
       String image_url = apiResponse.image_url;
       update_firmware = apiResponse.update_firmware;
+#ifdef DEV_FIRMWARE
+      // Never let a server-pushed OTA overwrite a locally flashed dev build
+      // mid-debug-session. Release builds are unaffected.
+      if (update_firmware) {
+        Log.info("%s [%d]: OTA requested by server — ignored (DEV_FIRMWARE)\r\n", __FILE__, __LINE__);
+        update_firmware = false;
+      }
+#endif
       String firmware_url = apiResponse.firmware_url;
       uint64_t rate = apiResponse.refresh_rate;
       reset_firmware = apiResponse.reset_firmware;
@@ -3292,7 +3745,33 @@ static bool checkAndPerformFirmwareUpdate(void)
 void goToSleep(void)
 {
   Log.info("%s [%d]: go to sleep\r\n", __FILE__, __LINE__);
-  submitStoredLogs();
+  trace("goToSleep entry");
+#ifdef TAP_TRACE
+  // Freeze the trace for the next boot to dump. Do this before any of the
+  // sleep-prep work so we capture the last observed time.
+  memcpy(g_prev_trace, g_trace, sizeof(g_prev_trace));
+  g_prev_trace_count = g_trace_count;
+  // Only persist trace to NVS for interesting cycles (real GPIO tap wakes).
+  // Cold boots and timer wakes would otherwise overwrite the tap trace we
+  // actually want to see, given the USB_UART_CHIP_RESET loop on macOS.
+  if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO ||
+      wakeup_reason == ESP_SLEEP_WAKEUP_EXT0 ||
+      wakeup_reason == ESP_SLEEP_WAKEUP_EXT1 ||
+      middle_tap_fresh_fetch) {
+    preferences.putBytes("dbg_trace", g_trace, sizeof(Checkpoint) * g_trace_count);
+    preferences.putUChar("dbg_tcount", g_trace_count);
+    preferences.putULong("dbg_wr", (uint32_t)wakeup_reason);
+    preferences.putUChar("dbg_st1", wakeup_stub_iqs_status.status[1]);
+    preferences.putBool("dbg_fast", middle_tap_fresh_fetch);
+    Serial.printf("[trace] NVS write: %u checkpoints (tap/gpio wake)\n", g_trace_count);
+  } else {
+    Serial.printf("[trace] NVS write: SKIPPED (wake_reason=%d, not GPIO)\n", (int)wakeup_reason);
+  }
+#endif // TAP_TRACE
+  // Skip log flush on the interactive fast path — same reason as above.
+  if (!middle_tap_fresh_fetch) {
+    submitStoredLogs();
+  }
 
 // DEBUG - workaround to prevent crash in the WiFi stack of unknown origin
 #ifndef BOARD_X_CLASS

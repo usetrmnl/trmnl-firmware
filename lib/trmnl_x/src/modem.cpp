@@ -30,8 +30,36 @@ Modem::Modem(uint32_t baudRate) : ModemSerial(0) {
   // Verify modem is alive at the initial baud rate
   while (ModemSerial.available()) ModemSerial.read();
   sendCommand("AT");
-  if (waitForResponse("OK", 5000).isEmpty()) {
-    Serial.println("[MODEM] no response to AT — skipping baud upgrade");
+  if (waitForResponse("OK", 2000).isEmpty()) {
+    // No AT response at the bootstrap baud. A previous session persisted
+    // 5 Mbaud in the C5's own NVS via AT+UART_DEF (survives power cycles), so
+    // the C5 now boots at 5 Mbaud while we opened at 115200 — sync fails.
+    // Reopen at 5 Mbaud with the RTS/CTS the persisted config expects and
+    // retry; if it answers, we're already upgraded and skip the negotiation.
+    Serial.println("[MODEM] no AT at initial baud — trying persisted 5 Mbps");
+    ModemSerial.end();
+    ModemSerial.setRxBufferSize(8192);
+    ModemSerial.begin(5000000, SERIAL_8N1, AT_UART_RX, AT_UART_TX);
+    ModemSerial.setHwFlowCtrlMode(UART_HW_FLOWCTRL_CTS_RTS, 120);
+    ModemSerial.setPins(-1, -1, AT_UART_RTS, AT_UART_CTS);
+    this->baudRate = 5000000;
+    delay(100);
+    while (ModemSerial.available()) ModemSerial.read();
+    sendCommand("AT");
+    if (waitForResponse("OK", 2000).isEmpty()) {
+      Serial.println("[MODEM] no response at 115200 or 5 Mbps — modem not ready");
+      return;
+    }
+    Serial.println("[MODEM] C5 already at persisted 5 Mbps — skipping baud upgrade");
+    // Already at target baud; just re-assert station mode + auto-rejoin.
+    sendCommand("AT+CWMODE=1");
+    if (waitForResponse("OK", 5000).isEmpty()) {
+      Serial.println("[MODEM] AT+CWMODE failed.");
+      return;
+    }
+    sendCommand("AT+CWAUTOCONN=1");
+    waitForResponse("OK", 3000);
+    _initialized = true;
     return;
   }
 
@@ -64,10 +92,31 @@ Modem::Modem(uint32_t baudRate) : ModemSerial(0) {
   sendCommand("AT");
   if (waitForResponse("OK", 5000).isEmpty()) {
     Serial.println("[MODEM] no response at 5 Mbps — falling back to 2.4 GHz mode");
-  } else {
-    Serial.println("[MODEM] running at 5 Mbps with RTS/CTS");
-    _initialized = true;
+    return;
   }
+  Serial.println("[MODEM] running at 5 Mbps with RTS/CTS");
+
+  // Persist the high baud rate across power cycles so the 115200 bootstrap
+  // phase (AT sync, CWMODE, UART_CUR negotiation) is skipped on future
+  // boots — saves ~400 ms per wake (T7).
+  sendCommand("AT+UART_DEF=5000000,8,1,0,3");
+  if (waitForResponse("OK", 3000).isEmpty()) {
+    Serial.println("[MODEM] AT+UART_DEF failed — baud not persisted");
+  } else {
+    Serial.println("[MODEM] UART baud rate persisted to NVS");
+  }
+
+  // Enable auto-rejoin so the C5 re-associates during its own boot, in
+  // parallel with our wake-up. Future connectToNetwork() checks CWJAP?
+  // and skips the explicit CWJAP when already joined.
+  sendCommand("AT+CWAUTOCONN=1");
+  if (waitForResponse("OK", 3000).isEmpty()) {
+    Serial.println("[MODEM] AT+CWAUTOCONN=1 failed");
+  } else {
+    Serial.println("[MODEM] auto-rejoin enabled");
+  }
+
+  _initialized = true;
 }
 
 
@@ -448,6 +497,31 @@ bool Modem::connectToNetwork(const String& ssid, const String& password) {
   if (waitForResponse("OK", 3000).isEmpty()) {
     Serial.println("[MODEM] connectToNetwork: AT+CWMODE=1 failed");
     return false;
+  }
+
+  // T7: if CWAUTOCONN already rejoined during C5 boot, skip the explicit
+  // AT+CWJAP — saves ~3-5 s per wake. Check by querying current association.
+  sendCommand("AT+CWJAP?");
+  String jresp = waitForResponse("OK", 3000);
+  if (!jresp.isEmpty() && jresp.indexOf("+CWJAP:\"") >= 0) {
+    // Already associated (CWAUTOCONN did its job during C5 boot). The
+    // "WIFI GOT IP" URC most likely already fired before we started listening,
+    // so don't wait for it — poll AT+CIPSTA? for a non-zero IP directly.
+    Serial.println("[MODEM] CWAUTOCONN already joined — polling for IP");
+    unsigned long ipDeadline = millis() + 8000;
+    while (millis() < ipDeadline) {
+      while (ModemSerial.available()) ModemSerial.read();
+      sendCommand("AT+CIPSTA?");
+      String ipResp = waitForResponse("OK", 2000);
+      // +CIPSTA:ip:"0.0.0.0" means no DHCP lease yet; any other IP is real.
+      if (ipResp.indexOf("+CIPSTA:ip:\"") >= 0 &&
+          ipResp.indexOf("+CIPSTA:ip:\"0.0.0.0\"") < 0) {
+        Serial.println("[MODEM] already connected (CWAUTOCONN)");
+        return true;
+      }
+      delay(200);
+    }
+    Serial.println("[MODEM] already joined but no IP — falling through to explicit CWJAP");
   }
 
   String cmd = "AT+CWJAP=\"" + s + "\",\"" + p + "\"";

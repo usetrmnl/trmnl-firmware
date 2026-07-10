@@ -9,6 +9,7 @@
 #include <DEV_Config.h>
 extern RTC_DATA_ATTR int iPrevWakeTime; // total wake time of the last cycle (for statistics collection)
 extern RTC_DATA_ATTR bool bUsedCachedImage; // if the last image displayed was read from cache (for statistics collection)
+extern void trace(const char *name); // timing checkpoints (bl.cpp), persisted across deep sleep
 #ifdef SENSOR_SDA
 extern int lastCO2, lastSCDTemp, lastTemp, lastSCDHumid, lastHumid, lastPressure, lastType, lastTime;
 const char *szDevices[] = {"None", "AHT20", "BMP180", "BME280", "BMP388", "SHT3X", "HDC1080", "HTS221", "MCP9808","BME68x","SHTC3"};
@@ -92,7 +93,11 @@ ApiDisplayResult fetchApiDisplay(ApiDisplayInputs &apiDisplayInputs)
         delay(5);
 
         Log_info("Start location: %s", https->getLocation().c_str());
+        // First GET() includes TCP connect + TLS handshake — the checkpoint
+        // pair around it is the handshake cost we want to see in the trace.
+        trace("api tls+GET begin");
         int httpCode = https->GET();
+        trace("api tls+GET end");
         if(httpCode == HTTP_CODE_PERMANENT_REDIRECT ||httpCode == HTTP_CODE_TEMPORARY_REDIRECT){
               String location = https->getLocation();
               https->end();
@@ -125,6 +130,7 @@ ApiDisplayResult fetchApiDisplay(ApiDisplayInputs &apiDisplayInputs)
         Log_info("GET... code: %d", httpCode);
 
         String payload = https->getString();
+        trace("api body read end");
         size_t size = https->getSize();
         Log_info("Content size: %d", size);
         Log_info("Free heap size: %d", ESP.getMaxAllocHeap());

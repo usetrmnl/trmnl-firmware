@@ -1,6 +1,7 @@
 #include <wifi_network.h>
 #include <WiFi.h>
 #include <WifiCaptive.h>
+#include <connect.h>
 #include <trmnl_log.h>
 #include <ESPmDNS.h>
 #include <Preferences.h>
@@ -38,16 +39,22 @@ bool connectWithSavedCredentials(void) {
   if (!WifiCaptivePortal.isSaved())
     return false;
 
+  WifiCredentials creds = WifiCaptivePortal.getLastCredentials();
+
 #ifdef BOARD_TRMNL_X
-  if (g_modem)
-  {
-    WifiCredentials creds = WifiCaptivePortal.getLastCredentials();
-    if (creds.is5GHz)
-      return g_modem->connectToNetwork(creds.ssid, creds.pswd);
-  }
+  if (g_modem && creds.is5GHz)
+    return g_modem->connectToNetwork(creds.ssid, creds.pswd);
 #endif
 
-  bool connected = WifiCaptivePortal.autoConnect();
+  // T13: try the cached channel+BSSID fast-connect first on every wake type
+  // (timer wakes included, not just taps). Cuts radio-on time ~4 s → ~1 s — a
+  // real battery win at 15-min refreshes. fastConnectAndWait invalidates its
+  // cache and returns WL_CONNECT_FAILED on any miss (enterprise/5 GHz too), so
+  // we fall back to the full autoConnect scan: worst case one slow wake after
+  // a router/channel change.
+  bool connected = (fastConnectAndWait(creds) == WL_CONNECTED);
+  if (!connected)
+    connected = WifiCaptivePortal.autoConnect();
   if (connected) {
     Preferences prefs;
     prefs.begin("data", true);
