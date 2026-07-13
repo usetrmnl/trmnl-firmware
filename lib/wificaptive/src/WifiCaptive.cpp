@@ -109,6 +109,18 @@ bool WifiCaptive::startPortal()
             if (!_networks.empty()) return true;
             int n = WiFi.scanComplete();
             return n >= 0;
+        },
+        .forceRescan = [this]()
+        {
+#ifdef BOARD_TRMNL_X
+            if (_modemScanCallback)
+            {
+                _networks = _modemScanCallback();
+                return;
+            }
+#endif
+            WiFi.scanDelete();
+            WiFi.scanNetworks(true);
         }};
 
 #ifdef BOARD_TRMNL_X
@@ -827,6 +839,11 @@ void WifiCaptive::setModemConnectCallback(ModemConnectCallback cb)
 void WifiCaptive::setModemMac(const String& mac)
 {
     _modemMac = mac;
+}
+
+void WifiCaptive::setModemScanCallback(ModemScanCallback cb)
+{
+    _modemScanCallback = cb;
 }
 #endif
 

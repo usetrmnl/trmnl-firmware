@@ -7,7 +7,9 @@
 #include <preferences_persistence.h>
 #include "DEV_Config.h"
 #include "battery_small.h"
+#include "battery_hollow.h"
 #include "messages.h"
+#include "config.h"
 #define MAX_BIT_DEPTH 8
 #ifndef BOARD_X_CLASS
 #define BB_EPAPER
@@ -15,13 +17,13 @@
 #include <SPIFFS.h>
 #define FS SPIFFS
 const DISPLAY_PROFILE dpList[4] = { // 1-bit and 2-bit display types for each profile
-#if defined ( BOARD_XTEINK_X4 ) || defined ( MINI_EPD )
+#ifdef MINI_EPD
     {EP426_800x480, EP426_800x480_4GRAY}, // default (for original EPD)
     {EP426_800x480, EP426_800x480_4GRAY}, // a = uses built-in fast + 4-gray
     {EP426_800x480, EP426_800x480_4GRAY}, // b = darker grays
 };
 BBEPAPER bbep(EP426_800x480);
-#elif defined(BOARD_WAVESHARE_397)
+#elif defined(MINI_EPD2)
     {EP397_800x480, EP397_800x480_4GRAY}, // default (for original EPD)
     {EP397_800x480, EP397_800x480_4GRAY}, // a = uses built-in fast + 4-gray
     {EP397_800x480, EP397_800x480_4GRAY}, // b = darker grays
@@ -82,6 +84,8 @@ const uint8_t u8_graytable[] = {
 /* 14 */  0, 1, 1, 1, 2, 2, 2, 2, 2, 
 /* 15 */  0, 0, 0, 0, 0, 0, 0, 0, 2
 };
+#include "BQ27427.h"
+extern BQ27427 lipo; // Use lipo.[] to interact with the library in an Arduino 
 #endif
 // Counts the number of partial updates to know when to do a full update
 RTC_DATA_ATTR int iUpdateCount = 0;
@@ -113,6 +117,10 @@ void display_init(void)
     iTempProfile = preferences.getUInt(PREFERENCES_TEMP_PROFILE, TEMP_PROFILE_DEFAULT);
     Log_info("Saved temperature profile: %d", iTempProfile);
 #ifdef BB_EPAPER
+#ifdef BOARD_SEEED_STICKY
+    pinMode(47, OUTPUT); // enable EPD power
+    digitalWrite(47, 1);
+#endif
     bbep.setPanelType(dpList[iTempProfile].OneBit); // must be set BEFORE calling initio
     Log_info("BB e-Paper init");
     bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
@@ -1232,6 +1240,28 @@ int png_draw(PNGDRAW *pDraw)
     return 1;
 } /* png_draw() */
 #else // TRMNL_X version
+// The generic 2-bit gray update procedure is too dark on the X's 10.3" panel, so
+// we need to use the more complex 4-bit update method which has a custom pattern
+// specifically for that panel's characteristics. This loop maps 2-bit pixels to
+// 4-bit pixels by converting the values 0/1/2/3 to 0/5/10/15
+static void Expand2bppLineTo4bpp(const uint8_t *src, uint8_t *dest, int width)
+{
+    uint8_t b;
+    uint16_t u16;
+
+    for (int x = 0; x < width; x+=4) {
+        u16 = 0;
+        b = *src++;
+        for (int j=0; j<4; j++) {
+            u16 <<= 4;
+            u16 |= (((b >> 6) & 3) * 5);
+            b <<= 2;
+        } // for j
+      *dest++ = (uint8_t)(u16 >> 8);
+      *dest++ = (uint8_t)(u16 & 0xff);
+    } // for x
+} /* Expand2bppLineTo4bpp() */
+
 int png_draw(PNGDRAW *pDraw)
 {
     int x, y = pDraw->y;
@@ -1243,6 +1273,7 @@ int png_draw(PNGDRAW *pDraw)
     if (pDraw->iPixelType == PNG_PIXEL_INDEXED || pDraw->iBpp > 4) { // need to convert through the palette and/or reduce the bpp
         s = bbep.tempBuffer(); // temp space we can use
         iBpp = (pDraw->iBpp > 4) ? 4 : pDraw->iBpp;
+        if (iBpp == 2) iBpp = 4; // 2-bit indexed images -> 4bpp for calibrated gray refresh
         ReduceBpp(iBpp, pDraw->iPixelType, pDraw->pPalette, pDraw->pPixels, s, pDraw->iWidth, pDraw->iBpp);
     } else { // for grayscale images of 1/2/4-bpp we can directly use the pixels as-is
         iBpp = pDraw->iBpp;
@@ -1253,9 +1284,6 @@ int png_draw(PNGDRAW *pDraw)
         switch (iBpp) { // if this matches the new image we can do a non-flickering update
             case 1:
                 bbep.setPreviousMode(BB_MODE_1BPP);
-                break;
-            case 2:
-                bbep.setPreviousMode(BB_MODE_2BPP);
                 break;
             default:
                 bbep.setPreviousMode(BB_MODE_4BPP);
@@ -1284,25 +1312,13 @@ int png_draw(PNGDRAW *pDraw)
                 d -= iPitch;
             }
         }
-    } else if (iBpp == 2) {
-        iPitch = bbep.width()/4;
-        d += y * iPitch; // point to the correct line
-        if (bbep.width() == pDraw->iWidth) { // normal orientation
-            memcpy(d, s, (pDraw->iWidth+3)/4);
-        } else { // rotated
-            d += (bbep.height() - 1) * iPitch;
-            d += (y / 4);
-            ucMask = 0xc0 >> ((y & 3)*2); // destination mask
-            for (x=0; x<pDraw->iWidth; x++) {
-                if ((x & 3) == 0) uc = *s++;
-                ucPixel = d[0] & ~ucMask; // unset old pixel
-                ucPixel |= (uc & 0xc0) >> ((y & 3)*2);
-                d[0] = ucPixel;
-                uc <<= 2;
-                d -= iPitch;
-            } // for x
-        } // rotated 90 degrees
-    } else { // must be 4-bit, the native format
+    } else {
+        if (iBpp == 2) { // expand 2-bit grayscale to 4-bit for calibrated refresh
+            Expand2bppLineTo4bpp(s, bbep.tempBuffer(), pDraw->iWidth);
+            s = bbep.tempBuffer();
+            iBpp = 4;
+        }
+        // 4-bit native format (includes expanded 2-bit)
         if (bbep.width() == pDraw->iWidth) { // normal orientation
             d += y * iPitch; // point to the correct line
             memcpy(d, s, (pDraw->iWidth+1)/2);
@@ -1596,6 +1612,10 @@ PNG *png = new PNG();
                 } // temp profile needs the second plane written
             } else { // 2-bpp (or greater, but reduced to 2-bpp)
                 bbep.setPanelType(dpList[iTempProfile].TwoBit);
+#if defined( MINI_EPD ) || defined (MINI_EPD2)
+                Log_info("2-bit 4.26 re-init");
+                bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
+#endif
                 rc = REFRESH_FULL; // 4gray mode must be full refresh
                 iUpdateCount = 0; // grayscale mode resets the partial update counter
                 bbep.startWrite(PLANE_0); // start writing image data to plane 0
@@ -1616,7 +1636,8 @@ PNG *png = new PNG();
                     bbep.setMode(BB_MODE_1BPP);
                 break;
                 case 2:
-                    bbep.setMode(BB_MODE_2BPP);
+                    // 2-bit PNGs are expanded to 4bpp in png_draw() so refresh uses u8_graytable
+                    bbep.setMode(BB_MODE_4BPP);
                 break;
                 default:
                     bbep.setMode(BB_MODE_4BPP);
@@ -1674,12 +1695,10 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
     }
 #endif
 #ifdef BB_EPAPER
-    if (i426Workaround) {
-        // After a partial update, the 4.26" 800x480 needs to be 'reset' to accept writes
-        // This is only needed if the user pressed the WAKE button and there will be 2 updates
-        // while the power is on
+#if defined( MINI_EPD ) || defined (MINI_EPD2)
+        Log_info("4.26 1-bit re-init");
         bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
-    }
+#endif // MINI_EPD
 #endif // BB_EPAPER
     if (isPNG == true && data_size < MAX_IMAGE_SIZE)
     {
@@ -1713,7 +1732,21 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
 #ifdef BOARD_TRMNL_X
             // Show charging indicator if the USB power is connected (whether actually charging or not)
             if (get_usb_status() == UsbStatus::CONNECTED) {
+                Log_info("Displaying 'battery is charging' icon");
                 bbep.loadG5Image(battery_small, 40, bbep.height() - 120, BBEP_WHITE, BBEP_BLACK);
+            } else { // show battery level
+                y = bbep.height() - 120;
+                bbep.loadG5Image(battery_hollow, 40, y, BBEP_WHITE, BBEP_BLACK);
+                Log_info("Displaying 'battery charge level' icon");
+                if (lipo.begin(PIN_INTERNAL_SDA, PIN_INTERNAL_SCL)) { // only report SoC if battery was detected and BQ27427 initialized successfully
+                    int batt_percent = lipo.soc();
+                    if (batt_percent >= 97) batt_percent = 100; // can sometimes report 98% when full
+                    // Draw a black rectangle to represent the battery charge level
+                    bbep.fillRect(40+10, y+18, (97 * batt_percent)/100, 39, BBEP_BLACK);
+                } else {
+                    bbep.drawLine(40+10, y+18, 10+97, y+18+39, BBEP_BLACK);
+                    bbep.drawLine(40+10+97, y+18, 10, y+18+39, BBEP_BLACK);
+                }
             }
 #endif // BOARD_TRMNL_X
         }
@@ -1726,7 +1759,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
 #endif
         }
 #ifdef BB_EPAPER
-#if defined( BOARD_XTEINK_X4 ) || defined( MINI_EPD )
+#if defined( MINI_EPD ) || defined (MINI_EPD2)
         bbep.writePlane(PLANE_FALSE_DIFF);
 #else
         bbep.writePlane(); // send image data to the EPD
@@ -1752,7 +1785,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
         Log_info("%s [%d]: Forcing fast refresh (not partial) since the TRMNL refresh_rate is set to > 30 min\n", __FILE__, __LINE__);
         iRefreshMode = REFRESH_FAST;
     }
-    if (bbep.capabilities() & (BBEP_4COLOR | BBEP_3COLOR | BBEP_7COLOR)) bWait = 1;
+    if (bbep.capabilities() & (BBEP_4GRAY | BBEP_4COLOR | BBEP_3COLOR | BBEP_7COLOR)) bWait = 1;
     if (!bWait) iRefreshMode = REFRESH_PARTIAL; // fast update when showing loading screen
     Log_info("%s [%d]: EPD refresh mode: %d\r\n", __FILE__, __LINE__, iRefreshMode);
 #ifdef DO_NOT_LIGHT_SLEEP
@@ -1761,9 +1794,6 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
     bbep.setLightSleep(true);
 #endif
     bbep.refresh(iRefreshMode, bWait);
-    if ((bbep.getPanelType() == EP426_800x480 || bbep.getPanelType() == EP397_800x480) && iRefreshMode == REFRESH_PARTIAL) {
-        i426Workaround = 1; // need to re-initialize the controller for another update before sleeping
-    }
     if (bAlloc) {
         bbep.freeBuffer();
     }
@@ -2556,7 +2586,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         bbep.setCursor(40, 48); // place in upper left corner
         bbep.println(string1);
         String string2 = "Connect your phone or computer to ";
-        string2 += (message.length() > 0) ? "'" + message + "'" : String("the TRMNL");
+        string2 += (message.length() > 0) ? "\"" + message + "\"" : String("the TRMNL");
         string2 += " Wi-Fi";
         bbep.getStringBox(string2, &rect);
 #ifdef __BB_EPAPER__

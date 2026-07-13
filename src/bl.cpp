@@ -49,6 +49,7 @@
 #include <wifi-helpers.h>
 #include <sys/time.h>
 #include "messages.h"
+#include "displayed_image.h"
 #ifdef SENSOR_SDA
 #include <bb_scd41.h>
 #include <bb_temperature.h>
@@ -95,7 +96,6 @@ RTC_DATA_ATTR int iPrevWakeTime = 0; // total wake time of the last cycle (for s
 RTC_DATA_ATTR bool bUsedCachedImage = false; // if the last image displayed was read from cache (for statistics collection)
 RTC_DATA_ATTR uint8_t need_to_refresh_display = 1;
 RTC_DATA_ATTR bool otg_state = false;  // Track OTG state across deep sleep
-RTC_DATA_ATTR char szPrevFile[36] = {0};
 bool touchbar_tap_mode = true;  // false = "slide", true = "tap" (default)
 Preferences preferences;
 PreferencesPersistence preferencesPersistence(preferences);
@@ -124,7 +124,6 @@ static uint8_t *storedLogoOrDefault(int iType);
 static bool checkCurrentFileName(String &newName);
 static DeviceStatusStamp getDeviceStatusStamp();
 void log_nvs_usage();
-void fixFileName(const char *src, char *dest);
 void config_gpio_for_lp();
 int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious);
 
@@ -175,10 +174,6 @@ bool otg_message = false;
 static touchbar_side_t pending_indicator_side = TOUCHBAR_LEFT;
 static bool pending_indicator_filled = false;
 static bool has_pending_indicator = false;
-
-#define SENSOR_SDA_PIN 39
-#define SENSOR_SCL_PIN 40
-#define SENSOR_READY_PIN GPIO_NUM_3
 
 // WiFi reset confirmation constants
 #define WIFI_RESET_CONFIRMATION_TIMEOUT_MS 15000
@@ -384,6 +379,7 @@ static void showLastImageAndSleep()
     if (buf && file_size > 0) {
       display_show_image(buf, file_size, true);
       free(buf);
+      DisplayedImage::remember(curPath.c_str());
     }
   }
   goToSleep();
@@ -489,7 +485,11 @@ static void show_cached_image_by_offset(int offset) {
     if (path.isEmpty()) { Log_info("No cached image for gesture"); return; }
     int file_size = 0;
     buffer = display_read_file(path.c_str(), &file_size);
-    if (buffer && file_size > 0) { display_show_image(buffer, file_size, true); goToSleep(); }
+    if (buffer && file_size > 0) {
+      display_show_image(buffer, file_size, true);
+      DisplayedImage::remember(path.c_str());
+      goToSleep();
+    }
     return;
   }
 
@@ -532,6 +532,7 @@ static void show_cached_image_by_offset(int offset) {
 
   preferences.putString(PREFERENCES_BROWSE_PATH_KEY, String(images[new_idx]));
   display_show_image(buffer, file_size, true);
+  DisplayedImage::remember(images[new_idx]);
   goToSleep();
 }
 
@@ -831,6 +832,13 @@ void sensor_init(void)
  */
 void bl_init(void)
 {
+#ifdef BOARD_SEEED_STICKY
+  pinMode(45, OUTPUT); // power hold (DATA)
+  pinMode(46, OUTPUT); // power lock (CLK)
+  digitalWrite(45, 1);
+  digitalWrite(46, 0);
+  digitalWrite(46, 1); // Hold the battery power enabled for after the user releases the power button
+#endif
 #ifdef BOARD_TRMNL_X
   uint32_t init_time = esp_cpu_get_cycle_count() / esp_rom_get_cpu_ticks_per_us();
 #else
@@ -1093,7 +1101,7 @@ void bl_init(void)
 #endif // BOARD_TRMNL_X
     // Force the display to show the current playlist image after the loading screen
     // (even if it hasn't changed)
-    szPrevFile[0] = 0;
+    DisplayedImage::clear();
 
     need_to_refresh_display = 1;
     preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
@@ -1108,14 +1116,14 @@ void bl_init(void)
 
   if (battery_count != BATTERY_NONE) {
     bool bBQ27Alive = false;
-    if (!lipo.begin(SENSOR_SDA_PIN, SENSOR_SCL_PIN)) {
+    if (!lipo.begin(PIN_INTERNAL_SDA, PIN_INTERNAL_SCL)) {
       BQ27427_reset(); // try resetting the chip
       delay(300); // BQ27427 needs 250 ms to power up
-      if (!lipo.begin(SENSOR_SDA_PIN, SENSOR_SCL_PIN)) { // try again
+      if (!lipo.begin(PIN_INTERNAL_SDA, PIN_INTERNAL_SCL)) { // try again
       // If communication fails, print an error message and loop forever.
         Log_error("Error: Unable to communicate with BQ27427.");
-        gpio_dump_io_configuration(stdout, (1ULL << 39));
-        gpio_dump_io_configuration(stdout, (1ULL << 40));
+        gpio_dump_io_configuration(stdout, (1ULL << PIN_INTERNAL_SDA));
+        gpio_dump_io_configuration(stdout, (1ULL << PIN_INTERNAL_SCL));
       } else {
         bBQ27Alive = true;
       }
@@ -1235,17 +1243,35 @@ void bl_init(void)
   // Only scan when no credentials are saved (i.e. captive portal will be shown). 
   if (g_modem && !WifiCaptivePortal.isSaved())
   {
+    // The modem is a separate radio and can see the device's own captive-portal
+    // SoftAP over the air; exclude it so it never shows up as a connectable network.
+    String ownApSsid = WifiCaptivePortal.getAPSSID();
+
     Log_info("No saved credentials — scanning networks via modem...");
     auto modemNets = g_modem->scanNetworks();
     Log_info("Modem found %d network(s)", modemNets.size());
     std::vector<ExternalNetwork> nets;
-    for (auto& n : modemNets)
+    for (auto& n : modemNets) {
+      if (n.ssid == ownApSsid) continue;
       nets.push_back({n.ssid, n.rssi, n.open, n.is5GHz});
+    }
     WifiCaptivePortal.setNetworks(nets);
 
     // Register callback so captive portal can connect 5 GHz networks via modem
     WifiCaptivePortal.setModemConnectCallback([](const String& ssid, const String& pass) {
       return g_modem->connectToNetwork(ssid, pass);
+    });
+
+    // Register callback so the captive portal's Refresh button can trigger a fresh modem scan
+    WifiCaptivePortal.setModemScanCallback([ownApSsid]() {
+      auto modemNets = g_modem->scanNetworks();
+      Log_info("Modem re-scan found %d network(s)", modemNets.size());
+      std::vector<ExternalNetwork> nets;
+      for (auto& n : modemNets) {
+        if (n.ssid == ownApSsid) continue;
+        nets.push_back({n.ssid, n.rssi, n.open, n.is5GHz});
+      }
+      return nets;
     });
 
     String modemMac = g_modem->getMacAddress();
@@ -1668,10 +1694,10 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
 void load_prev_image(void)
 {
   uint8_t *buffer;
-  size_t content_size = 0; //filesystem_read_and_allocate(szPrevFile, &buffer);
+  size_t content_size = 0;
   if (content_size > 0) {
     // Decode it into the previous buffer
-    Log.info("%s [%d]: Decoding previous image (%s) into FastEPD previous buffer\r\n", __FILE__, __LINE__, szPrevFile);
+    Log.info("%s [%d]: Decoding previous image (%s) into FastEPD previous buffer\r\n", __FILE__, __LINE__, DisplayedImage::get());
     png_to_epd(buffer, content_size, true);
   }
 } /* load_prev_image() */
@@ -1732,18 +1758,18 @@ static https_request_err_e downloadAndShow()
   if (!status && result == HTTPS_SUCCESS) { // this means we already have this image stored in SPIFFS
       char szTemp[36];
 #if defined( BOARD_X_CLASS ) && !defined(BOARD_SEEED_RETERMINAL_E1003)
-      if (szPrevFile[0]) {
+      if (DisplayedImage::exists()) {
         load_prev_image(); // decode the older image into the previous buffer of FastEPD
       }
 #endif // BOARD_X_CLASS
       fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
-      if (strcmp(szTemp, szPrevFile) == 0) {
+      if (DisplayedImage::matches(szTemp)) {
         // We just displayed the same image, don't refresh the display
         Log.info("%s [%d]: The image hasn't changed since the last wakeup, don't refresh the display.\r\n", __FILE__, __LINE__);
         buffer = nullptr;
         return result;
       }
-      strcpy(szPrevFile, szTemp); // save the filename to compare on the next wakeup
+      DisplayedImage::remember(szTemp);
       Log.info("%s [%d]: Reading %s from SPIFFS\r\n", __FILE__, __LINE__, szTemp);
       size_t content_size = filesystem_read_and_allocate(szTemp, &buffer);
       if (!buffer || content_size == 0) {
@@ -1755,7 +1781,7 @@ static https_request_err_e downloadAndShow()
       display_show_image(buffer, content_size, true);
       free(buffer);
       buffer = nullptr;
-      strcpy(szPrevFile, szTemp); // current image becomes the previous image
+      DisplayedImage::remember(szTemp); // current image becomes the previous image
       // Rotate NVS path keys: last ← current ← szTemp
       String _curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
       String _lastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
@@ -1808,6 +1834,7 @@ static https_request_err_e downloadAndShow()
 
     display_show_image(buf, fileSize, true);
     free(buf);
+    DisplayedImage::remember(szTemp); // current image becomes the previous image
 
     preferences.putString(PREFERENCES_CURRENT_PATH_KEY, String(szTemp));
     update_playlist_order(szTemp, _prevPath.c_str());
@@ -2015,6 +2042,7 @@ static https_request_err_e downloadAndShow()
             writeImageToFile(szTemp, buffer, content_size);
             Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
             display_show_image(buffer, content_size, true);
+            DisplayedImage::remember(szTemp); // current image becomes the previous image
             if (buffer_malloc) {
               Log.info("%s [%d]: Freeing the image buffer we allocated\r\n", __FILE__, __LINE__);
               free(buffer);
@@ -2094,6 +2122,11 @@ static https_request_err_e downloadAndShow()
             }
             Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
             display_show_image(buffer, content_size, true);
+            {
+              char szTemp[36];
+              fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
+              DisplayedImage::remember(szTemp);
+            }
             
             if (buffer_malloc) {
               Log.info("%s [%d]: Freeing the image buffer we allocated\r\n", __FILE__, __LINE__);

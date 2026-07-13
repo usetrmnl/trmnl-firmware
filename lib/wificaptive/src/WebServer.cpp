@@ -84,6 +84,10 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
                              {
 		String json = "{\"networks\":[";
 
+		if (request->hasParam("force")) {
+			callbacks.forceRescan();
+		}
+
 		if (!callbacks.isNetworkListReady()) {
 			if (WiFi.scanComplete() == WIFI_SCAN_FAILED) {
 				WiFi.scanNetworks(true);

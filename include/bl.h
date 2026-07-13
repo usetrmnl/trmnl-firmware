@@ -30,4 +30,6 @@ void logWithAction(LogAction action, LogLevel level, const char *message, time_t
 bool submitLogString(const char *log_buffer);
 bool storeLogString(const char *log_buffer);
 
+void fixFileName(const char *src, char *dest);
+
 #endif

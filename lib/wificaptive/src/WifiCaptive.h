@@ -88,6 +88,8 @@ private:
     ModemConnectCallback _modemConnectCallback;
 #ifdef BOARD_TRMNL_X
     String _modemMac;
+    using ModemScanCallback = std::function<std::vector<ExternalNetwork>()>;
+    ModemScanCallback _modemScanCallback;
 #endif
 
     void setUpDNSServer(DNSServer &dnsServer, const IPAddress &localIP);
@@ -139,6 +141,9 @@ public:
 #ifdef BOARD_TRMNL_X
     /// @brief Sets the modem (5 GHz) MAC address shown in the captive portal.
     void setModemMac(const String& mac);
+
+    /// @brief Registers a callback used to re-scan networks via the modem on demand (e.g. Refresh button).
+    void setModemScanCallback(ModemScanCallback cb);
 #endif
 
     /// @brief Sets a callback invoked every portal loop iteration (approx. every 60 ms).

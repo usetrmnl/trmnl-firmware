@@ -89,6 +89,9 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #define PIN_INTERRUPT 3
 #elif defined(BOARD_TRMNL_X)
 #define PIN_INTERRUPT 3
+#define PIN_INTERNAL_SDA 39
+#define PIN_INTERNAL_SCL 40
+#define PIN_INTERNAL_READY GPIO_NUM_3
 #define DEVICE_MODEL "x"
 #elif defined(BOARD_TRMNL_X_EPDIY)
 #define PIN_INTERRUPT 0
@@ -156,6 +159,9 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #define PIN_INTERRUPT 3        // the green button
 #define PIN_VBAT_SWITCH 21     // load switch enable pin for battery voltage measurement
 #define VBAT_SWITCH_LEVEL HIGH // load switch enable pin active level
+#elif defined(BOARD_SEEED_STICKY)
+#define DEVICE_MODEL "reTerminal Sticky"
+#define PIN_INTERRUPT 4        // the power button
 #elif defined(BOARD_SEEED_RETERMINAL_E1003)
 #define PIN_INTERRUPT 3 // green button
 #define PIN_VBAT_SWITCH 40
