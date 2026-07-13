@@ -9,6 +9,21 @@
 #include "esp_err.h"
 #include "esp_netif.h"
 #include "esp_sntp.h"
+#include <vector>
+#include <Preferences.h>
+
+String getDeviceHostname() {
+    Preferences prefs;
+    prefs.begin("data", true);
+    String saved = prefs.getString("hostname", "");
+    prefs.end();
+    if (saved.length() > 0) return saved;
+
+    String mac = WiFi.macAddress(); // "AA:BB:CC:DD:EE:FF"
+    String suffix = mac.substring(12, 14) + mac.substring(15, 17);
+    suffix.toLowerCase();
+    return "trmnl-" + suffix;
+}
 
 /**
  * @brief Configure static IP with smart defaults
@@ -162,15 +177,26 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
 {
     WifiEventData eventData;
 
+    // Register WiFi event handlers and remember each registration id.
+    std::vector<wifi_event_id_t> handlerIds;
     for (int i = ARDUINO_EVENT_WIFI_READY; i < ARDUINO_EVENT_MAX; i++)
     {
-        WiFi.onEvent([i, &eventData](WiFiEvent_t event, WiFiEventInfo_t info)
+        wifi_event_id_t id = WiFi.onEvent([&eventData](WiFiEvent_t event, WiFiEventInfo_t info)
                      {
                          eventData.eventCount++;
 
                          captureEventData(event, info, &eventData); },
                      (arduino_event_id_t)i);
+        handlerIds.push_back(id);
     }
+
+    auto removeEventHandlers = [&handlerIds]()
+    {
+        for (wifi_event_id_t id : handlerIds)
+        {
+            WiFi.removeEvent(id);
+        }
+    };
 
     if (!credentials.useStaticIP)
     {
@@ -179,6 +205,16 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
 
     // always start with a clean state - disable any previous configuration
     disableWpa2Enterprise();
+
+    // Pick the strongest AP when an SSID is broadcast by multiple access points
+    // (mesh/roaming networks). The arduino-esp32 default is WIFI_FAST_SCAN, which
+    // associates with the FIRST AP found for the SSID regardless of signal strength,
+    // so the device can latch onto a weak/distant AP. WIFI_ALL_CHANNEL_SCAN scans
+    // every channel first, then WIFI_CONNECT_AP_BY_SIGNAL connects to the AP with the
+    // highest RSSI. Trade-off: a full-channel scan adds ~1-2s to each connect, which is
+    // an acceptable cost for reliably joining the nearest AP. See issue #285.
+    WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
+    WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
 
     wl_status_t beginResult;
 
@@ -190,10 +226,7 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
         {
             Log_error("WiFi: Enterprise mode requires an identity");
             // clean up event handlers
-            for (int i = ARDUINO_EVENT_WIFI_READY; i < ARDUINO_EVENT_MAX; i++)
-            {
-                WiFi.removeEvent(i);
-            }
+            removeEventHandlers();
             return {WL_CONNECT_FAILED, eventData};
         }
 
@@ -259,15 +292,16 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
             Log_error("WiFi: Failed to enable WPA2 Enterprise, error: %d", err);
             disableWpa2Enterprise();
             // clean up event handlers
-            for (int i = ARDUINO_EVENT_WIFI_READY; i < ARDUINO_EVENT_MAX; i++)
-            {
-                WiFi.removeEvent(i);
-            }
+            removeEventHandlers();
             return {WL_CONNECT_FAILED, eventData};
         }
 
         // Configure static IP if specified (must be before WiFi.begin)
         configureStaticIP(credentials);
+
+        String hostname = getDeviceHostname();
+        WiFi.setHostname(hostname.c_str());
+        Log_info("WiFi: hostname set to %s", hostname.c_str());
 
         WiFi.begin(credentials.ssid.c_str());
 
@@ -281,6 +315,10 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
 
         // Configure static IP if specified (must be before WiFi.begin)
         configureStaticIP(credentials);
+
+        String hostname = getDeviceHostname();
+        WiFi.setHostname(hostname.c_str());
+        Log_info("WiFi: hostname set to %s", hostname.c_str());
 
         beginResult = WiFi.begin(credentials.ssid.c_str(), credentials.pswd.c_str());
         Log_info("WiFi: begin (WPA2-Personal), starting from status %s", wifiStatusStr(beginResult));
@@ -296,10 +334,7 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
     }
 
     // Clean up Arduino event handlers
-    for (int i = ARDUINO_EVENT_WIFI_READY; i < ARDUINO_EVENT_MAX; i++)
-    {
-        WiFi.removeEvent(i);
-    }
+    removeEventHandlers();
 
     return {result, eventData};
 }

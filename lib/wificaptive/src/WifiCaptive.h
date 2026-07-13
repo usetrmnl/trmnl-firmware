@@ -59,6 +59,7 @@ private:
     AsyncWebServer *_server;
     String _ssid = "";
     String _password = "";
+    String _band = "";
     String _api_server = "";
     WifiCredentials _enterprise_credentials;
 
@@ -74,6 +75,8 @@ private:
     ModemConnectCallback _modemConnectCallback;
 #ifdef BOARD_TRMNL_X
     String _modemMac;
+    using ModemScanCallback = std::function<std::vector<ExternalNetwork>()>;
+    ModemScanCallback _modemScanCallback;
 #endif
 
     void setUpDNSServer(DNSServer &dnsServer, const IPAddress &localIP);
@@ -93,6 +96,10 @@ public:
     /// @brief Starts WiFi configuration portal.
     /// @return True if successfully connected to provided SSID, false otherwise.
     bool startPortal();
+
+    /// @brief Returns the SSID broadcast by the setup access point (e.g. "TRMNL-4D4CF0").
+    ///        Derived from the eFuse MAC, so it is stable and available before startPortal().
+    String getAPSSID();
 
     /// @brief Checks if any ssid is saved
     /// @return True if any ssis is saved, false otherwise
@@ -121,6 +128,9 @@ public:
 #ifdef BOARD_TRMNL_X
     /// @brief Sets the modem (5 GHz) MAC address shown in the captive portal.
     void setModemMac(const String& mac);
+
+    /// @brief Registers a callback used to re-scan networks via the modem on demand (e.g. Refresh button).
+    void setModemScanCallback(ModemScanCallback cb);
 #endif
 
     /// @brief Sets a callback invoked every portal loop iteration (approx. every 60 ms).

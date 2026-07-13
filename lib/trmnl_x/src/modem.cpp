@@ -10,6 +10,7 @@
 #include "esp_loader_io.h"
 #include "esp32_port.h"
 #include "modem.h"
+#include <string_utils.h>
 
 #if defined (BOARD_TRMNL_X) || defined (BOARD_TRLML_X_EPDIY)
 #include <LittleFS.h>
@@ -438,9 +439,8 @@ std::vector<Modem::ModemNetwork> Modem::scanNetworks() {
 // connectToNetwork() / disconnectFromNetwork()
 // ---------------------------------------------------------------------------
 bool Modem::connectToNetwork(const String& ssid, const String& password) {
-  // Escape backslash and double-quote in ssid/password
-  String s = ssid;      s.replace("\\", "\\\\"); s.replace("\"", "\\\"");
-  String p = password;  p.replace("\\", "\\\\"); p.replace("\"", "\\\"");
+  String s = escape_modem_param(ssid);
+  String p = escape_modem_param(password);
 
   while (ModemSerial.available()) ModemSerial.read();  // flush
 
@@ -509,8 +509,10 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, const String& saveToFil
     }
   }
 
+  String urlParam = escape_modem_param(url);
+
   // Use AT+HTTPURLCFG only when the URL itself is too long to fit inline.
-  bool useUrlCfg = (url.length() + 24 > 256);
+  bool useUrlCfg = (urlParam.length() + 24 > 256);
 
   if (useUrlCfg) {
     Serial.printf("[HTTP] URL %u bytes — using AT+HTTPURLCFG\n", url.length());
@@ -541,7 +543,7 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, const String& saveToFil
     Serial.flush();
     sendCommand("AT+HTTPCLIENT=2,1,\"\",,,2");
   } else {
-    String httpCmd = "AT+HTTPCLIENT=2,1,\"" + url + "\",,,2";
+    String httpCmd = "AT+HTTPCLIENT=2,1,\"" + urlParam + "\",,,2";
     Serial.printf("[HTTP] cmd(%u): %s\n", httpCmd.length(), httpCmd.substring(0, 180).c_str());
     Serial.flush();
     sendCommand(httpCmd.c_str());
@@ -734,7 +736,7 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, const String& saveToFil
 // ---------------------------------------------------------------------------
 // httpGet() — chunk-callback overload: calls chunkCb(data, len) per chunk
 // ---------------------------------------------------------------------------
-Modem::ModemHttpResult Modem::httpGet(const String& url, std::function<bool(const uint8_t*, size_t)> chunkCb, size_t contentLength, const String& reqHeaders) {
+Modem::ModemHttpResult Modem::httpGet(const String& url, std::function<bool(const uint8_t*, size_t)> chunkCb, size_t contentLength, const String& reqHeaders, unsigned long timeoutMs) {
   while (ModemSerial.available()) ModemSerial.read();  // flush
 
   if (!reqHeaders.isEmpty()) {
@@ -760,7 +762,9 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, std::function<bool(cons
     }
   }
 
-  bool useUrlCfg = (url.length() + 24 > 256);
+  String urlParam = escape_modem_param(url);
+
+  bool useUrlCfg = (urlParam.length() + 24 > 256);
   if (useUrlCfg) {
     sendCommand(("AT+HTTPURLCFG=" + String(url.length())).c_str());
     if (waitForResponse(">", 5000).isEmpty()) return {false, 0, "", 0};
@@ -770,7 +774,7 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, std::function<bool(cons
     while (ModemSerial.available()) ModemSerial.read();
     sendCommand("AT+HTTPCLIENT=2,1,\"\",,,2");
   } else {
-    sendCommand(("AT+HTTPCLIENT=2,1,\"" + url + "\",,,2").c_str());
+    sendCommand(("AT+HTTPCLIENT=2,1,\"" + urlParam + "\",,,2").c_str());
   }
 
   enum class ParseState { SCAN, SIZE, DATA };
@@ -797,7 +801,7 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, std::function<bool(cons
 
   unsigned long downloadStart  = 0;
   unsigned long lastProgressMs = 0;
-  unsigned long deadline = millis() + 60000;
+  unsigned long deadline = millis() + timeoutMs;
 
   while (!done && !error && !cbAbort && millis() < deadline) {
     esp_task_wdt_reset();

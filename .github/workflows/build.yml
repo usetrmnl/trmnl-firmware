@@ -20,9 +20,9 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/cache@v5
+      - uses: actions/cache@v6
         with:
           path: |
             ~/.cache/pip
@@ -98,3 +98,9 @@ jobs:
     with:
       include_git_hash_in_firmware_version: false
       filename_suffix_type: git_tag
+
+  publish-dev-builds:
+    needs: build-test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    uses: ./.github/workflows/publish-dev-firmware.yml
+    secrets: inherit

@@ -3,18 +3,18 @@
 
 #define FW_MAJOR_VERSION 1
 #define FW_MINOR_VERSION 8
-#define FW_PATCH_VERSION 6
+#define FW_PATCH_VERSION 9
 
 // Helper macros for stringification
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 
-#ifndef FW_VERSION_SUFFIX
-#define FW_VERSION_SUFFIX ""
+#ifndef FW_COMMIT
+#define FW_COMMIT ""
 #endif
 
 // Compile-time firmware version string
-#define FW_VERSION_STRING TOSTRING(FW_MAJOR_VERSION) "." TOSTRING(FW_MINOR_VERSION) "." TOSTRING(FW_PATCH_VERSION) FW_VERSION_SUFFIX
+#define FW_VERSION_STRING TOSTRING(FW_MAJOR_VERSION) "." TOSTRING(FW_MINOR_VERSION) "." TOSTRING(FW_PATCH_VERSION)
 
 #define LOG_MAX_NOTES_NUMBER 10
 
@@ -46,8 +46,8 @@
 
 #define DISPLAY_BMP_IMAGE_SIZE 48062 // in bytes - 62 bytes - header; 48000 bytes - bitmap (480*800 1bpp) / 8
 #define DEFAULT_IMAGE_SIZE 48000
-#if defined(BOARD_TRMNL_X) || defined(BOARD_TRMNL_X_EPDIY)
-#define MAX_IMAGE_SIZE 750000 // Use PSRAM on the ESP32-S3
+#if defined(BOARD_X_CLASS)
+#define MAX_IMAGE_SIZE 750000 // Use PSRAM on the ESP32-S3 (all X-class boards have PSRAM)
 #else
 #define MAX_IMAGE_SIZE 90000 // largest compressed image we can receive
 #endif
@@ -85,22 +85,25 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #define PIN_INTERRUPT 3
 #define DEVICE_MODEL "og_gen2"
 #elif defined(BOARD_XTEINK_X4)
-#define DEVICE_MODEL "XTEINK_X4"
+#define DEVICE_MODEL "xteink_x4"
 #define PIN_INTERRUPT 3
 #elif defined(BOARD_TRMNL_X)
 #define PIN_INTERRUPT 3
+#define PIN_INTERNAL_SDA 39
+#define PIN_INTERNAL_SCL 40
+#define PIN_INTERNAL_READY GPIO_NUM_3
 #define DEVICE_MODEL "x"
 #elif defined(BOARD_TRMNL_X_EPDIY)
 #define PIN_INTERRUPT 0
 #define DEVICE_MODEL "x"
 #elif defined(BOARD_TRMNL_X_SENSORIAC5)
 #define PIN_INTERRUPT 0
-#define DEVICE_MODEL "Sensoria_C5"
+#define DEVICE_MODEL "sensoria_c5"
 #define SENSOR_SDA 7
 #define SENSOR_SCL 6
 #elif defined(BOARD_TRMNL_X_SENSORIAS3)
 #define PIN_INTERRUPT 0
-#define DEVICE_MODEL "Sensoria_S3"
+#define DEVICE_MODEL "sensoria_s3"
 #define SENSOR_SDA 39
 #define SENSOR_SCL 40
 #elif defined(BOARD_TRMNL_X_LILYGO)
@@ -108,12 +111,12 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #define PIN_INTERRUPT 0
 // to-do: this has a BQ27220 power management chip that can read the battery voltage
 #define FAKE_BATTERY_VOLTAGE
-#define DEVICE_MODEL "LilyGo"
+#define DEVICE_MODEL "lilygo"
 #elif defined(BOARD_TRMNL_X_PAPERS3)
 // touch interrupt
 #define PIN_INTERRUPT 0
 #define FAKE_BATTERY_VOLTAGE
-#define DEVICE_MODEL "PaperS3"
+#define DEVICE_MODEL "paper_s3"
 #elif defined(BOARD_ESP32_C5_DEVKITC_1)
 #define PIN_INTERRUPT 28
 #define DEVICE_MODEL "gen-2"
@@ -123,7 +126,7 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #define FAKE_BATTERY_VOLTAGE
 #elif defined(BOARD_WAVESHARE_397)
 #define PIN_INTERRUPT 0
-#define DEVICE_MODEL "Waveshare_397"
+#define DEVICE_MODEL "waveshare_397"
 #define SENSOR_SDA 41
 #define SENSOR_SCL 42
 #elif defined(BOARD_SEEED_XIAO_ESP32C3)
@@ -147,23 +150,26 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #define PIN_VBAT_SWITCH 6      // load switch enable pin for battery voltage measurement
 #define VBAT_SWITCH_LEVEL HIGH // load switch enable pin active level
 #elif defined(BOARD_SEEED_RETERMINAL_E1001)
-#define DEVICE_MODEL "reTerminal E1001"
+#define DEVICE_MODEL "reterminal_e1001"
 #define PIN_INTERRUPT 3        // the green button
 #define PIN_VBAT_SWITCH 21     // load switch enable pin for battery voltage measurement
 #define VBAT_SWITCH_LEVEL HIGH // load switch enable pin active level
 #elif defined(BOARD_SEEED_RETERMINAL_E1002)
-#define DEVICE_MODEL "reTerminal E1002"
+#define DEVICE_MODEL "reterminal_e1002"
 #define PIN_INTERRUPT 3        // the green button
 #define PIN_VBAT_SWITCH 21     // load switch enable pin for battery voltage measurement
 #define VBAT_SWITCH_LEVEL HIGH // load switch enable pin active level
+#elif defined(BOARD_SEEED_STICKY)
+#define DEVICE_MODEL "reTerminal Sticky"
+#define PIN_INTERRUPT 4        // the power button
 #elif defined(BOARD_SEEED_RETERMINAL_E1003)
 #define PIN_INTERRUPT 3 // green button
 #define PIN_VBAT_SWITCH 40
 #define VBAT_SWITCH_LEVEL HIGH
-#define DEVICE_MODEL "reTerminal E1003"
+#define DEVICE_MODEL "reterminal_e1003"
 #endif
 
-#if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002)
+#if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002) || defined(BOARD_SEEED_RETERMINAL_E1003)
 #define PIN_BATTERY 1
 #elif defined(BOARD_XTEINK_X4)
 #define PIN_BATTERY 0
