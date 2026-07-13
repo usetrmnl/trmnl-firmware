@@ -123,13 +123,13 @@ bool filesystem_read_from_file(const char *name, uint8_t *out_buffer, size_t siz
  */
 void filesystem_purge_old_file(const char *name)
 {
-uint32_t u32;
-time_t tt;
+uint32_t timestamp;
+time_t now;
 File rootDir; 
 char *s, szTemp[32];
 bool bDel;
 
-    time(&tt); // get the current epoch time
+    time(&now); // get the current epoch time
     rootDir = FS.open("/");
     while (File file = rootDir.openNextFile()) {
         Log_info("Checking file \"%s\" for deletion", file.name());
@@ -141,18 +141,18 @@ bool bDel;
         }
 
         s = (char *)file.name();
-        // The last 10 characters of the name are the epoch timestamp
-        u32 = (uint32_t) atoi(&s[strlen(s)-10]);
+
+        timestamp = filesystem_extract_timestamp(s);
         bDel = false;
 
         strcpy(szTemp, "/"); // needed on this file operation
         strcat(szTemp, file.name());
 
-        Log_info("Comparing name %s with %s, timestamp %u, current time %u", name, file.name(), u32, (uint32_t)tt);
-        if (memcmp(name, szTemp, 14) == 0) { // older version of the same file
+        Log_info("Comparing name %s with %s, timestamp %u, current time %u", name, file.name(), timestamp, (uint32_t)now);
+        if (strncmp(name, szTemp, 14) == 0) { // older version of the same file
             Log_info("Deleting older version of plugin image %s - %s", name, file.name());
             bDel = true;
-        } else if ((uint32_t)tt - u32 > 60*60*24) { // More than 24h old
+        } else if ((uint32_t)now > timestamp + 60*60*24) { // More than 24h old, or no timestamp
             Log_info("Deleting image older than 24h - %s", file.name());
             bDel = true;
         }
@@ -314,4 +314,29 @@ void list_files()
         Log_info("  %d  %s", file.size(), file.name());
     }
     rootDir.close();
+}
+
+uint32_t filesystem_extract_timestamp(const char *filename)
+{
+    if (strlen(filename) < 10)
+    {
+        return 0;
+    }
+
+    const char *szTimestamp = &filename[strlen(filename)-10];
+    bool is_numeric = true;
+
+    for (int i = 0; i < 10 && is_numeric; i++) 
+    {
+        is_numeric = (szTimestamp[i] >= '0' && szTimestamp[i] <= '9');
+    }
+
+    if (is_numeric)
+    {
+        return (uint32_t) atoi(szTimestamp);
+    }
+    else
+    {
+        return 0;
+    }
 }

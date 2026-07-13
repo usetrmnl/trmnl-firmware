@@ -546,22 +546,6 @@ static void iqs323_do_prepare_sleep(void)
         Serial.println("IQS323 Task: Reset detected before sleep");
     }
 
-    // Perform Re-ATI before sleep to ensure proper calibration on wake
-    Serial.println("IQS323 Task: Triggering Re-ATI before sleep");
-    iqs323.ReATI(STOP);
-
-    // Wait for ATI to complete
-    uint32_t ati_start = millis();
-    while (iqs323.readATIactive() && (millis() - ati_start) < 500) {
-        vTaskDelay(pdMS_TO_TICKS(10));
-    }
-
-    if (iqs323.readATIactive()) {
-        Serial.println("IQS323 Task: ATI still active after timeout before sleep");
-    } else {
-        Serial.println("IQS323 Task: Re-ATI completed before sleep");
-    }
-
     // Activate event mode for low-power operation during sleep
     // In event mode, IQS323 only opens communication windows on touch events
     Serial.println("IQS323 Task: Activating event mode for sleep");
