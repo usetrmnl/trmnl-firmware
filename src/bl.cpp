@@ -1087,7 +1087,7 @@ void bl_init(void)
 #ifdef BOARD_TRMNL_X
 
     if (!otg_message && WifiCaptivePortal.isSaved()) {
-      display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false);
+      display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false, true);
       if (has_pending_indicator) {
         display_draw_touchbar_indicator(pending_indicator_side, pending_indicator_filled);
         has_pending_indicator = false;
@@ -1096,8 +1096,8 @@ void bl_init(void)
     else if (!WifiCaptivePortal.isSaved()) {
       showMessageWithLogo(NONE);
     }
-#else 
-    display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false);
+#else
+    display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false, true);
 #endif // BOARD_TRMNL_X
     // Force the display to show the current playlist image after the loading screen
     // (even if it hasn't changed)
@@ -1291,7 +1291,7 @@ void bl_init(void)
   WifiCredentials hardcodedCreds = {.ssid = "ssid-goes-here", .pswd = "password-goes-here"};
   Log_info("Hardcoded WiFi: connecting to SSID '%s'", hardcodedCreds.ssid.c_str());
   auto connectResult = WifiCaptivePortal.connect(hardcodedCreds);
-  Log_info("Hardcoded WiFi: connect result '%s'", wifiStatusStr(connectResult));
+  Log_info("Hardcoded WiFi: connect result '%s'", wifiStatusStr(connectResult.status));
 // goToSleep();
 #else
 

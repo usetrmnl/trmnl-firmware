@@ -28,6 +28,8 @@
 #define WIFI_CONNECTION_ATTEMPTS 3
 // Define max connection timeout
 #define CONNECTION_TIMEOUT 15000
+// Shorter timeout for fast-connect attempt (specific BSSID+channel); falls back to full scan on expiry
+#define WIFI_FAST_CONNECT_TIMEOUT 5000
 
 #define WIFI_SSID_KEY(i) ("wifi_" + String(i) + "_ssid").c_str()
 #define WIFI_PSWD_KEY(i) ("wifi_" + String(i) + "_pswd").c_str()
@@ -43,7 +45,18 @@
 #define WIFI_STATIC_DNS2_KEY(i) ("wifi_" + String(i) + "_dns2").c_str()
 #define WIFI_USE_STATIC_KEY(i) ("wifi_" + String(i) + "_usip").c_str()
 
+#define WIFI_BSSID_KEY(i) ("wifi_" + String(i) + "_bssid").c_str()
+#define WIFI_CHAN_KEY(i)   ("wifi_" + String(i) + "_chan").c_str()
+#define WIFI_FULLSCAN_KEY(i) ("wifi_" + String(i) + "_fscan").c_str()
+
 #define WIFI_LAST_INDEX "wifi_last_index"
+
+// Minimum RSSI (dBm) to keep a fast-connect result; weaker signal triggers a full scan
+#define WIFI_FAST_CONNECT_MIN_RSSI (-75)
+
+// Force a full channel scan at least this often, even if the cached BSSID still connects fine,
+// so the device can roam to a better AP/channel.
+#define WIFI_FULL_SCAN_INTERVAL_SEC (24UL * 60 * 60)
 
 struct ExternalNetwork {
     String  ssid;
@@ -85,13 +98,13 @@ private:
     void saveLastUsedWifiIndex(int index);
     int readLastUsedWifiIndex();
     void saveApiServer(String url);
-    bool tryConnectWithRetries(const WifiCredentials creds, int last_used_index);
+    bool tryConnectWithRetries(WifiCredentials creds, int last_used_index);
     std::vector<WifiCredentials> matchNetworks(std::vector<WifiNetwork> &scanResults, WifiCredentials wifiCredentials[]);
     std::vector<WifiNetwork> getScannedUniqueNetworks(bool runScan);
     std::vector<WifiNetwork> combineNetworks(std::vector<WifiNetwork> &scanResults, WifiCredentials wifiCredentials[]);
 
 public:
-    wl_status_t connect(const WifiCredentials credentials);
+    WifiConnectionResult connect(const WifiCredentials credentials);
 
     /// @brief Starts WiFi configuration portal.
     /// @return True if successfully connected to provided SSID, false otherwise.
