@@ -33,6 +33,7 @@ void setup()
   RUN_TEST(connect_to_wifi);
 
   test_api_setup();
+  test_tls_resume();
   // test_api_display();
   // test_wifi(); // must be last in the suite, until production bug is fixed
 

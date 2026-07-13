@@ -9,3 +9,4 @@ void test_smoke(void);       // smoke_tests.cpp
 void test_wifi(void);        // wifi_tests.cpp
 void test_api_setup(void);   // api_setup_tests.cpp
 void test_api_display(void); // api_display_tests.cpp
+void test_tls_resume(void);  // tls_resume_tests.cpp
