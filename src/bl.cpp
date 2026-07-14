@@ -175,10 +175,6 @@ static touchbar_side_t pending_indicator_side = TOUCHBAR_LEFT;
 static bool pending_indicator_filled = false;
 static bool has_pending_indicator = false;
 
-#define SENSOR_SDA_PIN 39
-#define SENSOR_SCL_PIN 40
-#define SENSOR_READY_PIN GPIO_NUM_3
-
 // WiFi reset confirmation constants
 #define WIFI_RESET_CONFIRMATION_TIMEOUT_MS 15000
 #define WIFI_RESET_POLL_INTERVAL_MS 100
@@ -836,6 +832,13 @@ void sensor_init(void)
  */
 void bl_init(void)
 {
+#ifdef BOARD_SEEED_STICKY
+  pinMode(45, OUTPUT); // power hold (DATA)
+  pinMode(46, OUTPUT); // power lock (CLK)
+  digitalWrite(45, 1);
+  digitalWrite(46, 0);
+  digitalWrite(46, 1); // Hold the battery power enabled for after the user releases the power button
+#endif
 #ifdef BOARD_TRMNL_X
   uint32_t init_time = esp_cpu_get_cycle_count() / esp_rom_get_cpu_ticks_per_us();
 #else
@@ -1084,7 +1087,7 @@ void bl_init(void)
 #ifdef BOARD_TRMNL_X
 
     if (!otg_message && WifiCaptivePortal.isSaved()) {
-      display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false);
+      display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false, true);
       if (has_pending_indicator) {
         display_draw_touchbar_indicator(pending_indicator_side, pending_indicator_filled);
         has_pending_indicator = false;
@@ -1093,8 +1096,8 @@ void bl_init(void)
     else if (!WifiCaptivePortal.isSaved()) {
       showMessageWithLogo(NONE);
     }
-#else 
-    display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false);
+#else
+    display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false, true);
 #endif // BOARD_TRMNL_X
     // Force the display to show the current playlist image after the loading screen
     // (even if it hasn't changed)
@@ -1113,14 +1116,14 @@ void bl_init(void)
 
   if (battery_count != BATTERY_NONE) {
     bool bBQ27Alive = false;
-    if (!lipo.begin(SENSOR_SDA_PIN, SENSOR_SCL_PIN)) {
+    if (!lipo.begin(PIN_INTERNAL_SDA, PIN_INTERNAL_SCL)) {
       BQ27427_reset(); // try resetting the chip
       delay(300); // BQ27427 needs 250 ms to power up
-      if (!lipo.begin(SENSOR_SDA_PIN, SENSOR_SCL_PIN)) { // try again
+      if (!lipo.begin(PIN_INTERNAL_SDA, PIN_INTERNAL_SCL)) { // try again
       // If communication fails, print an error message and loop forever.
         Log_error("Error: Unable to communicate with BQ27427.");
-        gpio_dump_io_configuration(stdout, (1ULL << 39));
-        gpio_dump_io_configuration(stdout, (1ULL << 40));
+        gpio_dump_io_configuration(stdout, (1ULL << PIN_INTERNAL_SDA));
+        gpio_dump_io_configuration(stdout, (1ULL << PIN_INTERNAL_SCL));
       } else {
         bBQ27Alive = true;
       }
@@ -1240,17 +1243,35 @@ void bl_init(void)
   // Only scan when no credentials are saved (i.e. captive portal will be shown). 
   if (g_modem && !WifiCaptivePortal.isSaved())
   {
+    // The modem is a separate radio and can see the device's own captive-portal
+    // SoftAP over the air; exclude it so it never shows up as a connectable network.
+    String ownApSsid = WifiCaptivePortal.getAPSSID();
+
     Log_info("No saved credentials — scanning networks via modem...");
     auto modemNets = g_modem->scanNetworks();
     Log_info("Modem found %d network(s)", modemNets.size());
     std::vector<ExternalNetwork> nets;
-    for (auto& n : modemNets)
+    for (auto& n : modemNets) {
+      if (n.ssid == ownApSsid) continue;
       nets.push_back({n.ssid, n.rssi, n.open, n.is5GHz});
+    }
     WifiCaptivePortal.setNetworks(nets);
 
     // Register callback so captive portal can connect 5 GHz networks via modem
     WifiCaptivePortal.setModemConnectCallback([](const String& ssid, const String& pass) {
       return g_modem->connectToNetwork(ssid, pass);
+    });
+
+    // Register callback so the captive portal's Refresh button can trigger a fresh modem scan
+    WifiCaptivePortal.setModemScanCallback([ownApSsid]() {
+      auto modemNets = g_modem->scanNetworks();
+      Log_info("Modem re-scan found %d network(s)", modemNets.size());
+      std::vector<ExternalNetwork> nets;
+      for (auto& n : modemNets) {
+        if (n.ssid == ownApSsid) continue;
+        nets.push_back({n.ssid, n.rssi, n.open, n.is5GHz});
+      }
+      return nets;
     });
 
     String modemMac = g_modem->getMacAddress();
@@ -1270,7 +1291,7 @@ void bl_init(void)
   WifiCredentials hardcodedCreds = {.ssid = "ssid-goes-here", .pswd = "password-goes-here"};
   Log_info("Hardcoded WiFi: connecting to SSID '%s'", hardcodedCreds.ssid.c_str());
   auto connectResult = WifiCaptivePortal.connect(hardcodedCreds);
-  Log_info("Hardcoded WiFi: connect result '%s'", wifiStatusStr(connectResult));
+  Log_info("Hardcoded WiFi: connect result '%s'", wifiStatusStr(connectResult.status));
 // goToSleep();
 #else
 
@@ -3349,8 +3370,17 @@ void goToSleep(void)
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
 #endif
 #ifdef BOARD_XTEINK_X4
+// The Xteink X4 has a high current draw in deep sleep (3-4mA), so allow the user to select
+// if they want to completely shut down the power and only update with a physical button press
+// or have short battery life (5-7 days) in the normal TRMNL wakeup mode
+#ifdef X4_WAKE_ON_BUTTON
+  pinMode(13, OUTPUT);
+  digitalWrite(13, 0); // cut off the battery power
+  delay(100); // allow it to settle before going into power-off
+#else // Keep the battery power on and allow timed wakeup
   gpio_hold_en(GPIO_NUM_13); // MOSFET enabling the battery power
   gpio_deep_sleep_hold_en(); // Needed to keep the battery power enabled during RTC sleep
+#endif
 #endif
   esp_deep_sleep_start();
 }

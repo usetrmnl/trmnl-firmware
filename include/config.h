@@ -3,106 +3,109 @@
 
 #define FW_MAJOR_VERSION 1
 #define FW_MINOR_VERSION 8
-#define FW_PATCH_VERSION 9
+#define FW_PATCH_VERSION 10
 
 // Helper macros for stringification
-#define STRINGIFY(x)     #x
-#define TOSTRING(x)      STRINGIFY(x)
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
 
 #ifndef FW_COMMIT
 #define FW_COMMIT ""
 #endif
 
 // Compile-time firmware version string
-#define FW_VERSION_STRING    TOSTRING(FW_MAJOR_VERSION) "." TOSTRING(FW_MINOR_VERSION) "." TOSTRING(FW_PATCH_VERSION)
+#define FW_VERSION_STRING TOSTRING(FW_MAJOR_VERSION) "." TOSTRING(FW_MINOR_VERSION) "." TOSTRING(FW_PATCH_VERSION)
 
 #define LOG_MAX_NOTES_NUMBER 10
 
-#define PREFERENCES_API_KEY  "api_key"
-#define PREFERENCES_API_KEY_DEFAULT          ""
-#define PREFERENCES_API_URL                  "api_url"
-#define PREFERENCES_FRIENDLY_ID              "friendly_id"
-#define PREFERENCES_FRIENDLY_ID_DEFAULT      ""
-#define PREFERENCES_SLEEP_TIME_KEY           "refresh_rate"
-#define PREFERENCES_TEMP_PROFILE             "temp_profile"
-#define PREFERENCES_LOG_KEY                  "log_"
-#define PREFERENCES_LOG_BUFFER_HEAD_KEY      "log_head"
-#define PREFERENCES_LOG_ID_KEY               "log_id"
-#define PREFERENCES_DEVICE_REGISTERED_KEY    "plugin"
-#define PREFERENCES_SF_KEY                   "sf"
-#define PREFERENCES_FILENAME_KEY             "filename"
-#define PREFERENCES_CURRENT_PATH_KEY         "curr_path"
-#define PREFERENCES_LAST_PATH_KEY            "last_path"
-#define PREFERENCES_PLAYLIST_ORDER_KEY       "playlist_order"
-#define PREFERENCES_BROWSE_PATH_KEY          "browse_path"
-#define MAX_CACHED_IMAGES                    30
-#define PREFERENCES_LAST_SLEEP_TIME          "last_sleep"
-#define PREFERENCES_CONNECT_API_RETRY_COUNT  "retry_count"
+#define PREFERENCES_API_KEY "api_key"
+#define PREFERENCES_API_KEY_DEFAULT ""
+#define PREFERENCES_API_URL "api_url"
+#define PREFERENCES_FRIENDLY_ID "friendly_id"
+#define PREFERENCES_FRIENDLY_ID_DEFAULT ""
+#define PREFERENCES_SLEEP_TIME_KEY "refresh_rate"
+#define PREFERENCES_TEMP_PROFILE "temp_profile"
+#define PREFERENCES_LOG_KEY "log_"
+#define PREFERENCES_LOG_BUFFER_HEAD_KEY "log_head"
+#define PREFERENCES_LOG_ID_KEY "log_id"
+#define PREFERENCES_DEVICE_REGISTERED_KEY "plugin"
+#define PREFERENCES_SF_KEY "sf"
+#define PREFERENCES_FILENAME_KEY "filename"
+#define PREFERENCES_CURRENT_PATH_KEY "curr_path"
+#define PREFERENCES_LAST_PATH_KEY "last_path"
+#define PREFERENCES_PLAYLIST_ORDER_KEY "playlist_order"
+#define PREFERENCES_BROWSE_PATH_KEY "browse_path"
+#define MAX_CACHED_IMAGES 30
+#define PREFERENCES_LAST_SLEEP_TIME "last_sleep"
+#define PREFERENCES_CONNECT_API_RETRY_COUNT "retry_count"
 #define PREFERENCES_CONNECT_WIFI_RETRY_COUNT "wifi_retry"
-#define PREFERENCES_TOUCHBAR_MODE_KEY        "touchbar_mode"
-#define PREFERENCES_LAST_OTA                 "last_ota"
+#define PREFERENCES_TOUCHBAR_MODE_KEY "touchbar_mode"
+#define PREFERENCES_LAST_OTA "last_ota"
 
-#define WIFI_CONNECTION_RSSI                 (-100)
+#define WIFI_CONNECTION_RSSI (-100)
 
 #define DISPLAY_BMP_IMAGE_SIZE 48062 // in bytes - 62 bytes - header; 48000 bytes - bitmap (480*800 1bpp) / 8
-#define DEFAULT_IMAGE_SIZE     48000
+#define DEFAULT_IMAGE_SIZE 48000
 #if defined(BOARD_X_CLASS)
 #define MAX_IMAGE_SIZE 750000 // Use PSRAM on the ESP32-S3 (all X-class boards have PSRAM)
 #else
 #define MAX_IMAGE_SIZE 90000 // largest compressed image we can receive
 #endif
-#define SLEEP_uS_TO_S_FACTOR                 1000000           /* Conversion factor for micro seconds to seconds */
-#define SLEEP_TIME_TO_SLEEP                  900                /* Time ESP32 will go to sleep (in seconds) */
-#define SLEEP_TIME_WHILE_NOT_CONNECTED       5       /* Time ESP32 will go to sleep (in seconds) */
+#define SLEEP_uS_TO_S_FACTOR 1000000           /* Conversion factor for micro seconds to seconds */
+#define SLEEP_TIME_TO_SLEEP 900                /* Time ESP32 will go to sleep (in seconds) */
+#define SLEEP_TIME_WHILE_NOT_CONNECTED 5       /* Time ESP32 will go to sleep (in seconds) */
 #define SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED 5 /* Time ESP32 will go to sleep (in seconds) */
 
 // Different display profiles
-#define TEMP_PROFILE_DEFAULT                 0
-#define TEMP_PROFILE_A                       1
-#define TEMP_PROFILE_B                       2
-#define TEMP_PROFILE_C                       3
+#define TEMP_PROFILE_DEFAULT 0
+#define TEMP_PROFILE_A 1
+#define TEMP_PROFILE_B 2
+#define TEMP_PROFILE_C 3
 
-#define MS_TO_S_FACTOR                       1000 /* Conversion factor for milliseconds to seconds */
+#define MS_TO_S_FACTOR 1000 /* Conversion factor for milliseconds to seconds */
 
 enum API_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the API (in seconds)
 {
-  API_FIRST_RETRY = 15,
-  API_SECOND_RETRY = 30,
-  API_THIRD_RETRY = 60
+    API_FIRST_RETRY = 15,
+    API_SECOND_RETRY = 30,
+    API_THIRD_RETRY = 60
 };
 
 enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi-Fi (in seconds)
 {
-  WIFI_FIRST_RETRY = 60,
-  WIFI_SECOND_RETRY = 180,
-  WIFI_THIRD_RETRY = 300
+    WIFI_FIRST_RETRY = 60,
+    WIFI_SECOND_RETRY = 180,
+    WIFI_THIRD_RETRY = 300
 };
 
 #if defined(BOARD_TRMNL) || defined(BOARD_TRMNL_4CLR)
 #define PIN_INTERRUPT 2
-#define DEVICE_MODEL  "og"
+#define DEVICE_MODEL "og"
 #elif defined(BOARD_TRMNL_GEN2)
 #define PIN_INTERRUPT 3
-#define DEVICE_MODEL  "og_gen2"
+#define DEVICE_MODEL "og_gen2"
 #elif defined(BOARD_XTEINK_X4)
-#define DEVICE_MODEL  "xteink_x4"
+#define DEVICE_MODEL "xteink_x4"
 #define PIN_INTERRUPT 3
 #elif defined(BOARD_TRMNL_X)
 #define PIN_INTERRUPT 3
-#define DEVICE_MODEL  "x"
+#define PIN_INTERNAL_SDA 39
+#define PIN_INTERNAL_SCL 40
+#define PIN_INTERNAL_READY GPIO_NUM_3
+#define DEVICE_MODEL "x"
 #elif defined(BOARD_TRMNL_X_EPDIY)
 #define PIN_INTERRUPT 0
-#define DEVICE_MODEL  "x"
+#define DEVICE_MODEL "x"
 #elif defined(BOARD_TRMNL_X_SENSORIAC5)
 #define PIN_INTERRUPT 0
-#define DEVICE_MODEL  "sensoria_c5"
-#define SENSOR_SDA    7
-#define SENSOR_SCL    6
+#define DEVICE_MODEL "sensoria_c5"
+#define SENSOR_SDA 7
+#define SENSOR_SCL 6
 #elif defined(BOARD_TRMNL_X_SENSORIAS3)
 #define PIN_INTERRUPT 0
-#define DEVICE_MODEL  "sensoria_s3"
-#define SENSOR_SDA    39
-#define SENSOR_SCL    40
+#define DEVICE_MODEL "sensoria_s3"
+#define SENSOR_SDA 39
+#define SENSOR_SCL 40
 #elif defined(BOARD_TRMNL_X_LILYGO)
 // touch interrupt
 #define PIN_INTERRUPT 0
@@ -116,26 +119,25 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #define DEVICE_MODEL "paper_s3"
 #elif defined(BOARD_ESP32_C5_DEVKITC_1)
 #define PIN_INTERRUPT 28
-#define DEVICE_MODEL  "gen-2"
+#define DEVICE_MODEL "gen-2"
 #elif defined(BOARD_WAVESHARE_ESP32_DRIVER)
 #define PIN_INTERRUPT 33
-#define DEVICE_MODEL  "waveshare"
+#define DEVICE_MODEL "waveshare"
 #define FAKE_BATTERY_VOLTAGE
 #elif defined(BOARD_WAVESHARE_397)
 #define PIN_INTERRUPT 0
-#define DEVICE_MODEL  "waveshare_397"
-#define SENSOR_SDA    41
-#define SENSOR_SCL    42
+#define DEVICE_MODEL "waveshare_397"
+#define SENSOR_SDA 41
+#define SENSOR_SCL 42
 #elif defined(BOARD_SEEED_XIAO_ESP32C3)
 #define DEVICE_MODEL "seeed_esp32c3"
-#define PIN_INTERRUPT                                                                                                  \
-  9 // the boot button on the XIAO ESP32-C3, this button can't be used as wakeup  source though
+#define PIN_INTERRUPT 9 // the boot button on the XIAO ESP32-C3, this button can't be used as wakeup  source though
                         // because it's not in the RTC GPIO group. Instead, you can always use the reset button to
-    // wake up the device. Resetting WiFi configuration needs special routine - press reset button
-    // then press the boot button in less than 2 seconds, and hold it for 5 seconds.
+                        // wake up the device. Resetting WiFi configuration needs special routine - press reset button
+                        // then press the boot button in less than 2 seconds, and hold it for 5 seconds.
 #define FAKE_BATTERY_VOLTAGE
 #elif defined(BOARD_SEEED_XIAO_ESP32S3)
-#define DEVICE_MODEL  "seeed_esp32s3"
+#define DEVICE_MODEL "seeed_esp32s3"
 #define PIN_INTERRUPT 0 // the boot button on the XIAO ESP32-S3, this button works as regular wakeup button
 #define FAKE_BATTERY_VOLTAGE
 #elif (defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_XIAO_EPAPER_DISPLAY_3CLR))
@@ -143,29 +145,31 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #ifdef MINI_EPD
 #define PIN_INTERRUPT 2 // with silkscreen "KEY1"
 #else
-#define PIN_INTERRUPT 5 // with silkscreen "KEY3"
-#endif // !MINI_EPD
-#define PIN_VBAT_SWITCH   6 // load switch enable pin for battery voltage measurement
+#define PIN_INTERRUPT 5        // with silkscreen "KEY3"
+#endif                         // !MINI_EPD
+#define PIN_VBAT_SWITCH 6      // load switch enable pin for battery voltage measurement
 #define VBAT_SWITCH_LEVEL HIGH // load switch enable pin active level
 #elif defined(BOARD_SEEED_RETERMINAL_E1001)
-#define DEVICE_MODEL      "reterminal_e1001"
-#define PIN_INTERRUPT     3 // the green button
-#define PIN_VBAT_SWITCH   21 // load switch enable pin for battery voltage measurement
+#define DEVICE_MODEL "reterminal_e1001"
+#define PIN_INTERRUPT 3        // the green button
+#define PIN_VBAT_SWITCH 21     // load switch enable pin for battery voltage measurement
 #define VBAT_SWITCH_LEVEL HIGH // load switch enable pin active level
 #elif defined(BOARD_SEEED_RETERMINAL_E1002)
-#define DEVICE_MODEL      "reterminal_e1002"
-#define PIN_INTERRUPT     3 // the green button
-#define PIN_VBAT_SWITCH   21 // load switch enable pin for battery voltage measurement
+#define DEVICE_MODEL "reterminal_e1002"
+#define PIN_INTERRUPT 3        // the green button
+#define PIN_VBAT_SWITCH 21     // load switch enable pin for battery voltage measurement
 #define VBAT_SWITCH_LEVEL HIGH // load switch enable pin active level
+#elif defined(BOARD_SEEED_STICKY)
+#define DEVICE_MODEL "reTerminal Sticky"
+#define PIN_INTERRUPT 4        // the power button
 #elif defined(BOARD_SEEED_RETERMINAL_E1003)
-#define PIN_INTERRUPT     3 // green button
-#define PIN_VBAT_SWITCH   40
+#define PIN_INTERRUPT 3 // green button
+#define PIN_VBAT_SWITCH 40
 #define VBAT_SWITCH_LEVEL HIGH
-#define DEVICE_MODEL      "reterminal_e1003"
+#define DEVICE_MODEL "reterminal_e1003"
 #endif
 
-#if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001) ||                                     \
-  defined(BOARD_SEEED_RETERMINAL_E1002) || defined(BOARD_SEEED_RETERMINAL_E1003)
+#if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002) || defined(BOARD_SEEED_RETERMINAL_E1003)
 #define PIN_BATTERY 1
 #elif defined(BOARD_XTEINK_X4)
 #define PIN_BATTERY 0
@@ -175,12 +179,12 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 
 // #define FAKE_BATTERY_VOLTAGE // Uncomment to report 4.2V instead of reading ADC
 
-#define BUTTON_HOLD_TIME           5000
-#define BUTTON_MEDIUM_HOLD_TIME    1000
-#define BUTTON_SOFT_RESET_TIME     15000
+#define BUTTON_HOLD_TIME 5000
+#define BUTTON_MEDIUM_HOLD_TIME 1000
+#define BUTTON_SOFT_RESET_TIME 15000
 #define BUTTON_DOUBLE_CLICK_WINDOW 800
 
-#define SERVER_MAX_RETRIES         3
-#define API_BASE_URL               "https://trmnl.app"
+#define SERVER_MAX_RETRIES 3
+#define API_BASE_URL "https://trmnl.app"
 
 #endif
