@@ -1633,10 +1633,9 @@ PNG *png = new PNG();
                 } // temp profile needs the second plane written
             } else { // 2-bpp (or greater, but reduced to 2-bpp)
                 bbep.setPanelType(dpList[iTempProfile].TwoBit);
-#if defined( MINI_EPD ) || defined (MINI_EPD2)
-                Log_info("2-bit 4.26 re-init");
-                bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
-#endif
+                if (bbep.getPanelType() == EP426_800x480_4GRAY || bbep.getPanelType() == EP397_800x480_4GRAY) {
+                    bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
+                }
                 rc = REFRESH_FULL; // 4gray mode must be full refresh
                 iUpdateCount = 0; // grayscale mode resets the partial update counter
                 bbep.startWrite(PLANE_0); // start writing image data to plane 0
@@ -1681,7 +1680,7 @@ PNG *png = new PNG();
  * @param reverse shows if the color scheme is reverse
  * @return none
  */
-void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
+void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool bSkipClear)
 
 {
     bool isPNG = data_size >= 4 && MOTOLONG(image_buffer) == (int32_t)0x89504e47;
@@ -1716,10 +1715,12 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     }
 #endif
 #ifdef BB_EPAPER
-#if defined( MINI_EPD ) || defined (MINI_EPD2)
-        Log_info("4.26 1-bit re-init");
+    if (i426Workaround && bbep.getPanelType() == dpList[iTempProfile].OneBit) {
+        // After a partial update, the 3.97" & 4.26" 800x480 needs to be 'reset' to accept writes
+        // This is only needed if the user pressed the WAKE button and there will be 2 updates
+        // while the power is on
         bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
-#endif // MINI_EPD
+    }
 #endif // BB_EPAPER
     if (isPNG == true && data_size < MAX_IMAGE_SIZE)
     {
@@ -1786,11 +1787,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
         }
 #ifdef BB_EPAPER
 #ifndef BOARD_SEEED_RETERMINAL_E1002
-#if defined( MINI_EPD ) || defined (MINI_EPD2)
-        bbep.writePlane(PLANE_FALSE_DIFF);
-#else
         bbep.writePlane(); // send image data to the EPD
-#endif
 #endif // !BOARD_SEEED_RETERMINAL_E1002
         iRefreshMode = REFRESH_PARTIAL;
 #endif // BB_EPAPER
@@ -1821,6 +1818,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
     bbep.setLightSleep(false);
 #else
     bbep.setLightSleep(true);
+
 #endif // DO_NOT_LIGHT_SLEEP
 #endif // !BOARD_SEEED_RETERMINAL_E1002
     if (!display_update_epaper(iRefreshMode, bWait)) {
@@ -1829,6 +1827,10 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
             bbep.freeBuffer();
         }
         return;
+    }
+
+    if ((bbep.getPanelType() == EP426_800x480 || bbep.getPanelType() == EP426_800x480_4GRAY || bbep.getPanelType() == EP397_800x480 || bbep.getPanelType() == EP397_800x480_4GRAY) && iRefreshMode == REFRESH_PARTIAL) {
+        i426Workaround = 1; // need to re-initialize the controller for another update before sleeping
     }
     if (bAlloc) {
         bbep.freeBuffer();
@@ -1843,8 +1845,12 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait)
  //       bbep.setPasses(6,6);
  //       bbep.partialUpdate(false); // we have a previous image to diff against; use a non-flickering update
  //   } else {
-        int iClearMode = ((iUpdateCount & 7) == 0 || (iTempProfile > 0)) ? CLEAR_SLOW : CLEAR_FAST;
-        Log_info("fullUpdate clear mode = %d\n", iClearMode); 
+        // bWait=false means loading screen: skip clearing passes so it appears
+        // faster. Ghosting from the previous image is acceptable since the
+        // real content refresh (bWait=true) immediately follows.
+        int iClearMode = bSkipClear ? CLEAR_NONE
+                                   : ((iUpdateCount & 7) == 0 || (iTempProfile > 0)) ? CLEAR_SLOW : CLEAR_FAST;
+        Log_info("fullUpdate clear mode = %d\n", iClearMode);
         bbep.fullUpdate(iClearMode, false);
  //   }
  }

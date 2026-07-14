@@ -1,5 +1,6 @@
-#include <WiFiType.h>
-#include <Arduino.h>
+#include "wifi-helpers.h"
+#include <WiFi.h>
+#include "esp_netif.h"
 
 struct WifiStatusNode
 {
@@ -7,7 +8,7 @@ struct WifiStatusNode
   wl_status_t value;
 };
 
-inline const char *wifiStatusStr(wl_status_t wifi_status)
+const char *wifiStatusStr(wl_status_t wifi_status)
 {
   static const WifiStatusNode wifiStatusMap[] = {
     {"no_shield", WL_NO_SHIELD},
@@ -23,9 +24,18 @@ inline const char *wifiStatusStr(wl_status_t wifi_status)
   for (const WifiStatusNode &entry : wifiStatusMap)
   {
     if (wifi_status == entry.value)
-    {
       return entry.name;
-    }
   }
   return nullptr;
+}
+
+void applyWifiHostname(const String &hostname)
+{
+  if (hostname.length() == 0)
+    return;
+
+  WiFi.setHostname(hostname.c_str());
+  esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+  if (netif != nullptr)
+    esp_netif_set_hostname(netif, hostname.c_str());
 }

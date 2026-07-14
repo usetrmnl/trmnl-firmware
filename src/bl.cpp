@@ -851,6 +851,9 @@ void bl_init(void)
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
 #endif
   Log_info("BL init success");
+
+  WifiCaptivePortal.setHostname(getWifiClientHostname());
+
 #ifdef BOARD_TRMNL_X
   bool bModemNeeded = false;
   Log.info("%s [%d]: Checking if we need to use the ESP32-C5 modem...\r\n", __FILE__, __LINE__);
@@ -1087,7 +1090,7 @@ void bl_init(void)
 #ifdef BOARD_TRMNL_X
 
     if (!otg_message && WifiCaptivePortal.isSaved()) {
-      display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false);
+      display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false, true);
       if (has_pending_indicator) {
         display_draw_touchbar_indicator(pending_indicator_side, pending_indicator_filled);
         has_pending_indicator = false;
@@ -1096,8 +1099,8 @@ void bl_init(void)
     else if (!WifiCaptivePortal.isSaved()) {
       showMessageWithLogo(NONE);
     }
-#else 
-    display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false);
+#else
+    display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false, true);
 #endif // BOARD_TRMNL_X
     // Force the display to show the current playlist image after the loading screen
     // (even if it hasn't changed)
@@ -1243,17 +1246,35 @@ void bl_init(void)
   // Only scan when no credentials are saved (i.e. captive portal will be shown). 
   if (g_modem && !WifiCaptivePortal.isSaved())
   {
+    // The modem is a separate radio and can see the device's own captive-portal
+    // SoftAP over the air; exclude it so it never shows up as a connectable network.
+    String ownApSsid = WifiCaptivePortal.getAPSSID();
+
     Log_info("No saved credentials — scanning networks via modem...");
     auto modemNets = g_modem->scanNetworks();
     Log_info("Modem found %d network(s)", modemNets.size());
     std::vector<ExternalNetwork> nets;
-    for (auto& n : modemNets)
+    for (auto& n : modemNets) {
+      if (n.ssid == ownApSsid) continue;
       nets.push_back({n.ssid, n.rssi, n.open, n.is5GHz});
+    }
     WifiCaptivePortal.setNetworks(nets);
 
     // Register callback so captive portal can connect 5 GHz networks via modem
     WifiCaptivePortal.setModemConnectCallback([](const String& ssid, const String& pass) {
-      return g_modem->connectToNetwork(ssid, pass);
+      return g_modem->connectToNetwork(ssid, pass, getWifiClientHostname());
+    });
+
+    // Register callback so the captive portal's Refresh button can trigger a fresh modem scan
+    WifiCaptivePortal.setModemScanCallback([ownApSsid]() {
+      auto modemNets = g_modem->scanNetworks();
+      Log_info("Modem re-scan found %d network(s)", modemNets.size());
+      std::vector<ExternalNetwork> nets;
+      for (auto& n : modemNets) {
+        if (n.ssid == ownApSsid) continue;
+        nets.push_back({n.ssid, n.rssi, n.open, n.is5GHz});
+      }
+      return nets;
     });
 
     String modemMac = g_modem->getMacAddress();
@@ -1273,7 +1294,7 @@ void bl_init(void)
   WifiCredentials hardcodedCreds = {.ssid = "ssid-goes-here", .pswd = "password-goes-here"};
   Log_info("Hardcoded WiFi: connecting to SSID '%s'", hardcodedCreds.ssid.c_str());
   auto connectResult = WifiCaptivePortal.connect(hardcodedCreds);
-  Log_info("Hardcoded WiFi: connect result '%s'", wifiStatusStr(connectResult));
+  Log_info("Hardcoded WiFi: connect result '%s'", wifiStatusStr(connectResult.status));
 // goToSleep();
 #else
 
@@ -3352,8 +3373,17 @@ void goToSleep(void)
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
 #endif
 #ifdef BOARD_XTEINK_X4
+// The Xteink X4 has a high current draw in deep sleep (3-4mA), so allow the user to select
+// if they want to completely shut down the power and only update with a physical button press
+// or have short battery life (5-7 days) in the normal TRMNL wakeup mode
+#ifdef X4_WAKE_ON_BUTTON
+  pinMode(13, OUTPUT);
+  digitalWrite(13, 0); // cut off the battery power
+  delay(100); // allow it to settle before going into power-off
+#else // Keep the battery power on and allow timed wakeup
   gpio_hold_en(GPIO_NUM_13); // MOSFET enabling the battery power
   gpio_deep_sleep_hold_en(); // Needed to keep the battery power enabled during RTC sleep
+#endif
 #endif
   esp_deep_sleep_start();
 }
