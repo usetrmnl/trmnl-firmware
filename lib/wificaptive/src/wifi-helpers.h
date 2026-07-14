@@ -2,6 +2,5 @@
 #include <WiFiType.h>
 #include <Arduino.h>
 
-String getWifiClientHostname(void);
-void configureWifiHostname(void);
+void applyWifiHostname(const String &hostname);
 const char *wifiStatusStr(wl_status_t wifi_status);

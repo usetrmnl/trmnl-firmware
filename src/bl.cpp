@@ -851,6 +851,9 @@ void bl_init(void)
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
 #endif
   Log_info("BL init success");
+
+  WifiCaptivePortal.setHostname(getWifiClientHostname());
+
 #ifdef BOARD_TRMNL_X
   bool bModemNeeded = false;
   Log.info("%s [%d]: Checking if we need to use the ESP32-C5 modem...\r\n", __FILE__, __LINE__);
@@ -1259,7 +1262,7 @@ void bl_init(void)
 
     // Register callback so captive portal can connect 5 GHz networks via modem
     WifiCaptivePortal.setModemConnectCallback([](const String& ssid, const String& pass) {
-      return g_modem->connectToNetwork(ssid, pass);
+      return g_modem->connectToNetwork(ssid, pass, getWifiClientHostname());
     });
 
     // Register callback so the captive portal's Refresh button can trigger a fresh modem scan

@@ -78,6 +78,7 @@ private:
 
     std::function<void()> _resetcallback;
     std::function<void()> _tickCallback = nullptr;
+    String _hostname = "";
 
     WifiCredentials _savedWifis[WIFI_MAX_SAVED_CREDS];
     int _lastIndex = 0;
@@ -124,6 +125,13 @@ public:
     /// @brief sets the function callback that is triggered when uses performs soft reset
     /// @param func reset callback
     void setResetSettingsCallback(std::function<void()> func);
+
+    /// @brief Sets the device hostname applied when connecting. Set at boot by the app;
+    ///        the portal updates it when the user saves a custom hostname.
+    void setHostname(const String &hostname);
+
+    /// @brief Returns the hostname set via setHostname(), or "" if none is set.
+    String getHostname();
 
     /// @brief Connects to the saved SSID with the best signal strength
     /// @return True if successfully connected to saved SSID, false otherwise.

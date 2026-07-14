@@ -294,7 +294,7 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
 
         // configure WPA2 Enterprise
         WiFi.mode(WIFI_STA);
-        configureWifiHostname();
+        applyWifiHostname(WifiCaptivePortal.getHostname());
         WiFi.disconnect();
         delay(100);
 
@@ -362,8 +362,9 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
         // Configure static IP if specified (must be before WiFi.begin)
         configureStaticIP(credentials);
 
-        configureWifiHostname();
-        Log_info("WiFi: hostname set to %s", getWifiClientHostname().c_str());
+        String hostname = WifiCaptivePortal.getHostname();
+        applyWifiHostname(hostname);
+        Log_info("WiFi: hostname set to %s", hostname.c_str());
 
         // Full channel scan to pick the strongest AP (see issue #285)
         usedFullScan = true;
@@ -378,12 +379,13 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
     {
         // regular connection
         WiFi.mode(WIFI_STA);
-        configureWifiHostname();
+        String hostname = WifiCaptivePortal.getHostname();
+        applyWifiHostname(hostname);
 
         // Configure static IP if specified (must be before WiFi.begin)
         configureStaticIP(credentials);
 
-        Log_info("WiFi: hostname set to %s", getWifiClientHostname().c_str());
+        Log_info("WiFi: hostname set to %s", hostname.c_str());
 
         if (tryFastConnect(credentials))
         {

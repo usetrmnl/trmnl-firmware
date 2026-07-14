@@ -352,6 +352,16 @@ void WifiCaptive::setPortalTickCallback(std::function<void()> func)
     _tickCallback = func;
 }
 
+void WifiCaptive::setHostname(const String &hostname)
+{
+    _hostname = hostname;
+}
+
+String WifiCaptive::getHostname()
+{
+    return _hostname;
+}
+
 bool WifiCaptive::isSaved()
 {
     readWifiCredentials();

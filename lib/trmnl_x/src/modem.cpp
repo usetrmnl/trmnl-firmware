@@ -10,7 +10,6 @@
 #include "esp_loader_io.h"
 #include "esp32_port.h"
 #include "modem.h"
-#include "../../wificaptive/src/wifi-helpers.h"
 #include <string_utils.h>
 
 #if defined (BOARD_TRMNL_X) || defined (BOARD_TRLML_X_EPDIY)
@@ -439,9 +438,10 @@ std::vector<Modem::ModemNetwork> Modem::scanNetworks() {
 // ---------------------------------------------------------------------------
 // connectToNetwork() / disconnectFromNetwork()
 // ---------------------------------------------------------------------------
-bool Modem::connectToNetwork(const String& ssid, const String& password) {
+bool Modem::connectToNetwork(const String& ssid, const String& password, const String& hostname) {
   String s = escape_modem_param(ssid);
   String p = escape_modem_param(password);
+  String h = escape_modem_param(hostname);
 
   while (ModemSerial.available()) ModemSerial.read();  // flush
 
@@ -451,9 +451,10 @@ bool Modem::connectToNetwork(const String& ssid, const String& password) {
     return false;
   }
 
-  String hostname = getWifiClientHostname();
-  sendCommand(("AT+CWHOSTNAME=\"" + hostname + "\"").c_str());
-  waitForResponse("OK", 3000);
+  if (hostname.length() > 0) {
+    sendCommand(("AT+CWHOSTNAME=\"" + h + "\"").c_str());
+    waitForResponse("OK", 3000);
+  }
 
   String cmd = "AT+CWJAP=\"" + s + "\",\"" + p + "\"";
   sendCommand(cmd.c_str());
