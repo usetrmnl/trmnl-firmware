@@ -1,5 +1,4 @@
 #include "WebServer.h"
-#include "../../../include/config.h"
 #include <WiFi.h>
 #include <test.h>
 #include <trmnl_log.h>
@@ -196,7 +195,7 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
         if (hostname.length() > 0) {
             Preferences prefs;
             prefs.begin("data", false);
-            prefs.putString(PREFERENCES_HOSTNAME, hostname);
+            prefs.putString("hostname", hostname);
             prefs.end();
             Log_info("WebServer: Saved hostname: %s", hostname.c_str());
         }
