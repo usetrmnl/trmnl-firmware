@@ -10,6 +10,28 @@
 #include "esp_netif.h"
 #include "esp_sntp.h"
 #include <vector>
+#include <Preferences.h>
+#include <time.h>
+
+static bool parseBssid(const String &str, uint8_t out[6])
+{
+    if (str.length() != 17) return false;
+    for (int i = 0; i < 6; i++)
+    {
+        int pos = i * 3;
+        auto hexVal = [](char c) -> int {
+            if (c >= '0' && c <= '9') return c - '0';
+            if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+            if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+            return -1;
+        };
+        int hi = hexVal(str[pos]);
+        int lo = hexVal(str[pos + 1]);
+        if (hi < 0 || lo < 0) return false;
+        out[i] = (uint8_t)((hi << 4) | lo);
+    }
+    return true;
+}
 
 /**
  * @brief Configure static IP with smart defaults
@@ -159,9 +181,73 @@ void captureEventData(WiFiEvent_t event, WiFiEventInfo_t info, WifiEventData *ev
     }
 }
 
+/**
+ * @brief Attempt a fast connect using the cached BSSID+channel, skipping the full channel scan.
+ *
+ * Skipped when the periodic roam scan is due (WIFI_FULL_SCAN_INTERVAL_SEC) so the device
+ * can roam to a better AP/channel even when the cached AP still connects fine (see issue #285).
+ * If the fast connect succeeds but the signal is weak (< WIFI_FAST_CONNECT_MIN_RSSI), the
+ * connection is dropped so the caller can scan for a better AP.
+ *
+ * @param credentials WiFi credentials with cached channel/BSSID from a previous connection
+ * @return true if connected with acceptable signal strength, false to fall back to a full scan
+ */
+static bool tryFastConnect(const WifiCredentials &credentials)
+{
+    if (credentials.channel == 0 || credentials.bssid.length() == 0)
+    {
+        return false;
+    }
+
+    uint32_t now = (uint32_t)time(nullptr);
+    bool clockLooksValid = credentials.lastFullScanEpoch != 0 && now >= credentials.lastFullScanEpoch;
+    uint32_t secondsSinceLastFullScan = clockLooksValid ? (now - credentials.lastFullScanEpoch) : 0;
+    bool fullScanDue = !clockLooksValid || secondsSinceLastFullScan >= WIFI_FULL_SCAN_INTERVAL_SEC;
+
+    if (fullScanDue)
+    {
+        Log_info("WiFi: Periodic roam scan due (last full scan %us ago), skipping fast connect",
+                 secondsSinceLastFullScan);
+        return false;
+    }
+
+    uint8_t bssidBytes[6];
+    if (!parseBssid(credentials.bssid, bssidBytes))
+    {
+        return false;
+    }
+
+    Log_info("WiFi: Trying fast connect to %s on channel %d (BSSID %s)",
+             credentials.ssid.c_str(), credentials.channel, credentials.bssid.c_str());
+    WiFi.setScanMethod(WIFI_FAST_SCAN);
+    wl_status_t beginResult = WiFi.begin(credentials.ssid.c_str(), credentials.pswd.c_str(),
+                                         credentials.channel, bssidBytes);
+    Log_info("WiFi: Fast connect begin, status %s", wifiStatusStr(beginResult));
+    auto fastResult = waitForConnectResult(WIFI_FAST_CONNECT_TIMEOUT);
+    if (fastResult == WL_CONNECTED)
+    {
+        int32_t rssi = WiFi.RSSI();
+        Log_info("WiFi: Fast connect succeeded, RSSI %d dBm", rssi);
+        if (rssi >= WIFI_FAST_CONNECT_MIN_RSSI)
+        {
+            return true;
+        }
+        Log_info("WiFi: Weak signal (%d dBm < %d dBm), scanning for better AP",
+                 rssi, WIFI_FAST_CONNECT_MIN_RSSI);
+    }
+    else
+    {
+        Log_info("WiFi: Fast connect failed, falling back to full channel scan");
+    }
+    WiFi.disconnect();
+    delay(100);
+    return false;
+}
+
 WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials credentials)
 {
     WifiEventData eventData;
+    bool usedFullScan = false;
 
     // Register WiFi event handlers and remember each registration id.
     std::vector<wifi_event_id_t> handlerIds;
@@ -192,16 +278,6 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
     // always start with a clean state - disable any previous configuration
     disableWpa2Enterprise();
 
-    // Pick the strongest AP when an SSID is broadcast by multiple access points
-    // (mesh/roaming networks). The arduino-esp32 default is WIFI_FAST_SCAN, which
-    // associates with the FIRST AP found for the SSID regardless of signal strength,
-    // so the device can latch onto a weak/distant AP. WIFI_ALL_CHANNEL_SCAN scans
-    // every channel first, then WIFI_CONNECT_AP_BY_SIGNAL connects to the AP with the
-    // highest RSSI. Trade-off: a full-channel scan adds ~1-2s to each connect, which is
-    // an acceptable cost for reliably joining the nearest AP. See issue #285.
-    WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
-    WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
-
     wl_status_t beginResult;
 
     if (credentials.isEnterprise)
@@ -213,7 +289,7 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
             Log_error("WiFi: Enterprise mode requires an identity");
             // clean up event handlers
             removeEventHandlers();
-            return {WL_CONNECT_FAILED, eventData};
+            return {WL_CONNECT_FAILED, eventData, usedFullScan};
         }
 
         // configure WPA2 Enterprise
@@ -280,7 +356,7 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
             disableWpa2Enterprise();
             // clean up event handlers
             removeEventHandlers();
-            return {WL_CONNECT_FAILED, eventData};
+            return {WL_CONNECT_FAILED, eventData, usedFullScan};
         }
 
         // Configure static IP if specified (must be before WiFi.begin)
@@ -289,6 +365,10 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
         configureWifiHostname();
         Log_info("WiFi: hostname set to %s", getWifiClientHostname().c_str());
 
+        // Full channel scan to pick the strongest AP (see issue #285)
+        usedFullScan = true;
+        WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
+        WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
         WiFi.begin(credentials.ssid.c_str());
 
         beginResult = WiFi.status();
@@ -305,6 +385,16 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
 
         Log_info("WiFi: hostname set to %s", getWifiClientHostname().c_str());
 
+        if (tryFastConnect(credentials))
+        {
+            removeEventHandlers();
+            return {WL_CONNECTED, eventData, usedFullScan};
+        }
+
+        // Full channel scan: find the AP with the strongest signal for this SSID (see issue #285)
+        usedFullScan = true;
+        WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
+        WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
         beginResult = WiFi.begin(credentials.ssid.c_str(), credentials.pswd.c_str());
         Log_info("WiFi: begin (WPA2-Personal), starting from status %s", wifiStatusStr(beginResult));
     }
@@ -321,7 +411,7 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
     // Clean up Arduino event handlers
     removeEventHandlers();
 
-    return {result, eventData};
+    return {result, eventData, usedFullScan};
 }
 
 wl_status_t waitForConnectResult(uint32_t timeout)
@@ -339,7 +429,7 @@ wl_status_t waitForConnectResult(uint32_t timeout)
         }
         status = newStatus;
         // @todo detect additional states, connect happens, then dhcp then get ip, there is some delay here, make sure not to timeout if waiting on IP
-        if (status == WL_CONNECTED || status == WL_CONNECT_FAILED)
+        if (status == WL_CONNECTED || status == WL_CONNECT_FAILED || status == WL_NO_SSID_AVAIL)
         {
             return status;
         }

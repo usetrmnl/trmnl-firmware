@@ -3,9 +3,9 @@
 #include <WiFi.h>
 #include <test.h>
 #include <trmnl_log.h>
-#include <Preferences.h> 
+#include <Preferences.h>
 
-void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperationCallbacks callbacks, const String& modemMac)
+void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperationCallbacks callbacks, const String &modemMac)
 {
     //======================== Webserver ========================
     // WARNING IOS (and maybe macos) WILL NOT POP UP IF IT CONTAINS THE WORD "Success" https://www.esp8266.com/viewtopic.php?f=34&t=4398
@@ -41,10 +41,10 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
     // Serve index.html
     server.on("/", HTTP_ANY, [&](AsyncWebServerRequest *request)
               {
-		AsyncWebServerResponse *response = request->beginResponse(200, "text/html", INDEX_HTML, INDEX_HTML_LEN);
-		response->addHeader("Content-Encoding", "gzip");
-    	request->send(response);  // redirect to the local IP URL
-        });
+                  AsyncWebServerResponse *response = request->beginResponse(200, "text/html", INDEX_HTML, INDEX_HTML_LEN);
+                  response->addHeader("Content-Encoding", "gzip");
+                  request->send(response); // redirect to the local IP URL
+              });
 
     // Servce logo.svg
     server.on("/logo.svg", HTTP_ANY, [&](AsyncWebServerRequest *request)
@@ -63,18 +63,31 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
               {
                 AsyncWebServerResponse *response = request->beginResponse(200, "text/html", ADVANCED_HTML, ADVANCED_HTML_LEN);
                 response->addHeader("Content-Encoding", "gzip");
-                request->send(response); 
-            });
+                request->send(response); });
     server.on("/run-test", HTTP_GET, [](AsyncWebServerRequest *request)
               {
                 Serial.println("Running sensor test from web...");
                 String json = testTemperature();
-                request->send(200, "application/json", json);
-              });
+                request->send(200, "application/json", json); });
+
+    
+    server.on("/device-settings", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+        Preferences prefs;
+        prefs.begin("data", true);
+        String apiUrl = prefs.getString("api_url", "");
+        prefs.end();
+        apiUrl.replace("\\", "\\\\");
+        apiUrl.replace("\"", "\\\"");
+        request->send(200, "application/json", "{\"api_url\":\"" + apiUrl + "\"}"); });
 
     auto scanGET = server.on("/scan", HTTP_GET, [callbacks, modemMac](AsyncWebServerRequest *request)
                              {
 		String json = "{\"networks\":[";
+
+		if (request->hasParam("force")) {
+			callbacks.forceRescan();
+		}
 
 		if (!callbacks.isNetworkListReady()) {
 			if (WiFi.scanComplete() == WIFI_SCAN_FAILED) {
@@ -145,6 +158,7 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
 		String pswd = data["pswd"];
         String api_server = data["server"];
         bool isEnterprise = data["isEnterprise"].is<bool>() && data["isEnterprise"].as<bool>();
+        String band = data["band"].is<String>() ? data["band"].as<String>() : "";
         String username = data["username"].is<String>() ? data["username"].as<String>() : "";
         String identity = data["identity"].is<String>() ? data["identity"].as<String>() : "";
 
@@ -189,7 +203,7 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
 
         Log_info("WebServer: Received SSID: %s, Static IP: %s", ssid.c_str(), useStaticIP ? "yes" : "no");
 
-        callbacks.setConnectionCredentials(credentials, api_server);
+        callbacks.setConnectionCredentials(credentials, api_server, band);
         String mac = WiFi.macAddress();
         String message = "{\"ssid\":\"" + ssid + "\",\"mac\":\"" + mac + "\"";
 #ifdef BOARD_TRMNL_X

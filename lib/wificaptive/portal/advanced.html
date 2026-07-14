@@ -290,18 +290,17 @@
     function showCustomServerInput() {
       document.getElementById('custom_server_form_group').style.display = 'flex';
       closeCustomServerModal();
-      const savedServer = localStorage.getItem('customServer');
-      if (savedServer) {
-        document.getElementById('server').value = savedServer;
-      }
     }
 
-    function loadServerFromStorage() {
-      const savedServer = localStorage.getItem('customServer');
-      if (savedServer) {
-        document.getElementById('server').value = savedServer;
-        document.getElementById('custom_server_form_group').style.display = 'flex';
-      }
+    async function loadServerFromDevice() {
+      try {
+        const response = await fetch('/device-settings');
+        const server = (await response.json()).api_url;
+        if (server) {
+          document.getElementById('server').value = server;
+          document.getElementById('custom_server_form_group').style.display = 'flex';
+        }
+      } catch (_) { }
     }
 
     function closeCustomServerModal() {
@@ -348,6 +347,8 @@
     }
 
     function goBack() {
+      // Carry the (not yet connected, so not yet device-stored) server value
+      // back to the main page
       const serverValue = document.getElementById('server').value;
       if (serverValue) {
         localStorage.setItem('customServer', serverValue);
@@ -490,7 +491,7 @@
 
     // Load server value when page loads
     window.onload = function() {
-      loadServerFromStorage();
+      loadServerFromDevice();
       loadStaticIPFromStorage();
       loadNTPFromStorage();
       loadHostnameFromStorage();

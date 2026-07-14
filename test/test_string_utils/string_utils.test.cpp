@@ -44,6 +44,41 @@ void test_format_message_truncation_boundary(void) {
     TEST_ASSERT_EQUAL_STRING("1234...", buffer);
 }
 
+void test_escape_plain_string_unchanged(void) {
+    TEST_ASSERT_EQUAL_STRING("MyNetwork", escape_modem_param("MyNetwork").c_str());
+}
+
+void test_escape_empty_string(void) {
+    TEST_ASSERT_EQUAL_STRING("", escape_modem_param("").c_str());
+}
+
+void test_escape_comma(void) {
+    TEST_ASSERT_EQUAL_STRING("pass\\,word", escape_modem_param("pass,word").c_str());
+}
+
+void test_escape_quote(void) {
+    TEST_ASSERT_EQUAL_STRING("say \\\"hi\\\"", escape_modem_param("say \"hi\"").c_str());
+}
+
+void test_escape_backslash(void) {
+    TEST_ASSERT_EQUAL_STRING("a\\\\b", escape_modem_param("a\\b").c_str());
+}
+
+void test_escape_backslash_before_comma(void) {
+    // Input contains a literal backslash followed by a comma: a\,b
+    // Backslash must be doubled first, then the comma escaped: a\\\,b
+    TEST_ASSERT_EQUAL_STRING("a\\\\\\,b", escape_modem_param("a\\,b").c_str());
+}
+
+void test_escape_all_special_chars_combined(void) {
+    // Input: c:\dir,"x" -> c:\\dir\,\"x\"
+    TEST_ASSERT_EQUAL_STRING("c:\\\\dir\\,\\\"x\\\"", escape_modem_param("c:\\dir,\"x\"").c_str());
+}
+
+void test_escape_multiple_commas(void) {
+    TEST_ASSERT_EQUAL_STRING("a\\,b\\,c", escape_modem_param("a,b,c").c_str());
+}
+
 void setUp(void) {
     // set stuff up here
 }
@@ -58,6 +93,14 @@ void process() {
     RUN_TEST(test_format_message_with_truncation);
     RUN_TEST(test_format_message_exact_fit);
     RUN_TEST(test_format_message_truncation_boundary);
+    RUN_TEST(test_escape_plain_string_unchanged);
+    RUN_TEST(test_escape_empty_string);
+    RUN_TEST(test_escape_comma);
+    RUN_TEST(test_escape_quote);
+    RUN_TEST(test_escape_backslash);
+    RUN_TEST(test_escape_backslash_before_comma);
+    RUN_TEST(test_escape_all_special_chars_combined);
+    RUN_TEST(test_escape_multiple_commas);
     UNITY_END();
 }
 
