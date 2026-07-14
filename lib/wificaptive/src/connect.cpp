@@ -33,19 +33,6 @@ static bool parseBssid(const String &str, uint8_t out[6])
     return true;
 }
 
-String getDeviceHostname() {
-    Preferences prefs;
-    prefs.begin("data", true);
-    String saved = prefs.getString("hostname", "");
-    prefs.end();
-    if (saved.length() > 0) return saved;
-
-    String mac = WiFi.macAddress(); // "AA:BB:CC:DD:EE:FF"
-    String suffix = mac.substring(12, 14) + mac.substring(15, 17);
-    suffix.toLowerCase();
-    return "trmnl-" + suffix;
-}
-
 /**
  * @brief Configure static IP with smart defaults
  *
@@ -307,6 +294,7 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
 
         // configure WPA2 Enterprise
         WiFi.mode(WIFI_STA);
+        applyWifiHostname(WifiCaptivePortal.getHostname());
         WiFi.disconnect();
         delay(100);
 
@@ -374,8 +362,8 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
         // Configure static IP if specified (must be before WiFi.begin)
         configureStaticIP(credentials);
 
-        String hostname = getDeviceHostname();
-        WiFi.setHostname(hostname.c_str());
+        String hostname = WifiCaptivePortal.getHostname();
+        applyWifiHostname(hostname);
         Log_info("WiFi: hostname set to %s", hostname.c_str());
 
         // Full channel scan to pick the strongest AP (see issue #285)
@@ -391,12 +379,12 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
     {
         // regular connection
         WiFi.mode(WIFI_STA);
+        String hostname = WifiCaptivePortal.getHostname();
+        applyWifiHostname(hostname);
 
         // Configure static IP if specified (must be before WiFi.begin)
         configureStaticIP(credentials);
 
-        String hostname = getDeviceHostname();
-        WiFi.setHostname(hostname.c_str());
         Log_info("WiFi: hostname set to %s", hostname.c_str());
 
         if (tryFastConnect(credentials))

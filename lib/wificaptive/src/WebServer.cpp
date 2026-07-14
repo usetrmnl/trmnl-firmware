@@ -1,4 +1,5 @@
 #include "WebServer.h"
+#include "WifiCaptive.h"
 #include <WiFi.h>
 #include <test.h>
 #include <trmnl_log.h>
@@ -197,6 +198,7 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
             prefs.begin("data", false);
             prefs.putString("hostname", hostname);
             prefs.end();
+            WifiCaptivePortal.setHostname(hostname); // keep in-memory hostname up-to-date
             Log_info("WebServer: Saved hostname: %s", hostname.c_str());
         }
 
