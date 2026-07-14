@@ -52,9 +52,7 @@
 #define MAX_IMAGE_SIZE 90000 // largest compressed image we can receive
 #endif
 #define SLEEP_uS_TO_S_FACTOR 1000000           /* Conversion factor for micro seconds to seconds */
-#define SLEEP_TIME_TO_SLEEP 900                /* Time ESP32 will go to sleep (in seconds) */
-#define SLEEP_TIME_WHILE_NOT_CONNECTED 5       /* Time ESP32 will go to sleep (in seconds) */
-#define SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED 5 /* Time ESP32 will go to sleep (in seconds) */
+#define SLEEP_TIME_TO_SLEEP 900 /* Time ESP32 will go to sleep (in seconds) */
 
 // Different display profiles
 #define TEMP_PROFILE_DEFAULT 0

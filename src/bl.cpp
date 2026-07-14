@@ -30,6 +30,7 @@
 #include <api-client/setup.h>
 #include <special_function.h>
 #include <ota_schedule.h>
+#include <fast_poll_backoff.h>
 #include <api_response_parsing.h>
 #include "logging_parcers.h"
 #include <SPIFFS.h>
@@ -1572,11 +1573,12 @@ void bl_init(void)
   break;
   case HTTPS_PLUGIN_NOT_ATTACHED:
   {
-    if (preferences.getInt(PREFERENCES_SLEEP_TIME_KEY, 0) != SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED)
+    uint32_t fast_poll_sleep = fastPollNextSleep(preferencesPersistence);
+    if (preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, 0) != fast_poll_sleep)
     {
-      Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED);
-      preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED);
-      Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED);
+      Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, fast_poll_sleep);
+      preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, fast_poll_sleep);
+      Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, fast_poll_sleep);
     }
   }
   break;
@@ -2302,6 +2304,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
         else
         {
           Log.info("%s [%d]: End with NO empty_state\r\n", __FILE__, __LINE__);
+          fastPollStreakReset(preferencesPersistence);
           if (flag)
           {
             if (preferences.getBool(PREFERENCES_DEVICE_REGISTERED_KEY, false) != false) // check the flag to avoid the re-writing
@@ -2363,8 +2366,9 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
     case 202:
     {
       result = HTTPS_NO_REGISTER;
-      Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
-      size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
+      uint32_t fast_poll_sleep = fastPollNextSleep(preferencesPersistence);
+      Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, fast_poll_sleep);
+      size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, fast_poll_sleep);
       Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
       status = false;
     }
@@ -2372,8 +2376,9 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
     case 500:
     {
       result = HTTPS_RESET;
-      Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
-      preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
+      uint32_t fast_poll_sleep = fastPollNextSleep(preferencesPersistence);
+      Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, fast_poll_sleep);
+      preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, fast_poll_sleep);
       Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
       status = false;
     }
@@ -2788,8 +2793,9 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
     case 202:
     {
       result = HTTPS_NO_REGISTER;
-      Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
-      preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
+      uint32_t fast_poll_sleep = fastPollNextSleep(preferencesPersistence);
+      Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, fast_poll_sleep);
+      preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, fast_poll_sleep);
       Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
       status = false;
     }
@@ -2797,8 +2803,9 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
     case 500:
     {
       result = HTTPS_RESET;
-      Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
-      preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
+      uint32_t fast_poll_sleep = fastPollNextSleep(preferencesPersistence);
+      Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, fast_poll_sleep);
+      preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, fast_poll_sleep);
       Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
       status = false;
     }
