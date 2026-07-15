@@ -25,8 +25,9 @@ FirmwareUpdateService::FirmwareUpdateService(
 {
 }
 
-bool FirmwareUpdateService::validateFirmwareUpdatePossible(bool update_firmware, const String &firmware_url)
+bool FirmwareUpdateService::isUpdateDue(bool update_firmware, const String &firmware_url)
 {
+  Log_info("%s [%d]: update_firmware: %d\r\n", __FILE__, __LINE__, update_firmware);
   if (!update_firmware)
     return false;
 
@@ -186,14 +187,10 @@ bool FirmwareUpdateService::performFirmwareUpdate()
   return ota_ok;
 }
 
-FirmwareUpdateResult FirmwareUpdateService::tryUpdate(bool update_firmware, const String &firmware_url)
+FirmwareUpdateResult FirmwareUpdateService::performUpdate()
 {
   _failureMessage = NONE;
   FirmwareUpdateResult result;
-  Log_info("%s [%d]: update_firmware: %d\r\n", __FILE__, __LINE__, update_firmware);
-
-  if (!validateFirmwareUpdatePossible(update_firmware, firmware_url))
-    return result;
 
   uint32_t now = _getTime();
   if (!performFirmwareUpdate())

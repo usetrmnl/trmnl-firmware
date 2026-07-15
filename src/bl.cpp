@@ -1495,11 +1495,20 @@ void bl_init(void)
   }
 
   // OTA update checking
-  FirmwareUpdateResult firmwareUpdateResult = firmwareUpdateService.tryUpdate(
-      apiDisplayResult.response.update_firmware,
-      apiDisplayResult.response.firmware_url);
-  if (firmwareUpdateResult.failureMessage != NONE)
-    showMessageWithLogo(firmwareUpdateResult.failureMessage);
+  if (firmwareUpdateService.isUpdateDue(
+          apiDisplayResult.response.update_firmware,
+          apiDisplayResult.response.firmware_url))
+  {
+    showMessageWithLogo(FW_UPDATE);
+    FirmwareUpdateResult firmwareUpdateResult = firmwareUpdateService.performUpdate();
+    if (firmwareUpdateResult.updated)
+    {
+      showMessageWithLogo(FW_UPDATE_SUCCESS);
+      ESP.restart();
+    }
+    if (firmwareUpdateResult.failureMessage != NONE)
+      showMessageWithLogo(firmwareUpdateResult.failureMessage);
+  }
 
   // error handling
   switch (request_result)
@@ -1577,13 +1586,7 @@ void bl_init(void)
   // display go to sleep
   Log_info("%s [%d]: BL done, going to sleep...", __FILE__, __LINE__);
   display_sleep();
-  if (firmwareUpdateResult.updated)
-  {
-    showMessageWithLogo(FW_UPDATE_SUCCESS);
-    ESP.restart();
-  }
-  else
-    goToSleep();
+  goToSleep();
 } /* bl_init() */
 
 /**

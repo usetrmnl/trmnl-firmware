@@ -21,10 +21,10 @@ public:
       GetTimeFn getTime,
       int32_t wifiConnectionRssiThreshold);
 
-  FirmwareUpdateResult tryUpdate(bool update_firmware, const String &firmware_url);
+  bool isUpdateDue(bool update_firmware, const String &firmware_url);
+  FirmwareUpdateResult performUpdate();
 
 private:
-  bool validateFirmwareUpdatePossible(bool update_firmware, const String &firmware_url);
   bool performFirmwareUpdate();
 
   Persistence &_persistence;
