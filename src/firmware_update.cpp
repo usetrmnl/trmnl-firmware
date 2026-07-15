@@ -88,7 +88,10 @@ bool FirmwareUpdateService::performFirmwareUpdate()
             return false;
           }
           return true;
-        });
+        },
+        0,
+        "",
+        120000UL);
 
     if (!result.ok || !write_ok)
     {
