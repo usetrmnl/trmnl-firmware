@@ -1700,7 +1700,7 @@ void load_prev_image(void)
   size_t content_size = 0;
   if (content_size > 0) {
     // Decode it into the previous buffer
-    Log.info("%s [%d]: Decoding previous image (%s) into FastEPD previous buffer\r\n", __FILE__, __LINE__, DisplayedImage::get());
+    Log.info("%s [%d]: Decoding previous image (%s) into the EPD 'old' buffer\r\n", __FILE__, __LINE__, DisplayedImage::get());
     png_to_epd(buffer, content_size, true);
   }
 } /* load_prev_image() */
@@ -1760,11 +1760,11 @@ static https_request_err_e downloadAndShow()
 
   if (!status && result == HTTPS_SUCCESS) { // this means we already have this image stored in SPIFFS
       char szTemp[36];
-#if defined( BOARD_X_CLASS ) && !defined(BOARD_SEEED_RETERMINAL_E1003)
+#if BOARD_X_CLASS && !defined(BOARD_SEEED_RETERMINAL_E1003)
       if (DisplayedImage::exists()) {
         load_prev_image(); // decode the older image into the previous buffer of FastEPD
       }
-#endif // BOARD_X_CLASS
+#endif
       fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
       if (DisplayedImage::matches(szTemp)) {
         // We just displayed the same image, don't refresh the display
@@ -1980,7 +1980,7 @@ static https_request_err_e downloadAndShow()
             counter = https.getSize();
             if (counter && counter <= MAX_IMAGE_SIZE) {
               WiFiClient *stream = https.getStreamPtr();
-              int iLen, iCount = 0;
+              int iCount = 0;
 
               buffer = (uint8_t *)malloc(counter);
               if (buffer) {

@@ -92,6 +92,8 @@ extern BQ27427 lipo; // Use lipo.[] to interact with the library in an Arduino
 #endif
 // Counts the number of partial updates to know when to do a full update
 RTC_DATA_ATTR int iUpdateCount = 0;
+RTC_DATA_ATTR bool bCanDoPartial = false;
+
 #include "Group5.h"
 #include <config.h>
 #include "wifi_connect_qr.h"
@@ -118,7 +120,15 @@ static bool display_update_epaper(int refreshMode, bool wait, bool writePlane = 
     if (writePlane) {
         bbep.writePlane(plane);
     }
+    if (refreshMode == REFRESH_PARTIAL && !bCanDoPartial) {
+        refreshMode = REFRESH_FAST;
+        Log_info("Can't do partial refresh, no previous image");
+    } else {
+        Log_info("Have valid previous image in EPD memory, doing partial refresh");
+    }
     bbep.refresh(refreshMode, wait);
+    // The next update can be a partial update because the current is 1-bpp and stays in the EPD RAM
+    bCanDoPartial = (bbep.getPanelType() == dpList[iTempProfile].OneBit);
     return true;
 #endif
 }
@@ -519,6 +529,7 @@ uint16_t display_width()
     return bbep.width();
 }
 
+#ifdef BOARD_X_CLASS
 void display_draw_touchbar_indicator(touchbar_side_t side, bool filled)
 {
     const int radius = 24;
@@ -534,7 +545,6 @@ void display_draw_touchbar_indicator(touchbar_side_t side, bool filled)
         default: return;
     }
     int y = h - margin_bottom - radius;
-#ifdef BOARD_X_CLASS
     int prev_mode = bbep.getPreviousMode();
         const int rect_h = radius * 2;
         const int rect_w = rect_h * 4;
@@ -560,23 +570,8 @@ void display_draw_touchbar_indicator(touchbar_side_t side, bool filled)
         bbep.fillRect(rx - border, ry - border, rect_w + (2*border), rect_h + (2*border), border_color);
         bbep.fillRect(rx, ry, rect_w, rect_h, fill_color);
         bbep.partialUpdate(false);
-#else
-    {
-        const int rect_h = radius * 2;
-        const int rect_w = rect_h * 4;
-        const int border = 3;
-        int rx = x - rect_w / 2;
-        int ry = y - rect_h / 2;
-        uint8_t fill_color   = filled ? BBEP_BLACK : BBEP_WHITE;
-        uint8_t border_color = filled ? BBEP_WHITE : BBEP_BLACK;
-        bbep.fillRect(rx, ry, rect_w, rect_h, fill_color);
-        for (int b = 0; b < border; b++) {
-            bbep.drawRect(rx + b, ry + b, rect_w - b * 2, rect_h - b * 2, border_color);
-        }
-    }
-    bbep.refresh(REFRESH_PARTIAL, true);
+} /* display_draw_touchbar_indicator() */
 #endif
-}
 
 /**
  * @brief Function to draw multi-line text onto the display
@@ -1811,7 +1806,9 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
         iRefreshMode = REFRESH_FAST;
     }
     if (bbep.capabilities() & (BBEP_4GRAY | BBEP_4COLOR | BBEP_3COLOR | BBEP_7COLOR)) bWait = 1;
-    if (!bWait) iRefreshMode = REFRESH_PARTIAL; // fast update when showing loading screen
+    if (!bWait) {
+        iRefreshMode = REFRESH_FAST; // fast update when showing loading screen
+    }
     Log_info("%s [%d]: EPD refresh mode: %d\r\n", __FILE__, __LINE__, iRefreshMode);
 #ifndef BOARD_SEEED_RETERMINAL_E1002
 #ifdef DO_NOT_LIGHT_SLEEP
@@ -2687,7 +2684,7 @@ void display_sleep(void)
 {
     Log_info("Goto Sleep...");
 #ifdef BB_EPAPER
-    bbep.sleep(DEEP_SLEEP);
+    bbep.sleep(LIGHT_SLEEP);
 #else
     bbep.einkPower(0);
     bbep.deInit();
