@@ -280,6 +280,8 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
 
     wl_status_t beginResult;
 
+    WiFi.setAutoReconnect(false);
+
     if (credentials.isEnterprise)
     {
         Log_info("WiFi: Connecting to WPA2 Enterprise network: %s", credentials.ssid.c_str());
