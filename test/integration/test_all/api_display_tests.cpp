@@ -59,6 +59,7 @@ static ApiDisplayInputs make_display_inputs(float battery_voltage)
   inputs.macAddress = TEST_MAC_ADDRESS;
   inputs.batteryVoltage = battery_voltage;
   inputs.firmwareVersion = FW_VERSION_STRING;
+  inputs.firmwareCommit = FW_COMMIT;
   inputs.model = DEVICE_MODEL;
   inputs.rssi = WiFi.RSSI();
   inputs.displayWidth = display_width();

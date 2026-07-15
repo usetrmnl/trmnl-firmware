@@ -27,6 +27,7 @@ LogWithDetails input = {
     .logId = 456,
     .filenameCurrent = "current.png",
     .filenameNew = "new.png",
+    .level = LogLevel::LOG_INFO,
 };
 
 String compact(String input)
@@ -55,7 +56,8 @@ void test_serialize_log(void)
     "battery_voltage": 4.2,
     "wake_reason": "Timer",
     "free_heap_size": 50000,
-    "max_alloc_size": 40000
+    "max_alloc_size": 40000,
+    "level": "info"
   })");
 
   auto result = serialize_log(input);
@@ -85,7 +87,8 @@ void test_serialize_log_with_retry(void)
     "wake_reason": "Timer",
     "free_heap_size": 50000,
     "max_alloc_size": 40000,
-    "retry": 2
+    "level": "info",
+    "retry": 2,
   })");
 
   String result = serialize_log(inputWithRetry);

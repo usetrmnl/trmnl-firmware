@@ -28,6 +28,8 @@
 #define WIFI_CONNECTION_ATTEMPTS 3
 // Define max connection timeout
 #define CONNECTION_TIMEOUT 15000
+// Shorter timeout for fast-connect attempt (specific BSSID+channel); falls back to full scan on expiry
+#define WIFI_FAST_CONNECT_TIMEOUT 5000
 
 #define WIFI_SSID_KEY(i) ("wifi_" + String(i) + "_ssid").c_str()
 #define WIFI_PSWD_KEY(i) ("wifi_" + String(i) + "_pswd").c_str()
@@ -43,7 +45,18 @@
 #define WIFI_STATIC_DNS2_KEY(i) ("wifi_" + String(i) + "_dns2").c_str()
 #define WIFI_USE_STATIC_KEY(i) ("wifi_" + String(i) + "_usip").c_str()
 
+#define WIFI_BSSID_KEY(i) ("wifi_" + String(i) + "_bssid").c_str()
+#define WIFI_CHAN_KEY(i)   ("wifi_" + String(i) + "_chan").c_str()
+#define WIFI_FULLSCAN_KEY(i) ("wifi_" + String(i) + "_fscan").c_str()
+
 #define WIFI_LAST_INDEX "wifi_last_index"
+
+// Minimum RSSI (dBm) to keep a fast-connect result; weaker signal triggers a full scan
+#define WIFI_FAST_CONNECT_MIN_RSSI (-75)
+
+// Force a full channel scan at least this often, even if the cached BSSID still connects fine,
+// so the device can roam to a better AP/channel.
+#define WIFI_FULL_SCAN_INTERVAL_SEC (24UL * 60 * 60)
 
 struct ExternalNetwork {
     String  ssid;
@@ -59,11 +72,13 @@ private:
     AsyncWebServer *_server;
     String _ssid = "";
     String _password = "";
+    String _band = "";
     String _api_server = "";
     WifiCredentials _enterprise_credentials;
 
     std::function<void()> _resetcallback;
     std::function<void()> _tickCallback = nullptr;
+    String _hostname = "";
 
     WifiCredentials _savedWifis[WIFI_MAX_SAVED_CREDS];
     int _lastIndex = 0;
@@ -74,6 +89,8 @@ private:
     ModemConnectCallback _modemConnectCallback;
 #ifdef BOARD_TRMNL_X
     String _modemMac;
+    using ModemScanCallback = std::function<std::vector<ExternalNetwork>()>;
+    ModemScanCallback _modemScanCallback;
 #endif
 
     void setUpDNSServer(DNSServer &dnsServer, const IPAddress &localIP);
@@ -82,17 +99,21 @@ private:
     void saveLastUsedWifiIndex(int index);
     int readLastUsedWifiIndex();
     void saveApiServer(String url);
-    bool tryConnectWithRetries(const WifiCredentials creds, int last_used_index);
+    bool tryConnectWithRetries(WifiCredentials creds, int last_used_index);
     std::vector<WifiCredentials> matchNetworks(std::vector<WifiNetwork> &scanResults, WifiCredentials wifiCredentials[]);
     std::vector<WifiNetwork> getScannedUniqueNetworks(bool runScan);
     std::vector<WifiNetwork> combineNetworks(std::vector<WifiNetwork> &scanResults, WifiCredentials wifiCredentials[]);
 
 public:
-    wl_status_t connect(const WifiCredentials credentials);
+    WifiConnectionResult connect(const WifiCredentials credentials);
 
     /// @brief Starts WiFi configuration portal.
     /// @return True if successfully connected to provided SSID, false otherwise.
     bool startPortal();
+
+    /// @brief Returns the SSID broadcast by the setup access point (e.g. "TRMNL-4D4CF0").
+    ///        Derived from the eFuse MAC, so it is stable and available before startPortal().
+    String getAPSSID();
 
     /// @brief Checks if any ssid is saved
     /// @return True if any ssis is saved, false otherwise
@@ -104,6 +125,13 @@ public:
     /// @brief sets the function callback that is triggered when uses performs soft reset
     /// @param func reset callback
     void setResetSettingsCallback(std::function<void()> func);
+
+    /// @brief Sets the device hostname applied when connecting. Set at boot by the app;
+    ///        the portal updates it when the user saves a custom hostname.
+    void setHostname(const String &hostname);
+
+    /// @brief Returns the hostname set via setHostname(), or "" if none is set.
+    String getHostname();
 
     /// @brief Connects to the saved SSID with the best signal strength
     /// @return True if successfully connected to saved SSID, false otherwise.
@@ -121,6 +149,9 @@ public:
 #ifdef BOARD_TRMNL_X
     /// @brief Sets the modem (5 GHz) MAC address shown in the captive portal.
     void setModemMac(const String& mac);
+
+    /// @brief Registers a callback used to re-scan networks via the modem on demand (e.g. Refresh button).
+    void setModemScanCallback(ModemScanCallback cb);
 #endif
 
     /// @brief Sets a callback invoked every portal loop iteration (approx. every 60 ms).

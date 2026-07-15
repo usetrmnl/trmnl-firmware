@@ -4,6 +4,7 @@
 #include <ArduinoJson.h>
 #include "special_function.h"
 #include "hardware_types.h"
+#include "trmnl_log.h"
 
 enum class ApiSetupOutcome
 {
@@ -75,6 +76,7 @@ struct ApiDisplayInputs
   int stateOfHealth;
 #endif
   String firmwareVersion;
+  String firmwareCommit;
   String model;
   int rssi;
   String wifiBand;
@@ -127,4 +129,5 @@ struct LogWithDetails
   String filenameNew;
   bool logRetry;
   int retryAttempt;
+  LogLevel level;
 };

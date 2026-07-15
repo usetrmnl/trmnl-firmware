@@ -12,10 +12,12 @@
 struct WifiOperationCallbacks
 {
     std::function<void()> resetSettings;
-    std::function<void(const WifiCredentials, const String)> setConnectionCredentials;
+    std::function<void(const WifiCredentials, const String, const String)> setConnectionCredentials;
     std::function<std::vector<WifiNetwork>(bool)> getAnnotatedNetworks;
     /// Returns true when the network list is ready to serve (external list populated or WiFi scan complete).
     std::function<bool()> isNetworkListReady;
+    /// Discards any cached scan results and starts a fresh scan (native WiFi or modem, whichever applies).
+    std::function<void()> forceRescan;
 };
 
 void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperationCallbacks callbacks, const String& modemMac = "");

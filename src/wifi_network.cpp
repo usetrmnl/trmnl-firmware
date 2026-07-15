@@ -2,6 +2,9 @@
 #include <WiFi.h>
 #include <WifiCaptive.h>
 #include <trmnl_log.h>
+#include <ESPmDNS.h>
+#include <Preferences.h>
+#include <config.h>
 
 #ifdef BOARD_TRMNL_X
 // Defined in bl.cpp; set once during bl_init(). Only used on the 5 GHz path.
@@ -11,6 +14,27 @@ extern Modem *g_modem;
 
 namespace {
 constexpr unsigned long WIFI_RECONNECT_TIMEOUT_MS = 10000;
+}
+
+String getWifiClientHostname(void)
+{
+  Preferences prefs;
+  if (!prefs.begin("data", true))
+    return String(WIFI_CLIENT_HOSTNAME_PREFIX);
+
+  String customHostName = prefs.getString(PREFERENCES_HOSTNAME, "");
+  if (customHostName.length() > 0)
+  {
+    prefs.end();
+    return customHostName;
+  }
+
+  String hostname = WIFI_CLIENT_HOSTNAME_PREFIX;
+  String friendly_id = prefs.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
+  prefs.end();
+  if (friendly_id.length() > 0)
+    hostname += "-" + friendly_id;
+  return hostname;
 }
 
 WiFiStatus getWiFiStatus(void)
@@ -41,11 +65,20 @@ bool connectWithSavedCredentials(void) {
   {
     WifiCredentials creds = WifiCaptivePortal.getLastCredentials();
     if (creds.is5GHz)
-      return g_modem->connectToNetwork(creds.ssid, creds.pswd);
+      return g_modem->connectToNetwork(creds.ssid, creds.pswd, getWifiClientHostname());
   }
 #endif
 
-  return WifiCaptivePortal.autoConnect();
+  bool connected = WifiCaptivePortal.autoConnect();
+  if (connected) {
+    String hostname = getWifiClientHostname();
+    if (MDNS.begin(hostname.c_str())) {
+      Log_info("mDNS started: %s.local", hostname.c_str());
+    } else {
+      Log_error("mDNS failed to start");
+    }
+  }
+  return connected;
 }
 
 bool ensureWifiConnected(void) {
