@@ -1,3 +1,4 @@
+#ifdef BOARD_SEEED_RETERMINAL_E1002
 #include "bb_epaper.h"
 #include "config.h"
 #include "DEV_Config.h"
@@ -277,3 +278,4 @@ bool spectra6_update()
     Log_info("spectra6_update end");
     return true;
 }
+#endif
