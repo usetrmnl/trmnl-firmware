@@ -115,10 +115,7 @@ static void writeImageToFile(const char *name, uint8_t *in_buffer, size_t size);
 void showMessageWithLogo(MSG message_type);
 static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, const char *fw_version, String message);
 static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiResponse);
-FirmwareUpdateService firmwareUpdateService(
-    preferencesPersistence,
-    getTime,
-    WIFI_CONNECTION_RSSI);
+FirmwareUpdateService firmwareUpdateService(preferencesPersistence, getTime, WIFI_CONNECTION_RSSI);
 static void wifiErrorDeepSleep();
 static uint8_t *storedLogoOrDefault(int iType);
 static bool checkCurrentFileName(String &newName);
