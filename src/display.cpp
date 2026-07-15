@@ -1912,6 +1912,8 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef BB_EPAPER
     bbep.allocBuffer(false);
+#else
+    bbep.setMode(BB_MODE_1BPP); // message screens are 1-bit
 #endif
     if (image_buffer && *(uint16_t *)image_buffer == BB_BITMAP_MARKER)
     {
@@ -2541,6 +2543,8 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 #ifdef BB_EPAPER
     bbep.allocBuffer(false);
     Log_info("Free heap after bbep.allocBuffer() - %d", ESP.getMaxAllocHeap());
+#else
+    bbep.setMode(BB_MODE_1BPP); // message screens are 1-bit
 #endif
 
     if (message_type == WIFI_CONNECT)
