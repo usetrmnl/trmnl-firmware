@@ -1,218 +1,222 @@
 #include "WebServer.h"
-
-#include <Preferences.h>
+#include "WifiCaptive.h"
 #include <WiFi.h>
 #include <test.h>
 #include <trmnl_log.h>
+#include <Preferences.h>
 
-void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperationCallbacks callbacks,
-                    const String &modemMac) {
+void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperationCallbacks callbacks, const String &modemMac)
+{
     //======================== Webserver ========================
-    // WARNING IOS (and maybe macos) WILL NOT POP UP IF IT CONTAINS THE WORD "Success"
-  // https://www.esp8266.com/viewtopic.php?f=34&t=4398 SAFARI (IOS) IS STUPID, G-ZIPPED FILES CAN'T END IN .GZ
-  // https://github.com/homieiot/homie-esp8266/issues/476 this is fixed by the webserver serve static function. SAFARI
-    // (IOS) there is a 128KB limit to the size of the HTML. The HTML can reference external resources/images that bring
-  // the total over 128KB SAFARI (IOS) popup browser has some severe limitations (javascript disabled, cookies disabled)
+    // WARNING IOS (and maybe macos) WILL NOT POP UP IF IT CONTAINS THE WORD "Success" https://www.esp8266.com/viewtopic.php?f=34&t=4398
+    // SAFARI (IOS) IS STUPID, G-ZIPPED FILES CAN'T END IN .GZ https://github.com/homieiot/homie-esp8266/issues/476 this is fixed by the webserver serve static function.
+    // SAFARI (IOS) there is a 128KB limit to the size of the HTML. The HTML can reference external resources/images that bring the total over 128KB
+    // SAFARI (IOS) popup browser has some severe limitations (javascript disabled, cookies disabled)
 
     // Required
-  server.on("/connecttest.txt", [](AsyncWebServerRequest *request) {
-    request->redirect("http://logout.net");
-  }); // windows 11 captive portal workaround
-  server.on("/wpad.dat", [](AsyncWebServerRequest *request) {
-    request->send(404);
-  }); // Honestly don't understand what this is but a 404 stops win 10 keep calling this repeatedly and panicking the
-                                        // esp32 :)
+    server.on("/connecttest.txt", [](AsyncWebServerRequest *request)
+              { request->redirect("http://logout.net"); }); // windows 11 captive portal workaround
+    server.on("/wpad.dat", [](AsyncWebServerRequest *request)
+              { request->send(404); }); // Honestly don't understand what this is but a 404 stops win 10 keep calling this repeatedly and panicking the esp32 :)
 
     // Background responses: Probably not all are Required, but some are. Others might speed things up?
     // A Tier (commonly used by modern systems)
-  server.on("/generate_204",
-            [](AsyncWebServerRequest *request) { request->redirect(LocalIPURL); }); // android captive portal redirect
-  server.on("/redirect", [](AsyncWebServerRequest *request) { request->redirect(LocalIPURL); }); // microsoft redirect
-  server.on("/hotspot-detect.html",
-            [](AsyncWebServerRequest *request) { request->redirect(LocalIPURL); }); // apple call home
-  server.on("/canonical.html",
-            [](AsyncWebServerRequest *request) { request->redirect(LocalIPURL); }); // firefox captive portal call home
-  server.on("/success.txt",
-            [](AsyncWebServerRequest *request) { request->send(200); }); // firefox captive portal call home
-  server.on("/ncsi.txt", [](AsyncWebServerRequest *request) { request->redirect(LocalIPURL); }); // windows call home
+    server.on("/generate_204", [](AsyncWebServerRequest *request)
+              { request->redirect(LocalIPURL); }); // android captive portal redirect
+    server.on("/redirect", [](AsyncWebServerRequest *request)
+              { request->redirect(LocalIPURL); }); // microsoft redirect
+    server.on("/hotspot-detect.html", [](AsyncWebServerRequest *request)
+              { request->redirect(LocalIPURL); }); // apple call home
+    server.on("/canonical.html", [](AsyncWebServerRequest *request)
+              { request->redirect(LocalIPURL); }); // firefox captive portal call home
+    server.on("/success.txt", [](AsyncWebServerRequest *request)
+              { request->send(200); }); // firefox captive portal call home
+    server.on("/ncsi.txt", [](AsyncWebServerRequest *request)
+              { request->redirect(LocalIPURL); }); // windows call home
 
-  // return 404 to webpage icon
-  server.on("/favicon.ico", [](AsyncWebServerRequest *request) { request->send(404); }); // webpage icon
+    // return 404 to webpage icon
+    server.on("/favicon.ico", [](AsyncWebServerRequest *request)
+              { request->send(404); }); // webpage icon
 
-  // Serve index.html
-  server.on("/", HTTP_ANY, [&](AsyncWebServerRequest *request) {
-    AsyncWebServerResponse *response = request->beginResponse(200, "text/html", INDEX_HTML, INDEX_HTML_LEN);
-    response->addHeader("Content-Encoding", "gzip");
-    request->send(response); // redirect to the local IP URL
-  });
+    // Serve index.html
+    server.on("/", HTTP_ANY, [&](AsyncWebServerRequest *request)
+              {
+                  AsyncWebServerResponse *response = request->beginResponse(200, "text/html", INDEX_HTML, INDEX_HTML_LEN);
+                  response->addHeader("Content-Encoding", "gzip");
+                  request->send(response); // redirect to the local IP URL
+              });
 
-  // Servce logo.svg
-  server.on("/logo.svg", HTTP_ANY, [&](AsyncWebServerRequest *request) {
-    AsyncWebServerResponse *response = request->beginResponse(200, "text/html", LOGO_SVG, LOGO_SVG_LEN);
-    response->addHeader("Content-Encoding", "gzip");
-    response->addHeader("Content-Type", "image/svg+xml");
-    request->send(response);
-  });
+    // Servce logo.svg
+    server.on("/logo.svg", HTTP_ANY, [&](AsyncWebServerRequest *request)
+              {
+		AsyncWebServerResponse *response = request->beginResponse(200, "text/html", LOGO_SVG, LOGO_SVG_LEN);
+		response->addHeader("Content-Encoding", "gzip");
+		response->addHeader("Content-Type", "image/svg+xml");
+    	request->send(response); });
 
-  server.on("/soft-reset", HTTP_ANY, [callbacks](AsyncWebServerRequest *request) {
-    callbacks.resetSettings();
-    request->send(200);
-  });
+    server.on("/soft-reset", HTTP_ANY, [callbacks](AsyncWebServerRequest *request)
+              {
+		callbacks.resetSettings();
+		request->send(200); });
 
-  server.on("/advanced", HTTP_GET, [&](AsyncWebServerRequest *request) {
-    AsyncWebServerResponse *response = request->beginResponse(200, "text/html", ADVANCED_HTML, ADVANCED_HTML_LEN);
-    response->addHeader("Content-Encoding", "gzip");
-    request->send(response);
-  });
-  server.on("/run-test", HTTP_GET, [](AsyncWebServerRequest *request) {
-    Serial.println("Running sensor test from web...");
-    String json = testTemperature();
-    request->send(200, "application/json", json);
-  });
+    server.on("/advanced", HTTP_GET, [&](AsyncWebServerRequest *request)
+              {
+                AsyncWebServerResponse *response = request->beginResponse(200, "text/html", ADVANCED_HTML, ADVANCED_HTML_LEN);
+                response->addHeader("Content-Encoding", "gzip");
+                request->send(response); });
+    server.on("/run-test", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+                Serial.println("Running sensor test from web...");
+                String json = testTemperature();
+                request->send(200, "application/json", json); });
 
-  server.on("/device-settings", HTTP_GET, [](AsyncWebServerRequest *request) {
-    Preferences prefs;
-    prefs.begin("data", true);
-    String apiUrl = prefs.getString("api_url", "");
-    prefs.end();
-    apiUrl.replace("\\", "\\\\");
-    apiUrl.replace("\"", "\\\"");
-    request->send(200, "application/json", "{\"api_url\":\"" + apiUrl + "\"}");
-  });
+    
+    server.on("/device-settings", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+        Preferences prefs;
+        prefs.begin("data", true);
+        String apiUrl = prefs.getString("api_url", "");
+        prefs.end();
+        apiUrl.replace("\\", "\\\\");
+        apiUrl.replace("\"", "\\\"");
+        request->send(200, "application/json", "{\"api_url\":\"" + apiUrl + "\"}"); });
 
-  auto scanGET = server.on("/scan", HTTP_GET, [callbacks, modemMac](AsyncWebServerRequest *request) {
-    String json = "{\"networks\":[";
+    auto scanGET = server.on("/scan", HTTP_GET, [callbacks, modemMac](AsyncWebServerRequest *request)
+                             {
+		String json = "{\"networks\":[";
 
-    if (request->hasParam("force")) {
-      callbacks.forceRescan();
-    }
+		if (request->hasParam("force")) {
+			callbacks.forceRescan();
+		}
 
-    if (!callbacks.isNetworkListReady()) {
-      if (WiFi.scanComplete() == WIFI_SCAN_FAILED) {
-        WiFi.scanNetworks(true);
-      }
-      return request->send(202);
-    }
+		if (!callbacks.isNetworkListReady()) {
+			if (WiFi.scanComplete() == WIFI_SCAN_FAILED) {
+				WiFi.scanNetworks(true);
+			}
+			return request->send(202);
+		}
 
-    // Data structure to store the highest RSSI for each SSID
-    // Warning: DO NOT USE true on getAnnotatedNetworks in an async context!
-    std::vector<WifiNetwork> combinedNetworks = callbacks.getAnnotatedNetworks(false);
+		// Data structure to store the highest RSSI for each SSID
+		// Warning: DO NOT USE true on getAnnotatedNetworks in an async context!
+		std::vector<WifiNetwork> combinedNetworks = callbacks.getAnnotatedNetworks(false);
 
-    // Generate JSON response
-    size_t size = 0;
-    for (const auto &network : combinedNetworks) {
-      String ssid = network.ssid;
-      String rssi = String(network.rssi);
+		// Generate JSON response
+		size_t size = 0;
+		for (const auto &network : combinedNetworks)
+		{
+			String ssid = network.ssid;
+			String rssi = String(network.rssi);
 
-      // Escape invalid characters
-      ssid.replace("\\", "\\\\");
-      ssid.replace("\"", "\\\"");
-      json += "{";
-      json += "\"name\":\"" + ssid + "\",";
-      json += "\"rssi\":\"" + rssi + "\",";
-      json += "\"open\":" + String(network.open ? "true," : "false,");
-      json += "\"saved\":" + String(network.saved ? "true," : "false,");
-      json += "\"band\":\"" + String(network.is5GHz ? "5GHz" : "2.4GHz") + "\",";
-      json += "\"enterprise\":" + String(network.enterprise ? "true" : "false");
-      json += "}";
+			// Escape invalid characters
+			ssid.replace("\\","\\\\");
+			ssid.replace("\"","\\\"");
+			json+= "{";
+			json+= "\"name\":\""+ssid+"\",";
+			json+= "\"rssi\":\""+rssi+"\",";
+			json+= "\"open\":"+String(network.open ? "true,": "false,");
+			json+= "\"saved\":"+String(network.saved ? "true,": "false,"  );
+			json+= "\"band\":\""+String(network.is5GHz ? "5GHz" : "2.4GHz")+"\",";
+			json+= "\"enterprise\":"+String(network.enterprise ? "true": "false");
+			json+= "}";
 
-      size += 1;
+			size += 1;
 
-      if (size != combinedNetworks.size()) {
-        json += ",";
-      }
-    }
+			if (size != combinedNetworks.size())
+			{
+				json+= ",";
+			}
+		}
 
-    WiFi.scanDelete();
-    Serial.println(json);
+		WiFi.scanDelete();
+		Serial.println(json);
 
-    if (WiFi.scanComplete() == -2) {
+		if (WiFi.scanComplete() == -2){
 #ifdef CONFIG_IDF_TARGET_ESP32C5
-      WiFi.setBandMode(WIFI_BAND_MODE_AUTO);
+            WiFi.setBandMode(WIFI_BAND_MODE_AUTO);
 #endif
-      WiFi.scanNetworks(true);
-    }
+			WiFi.scanNetworks(true);
+		}
 
-    json += "],";
+		json += "],";
 
-    // Expose MAC pre-connect for easier setup debugging
-    String mac = WiFi.macAddress();
-    json += "\"mac\":\"" + mac + "\"";
+        // Expose MAC pre-connect for easier setup debugging
+        String mac = WiFi.macAddress();
+        json+= "\"mac\":\""+mac+"\"";
 #ifdef BOARD_TRMNL_X
-    if (!modemMac.isEmpty()) {
-      json += ",\"mac_5ghz\":\"" + modemMac + "\"";
-    }
+        if (!modemMac.isEmpty()) {
+            json+= ",\"mac_5ghz\":\""+modemMac+"\"";
+        }
 #endif
-    json += "}";
-    request->send(200, "application/json", json);
-    json = String();
-  });
+        json += "}";
+        request->send(200, "application/json", json);
+		json = String(); });
 
-  AsyncCallbackJsonWebHandler *handler = new AsyncCallbackJsonWebHandler(
-    "/connect", [callbacks, modemMac](AsyncWebServerRequest *request, JsonVariant &json) {
-      JsonObject data = json.as<JsonObject>();
-      String ssid = data["ssid"];
-      String pswd = data["pswd"];
-      String api_server = data["server"];
-      bool isEnterprise = data["isEnterprise"].is<bool>() && data["isEnterprise"].as<bool>();
-      String band = data["band"].is<String>() ? data["band"].as<String>() : "";
-      String username = data["username"].is<String>() ? data["username"].as<String>() : "";
-      String identity = data["identity"].is<String>() ? data["identity"].as<String>() : "";
+    AsyncCallbackJsonWebHandler *handler = new AsyncCallbackJsonWebHandler("/connect", [callbacks, modemMac](AsyncWebServerRequest *request, JsonVariant &json)
+                                                                           {
+		JsonObject data = json.as<JsonObject>();
+		String ssid = data["ssid"];
+		String pswd = data["pswd"];
+        String api_server = data["server"];
+        bool isEnterprise = data["isEnterprise"].is<bool>() && data["isEnterprise"].as<bool>();
+        String band = data["band"].is<String>() ? data["band"].as<String>() : "";
+        String username = data["username"].is<String>() ? data["username"].as<String>() : "";
+        String identity = data["identity"].is<String>() ? data["identity"].as<String>() : "";
 
-      // Static IP fields (optional)
-      bool useStaticIP = data["useStaticIP"].is<bool>() && data["useStaticIP"].as<bool>();
-      String staticIP = data["staticIP"].is<String>() ? data["staticIP"].as<String>() : "";
-      String gateway = data["gateway"].is<String>() ? data["gateway"].as<String>() : "";
-      String subnet = data["subnet"].is<String>() ? data["subnet"].as<String>() : "";
-      String dns1 = data["dns1"].is<String>() ? data["dns1"].as<String>() : "";
-      String dns2 = data["dns2"].is<String>() ? data["dns2"].as<String>() : "";
-      WifiCredentials credentials;
-      credentials.ssid = ssid;
-      credentials.pswd = pswd;
-      credentials.isEnterprise = isEnterprise;
-      credentials.username = username;
-      credentials.identity = identity;
-      // Static IP settings
-      credentials.useStaticIP = useStaticIP;
-      credentials.staticIP = staticIP;
-      credentials.gateway = gateway;
-      credentials.subnet = subnet;
-      credentials.dns1 = dns1;
-      credentials.dns2 = dns2;
+        // Static IP fields (optional)
+        bool useStaticIP = data["useStaticIP"].is<bool>() && data["useStaticIP"].as<bool>();
+        String staticIP = data["staticIP"].is<String>() ? data["staticIP"].as<String>() : "";
+        String gateway = data["gateway"].is<String>() ? data["gateway"].as<String>() : "";
+        String subnet = data["subnet"].is<String>() ? data["subnet"].as<String>() : "";
+        String dns1 = data["dns1"].is<String>() ? data["dns1"].as<String>() : "";
+        String dns2 = data["dns2"].is<String>() ? data["dns2"].as<String>() : "";
+        WifiCredentials credentials;
+        credentials.ssid = ssid;
+        credentials.pswd = pswd;
+        credentials.isEnterprise = isEnterprise;
+        credentials.username = username;
+        credentials.identity = identity;
+        // Static IP settings
+        credentials.useStaticIP = useStaticIP;
+        credentials.staticIP = staticIP;
+        credentials.gateway = gateway;
+        credentials.subnet = subnet;
+        credentials.dns1 = dns1;
+        credentials.dns2 = dns2;
 
-      String ntpServer = data["ntpServer1"].is<String>() ? data["ntpServer1"].as<String>() : "";
-      if (ntpServer.length() > 0) {
-        Preferences prefs;
-        prefs.begin("data", false);
-        prefs.putString("ntp_server", ntpServer);
-        prefs.end();
-        Log_info("WebServer: Saved NTP server: %s", ntpServer.c_str());
-      }
+        String ntpServer = data["ntpServer1"].is<String>() ? data["ntpServer1"].as<String>() : "";
+        if (ntpServer.length() > 0) {
+            Preferences prefs;
+            prefs.begin("data", false);
+            prefs.putString("ntp_server", ntpServer);
+            prefs.end();
+            Log_info("WebServer: Saved NTP server: %s", ntpServer.c_str());
+        }
 
-      String hostname = data["hostname"].is<String>() ? data["hostname"].as<String>() : "";
-      if (hostname.length() > 0) {
-        Preferences prefs;
-        prefs.begin("data", false);
-        prefs.putString("hostname", hostname);
-        prefs.end();
-        Log_info("WebServer: Saved hostname: %s", hostname.c_str());
-      }
+        String hostname = data["hostname"].is<String>() ? data["hostname"].as<String>() : "";
+        if (hostname.length() > 0) {
+            Preferences prefs;
+            prefs.begin("data", false);
+            prefs.putString("hostname", hostname);
+            prefs.end();
+            WifiCaptivePortal.setHostname(hostname); // keep in-memory hostname up-to-date
+            Log_info("WebServer: Saved hostname: %s", hostname.c_str());
+        }
 
-      Log_info("WebServer: Received SSID: %s, Static IP: %s", ssid.c_str(), useStaticIP ? "yes" : "no");
+        Log_info("WebServer: Received SSID: %s, Static IP: %s", ssid.c_str(), useStaticIP ? "yes" : "no");
 
-      callbacks.setConnectionCredentials(credentials, api_server, band);
-      String mac = WiFi.macAddress();
-      String message = "{\"ssid\":\"" + ssid + "\",\"mac\":\"" + mac + "\"";
+        callbacks.setConnectionCredentials(credentials, api_server, band);
+        String mac = WiFi.macAddress();
+        String message = "{\"ssid\":\"" + ssid + "\",\"mac\":\"" + mac + "\"";
 #ifdef BOARD_TRMNL_X
-      if (!modemMac.isEmpty()) {
-        message += ",\"mac_5ghz\":\"" + modemMac + "\"";
-      }
+        if (!modemMac.isEmpty()) {
+            message += ",\"mac_5ghz\":\"" + modemMac + "\"";
+        }
 #endif
-      message += "}";
-      request->send(200, "application/json", message);
-    });
+        message += "}";
+        request->send(200, "application/json", message); });
 
-  server.addHandler(handler);
+    server.addHandler(handler);
 
-  server.onNotFound([](AsyncWebServerRequest *request) { request->redirect(LocalIPURL); });
+    server.onNotFound([](AsyncWebServerRequest *request)
+                      { request->redirect(LocalIPURL); });
 }
