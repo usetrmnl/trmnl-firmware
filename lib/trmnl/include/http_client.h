@@ -7,7 +7,7 @@
 #include <HTTPClient.h>
 #include <trmnl_log.h>
 #include "api-client/request_headers.h"
-#include "resumable_wifi_client_secure.h" // no-op unless -D TLS_RESUME
+#include "resumable_wifi_client_secure.h"
 
 // Error codes for the HTTP utilities - using distinct values to avoid overlap
 enum HttpError

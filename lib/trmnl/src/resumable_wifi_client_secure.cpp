@@ -1,5 +1,4 @@
 #include "resumable_wifi_client_secure.h"
-#ifdef TLS_RESUME
 
 #include "Arduino.h"
 #include <esp32-hal-log.h>
@@ -45,7 +44,8 @@ static int rwcs_start(sslclient_context *ssl_client, const IPAddress &ip, uint32
   int enable = 1;
 
   ssl_client->socket = lwip_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-  if (ssl_client->socket < 0) {
+  if (ssl_client->socket < 0)
+  {
     log_e("ERROR opening socket");
     return ssl_client->socket;
   }
@@ -57,7 +57,8 @@ static int rwcs_start(sslclient_context *ssl_client, const IPAddress &ip, uint32
   serv_addr.sin_addr.s_addr = ip;
   serv_addr.sin_port = htons(port);
 
-  if (timeout <= 0) {
+  if (timeout <= 0)
+  {
     timeout = 30000;
   }
   ssl_client->socket_timeout = timeout;
@@ -70,7 +71,8 @@ static int rwcs_start(sslclient_context *ssl_client, const IPAddress &ip, uint32
   tv.tv_usec = (timeout % 1000) * 1000;
 
   int res = lwip_connect(ssl_client->socket, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
-  if (res < 0 && errno != EINPROGRESS) {
+  if (res < 0 && errno != EINPROGRESS)
+  {
     log_e("connect on fd %d, errno: %d", ssl_client->socket, errno);
     lwip_close(ssl_client->socket);
     ssl_client->socket = -1;
@@ -81,7 +83,8 @@ static int rwcs_start(sslclient_context *ssl_client, const IPAddress &ip, uint32
   res = select(ssl_client->socket + 1, nullptr, &fdset, nullptr, &tv);
   int sockerr = 0;
   socklen_t len = sizeof(sockerr);
-  if (res <= 0 || getsockopt(ssl_client->socket, SOL_SOCKET, SO_ERROR, &sockerr, &len) < 0 || sockerr != 0) {
+  if (res <= 0 || getsockopt(ssl_client->socket, SOL_SOCKET, SO_ERROR, &sockerr, &len) < 0 || sockerr != 0)
+  {
     log_e("connect failed on fd %d (select %d, sockerr %d)", ssl_client->socket, res, sockerr);
     lwip_close(ssl_client->socket);
     ssl_client->socket = -1;
@@ -121,7 +124,8 @@ static int rwcs_start(sslclient_context *ssl_client, const IPAddress &ip, uint32
   // Resume: mbedtls_ssl_set_session() deep-copies, so the local copy is freed at once.
   // A ticket the server declines degrades to a full handshake on its own — nothing to
   // handle here; the renewed session is captured below either way.
-  if (try_resume) {
+  if (try_resume)
+  {
     mbedtls_ssl_session saved;
     mbedtls_ssl_session_init(&saved);
     if (mbedtls_ssl_session_load(&saved, s_sess, s_sess_len) == 0)
@@ -130,7 +134,8 @@ static int rwcs_start(sslclient_context *ssl_client, const IPAddress &ip, uint32
   }
 
   unsigned long handshake_start = millis();
-  while ((ret = mbedtls_ssl_handshake(&ssl_client->ssl_ctx)) != 0) {
+  while ((ret = mbedtls_ssl_handshake(&ssl_client->ssl_ctx)) != 0)
+  {
     if (ret != MBEDTLS_ERR_SSL_WANT_READ && ret != MBEDTLS_ERR_SSL_WANT_WRITE)
       return RWCS_ERR(ret);
     if ((millis() - handshake_start) > ssl_client->handshake_timeout)
@@ -140,9 +145,11 @@ static int rwcs_start(sslclient_context *ssl_client, const IPAddress &ip, uint32
 
   mbedtls_ssl_session got;
   mbedtls_ssl_session_init(&got);
-  if (mbedtls_ssl_get_session(&ssl_client->ssl_ctx, &got) == 0) {
+  if (mbedtls_ssl_get_session(&ssl_client->ssl_ctx, &got) == 0)
+  {
     size_t olen = 0;
-    if (mbedtls_ssl_session_save(&got, s_sess, sizeof(s_sess), &olen) == 0) {
+    if (mbedtls_ssl_session_save(&got, s_sess, sizeof(s_sess), &olen) == 0)
+    {
       s_sess_len = (uint32_t)olen;
       s_sess_magic = RWCS_SESS_MAGIC;
     }
@@ -171,7 +178,8 @@ int ResumableWiFiClientSecure::connectResumable(IPAddress ip, uint16_t port, con
 
   int sock = rwcs_start(sslclient, ip, port, host, _timeout, _alpn_protos, try_resume);
   _lastError = sock;
-  if (sock < 0) {
+  if (sock < 0)
+  {
     s_sess_magic = 0; // drop the saved session so a genuine failure can't loop on a bad ticket
     stop();
     return 0;
@@ -179,5 +187,3 @@ int ResumableWiFiClientSecure::connectResumable(IPAddress ip, uint16_t port, con
   _connected = true;
   return 1;
 }
-
-#endif // TLS_RESUME

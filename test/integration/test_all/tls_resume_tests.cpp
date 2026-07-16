@@ -25,7 +25,6 @@
 #include <test_helpers.h>
 #include "tests.h"
 
-#ifdef TLS_RESUME
 #include <resumable_wifi_client_secure.h>
 
 static const char *HOST = "trmnl.app";
@@ -131,12 +130,3 @@ void test_tls_resume(void)
   RUN_TEST(test_resumed_connect_is_fast);
   RUN_TEST(test_resumed_session_headers_reach_server);
 }
-
-#else
-
-void test_tls_resume(void)
-{
-  Serial.println("TLS_RESUME not defined — skipping tls_resume tests");
-}
-
-#endif // TLS_RESUME

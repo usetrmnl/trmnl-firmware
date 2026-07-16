@@ -1,5 +1,5 @@
 #pragma once
-#ifdef TLS_RESUME
+
 #include <WiFiClientSecure.h>
 
 // WiFiClientSecure that resumes the TLS session across deep sleep, skipping the
@@ -19,4 +19,3 @@ public:
 private:
   int connectResumable(IPAddress ip, uint16_t port, const char *host);
 };
-#endif // TLS_RESUME
