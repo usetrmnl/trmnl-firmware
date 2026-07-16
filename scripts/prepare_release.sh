@@ -2,16 +2,47 @@
 
 set -e
 
+TRMNL_ENVS=(
+    trmnl
+    trmnl_4clr
+    TRMNL_X
+)
+
+BYOD_ENVS=(
+    seeed_xiao_esp32c3
+    xteink_x4
+    TRMNL_7inch5_OG_DIY_Kit
+    seeed_reTerminal_E1001
+    seeed_reTerminal_E1002
+    TRMNL_X_E1003
+)
+
+CONFIG="include/config.h"
 FORCE=0
+ENV_INPUT=()
+ENVS=()
+
 for arg in "$@"; do
     case "$arg" in
         --force|-f) FORCE=1 ;;
-        *) echo "Unknown option: $arg"; echo "Usage: $0 [--force]"; exit 1 ;;
+        --help) echo "Usage: $0 [--force] [trmnl] [byod] [env1] [env2] [...]"; exit 0 ;;
+        *) ENV_INPUT+=("$arg") ;;
     esac
 done
 
-ENVS=(trmnl trmnl_4clr TRMNL_X)
-CONFIG="include/config.h"
+# expand "trmnl" and "byod" to multiple environments
+for i in "${!ENV_INPUT[@]}"; do
+    case "${ENV_INPUT[$i]}" in
+        trmnl) ENVS+=("${TRMNL_ENVS[@]}") ;;
+        byod) ENVS+=("${BYOD_ENVS[@]}") ;;
+        *) ENVS+=("${ENV_INPUT[$i]}") ;;
+    esac
+done
+
+# default to TRMNL_ENVS if blank
+if [ ${#ENVS[@]} -eq 0 ]; then
+    ENVS=("${TRMNL_ENVS[@]}")
+fi
 
 if [ ! -f "$CONFIG" ]; then
     echo "Error: $CONFIG not found. Run from the firmware repo root."

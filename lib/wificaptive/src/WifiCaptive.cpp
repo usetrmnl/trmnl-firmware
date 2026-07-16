@@ -10,6 +10,7 @@
 #include "esp_event.h"
 #include "esp_wifi.h"
 #include "connect.h"
+#include <time.h>
 void goToSleep(void);
 void saveShipmentStarted(void);
 void showMessageWithLogo(MSG message_type);
@@ -201,7 +202,7 @@ bool WifiCaptive::startPortal()
             }
             else
             {
-                res = connect(credentials) == WL_CONNECTED;
+                res = connect(credentials).status == WL_CONNECTED;
             }
 
             if (res)
@@ -305,6 +306,9 @@ void WifiCaptive::resetSettings()
         preferences.remove(WIFI_STATIC_SN_KEY(i));
         preferences.remove(WIFI_STATIC_DNS1_KEY(i));
         preferences.remove(WIFI_STATIC_DNS2_KEY(i));
+        preferences.remove(WIFI_BSSID_KEY(i));
+        preferences.remove(WIFI_CHAN_KEY(i));
+        preferences.remove(WIFI_FULLSCAN_KEY(i));
     }
     preferences.end();
 
@@ -320,19 +324,22 @@ void WifiCaptive::resetSettings()
     WiFi.eraseAP();
 }
 
-wl_status_t WifiCaptive::connect(const WifiCredentials credentials)
+WifiConnectionResult WifiCaptive::connect(const WifiCredentials credentials)
 {
-    wl_status_t connRes = WL_NO_SSID_AVAIL;
-
-    if (credentials.ssid != "")
+    if (credentials.ssid == "")
     {
-        WiFi.enableSTA(true);
-
-        auto result = initiateConnectionAndWaitForOutcome(credentials);
-        connRes = result.status;
+        return {WL_NO_SSID_AVAIL, WifiEventData{}, false};
     }
 
-    return connRes;
+    // Credentials/bssid/channel are already durably persisted via our own Preferences calls, so
+    // arduino-esp32's built-in WiFi NVS persistence is redundant - and fast connect can now call
+    // WiFi.begin() twice per wake cycle (fast attempt + full-scan fallback), which would otherwise
+    // double the flash writes to that partition on every fallback.
+    WiFi.persistent(false);
+
+    WiFi.enableSTA(true);
+
+    return initiateConnectionAndWaitForOutcome(credentials);
 }
 
 void WifiCaptive::setResetSettingsCallback(std::function<void()> func)
@@ -343,6 +350,16 @@ void WifiCaptive::setResetSettingsCallback(std::function<void()> func)
 void WifiCaptive::setPortalTickCallback(std::function<void()> func)
 {
     _tickCallback = func;
+}
+
+void WifiCaptive::setHostname(const String &hostname)
+{
+    _hostname = hostname;
+}
+
+String WifiCaptive::getHostname()
+{
+    return _hostname;
 }
 
 bool WifiCaptive::isSaved()
@@ -371,6 +388,9 @@ void WifiCaptive::readWifiCredentials()
         _savedWifis[i].subnet = preferences.getString(WIFI_STATIC_SN_KEY(i), "");
         _savedWifis[i].dns1 = preferences.getString(WIFI_STATIC_DNS1_KEY(i), "");
         _savedWifis[i].dns2 = preferences.getString(WIFI_STATIC_DNS2_KEY(i), "");
+        _savedWifis[i].bssid = preferences.getString(WIFI_BSSID_KEY(i), "");
+        _savedWifis[i].channel = preferences.getUChar(WIFI_CHAN_KEY(i), 0);
+        _savedWifis[i].lastFullScanEpoch = preferences.getUInt(WIFI_FULLSCAN_KEY(i), 0);
     }
 
     int idx = preferences.getInt(WIFI_LAST_INDEX, 0);
@@ -435,6 +455,9 @@ void WifiCaptive::saveWifiCredentials(const WifiCredentials credentials)
         preferences.putString(WIFI_STATIC_SN_KEY(i), _savedWifis[i].subnet);
         preferences.putString(WIFI_STATIC_DNS1_KEY(i), _savedWifis[i].dns1);
         preferences.putString(WIFI_STATIC_DNS2_KEY(i), _savedWifis[i].dns2);
+        preferences.putString(WIFI_BSSID_KEY(i), _savedWifis[i].bssid);
+        preferences.putUChar(WIFI_CHAN_KEY(i), _savedWifis[i].channel);
+        preferences.putUInt(WIFI_FULLSCAN_KEY(i), _savedWifis[i].lastFullScanEpoch);
     }
     preferences.putInt(WIFI_LAST_INDEX, 0);
     preferences.end();
@@ -734,7 +757,7 @@ bool WifiCaptive::autoConnect()
     return false;
 }
 
-bool WifiCaptive::tryConnectWithRetries(const WifiCredentials creds, int last_used_index)
+bool WifiCaptive::tryConnectWithRetries(WifiCredentials creds, int last_used_index)
 {
     for (int attempt = 0; attempt < WIFI_CONNECTION_ATTEMPTS; attempt++)
     {
@@ -743,10 +766,29 @@ bool WifiCaptive::tryConnectWithRetries(const WifiCredentials creds, int last_us
                  creds.isEnterprise ? "yes" : "no",
                  creds.useStaticIP ? "yes" : "no",
                  creds.staticIP.c_str());
-        connect(creds);
-        if (WiFi.status() == WL_CONNECTED)
+        auto connResult = connect(creds);
+        if (connResult.status == WL_CONNECTED)
         {
             Log_info("Connected to %s", creds.ssid.c_str());
+            if (last_used_index >= 0 && last_used_index < WIFI_MAX_SAVED_CREDS && !creds.isEnterprise)
+            {
+                String connBssid = WiFi.BSSIDstr();
+                uint8_t connChannel = (uint8_t)WiFi.channel();
+                Log_info("Saving fast-connect hint: BSSID %s, channel %d", connBssid.c_str(), connChannel);
+                _savedWifis[last_used_index].bssid = connBssid;
+                _savedWifis[last_used_index].channel = connChannel;
+                Preferences prefs;
+                prefs.begin("wificaptive", false);
+                prefs.putString(WIFI_BSSID_KEY(last_used_index), connBssid);
+                prefs.putUChar(WIFI_CHAN_KEY(last_used_index), connChannel);
+                if (connResult.usedFullScan)
+                {
+                    uint32_t nowEpoch = (uint32_t)time(nullptr);
+                    _savedWifis[last_used_index].lastFullScanEpoch = nowEpoch;
+                    prefs.putUInt(WIFI_FULLSCAN_KEY(last_used_index), nowEpoch);
+                }
+                prefs.end();
+            }
             if (last_used_index >= 0)
             {
                 saveLastUsedWifiIndex(last_used_index);
@@ -761,6 +803,12 @@ bool WifiCaptive::tryConnectWithRetries(const WifiCredentials creds, int last_us
             Log_info("Cleaning up WPA2 Enterprise state after failed attempt");
             disableWpa2Enterprise();
         }
+
+        // The cached BSSID/channel just proved unreachable (or connect() already fell back to a
+        // full scan and that failed too) - clear this local copy so remaining retries go straight
+        // to a full scan instead of repeating the same doomed fast-connect probe.
+        creds.bssid = "";
+        creds.channel = 0;
 
         if (attempt < WIFI_CONNECTION_ATTEMPTS - 1)
         {
