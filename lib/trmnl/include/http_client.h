@@ -29,17 +29,22 @@ ReturnType withHttp(const String &url, Callback callback, bool resumable = false
   Log_info("==== withHttp() %s", url.c_str());
 
   bool isHttps = (url.indexOf("https://") != -1);
+  bool isTrmnlApi = (url.indexOf("https://trmnl.app") != -1);
 
   // Conditionally allocate only the client we need
   WiFiClient *client = nullptr;
 
   if (isHttps)
   {
-    WiFiClientSecure *secureClient =
-#ifdef TLS_RESUME
-        resumable ? new ResumableWiFiClientSecure() : // trmnl.app only: resume the TLS session across deep sleep
-#endif
-        new WiFiClientSecure();
+    WiFiClientSecure *secureClient;
+    if (resumable && isTrmnlApi)
+    {
+      secureClient = new ResumableWiFiClientSecure(); // trmnl.app only: resume the TLS session across deep sleep
+    }
+    else
+    {
+      secureClient = new WiFiClientSecure();
+    }
     secureClient->setInsecure();
     client = secureClient;
   }
