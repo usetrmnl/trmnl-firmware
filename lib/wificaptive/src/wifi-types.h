@@ -22,7 +22,7 @@ struct WifiCredentials {
   String bssid;        // "AA:BB:CC:DD:EE:FF"; empty if not yet known
   uint8_t channel = 0; // 0 if not yet known
     // Epoch (UTC seconds) of the last full channel scan for this network; 0 = never scanned.
-    // Used to force a periodic roam scan even when the cached BSSID/channel still connects fine.
+                       // Used to force a periodic roam scan even when the cached BSSID/channel still connects fine.
   uint32_t lastFullScanEpoch = 0;
   WifiCredentials() : is5GHz(false) {}
   WifiCredentials(String ssid, String pswd, bool is5GHz = false) : ssid(ssid), pswd(pswd), is5GHz(is5GHz) {}
