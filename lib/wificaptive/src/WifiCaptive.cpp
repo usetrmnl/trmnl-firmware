@@ -309,6 +309,10 @@ void WifiCaptive::resetSettings()
         preferences.remove(WIFI_BSSID_KEY(i));
         preferences.remove(WIFI_CHAN_KEY(i));
         preferences.remove(WIFI_FULLSCAN_KEY(i));
+        preferences.remove(WIFI_LEASE_IP_KEY(i));
+        preferences.remove(WIFI_LEASE_GW_KEY(i));
+        preferences.remove(WIFI_LEASE_MASK_KEY(i));
+        preferences.remove(WIFI_LEASE_DNS_KEY(i));
     }
     preferences.end();
 
@@ -339,7 +343,9 @@ WifiConnectionResult WifiCaptive::connect(const WifiCredentials credentials)
 
     WiFi.enableSTA(true);
 
-    return initiateConnectionAndWaitForOutcome(credentials);
+    auto result = initiateConnectionAndWaitForOutcome(credentials);
+    _fastLeaseApplied = (result.status == WL_CONNECTED) && result.fastLeaseApplied;
+    return result;
 }
 
 void WifiCaptive::setResetSettingsCallback(std::function<void()> func)
@@ -391,6 +397,10 @@ void WifiCaptive::readWifiCredentials()
         _savedWifis[i].bssid = preferences.getString(WIFI_BSSID_KEY(i), "");
         _savedWifis[i].channel = preferences.getUChar(WIFI_CHAN_KEY(i), 0);
         _savedWifis[i].lastFullScanEpoch = preferences.getUInt(WIFI_FULLSCAN_KEY(i), 0);
+        _savedWifis[i].leaseIP = preferences.getUInt(WIFI_LEASE_IP_KEY(i), 0);
+        _savedWifis[i].leaseGW = preferences.getUInt(WIFI_LEASE_GW_KEY(i), 0);
+        _savedWifis[i].leaseMask = preferences.getUInt(WIFI_LEASE_MASK_KEY(i), 0);
+        _savedWifis[i].leaseDNS = preferences.getUInt(WIFI_LEASE_DNS_KEY(i), 0);
     }
 
     int idx = preferences.getInt(WIFI_LAST_INDEX, 0);
@@ -458,6 +468,10 @@ void WifiCaptive::saveWifiCredentials(const WifiCredentials credentials)
         preferences.putString(WIFI_BSSID_KEY(i), _savedWifis[i].bssid);
         preferences.putUChar(WIFI_CHAN_KEY(i), _savedWifis[i].channel);
         preferences.putUInt(WIFI_FULLSCAN_KEY(i), _savedWifis[i].lastFullScanEpoch);
+        preferences.putUInt(WIFI_LEASE_IP_KEY(i), _savedWifis[i].leaseIP);
+        preferences.putUInt(WIFI_LEASE_GW_KEY(i), _savedWifis[i].leaseGW);
+        preferences.putUInt(WIFI_LEASE_MASK_KEY(i), _savedWifis[i].leaseMask);
+        preferences.putUInt(WIFI_LEASE_DNS_KEY(i), _savedWifis[i].leaseDNS);
     }
     preferences.putInt(WIFI_LAST_INDEX, 0);
     preferences.end();
@@ -788,6 +802,9 @@ bool WifiCaptive::tryConnectWithRetries(WifiCredentials creds, int last_used_ind
                     prefs.putUInt(WIFI_FULLSCAN_KEY(last_used_index), nowEpoch);
                 }
                 prefs.end();
+                if (!creds.useStaticIP) {
+                    saveLeaseForIndex(last_used_index);
+                }
             }
             if (last_used_index >= 0)
             {
@@ -818,6 +835,83 @@ bool WifiCaptive::tryConnectWithRetries(WifiCredentials creds, int last_used_ind
         }
     }
     return false;
+}
+
+void WifiCaptive::saveLeaseForIndex(int index) {
+  if (index < 0 || index >= WIFI_MAX_SAVED_CREDS ||
+      WiFi.status() != WL_CONNECTED) {
+    return;
+  }
+  uint32_t ip = (uint32_t)WiFi.localIP();
+  uint32_t gw = (uint32_t)WiFi.gatewayIP();
+  uint32_t mask = (uint32_t)WiFi.subnetMask();
+  uint32_t dns = (uint32_t)WiFi.dnsIP(0);
+  if (ip == 0 || gw == 0 || mask == 0) {
+    return;
+  }
+  _savedWifis[index].leaseIP = ip;
+  _savedWifis[index].leaseGW = gw;
+  _savedWifis[index].leaseMask = mask;
+  _savedWifis[index].leaseDNS = dns;
+  Preferences prefs;
+  prefs.begin("wificaptive", false);
+  prefs.putUInt(WIFI_LEASE_IP_KEY(index), ip);
+  prefs.putUInt(WIFI_LEASE_GW_KEY(index), gw);
+  prefs.putUInt(WIFI_LEASE_MASK_KEY(index), mask);
+  prefs.putUInt(WIFI_LEASE_DNS_KEY(index), dns);
+  prefs.end();
+}
+
+void WifiCaptive::clearLeaseForIndex(int index) {
+  if (index < 0 || index >= WIFI_MAX_SAVED_CREDS) {
+    return;
+  }
+  _savedWifis[index].leaseIP = 0;
+  _savedWifis[index].leaseGW = 0;
+  _savedWifis[index].leaseMask = 0;
+  _savedWifis[index].leaseDNS = 0;
+  Preferences prefs;
+  prefs.begin("wificaptive", false);
+  prefs.remove(WIFI_LEASE_IP_KEY(index));
+  prefs.remove(WIFI_LEASE_GW_KEY(index));
+  prefs.remove(WIFI_LEASE_MASK_KEY(index));
+  prefs.remove(WIFI_LEASE_DNS_KEY(index));
+  prefs.end();
+}
+
+bool WifiCaptive::recoverFromStaleLease() {
+  if (!_fastLeaseApplied) {
+    return false;
+  }
+  _fastLeaseApplied = false;
+
+  readWifiCredentials();
+  int index = readLastUsedWifiIndex();
+  WifiCredentials creds = _savedWifis[index];
+  if (creds.ssid == "") {
+    return false;
+  }
+
+  Log_info(
+      "WiFi: cached DHCP lease may be stale - dropping it and re-running DHCP");
+  // Drop the saved lease first so the next wake does a normal DHCP bind even if
+  // this recovery fails.
+  clearLeaseForIndex(index);
+
+  WiFi.disconnect();
+  delay(100);
+  // WiFi.config(0,0,0) clears the static (lease) config and re-enables the DHCP
+  // client.
+  WiFi.config((uint32_t)0, (uint32_t)0, (uint32_t)0);
+  WiFi.setScanMethod(WIFI_FAST_SCAN);
+  WiFi.begin(creds.ssid.c_str(), creds.pswd.c_str());
+  if (waitForConnectResult(CONNECTION_TIMEOUT) != WL_CONNECTED) {
+    Log_info("WiFi: reconnect with DHCP after stale lease failed");
+    return false;
+  }
+  Log_info("WiFi: reconnected with fresh DHCP lease");
+  saveLeaseForIndex(index);
+  return true;
 }
 
 bool checkForSavedCredentials()

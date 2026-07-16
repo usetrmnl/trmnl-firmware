@@ -48,6 +48,11 @@
 #define WIFI_BSSID_KEY(i) ("wifi_" + String(i) + "_bssid").c_str()
 #define WIFI_CHAN_KEY(i)   ("wifi_" + String(i) + "_chan").c_str()
 #define WIFI_FULLSCAN_KEY(i) ("wifi_" + String(i) + "_fscan").c_str()
+// Cached DHCP lease keys (fast connect skips the DHCP round trip)
+#define WIFI_LEASE_IP_KEY(i) ("wifi_" + String(i) + "_lip").c_str()
+#define WIFI_LEASE_GW_KEY(i) ("wifi_" + String(i) + "_lgw").c_str()
+#define WIFI_LEASE_MASK_KEY(i) ("wifi_" + String(i) + "_lmk").c_str()
+#define WIFI_LEASE_DNS_KEY(i) ("wifi_" + String(i) + "_ldns").c_str()
 
 #define WIFI_LAST_INDEX "wifi_last_index"
 
@@ -82,6 +87,9 @@ private:
 
     WifiCredentials _savedWifis[WIFI_MAX_SAVED_CREDS];
     int _lastIndex = 0;
+    // True while the current connection is running on a cached DHCP lease (set by connect(),
+    // consumed by recoverFromStaleLease() when a request fails and the lease may be stale).
+    bool _fastLeaseApplied = false;
 
     std::vector<ExternalNetwork> _networks;
 
@@ -100,6 +108,8 @@ private:
     int readLastUsedWifiIndex();
     void saveApiServer(String url);
     bool tryConnectWithRetries(WifiCredentials creds, int last_used_index);
+    void saveLeaseForIndex(int index);
+    void clearLeaseForIndex(int index);
     std::vector<WifiCredentials> matchNetworks(std::vector<WifiNetwork> &scanResults, WifiCredentials wifiCredentials[]);
     std::vector<WifiNetwork> getScannedUniqueNetworks(bool runScan);
     std::vector<WifiNetwork> combineNetworks(std::vector<WifiNetwork> &scanResults, WifiCredentials wifiCredentials[]);
@@ -143,6 +153,12 @@ public:
 
     /// @brief Returns the last successfully used WiFi credentials (including is5GHz flag).
     WifiCredentials getLastCredentials();
+
+    /// @brief Call when a request fails right after a fast connect that applied a cached DHCP
+    ///        lease: the lease may be stale (association succeeds but nothing routes). Drops the
+    ///        lease, re-runs DHCP and reconnects so the SAME wake can still succeed.
+    /// @return True if a fresh lease was obtained and the caller should retry immediately.
+    bool recoverFromStaleLease();
 
     /// @brief Registers a callback used to connect to 5 GHz networks via the modem.
     void setModemConnectCallback(ModemConnectCallback cb);

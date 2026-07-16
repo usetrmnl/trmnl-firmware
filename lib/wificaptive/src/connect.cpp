@@ -182,18 +182,52 @@ void captureEventData(WiFiEvent_t event, WiFiEventInfo_t info, WifiEventData *ev
 }
 
 /**
- * @brief Attempt a fast connect using the cached BSSID+channel, skipping the full channel scan.
+ * @brief Apply the cached DHCP lease as a static config (+ stop dhcpc) so association skips
+ *        the DHCP round trip. DHCP users only — static-IP users already went through
+ *        configureStaticIP.
+ * @return true if a lease was applied
+ */
+static bool applyCachedLease(const WifiCredentials &credentials)
+{
+    if (credentials.useStaticIP || credentials.leaseIP == 0 || credentials.leaseGW == 0 ||
+        credentials.leaseMask == 0)
+    {
+        return false;
+    }
+
+    IPAddress dns = credentials.leaseDNS ? IPAddress(credentials.leaseDNS)
+                                         : IPAddress(credentials.leaseGW);
+    if (!WiFi.config(IPAddress(credentials.leaseIP), IPAddress(credentials.leaseGW),
+                     IPAddress(credentials.leaseMask), dns))
+    {
+        return false;
+    }
+    esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    if (netif != nullptr)
+    {
+        esp_netif_dhcpc_stop(netif);
+    }
+    Log_info("WiFi: Applied cached DHCP lease: %s", IPAddress(credentials.leaseIP).toString().c_str());
+    return true;
+}
+
+/**
+ * @brief Attempt a fast connect using the cached BSSID+channel, skipping the full channel scan,
+ *        and the cached DHCP lease, skipping the DHCP round trip.
  *
  * Skipped when the periodic roam scan is due (WIFI_FULL_SCAN_INTERVAL_SEC) so the device
  * can roam to a better AP/channel even when the cached AP still connects fine (see issue #285).
  * If the fast connect succeeds but the signal is weak (< WIFI_FAST_CONNECT_MIN_RSSI), the
  * connection is dropped so the caller can scan for a better AP.
  *
- * @param credentials WiFi credentials with cached channel/BSSID from a previous connection
+ * @param credentials WiFi credentials with cached channel/BSSID/lease from a previous connection
+ * @param leaseAppliedOut set to true when connected using the cached DHCP lease (DHCP skipped);
+ *                        the caller must then treat routing failures as a possibly stale lease
  * @return true if connected with acceptable signal strength, false to fall back to a full scan
  */
-static bool tryFastConnect(const WifiCredentials &credentials)
+static bool tryFastConnect(const WifiCredentials &credentials, bool &leaseAppliedOut)
 {
+    leaseAppliedOut = false;
     if (credentials.channel == 0 || credentials.bssid.length() == 0)
     {
         return false;
@@ -217,6 +251,8 @@ static bool tryFastConnect(const WifiCredentials &credentials)
         return false;
     }
 
+    bool leaseApplied = applyCachedLease(credentials);
+
     Log_info("WiFi: Trying fast connect to %s on channel %d (BSSID %s)",
              credentials.ssid.c_str(), credentials.channel, credentials.bssid.c_str());
     WiFi.setScanMethod(WIFI_FAST_SCAN);
@@ -228,9 +264,9 @@ static bool tryFastConnect(const WifiCredentials &credentials)
     {
         int32_t rssi = WiFi.RSSI();
         Log_info("WiFi: Fast connect succeeded, RSSI %d dBm", rssi);
-        if (rssi >= WIFI_FAST_CONNECT_MIN_RSSI)
-        {
-            return true;
+        if (rssi >= WIFI_FAST_CONNECT_MIN_RSSI) {
+          leaseAppliedOut = leaseApplied;
+          return true;
         }
         Log_info("WiFi: Weak signal (%d dBm < %d dBm), scanning for better AP",
                  rssi, WIFI_FAST_CONNECT_MIN_RSSI);
@@ -238,6 +274,11 @@ static bool tryFastConnect(const WifiCredentials &credentials)
     else
     {
         Log_info("WiFi: Fast connect failed, falling back to full channel scan");
+    }
+    if (leaseApplied) {
+      // Undo the static lease config and restart dhcpc so the fallback full scan does a
+      // normal DHCP bind. WiFi.config(0,0,0) re-enables the DHCP client.
+      WiFi.config((uint32_t)0, (uint32_t)0, (uint32_t)0);
     }
     WiFi.disconnect();
     delay(100);
@@ -248,6 +289,7 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
 {
     WifiEventData eventData;
     bool usedFullScan = false;
+    bool fastLeaseApplied = false;
 
     // Register WiFi event handlers and remember each registration id.
     std::vector<wifi_event_id_t> handlerIds;
@@ -289,7 +331,7 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
             Log_error("WiFi: Enterprise mode requires an identity");
             // clean up event handlers
             removeEventHandlers();
-            return {WL_CONNECT_FAILED, eventData, usedFullScan};
+            return {WL_CONNECT_FAILED, eventData, usedFullScan, fastLeaseApplied};
         }
 
         // configure WPA2 Enterprise
@@ -356,7 +398,7 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
             disableWpa2Enterprise();
             // clean up event handlers
             removeEventHandlers();
-            return {WL_CONNECT_FAILED, eventData, usedFullScan};
+            return {WL_CONNECT_FAILED, eventData, usedFullScan, fastLeaseApplied};
         }
 
         // Configure static IP if specified (must be before WiFi.begin)
@@ -387,10 +429,10 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
 
         Log_info("WiFi: hostname set to %s", hostname.c_str());
 
-        if (tryFastConnect(credentials))
+        if (tryFastConnect(credentials, fastLeaseApplied))
         {
             removeEventHandlers();
-            return {WL_CONNECTED, eventData, usedFullScan};
+            return {WL_CONNECTED, eventData, usedFullScan, fastLeaseApplied};
         }
 
         // Full channel scan: find the AP with the strongest signal for this SSID (see issue #285)
@@ -413,7 +455,7 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
     // Clean up Arduino event handlers
     removeEventHandlers();
 
-    return {result, eventData, usedFullScan};
+    return {result, eventData, usedFullScan, fastLeaseApplied};
 }
 
 wl_status_t waitForConnectResult(uint32_t timeout)

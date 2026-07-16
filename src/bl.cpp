@@ -1746,6 +1746,8 @@ static https_request_err_e downloadAndShow()
           apiDisplayResult.error != HTTPS_RESPONSE_CODE_INVALID)
         break;
       Log_error_serial("Connection attempt %d/5 failed: %s", attempt, apiDisplayResult.error_detail.c_str());
+      if (attempt == 1 && WifiCaptivePortal.recoverFromStaleLease())
+        continue;
       if (attempt < 5) delay(2000);
     }
   }
