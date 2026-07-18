@@ -1,4 +1,5 @@
 #include "WebServer.h"
+#include "WifiCaptive.h"
 #include <WiFi.h>
 #include <test.h>
 #include <trmnl_log.h>
@@ -69,9 +70,24 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
                 String json = testTemperature();
                 request->send(200, "application/json", json); });
 
+    
+    server.on("/device-settings", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+        Preferences prefs;
+        prefs.begin("data", true);
+        String apiUrl = prefs.getString("api_url", "");
+        prefs.end();
+        apiUrl.replace("\\", "\\\\");
+        apiUrl.replace("\"", "\\\"");
+        request->send(200, "application/json", "{\"api_url\":\"" + apiUrl + "\"}"); });
+
     auto scanGET = server.on("/scan", HTTP_GET, [callbacks, modemMac](AsyncWebServerRequest *request)
                              {
 		String json = "{\"networks\":[";
+
+		if (request->hasParam("force")) {
+			callbacks.forceRescan();
+		}
 
 		if (!callbacks.isNetworkListReady()) {
 			if (WiFi.scanComplete() == WIFI_SCAN_FAILED) {
@@ -182,6 +198,7 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
             prefs.begin("data", false);
             prefs.putString("hostname", hostname);
             prefs.end();
+            WifiCaptivePortal.setHostname(hostname); // keep in-memory hostname up-to-date
             Log_info("WebServer: Saved hostname: %s", hostname.c_str());
         }
 

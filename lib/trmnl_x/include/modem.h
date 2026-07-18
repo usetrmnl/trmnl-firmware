@@ -35,7 +35,7 @@ public:
   };
   std::vector<ModemNetwork> scanNetworks();
 
-  bool connectToNetwork(const String& ssid, const String& password);
+  bool connectToNetwork(const String& ssid, const String& password, const String& hostname = "");
   bool disconnectFromNetwork();
 
   struct ModemHttpResult {

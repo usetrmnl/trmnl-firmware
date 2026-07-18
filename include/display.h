@@ -96,6 +96,12 @@ void display_show_battery(float f);
  */
 void display_reset(void);
 
+typedef enum {
+    TOUCHBAR_LEFT,
+    TOUCHBAR_MIDDLE,
+    TOUCHBAR_RIGHT,
+} touchbar_side_t;
+
 /**
  * @brief Function to read the display height
  * @return uint16_t - height of display in pixels
@@ -133,7 +139,7 @@ void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message,
  * @return none
  */
 
-void display_show_image(uint8_t *image_buffer, int data_size, bool bWait);
+void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool bSkipClear = false);
 
 /**
  * @brief Function to read an image from the file system
@@ -178,6 +184,8 @@ void display_show_msg_qa(uint8_t *image_buffer, const float *voltage, const floa
  * @param enabled true to enable light sleep, false to disable
  * @return none
  */
+void display_draw_touchbar_indicator(touchbar_side_t side, bool filled);
+
 void display_set_light_sleep(uint8_t enabled);
 
 /**
