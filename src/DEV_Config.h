@@ -34,6 +34,35 @@
 #include <stdint.h>
 #include <stdio.h>
 
+// TRMNL Device structure - defines the GPIO connections for the display, button and battery
+// Only needed on "OG" class devices with SPI ePaper displays
+typedef struct tag_trmnl_device
+{
+   const char *device_name;
+   uint8_t epd_sck_pin;
+   uint8_t epd_mosi_pin;
+   uint8_t epd_cs_pin;
+   uint8_t epd_rst_pin;
+   uint8_t epd_dc_pin;
+   uint8_t epd_busy_pin;
+   uint8_t sensor_sda;
+   uint8_t sensor_scl;
+   uint8_t interrupt_pin;
+   uint8_t battery_pin;
+   uint8_t panel_set;
+} TRMNL_DEVICE;
+
+// This enum defines sets of display configurations for different SPI panel types
+// These sets are what define the temperature profile - 3 per size (default, A, B)
+enum {
+  EPD_75 = 0,
+  EPD_426,
+  EPD_397,
+  EPD_75_3CLR,
+  EPD_75_4CLR,
+  EPD_75_6CLR
+};
+
 /**
  * data
 **/
@@ -41,117 +70,7 @@
 #define UWORD   uint16_t
 #define UDOUBLE uint32_t
 
-/**
- * GPIO config
-**/
-#if defined(BOARD_TRMNL) || defined (BOARD_TRMNL_4CLR)
-// Xiao ESP32C3 plus 8-pin breakout
-//   #define EPD_SCK_PIN  8
-//   #define EPD_MOSI_PIN 10
-//   #define EPD_CS_PIN   21
-//   #define EPD_RST_PIN  5
-//   #define EPD_DC_PIN   4
-//   #define EPD_BUSY_PIN 20
-// Pin def for Xiao ESP32C3 + old EPD breakout
-//   #define EPD_SCK_PIN  8
-//   #define EPD_MOSI_PIN 10
-//   #define EPD_CS_PIN   3
-//   #define EPD_RST_PIN  2
-//   #define EPD_DC_PIN   5
-//   #define EPD_BUSY_PIN 7
-   // Pin definition for TRMNL Board
-  #define EPD_SCK_PIN  7
-  #define EPD_MOSI_PIN 8
-  #define EPD_CS_PIN   6
-  #define EPD_RST_PIN  10
-  #define EPD_DC_PIN   5
-  #define EPD_BUSY_PIN 4
-  #define SENSOR_SDA 21
-  #define SENSOR_SCL 20
-#elif defined(BOARD_TRMNL_GEN2)
-  #define EPD_SCK_PIN  6
-  #define EPD_MOSI_PIN 1
-  #define EPD_CS_PIN   4
-  #define EPD_RST_PIN  2
-  #define EPD_DC_PIN   5
-  #define EPD_BUSY_PIN 0
-  #define SENSOR_SDA 11
-  #define SENSOR_SCL 12
-  #define BQ25616_STAT_PIN 24
-  #define BQ25616_PG_PIN 25
-#elif defined(BOARD_XTEINK_X4)
-  #define EPD_SCK_PIN  8
-  #define EPD_MOSI_PIN 10
-  #define EPD_CS_PIN   21
-  #define EPD_RST_PIN  5
-  #define EPD_DC_PIN   4
-  #define EPD_BUSY_PIN 6
-
-#elif defined(BOARD_WAVESHARE_ESP32_DRIVER)
-   // Pin definition for Waveshare ESP32 Driver Board
-   #define EPD_SCK_PIN  13
-   #define EPD_MOSI_PIN 14
-   #define EPD_CS_PIN   15
-   #define EPD_RST_PIN  26
-   #define EPD_DC_PIN   27
-   #define EPD_BUSY_PIN 25
-
-#elif defined(BOARD_WAVESHARE_397)
-   #define EPD_SCK_PIN  11
-   #define EPD_MOSI_PIN 12
-   #define EPD_CS_PIN   10
-   #define EPD_RST_PIN  46
-   #define EPD_DC_PIN   9
-   #define EPD_BUSY_PIN 3
-   #define FAKE_BATTERY_VOLTAGE
-#elif defined(BOARD_SEEED_STICKY)
-   #define EPD_SCK_PIN  13
-   #define EPD_MOSI_PIN 14
-   #define EPD_CS_PIN   15
-   #define EPD_RST_PIN  17
-   #define EPD_DC_PIN   16
-   #define EPD_BUSY_PIN 18
-   #define FAKE_BATTERY_VOLTAGE
-#elif defined(BOARD_SEEED_XIAO_ESP32C3)
-   // Pin definition for Seeed XIAO ESP32C3 Board
-   #define EPD_SCK_PIN  8
-   #define EPD_MOSI_PIN 10
-   #define EPD_CS_PIN   3
-   #define EPD_RST_PIN  2
-   #define EPD_DC_PIN   5
-   #define EPD_BUSY_PIN 4
-
-#elif defined(BOARD_SEEED_XIAO_ESP32S3)
-   // Pin definition for Seeed XIAO ESP32S3 Board
-   #define EPD_SCK_PIN  7
-   #define EPD_MOSI_PIN 9
-   #define EPD_CS_PIN   2
-   #define EPD_RST_PIN  1
-   #define EPD_DC_PIN   4
-   #define EPD_BUSY_PIN 3
-   
-#elif (defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_XIAO_EPAPER_DISPLAY_3CLR))
-   // Pin definition for TRMNL 7inch5 OG DIY Kit
-   #define EPD_SCK_PIN  7
-   #define EPD_MOSI_PIN 9
-   #define EPD_CS_PIN   44
-   #define EPD_RST_PIN  38
-   #define EPD_DC_PIN   10
-   #define EPD_BUSY_PIN 4
-   // DEBUG - remove the fake battery line after testing
-   #define FAKE_BATTERY_VOLTAGE
-#elif defined(BOARD_TRMNL_X)
-//   #define FAKE_BATTERY_VOLTAGE
-
-#elif defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002)
-   // Pin definition for reTerminal E1001 & E1002
-   #define EPD_SCK_PIN  7
-   #define EPD_MOSI_PIN 9
-   #define EPD_CS_PIN   10
-   #define EPD_RST_PIN  12
-   #define EPD_DC_PIN   11
-   #define EPD_BUSY_PIN 13
-#elif defined (BOARD_SEEED_RETERMINAL_E1003)
+#if defined (BOARD_SEEED_RETERMINAL_E1003)
    #define EPD_SCK_PIN  7
    #define EPD_MOSI_PIN 9
    #define EPD_MISO_PIN 8
@@ -160,10 +79,6 @@
    #define EPD_EN_PIN   11
    #define EPD_BUSY_PIN 13
    #define EPD_VCC_EN   21
-#elif defined (BOARD_X_CLASS)
-// Parallel Eink devices don't explicitly define GPIO pins for the display here
-#else
-   #error "Board type not defined. Please define BOARD_WAVESHARE_ESP32_DRIVER or BOARD_TRMNL or BOARD_SEEED_XIAO_ESP32C3 or BOARD_SEEED_XIAO_ESP32S3 in platformio.ini build_flags."
 #endif
 
 #define GPIO_PIN_SET   1

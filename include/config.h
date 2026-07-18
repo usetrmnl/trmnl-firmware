@@ -79,9 +79,12 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
     WIFI_THIRD_RETRY = 300
 };
 
-#if defined(BOARD_TRMNL) || defined(BOARD_TRMNL_4CLR)
+#if defined(BOARD_TRMNL)
 #define PIN_INTERRUPT 2
 #define DEVICE_MODEL "og"
+#elif defined(BOARD_TRMNL_4CLR)
+#define PIN_INTERRUPT 2
+#define DEVICE_MODEL "og_4clr"
 #elif defined(BOARD_TRMNL_GEN2)
 #define PIN_INTERRUPT 3
 #define DEVICE_MODEL "og_gen2"
