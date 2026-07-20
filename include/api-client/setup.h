@@ -1,11 +1,10 @@
 #pragma once
 
-#include <types.h>
-#include <api_types.h>
 #include <HTTPClient.h>
+#include <api_types.h>
+#include <types.h>
 
-struct ApiSetupResult
-{
+struct ApiSetupResult {
   https_request_err_e error;
   ApiSetupResponse response;
   String error_detail;

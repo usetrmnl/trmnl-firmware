@@ -1,32 +1,25 @@
-#include <unity.h>
 #include <api-client/request_headers.h>
 #include <special_function.h>
+#include <unity.h>
 
 // --- helpers ---------------------------------------------------------------
 
 // Index of the first header with the given name, or -1 if not present.
-static int indexOf(const HttpHeaderList &headers, const char *name)
-{
+static int indexOf(const HttpHeaderList &headers, const char *name) {
   for (size_t i = 0; i < headers.size(); ++i)
-    if (headers[i].first == name)
-      return (int)i;
+    if (headers[i].first == name) return (int)i;
   return -1;
 }
 
-static bool has(const HttpHeaderList &headers, const char *name)
-{
-  return indexOf(headers, name) >= 0;
-}
+static bool has(const HttpHeaderList &headers, const char *name) { return indexOf(headers, name) >= 0; }
 
 // Value of the first header with the given name (empty String if absent).
-static String valueOf(const HttpHeaderList &headers, const char *name)
-{
+static String valueOf(const HttpHeaderList &headers, const char *name) {
   int i = indexOf(headers, name);
   return i >= 0 ? headers[i].second : String();
 }
 
-static ApiDisplayInputs makeDisplayInputs()
-{
+static ApiDisplayInputs makeDisplayInputs() {
   ApiDisplayInputs inputs;
   inputs.baseUrl = "https://example.com";
   inputs.apiKey = "test-token";
@@ -49,8 +42,7 @@ static ApiDisplayInputs makeDisplayInputs()
 
 // --- buildSetupHeaders -----------------------------------------------------
 
-void test_setup_headers_names_and_order(void)
-{
+void test_setup_headers_names_and_order(void) {
   ApiSetupInputs inputs;
   inputs.baseUrl = "https://example.com";
   inputs.macAddress = "AA:BB:CC:DD:EE:FF";
@@ -73,8 +65,7 @@ void test_setup_headers_names_and_order(void)
 
 // --- buildLogHeaders -------------------------------------------------------
 
-void test_log_headers_names_and_values(void)
-{
+void test_log_headers_names_and_values(void) {
   ApiLogInputs inputs;
   inputs.macAddress = "AA:BB:CC:DD:EE:FF";
   inputs.apiKey = "secret-key";
@@ -95,8 +86,7 @@ void test_log_headers_names_and_values(void)
 
 // --- buildDisplayHeaders ---------------------------------------------------
 
-void test_display_headers_core_values(void)
-{
+void test_display_headers_core_values(void) {
   auto inputs = makeDisplayInputs();
   auto headers = buildDisplayHeaders(inputs);
 
@@ -118,31 +108,27 @@ void test_display_headers_core_values(void)
 
 // Update-Source and Temperature-Profile must always be present — these were the
 // two headers historically missing from the modem (5 GHz) display path.
-void test_display_headers_include_update_source_and_temperature_profile(void)
-{
+void test_display_headers_include_update_source_and_temperature_profile(void) {
   auto headers = buildDisplayHeaders(makeDisplayInputs());
   TEST_ASSERT_TRUE(has(headers, "Update-Source"));
   TEST_ASSERT_TRUE(has(headers, "Temperature-Profile"));
 }
 
-void test_display_headers_image_cached_reflects_input(void)
-{
+void test_display_headers_image_cached_reflects_input(void) {
   auto inputs = makeDisplayInputs();
   inputs.imageCached = true;
   auto headers = buildDisplayHeaders(inputs);
   TEST_ASSERT_EQUAL_STRING("true", valueOf(headers, "Image-Cached").c_str());
 }
 
-void test_display_headers_special_function_omitted_when_none(void)
-{
+void test_display_headers_special_function_omitted_when_none(void) {
   auto inputs = makeDisplayInputs();
   inputs.specialFunction = SF_NONE;
   auto headers = buildDisplayHeaders(inputs);
   TEST_ASSERT_FALSE(has(headers, "special_function"));
 }
 
-void test_display_headers_special_function_present_when_set(void)
-{
+void test_display_headers_special_function_present_when_set(void) {
   auto inputs = makeDisplayInputs();
   inputs.specialFunction = SF_IDENTIFY;
   auto headers = buildDisplayHeaders(inputs);
@@ -150,24 +136,21 @@ void test_display_headers_special_function_present_when_set(void)
   TEST_ASSERT_EQUAL_STRING("true", valueOf(headers, "special_function").c_str());
 }
 
-void test_display_headers_wifi_band_2_4(void)
-{
+void test_display_headers_wifi_band_2_4(void) {
   auto inputs = makeDisplayInputs();
   inputs.wifiBand = "2.4";
   auto headers = buildDisplayHeaders(inputs);
   TEST_ASSERT_EQUAL_STRING("2.4", valueOf(headers, "WiFi-Band").c_str());
 }
 
-void test_display_headers_wifi_band_5(void)
-{
+void test_display_headers_wifi_band_5(void) {
   auto inputs = makeDisplayInputs();
   inputs.wifiBand = "5";
   auto headers = buildDisplayHeaders(inputs);
   TEST_ASSERT_EQUAL_STRING("5", valueOf(headers, "WiFi-Band").c_str());
 }
 
-void test_display_headers_wifi_band_omitted_when_empty(void)
-{
+void test_display_headers_wifi_band_omitted_when_empty(void) {
   auto inputs = makeDisplayInputs();
   inputs.wifiBand = "";
   auto headers = buildDisplayHeaders(inputs);
@@ -178,8 +161,7 @@ void test_display_headers_wifi_band_omitted_when_empty(void)
 
 // The image request carries only auth headers (ID + Access-Token), shared by
 // the Wi-Fi and modem (5 GHz) image-download paths.
-void test_image_headers_names_order_and_values(void)
-{
+void test_image_headers_names_order_and_values(void) {
   auto inputs = makeDisplayInputs();
   auto headers = buildImageHeaders(inputs);
 
@@ -193,8 +175,7 @@ void test_image_headers_names_order_and_values(void)
 
 // --- formatHeaders ---------------------------------------------------------
 
-void test_format_headers_newline_separated_no_trailing_newline(void)
-{
+void test_format_headers_newline_separated_no_trailing_newline(void) {
   HttpHeaderList headers;
   headers.push_back({"ID", "abc"});
   headers.push_back({"Content-Type", "application/json"});
@@ -204,14 +185,12 @@ void test_format_headers_newline_separated_no_trailing_newline(void)
   TEST_ASSERT_EQUAL_STRING("ID: abc\nContent-Type: application/json", formatted.c_str());
 }
 
-void test_format_headers_empty_list_is_empty_string(void)
-{
+void test_format_headers_empty_list_is_empty_string(void) {
   HttpHeaderList headers;
   TEST_ASSERT_EQUAL_STRING("", formatHeaders(headers).c_str());
 }
 
-void test_format_setup_headers_round_trip(void)
-{
+void test_format_setup_headers_round_trip(void) {
   ApiSetupInputs inputs;
   inputs.macAddress = "MAC";
   inputs.firmwareVersion = "9.9.9";
@@ -219,9 +198,7 @@ void test_format_setup_headers_round_trip(void)
   // baseUrl intentionally unused by the header builder
 
   String formatted = formatHeaders(buildSetupHeaders(inputs));
-  TEST_ASSERT_EQUAL_STRING(
-      "ID: MAC\nContent-Type: application/json\nFW-Version: 9.9.9\nModel: x",
-      formatted.c_str());
+  TEST_ASSERT_EQUAL_STRING("ID: MAC\nContent-Type: application/json\nFW-Version: 9.9.9\nModel: x", formatted.c_str());
 }
 
 // --- runner ----------------------------------------------------------------
@@ -229,8 +206,7 @@ void test_format_setup_headers_round_trip(void)
 void setUp(void) {}
 void tearDown(void) {}
 
-void process()
-{
+void process() {
   UNITY_BEGIN();
   RUN_TEST(test_setup_headers_names_and_order);
   RUN_TEST(test_log_headers_names_and_values);
@@ -249,8 +225,7 @@ void process()
   UNITY_END();
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
   process();
   return 0;
 }

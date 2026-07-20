@@ -1,34 +1,33 @@
 #include <Arduino.h>
+
 #include "bl.h"
-#include "power.h"
 #include "esp_ota_ops.h"
+#include "power.h"
 #include "qa.h"
 
 #ifdef BOARD_TRMNL_X
 #include "display.h"
 #include "esp_sleep.h"
 #include "filesystem.h"
-#include "modem.h"
 #include "logo_medium.h"
+#include "modem.h"
 
 // TRMNL X setup (quite different from OG)
-void setup()
-{
+void setup() {
 #ifndef NO_QA
 
   bool isShipped = checkIfAlreadyShipped();
   if (!isShipped) {
-   bool shipmentStarted = checkIfShipmentStarted();
-   
-   display_init();
+    bool shipmentStarted = checkIfShipmentStarted();
 
-   if (shipmentStarted && get_usb_status() == UsbStatus::CONNECTED) {
+    display_init();
+
+    if (shipmentStarted && get_usb_status() == UsbStatus::CONNECTED) {
       // USB connected (e.g. battery died in transit and USB revived the device)
       enter_shipment_sleep();
       saveShipmentDone();
       ESP.restart();
-   }
-   else {
+    } else {
       filesystem_init();
 
       Serial.begin(115200);
@@ -46,14 +45,12 @@ void setup()
         if (modem.flashFromFile("/system/factory_ESP32C5-4MB.bin", flashError)) {
           Serial.println("[MODEM] Factory flash complete.");
           saveModemFlashed();
-        }
-        else {
+        } else {
           Serial.println("[MODEM] Factory flash FAILED.");
           display_show_msg(const_cast<uint8_t *>(logo_medium), MODEM_FLASH_FAILED, flashError.c_str());
           delay(5000);
         }
-      }
-      else {
+      } else {
         Serial.println("[MODEM] Already flashed, skipping...");
       }
       // enableShipmentMode() will block until charger is connected
@@ -62,16 +59,15 @@ void setup()
       // Charger detected, save shipment status to preferences
       saveShipmentDone();
       ESP.restart();
-   }
+    }
   }
 #endif // NO_QA
 
   bl_init();
 }
 #else // TRMNL OG setup()
-void setup()
-{
-  
+void setup() {
+
   bool testPassed = checkIfAlreadyPassed();
   if (!testPassed) {
     startQA();
@@ -81,7 +77,4 @@ void setup()
 }
 #endif // !BOARD_TRMNL_X
 
-void loop()
-{
-  bl_process();
-}
+void loop() { bl_process(); }

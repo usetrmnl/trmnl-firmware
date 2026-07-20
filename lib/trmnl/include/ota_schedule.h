@@ -1,7 +1,7 @@
 #pragma once
 
-#include <stdint.h>
 #include <persistence_interface.h>
+#include <stdint.h>
 
 constexpr uint32_t OTA_RETRY_INTERVAL_SECONDS = 24UL * 60 * 60;
 #define OTA_LAST_ATTEMPT_KEY "last_ota"
