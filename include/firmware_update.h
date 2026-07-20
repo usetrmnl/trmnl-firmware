@@ -1,25 +1,20 @@
 #pragma once
 
 #include <Arduino.h>
+#include <display.h>
 #include <functional>
 #include <persistence_interface.h>
-#include <display.h>
 
-struct FirmwareUpdateResult
-{
+struct FirmwareUpdateResult {
   bool updated = false;
   MSG failureMessage = NONE;
 };
 
-class FirmwareUpdateService
-{
+class FirmwareUpdateService {
 public:
   using GetTimeFn = std::function<uint32_t()>;
 
-  FirmwareUpdateService(
-      Persistence &persistence,
-      GetTimeFn getTime,
-      int32_t wifiConnectionRssiThreshold);
+  FirmwareUpdateService(Persistence &persistence, GetTimeFn getTime, int32_t wifiConnectionRssiThreshold);
 
   bool isUpdateDue(bool update_firmware, const String &firmware_url);
   FirmwareUpdateResult performUpdate();

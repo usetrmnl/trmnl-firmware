@@ -10,8 +10,7 @@
 //
 // trmnl.app only: same host, insecure (VERIFY_NONE), 7-day tickets. NOT for S3 —
 // different host, so a saved session is useless there.
-class ResumableWiFiClientSecure : public WiFiClientSecure
-{
+class ResumableWiFiClientSecure : public WiFiClientSecure {
 public:
   int connect(IPAddress ip, uint16_t port) override;
   int connect(const char *host, uint16_t port) override;

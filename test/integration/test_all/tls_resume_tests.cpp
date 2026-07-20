@@ -14,18 +14,18 @@
 // baselined with a stock WiFiClientSecure, never with the resumable client.
 
 #include <Arduino.h>
-#include <unity.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <api-client/display.h>
 #include <api-client/setup.h>
-#include <special_function.h>
 #include <config.h>
 #include <display.h>
-#include <test_helpers.h>
-#include "tests.h"
-
 #include <resumable_wifi_client_secure.h>
+#include <special_function.h>
+#include <test_helpers.h>
+#include <unity.h>
+
+#include "tests.h"
 
 static const char *HOST = "trmnl.app";
 
@@ -33,10 +33,8 @@ static const char *HOST = "trmnl.app";
 static String s_api_key;
 static String s_friendly_id;
 
-static void fetch_api_key_or_skip()
-{
-  if (!s_api_key.isEmpty())
-    return;
+static void fetch_api_key_or_skip() {
+  if (!s_api_key.isEmpty()) return;
 
   ApiSetupInputs setupInputs = {
       .baseUrl = TEST_BACKEND_URL,
@@ -46,16 +44,14 @@ static void fetch_api_key_or_skip()
   };
 
   ApiSetupResult r = fetchApiSetup(setupInputs);
-  TEST_ASSERT_EQUAL_MESSAGE(HTTPS_NO_ERR, r.error,
-                            "Pre-test /api/setup call failed at the transport layer");
+  TEST_ASSERT_EQUAL_MESSAGE(HTTPS_NO_ERR, r.error, "Pre-test /api/setup call failed at the transport layer");
   TEST_ASSERT_EQUAL_MESSAGE((int)ApiSetupOutcome::Ok, (int)r.response.outcome,
                             "Pre-test /api/setup returned non-Ok — is the test MAC registered?");
   s_api_key = r.response.api_key;
   s_friendly_id = r.response.friendly_id;
 }
 
-static ApiDisplayInputs make_display_inputs(float battery_voltage)
-{
+static ApiDisplayInputs make_display_inputs(float battery_voltage) {
   ApiDisplayInputs inputs = {};
   inputs.baseUrl = TEST_BACKEND_URL;
   inputs.apiKey = s_api_key;
@@ -74,8 +70,7 @@ static ApiDisplayInputs make_display_inputs(float battery_voltage)
   return inputs;
 }
 
-static unsigned long time_connect(WiFiClientSecure &client)
-{
+static unsigned long time_connect(WiFiClientSecure &client) {
   client.setInsecure();
   unsigned long start = millis();
   int ok = client.connect(HOST, 443);
@@ -85,8 +80,7 @@ static unsigned long time_connect(WiFiClientSecure &client)
   return elapsed;
 }
 
-static void test_resumed_connect_is_fast(void)
-{
+static void test_resumed_connect_is_fast(void) {
   WiFiClientSecure stock;
   unsigned long t_full = time_connect(stock); // full handshake baseline
 
@@ -102,8 +96,7 @@ static void test_resumed_connect_is_fast(void)
                                 "Resumed connect not meaningfully faster — session resume did not engage");
 }
 
-static void test_resumed_session_headers_reach_server(void)
-{
+static void test_resumed_session_headers_reach_server(void) {
   // Priming call: healthy battery over a (possibly full-handshake) connection.
   ApiDisplayInputs healthy = make_display_inputs(4.1f);
   ApiDisplayResult first = fetchApiDisplay(healthy);
@@ -123,8 +116,7 @@ static void test_resumed_session_headers_reach_server(void)
                                        "3.0V header not honored on resumed session — headers corrupted?");
 }
 
-void test_tls_resume(void)
-{
+void test_tls_resume(void) {
   fetch_api_key_or_skip();
 
   RUN_TEST(test_resumed_connect_is_fast);

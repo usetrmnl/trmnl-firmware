@@ -6,9 +6,10 @@
 // declare it in tests.h, and call it from setup() between UNITY_BEGIN/END.
 
 #include <Arduino.h>
-#include <unity.h>
 #include <Preferences.h>
 #include <device_id.h>
+#include <unity.h>
+
 #include "test_helpers.h"
 #include "tests.h"
 
@@ -17,13 +18,11 @@ extern Preferences preferences; // from bl.cpp
 void setUp(void) {}
 void tearDown(void) {}
 
-void setup_bl()
-{
+void setup_bl() {
   preferences.begin("data", false); // copied from bl_init()
 }
 
-void setup()
-{
+void setup() {
   Serial.begin(115200);
 
   setup_bl();

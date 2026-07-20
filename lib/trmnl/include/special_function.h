@@ -2,8 +2,7 @@
 
 #include <Arduino.h>
 
-enum SPECIAL_FUNCTION
-{
+enum SPECIAL_FUNCTION {
   SF_NONE,
   SF_IDENTIFY,
   SF_SLEEP,

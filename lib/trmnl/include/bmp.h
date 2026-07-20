@@ -1,7 +1,6 @@
 #include <cstdint>
 
-enum bmp_err_e
-{
+enum bmp_err_e {
   BMP_NO_ERR,
   BMP_NOT_BMP,
   BMP_BAD_SIZE,
