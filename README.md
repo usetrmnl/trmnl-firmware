@@ -402,3 +402,12 @@ Environment    Test                  Status    Duration
 -------------  --------------------  --------  ------------
 trmnl_test     integration/test_all  PASSED    00:00:56.488
 ```
+
+## Code Formatting
+
+We use `clang-format` for formatting C/C++ source files. You can install it [via Homebrew](https://formulae.brew.sh/formula/clang-format) or your package manager of choice - it's part of `llvm`.
+
+Two ways to format files:
+
+1. Run `./scripts/format.sh` to format the entire repository.
+2. VS Code users: install [the C/C++ extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cpptools) which will automatically format-on-save using clang-format.
