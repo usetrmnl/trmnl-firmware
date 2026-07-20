@@ -99,6 +99,7 @@ private:
   void saveLastUsedWifiIndex(int index);
   int readLastUsedWifiIndex();
   void saveApiServer(String url);
+  int findSavedWifiIndex(const WifiCredentials credentials);
   bool tryConnectWithRetries(WifiCredentials creds, int last_used_index);
   std::vector<WifiCredentials> matchNetworks(std::vector<WifiNetwork> &scanResults, WifiCredentials wifiCredentials[]);
   std::vector<WifiNetwork> getScannedUniqueNetworks(bool runScan);
