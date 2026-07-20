@@ -1,9 +1,8 @@
-#include <types.h>
-#include <api_types.h>
 #include <HTTPClient.h>
+#include <api_types.h>
+#include <types.h>
 
-struct ApiDisplayResult
-{
+struct ApiDisplayResult {
   https_request_err_e error;
   ApiDisplayResponse response;
   String error_detail;

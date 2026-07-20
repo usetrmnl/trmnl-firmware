@@ -1,9 +1,8 @@
-#include <unity.h>
 #include <png_flip.h>
 #include <string.h>
+#include <unity.h>
 
-void test_reverse_bits(void)
-{
+void test_reverse_bits(void) {
   // Test cases:
   // 0000 0000 -> 0000 0000
   TEST_ASSERT_EQUAL_HEX8(0x00, reverse_bits(0x00));
@@ -30,8 +29,7 @@ void test_reverse_bits(void)
   TEST_ASSERT_EQUAL_HEX8(0x48, reverse_bits(0x12));
 }
 
-void test_flip_image(void)
-{
+void test_flip_image(void) {
   // Create a test 16x8 image (2 bytes per row, 8 rows)
   const int width = 16;
   const int height = 8;
@@ -49,15 +47,8 @@ void test_flip_image(void)
       0x99, 0x66  // Row 7: 10011001 01100110
   };
 
-  unsigned char expected[buffer_size] = {
-      0x66, 0x99,
-      0xC3, 0x3C,
-      0xFF, 0x00,
-      0x00, 0xFF,
-      0x0F, 0xF0,
-      0x33, 0xCC,
-      0x5A, 0xA5,
-      0xAA, 0x55};
+  unsigned char expected[buffer_size] = {0x66, 0x99, 0xC3, 0x3C, 0xFF, 0x00, 0x00, 0xFF,
+                                         0x0F, 0xF0, 0x33, 0xCC, 0x5A, 0xA5, 0xAA, 0x55};
 
   // Create a copy of the original to modify
   unsigned char buffer[buffer_size];
@@ -70,8 +61,7 @@ void test_flip_image(void)
   TEST_ASSERT_EQUAL_HEX8_ARRAY(expected, buffer, buffer_size);
 }
 
-void test_horizontal_mirror(void)
-{
+void test_horizontal_mirror(void) {
   // Create a test 16x4 image (2 bytes per row, 4 rows)
   const int width = 16;
   const int height = 4;
@@ -85,11 +75,7 @@ void test_horizontal_mirror(void)
       0x3C, 0xC3  // Row 3: 00111100 11000011
   };
 
-  unsigned char expected[buffer_size] = {
-      0x55, 0xAA,
-      0x33, 0xCC,
-      0x00, 0xFF,
-      0xC3, 0x3C};
+  unsigned char expected[buffer_size] = {0x55, 0xAA, 0x33, 0xCC, 0x00, 0xFF, 0xC3, 0x3C};
 
   // Create a copy of the original to modify
   unsigned char buffer[buffer_size];
@@ -102,18 +88,15 @@ void test_horizontal_mirror(void)
   TEST_ASSERT_EQUAL_HEX8_ARRAY(expected, buffer, buffer_size);
 }
 
-void setUp(void)
-{
+void setUp(void) {
   // set stuff up here
 }
 
-void tearDown(void)
-{
+void tearDown(void) {
   // clean stuff up here
 }
 
-void process()
-{
+void process() {
   UNITY_BEGIN();
   RUN_TEST(test_reverse_bits);
   RUN_TEST(test_flip_image);
@@ -121,8 +104,7 @@ void process()
   UNITY_END();
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
   process();
   return 0;
 }

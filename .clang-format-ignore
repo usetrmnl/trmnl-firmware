@@ -1,0 +1,22 @@
+# currently large diffs in open PRs (>200 LOC) — skip to reduce merge conflicts for now
+src/bl.cpp
+src/display.cpp
+
+# vendor
+components/**
+lib/BMA530_SensorAPI/**
+lib/BQ27427/**
+lib/IQS323/**
+lib/trmnl_x/**
+
+# pre-generated constants
+include/Inter_18.h
+include/Roboto_Black_24.h
+include/nicoclean_8.h
+src/battery_small.h
+src/loading.h
+src/logo_big.h
+src/logo_medium.h
+src/logo_small.h
+src/wifi_connect_qr.h
+src/wifi_failed_qr.h

@@ -36,15 +36,15 @@
 
 /**
  * data
-**/
+ **/
 #define UBYTE   uint8_t
 #define UWORD   uint16_t
 #define UDOUBLE uint32_t
 
 /**
  * GPIO config
-**/
-#if defined(BOARD_TRMNL) || defined (BOARD_TRMNL_4CLR)
+ **/
+#if defined(BOARD_TRMNL) || defined(BOARD_TRMNL_4CLR)
 // Xiao ESP32C3 plus 8-pin breakout
 //   #define EPD_SCK_PIN  8
 //   #define EPD_MOSI_PIN 10
@@ -60,124 +60,125 @@
 //   #define EPD_DC_PIN   5
 //   #define EPD_BUSY_PIN 7
    // Pin definition for TRMNL Board
-  #define EPD_SCK_PIN  7
-  #define EPD_MOSI_PIN 8
-  #define EPD_CS_PIN   6
-  #define EPD_RST_PIN  10
-  #define EPD_DC_PIN   5
-  #define EPD_BUSY_PIN 4
-  #define SENSOR_SDA 21
-  #define SENSOR_SCL 20
+#define EPD_SCK_PIN  7
+#define EPD_MOSI_PIN 8
+#define EPD_CS_PIN   6
+#define EPD_RST_PIN  10
+#define EPD_DC_PIN   5
+#define EPD_BUSY_PIN 4
+#define SENSOR_SDA   21
+#define SENSOR_SCL   20
 #elif defined(BOARD_TRMNL_GEN2)
-  #define EPD_SCK_PIN  6
-  #define EPD_MOSI_PIN 1
-  #define EPD_CS_PIN   4
-  #define EPD_RST_PIN  2
-  #define EPD_DC_PIN   5
-  #define EPD_BUSY_PIN 0
-  #define SENSOR_SDA 11
-  #define SENSOR_SCL 12
-  #define BQ25616_STAT_PIN 24
-  #define BQ25616_PG_PIN 25
+#define EPD_SCK_PIN      6
+#define EPD_MOSI_PIN     1
+#define EPD_CS_PIN       4
+#define EPD_RST_PIN      2
+#define EPD_DC_PIN       5
+#define EPD_BUSY_PIN     0
+#define SENSOR_SDA       11
+#define SENSOR_SCL       12
+#define BQ25616_STAT_PIN 24
+#define BQ25616_PG_PIN   25
 #elif defined(BOARD_XTEINK_X4)
-  #define EPD_SCK_PIN  8
-  #define EPD_MOSI_PIN 10
-  #define EPD_CS_PIN   21
-  #define EPD_RST_PIN  5
-  #define EPD_DC_PIN   4
-  #define EPD_BUSY_PIN 6
+#define EPD_SCK_PIN  8
+#define EPD_MOSI_PIN 10
+#define EPD_CS_PIN   21
+#define EPD_RST_PIN  5
+#define EPD_DC_PIN   4
+#define EPD_BUSY_PIN 6
 
 #elif defined(BOARD_WAVESHARE_ESP32_DRIVER)
    // Pin definition for Waveshare ESP32 Driver Board
-   #define EPD_SCK_PIN  13
-   #define EPD_MOSI_PIN 14
-   #define EPD_CS_PIN   15
-   #define EPD_RST_PIN  26
-   #define EPD_DC_PIN   27
-   #define EPD_BUSY_PIN 25
+#define EPD_SCK_PIN  13
+#define EPD_MOSI_PIN 14
+#define EPD_CS_PIN   15
+#define EPD_RST_PIN  26
+#define EPD_DC_PIN   27
+#define EPD_BUSY_PIN 25
 
 #elif defined(BOARD_WAVESHARE_397)
-   #define EPD_SCK_PIN  11
-   #define EPD_MOSI_PIN 12
-   #define EPD_CS_PIN   10
-   #define EPD_RST_PIN  46
-   #define EPD_DC_PIN   9
-   #define EPD_BUSY_PIN 3
-   #define FAKE_BATTERY_VOLTAGE
+#define EPD_SCK_PIN  11
+#define EPD_MOSI_PIN 12
+#define EPD_CS_PIN   10
+#define EPD_RST_PIN  46
+#define EPD_DC_PIN   9
+#define EPD_BUSY_PIN 3
+#define FAKE_BATTERY_VOLTAGE
 #elif defined(BOARD_SEEED_STICKY)
-   #define EPD_SCK_PIN  13
-   #define EPD_MOSI_PIN 14
-   #define EPD_CS_PIN   15
-   #define EPD_RST_PIN  17
-   #define EPD_DC_PIN   16
-   #define EPD_BUSY_PIN 18
-   #define FAKE_BATTERY_VOLTAGE
+#define EPD_SCK_PIN  13
+#define EPD_MOSI_PIN 14
+#define EPD_CS_PIN   15
+#define EPD_RST_PIN  17
+#define EPD_DC_PIN   16
+#define EPD_BUSY_PIN 18
+#define FAKE_BATTERY_VOLTAGE
 #elif defined(BOARD_SEEED_XIAO_ESP32C3)
    // Pin definition for Seeed XIAO ESP32C3 Board
-   #define EPD_SCK_PIN  8
-   #define EPD_MOSI_PIN 10
-   #define EPD_CS_PIN   3
-   #define EPD_RST_PIN  2
-   #define EPD_DC_PIN   5
-   #define EPD_BUSY_PIN 4
+#define EPD_SCK_PIN  8
+#define EPD_MOSI_PIN 10
+#define EPD_CS_PIN   3
+#define EPD_RST_PIN  2
+#define EPD_DC_PIN   5
+#define EPD_BUSY_PIN 4
 
 #elif defined(BOARD_SEEED_XIAO_ESP32S3)
    // Pin definition for Seeed XIAO ESP32S3 Board
-   #define EPD_SCK_PIN  7
-   #define EPD_MOSI_PIN 9
-   #define EPD_CS_PIN   2
-   #define EPD_RST_PIN  1
-   #define EPD_DC_PIN   4
-   #define EPD_BUSY_PIN 3
-   
+#define EPD_SCK_PIN  7
+#define EPD_MOSI_PIN 9
+#define EPD_CS_PIN   2
+#define EPD_RST_PIN  1
+#define EPD_DC_PIN   4
+#define EPD_BUSY_PIN 3
+
 #elif (defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_XIAO_EPAPER_DISPLAY_3CLR))
    // Pin definition for TRMNL 7inch5 OG DIY Kit
-   #define EPD_SCK_PIN  7
-   #define EPD_MOSI_PIN 9
-   #define EPD_CS_PIN   44
-   #define EPD_RST_PIN  38
-   #define EPD_DC_PIN   10
-   #define EPD_BUSY_PIN 4
+#define EPD_SCK_PIN  7
+#define EPD_MOSI_PIN 9
+#define EPD_CS_PIN   44
+#define EPD_RST_PIN  38
+#define EPD_DC_PIN   10
+#define EPD_BUSY_PIN 4
    // DEBUG - remove the fake battery line after testing
-   #define FAKE_BATTERY_VOLTAGE
+#define FAKE_BATTERY_VOLTAGE
 #elif defined(BOARD_TRMNL_X)
 //   #define FAKE_BATTERY_VOLTAGE
 
 #elif defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002)
    // Pin definition for reTerminal E1001 & E1002
-   #define EPD_SCK_PIN  7
-   #define EPD_MOSI_PIN 9
-   #define EPD_CS_PIN   10
-   #define EPD_RST_PIN  12
-   #define EPD_DC_PIN   11
-   #define EPD_BUSY_PIN 13
-#elif defined (BOARD_SEEED_RETERMINAL_E1003)
-   #define EPD_SCK_PIN  7
-   #define EPD_MOSI_PIN 9
-   #define EPD_MISO_PIN 8
-   #define EPD_CS_PIN   10
-   #define EPD_RST_PIN  12
-   #define EPD_EN_PIN   11
-   #define EPD_BUSY_PIN 13
-   #define EPD_VCC_EN   21
-#elif defined (BOARD_X_CLASS)
+#define EPD_SCK_PIN  7
+#define EPD_MOSI_PIN 9
+#define EPD_CS_PIN   10
+#define EPD_RST_PIN  12
+#define EPD_DC_PIN   11
+#define EPD_BUSY_PIN 13
+#elif defined(BOARD_SEEED_RETERMINAL_E1003)
+#define EPD_SCK_PIN  7
+#define EPD_MOSI_PIN 9
+#define EPD_MISO_PIN 8
+#define EPD_CS_PIN   10
+#define EPD_RST_PIN  12
+#define EPD_EN_PIN   11
+#define EPD_BUSY_PIN 13
+#define EPD_VCC_EN   21
+#elif defined(BOARD_X_CLASS)
 // Parallel Eink devices don't explicitly define GPIO pins for the display here
 #else
-   #error "Board type not defined. Please define BOARD_WAVESHARE_ESP32_DRIVER or BOARD_TRMNL or BOARD_SEEED_XIAO_ESP32C3 or BOARD_SEEED_XIAO_ESP32S3 in platformio.ini build_flags."
+#error                                                                                                                 \
+  "Board type not defined. Please define BOARD_WAVESHARE_ESP32_DRIVER or BOARD_TRMNL or BOARD_SEEED_XIAO_ESP32C3 or BOARD_SEEED_XIAO_ESP32S3 in platformio.ini build_flags."
 #endif
 
-#define GPIO_PIN_SET   1
+#define GPIO_PIN_SET                    1
 
 /**
  * GPIO read and write
-**/
-#define DEV_Digital_Write(_pin, _value) digitalWrite(_pin, _value == 0? LOW:HIGH)
-#define DEV_Digital_Read(_pin) digitalRead(_pin)
+ **/
+#define DEV_Digital_Write(_pin, _value) digitalWrite(_pin, _value == 0 ? LOW : HIGH)
+#define DEV_Digital_Read(_pin)          digitalRead(_pin)
 
 /**
  * delay x ms
-**/
-#define DEV_Delay_ms(__xms) delay(__xms)
+ **/
+#define DEV_Delay_ms(__xms)             delay(__xms)
 
 /*------------------------------------------------------------------------------------------------------*/
 UBYTE DEV_Module_Init(void);

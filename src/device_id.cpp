@@ -2,8 +2,7 @@
 
 #include <WiFi.h>
 
-String device_mac_address()
-{
+String device_mac_address() {
 #ifdef TEST_MAC_ADDRESS
   return TEST_MAC_ADDRESS;
 #else
