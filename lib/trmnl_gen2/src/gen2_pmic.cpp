@@ -102,8 +102,11 @@ unsigned char enablePmic(void)
 void disablePmic(void)
 {
     set_ESP32_GpioLevel(0x00);  // PMIC_EN LOW
-    while (getGpioLevel(GEN2_PMIC_PG))
-        ;  // wait for PMIC_PG to go LOW
+    unsigned long t0 = millis();
+    while (getGpioLevel(GEN2_PMIC_PG) && (millis() - t0 < 5000))
+        ;  // wait for PMIC_PG to go LOW (max 5 s)
+    if (getGpioLevel(GEN2_PMIC_PG))
+        Serial.println("[PMIC] WARNING: PMIC_PG still HIGH after PMIC_EN LOW");
 }
 
 void powerSwitchEnable(void)

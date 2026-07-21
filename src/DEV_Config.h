@@ -76,8 +76,8 @@
   #define EPD_MOSI_PIN 10   // GEN2_SPI_MOSI
   #define EPD_MISO_PIN 8    // GEN2_SPI_MISO
   #define EPD_BUSY_PIN 27   // GEN2_EPD_BUSY (MOSFET-inverted)
-  #define SENSOR_SDA 11     // GEN2_I2C_SDA
-  #define SENSOR_SCL 12     // GEN2_I2C_SCL
+  // SENSOR_SDA/SCL intentionally not defined: GPIO 11/12 are the gen2 main I2C bus
+  // (expanders, PMIC, fuel gauge) managed exclusively by gen2_comm.cpp.
 #else
   // N8R4 production board pin assignments
   #define EPD_SCK_PIN      6

@@ -1,5 +1,4 @@
 // Image download + PNG/BMP decode pipeline for TRMNL Gen2 31.5" ACeP display.
-// Adapted from TRMNL_V3_C5 img_fetch.cpp.
 // PNG decode via PNGdec (bitbank2/PNGdec) — already a dependency of the main firmware.
 
 #include "gen2_img.h"
