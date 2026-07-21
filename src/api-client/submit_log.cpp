@@ -18,53 +18,56 @@ bool submitLogToApi(LogApiInput &input, const char *api_url) {
   strcpy(new_url, api_url);
   strcat(new_url, "/api/log");
 
-  return withHttp(new_url, [&](HTTPClient *httpsPointer, HttpError errorCode) -> bool {
-    if (errorCode != HttpError::HTTPCLIENT_SUCCESS || !httpsPointer) {
-      Log_error("[HTTPS] Unable to connect");
-      return false;
-    }
+  return withHttp(
+    new_url,
+    [&](HTTPClient *httpsPointer, HttpError errorCode) -> bool {
+      if (errorCode != HttpError::HTTPCLIENT_SUCCESS || !httpsPointer) {
+        Log_error("[HTTPS] Unable to connect");
+        return false;
+      }
 
-    Log_info("[HTTPS] POST...");
+      Log_info("[HTTPS] POST...");
 
-    HTTPClient &https = *httpsPointer;
+      HTTPClient &https = *httpsPointer;
 
-    applyHeaders(https, buildLogHeaders({device_mac_address(), input.api_key}));
-
-    https.setTimeout(15000);
-    https.setConnectTimeout(15000);
-
-    Log_info("Send log - |%s|", payload.c_str());
-
-                    // start connection and send HTTP header
-    int httpCode = https.POST(payload);
-    if (httpCode == HTTP_CODE_PERMANENT_REDIRECT || httpCode == HTTP_CODE_TEMPORARY_REDIRECT) {
-      String location = https.getLocation();
-      https.end();
-      String redirectUrl =
-        (location.startsWith("http://") || location.startsWith("https://")) ? location : (String(api_url) + location);
-      https.begin(redirectUrl);
-      https.setReuse(false);
       applyHeaders(https, buildLogHeaders({device_mac_address(), input.api_key}));
 
       https.setTimeout(15000);
       https.setConnectTimeout(15000);
-      httpCode = https.POST(payload);
-    }
+
+      Log_info("Send log - |%s|", payload.c_str());
+
+                    // start connection and send HTTP header
+      int httpCode = https.POST(payload);
+      if (httpCode == HTTP_CODE_PERMANENT_REDIRECT || httpCode == HTTP_CODE_TEMPORARY_REDIRECT) {
+        String location = https.getLocation();
+        https.end();
+        String redirectUrl =
+          (location.startsWith("http://") || location.startsWith("https://")) ? location : (String(api_url) + location);
+        https.begin(redirectUrl);
+        https.setReuse(false);
+        applyHeaders(https, buildLogHeaders({device_mac_address(), input.api_key}));
+
+        https.setTimeout(15000);
+        https.setConnectTimeout(15000);
+        httpCode = https.POST(payload);
+      }
 
                     // httpCode will be negative on error
-    if (httpCode < 0) {
-      Log_error("[HTTPS] POST... failed, error: %d %s", httpCode, https.errorToString(httpCode).c_str());
-      return false;
-    } else if (httpCode != HTTP_CODE_OK && httpCode != HTTP_CODE_MOVED_PERMANENTLY &&
-               httpCode != HTTP_CODE_NO_CONTENT) {
-      Log_error("[HTTPS] POST... failed, returned HTTP code unknown: %d %s", httpCode,
-                https.errorToString(httpCode).c_str());
-      return false;
-    }
+      if (httpCode < 0) {
+        Log_error("[HTTPS] POST... failed, error: %d %s", httpCode, https.errorToString(httpCode).c_str());
+        return false;
+      } else if (httpCode != HTTP_CODE_OK && httpCode != HTTP_CODE_MOVED_PERMANENTLY &&
+                 httpCode != HTTP_CODE_NO_CONTENT) {
+        Log_error("[HTTPS] POST... failed, returned HTTP code unknown: %d %s", httpCode,
+                  https.errorToString(httpCode).c_str());
+        return false;
+      }
 
                     // HTTP header has been send and Server response header has been handled
-    Log_info("[HTTPS] POST OK, code: %d", httpCode);
+      Log_info("[HTTPS] POST OK, code: %d", httpCode);
 
-    return true;
-  });
+      return true;
+    },
+    /*resumable=*/true);
 }

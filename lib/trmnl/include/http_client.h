@@ -8,6 +8,7 @@
 #include <trmnl_log.h>
 
 #include "api-client/request_headers.h"
+#include "resumable_wifi_client_secure.h"
 
 // Error codes for the HTTP utilities - using distinct values to avoid overlap
 enum HttpError {
@@ -23,16 +24,22 @@ enum HttpError {
  * @return The value returned by the callback
  */
 template <typename Callback, typename ReturnType = decltype(std::declval<Callback>()(nullptr, (HttpError)0))>
-ReturnType withHttp(const String &url, Callback callback) {
+ReturnType withHttp(const String &url, Callback callback, bool resumable = false) {
   Log_info("==== withHttp() %s", url.c_str());
 
   bool isHttps = (url.indexOf("https://") != -1);
+  bool isTrmnlApi = (url.indexOf("https://trmnl.app") != -1);
 
   // Conditionally allocate only the client we need
   WiFiClient *client = nullptr;
 
   if (isHttps) {
-    WiFiClientSecure *secureClient = new WiFiClientSecure();
+    WiFiClientSecure *secureClient;
+    if (resumable && isTrmnlApi) {
+      secureClient = new ResumableWiFiClientSecure(); // trmnl.app only: resume the TLS session across deep sleep
+    } else {
+      secureClient = new WiFiClientSecure();
+    }
     secureClient->setInsecure();
     client = secureClient;
   } else {
