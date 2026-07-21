@@ -391,6 +391,11 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
     {
         // regular connection
         WiFi.mode(WIFI_STA);
+#ifdef CONFIG_IDF_TARGET_ESP32C5
+        // WiFi.mode() resets the band mode to 2.4GHz-only on C5; restore both bands
+        // so the full-channel scan can find 5GHz APs.
+        WiFi.setBandMode(WIFI_BAND_MODE_AUTO);
+#endif
 
         // Configure static IP if specified (must be before WiFi.begin)
         configureStaticIP(credentials);

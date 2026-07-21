@@ -23,12 +23,12 @@ void gen2_spiInit(void)
 
 void gen2_i2cInit(void)
 {
-    // Power 3.3 V rail for expanders before starting I2C
+    // Init bus first, then power expanders (matches V3_C5 reference sequence)
+    Wire.begin(GEN2_I2C_SDA, GEN2_I2C_SCL, 100000);
+
     pinMode(GEN2_EXP_EN, OUTPUT);
     digitalWrite(GEN2_EXP_EN, HIGH);
-    delay(10);
-
-    Wire.begin(GEN2_I2C_SDA, GEN2_I2C_SCL);
+    delay(100);  // 100 ms for 3.3 V rail to stabilise before any expander access
 
     bool ok1 = expander1.begin();
     bool ok2 = expander2.begin();
@@ -39,8 +39,8 @@ void gen2_i2cInit(void)
     pinMode(GEN2_PMIC_EN, OUTPUT);
     digitalWrite(GEN2_PMIC_EN, LOW);
 
-    // Status inputs
-    pinMode(GEN2_PMIC_PG, INPUT);
+    // Status inputs — pull PMIC_PG LOW so a de-energised PMIC reads as not-good
+    pinMode(GEN2_PMIC_PG, INPUT_PULLDOWN);
     pinMode(GEN2_EPD_BUSY, INPUT);
 }
 

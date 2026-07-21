@@ -16,9 +16,9 @@
 #define GEN2_BTN5       0
 #define GEN2_GAUGE_INT  5    // BQ27427 interrupt
 
-// I2C
-#define GEN2_I2C_SDA    11
-#define GEN2_I2C_SCL    12
+// I2C — GPIO 2/3 are free on WROOM-1; GPIO 11/12 are flash WP/HD and USB D−
+#define GEN2_I2C_SDA    2
+#define GEN2_I2C_SCL    3
 
 // TCA9555 Expander 1 (I2C 0x20) — SPI CS and power rail controls
 #define EXP1_SPI1_CS3   0    // EPD IC 3 chip-select

@@ -75,8 +75,9 @@
   #define EPD_MOSI_PIN 10   // GEN2_SPI_MOSI
   #define EPD_MISO_PIN 8    // GEN2_SPI_MISO
   #define EPD_BUSY_PIN 27   // GEN2_EPD_BUSY (MOSFET-inverted)
-  #define SENSOR_SDA 11     // GEN2_I2C_SDA
-  #define SENSOR_SCL 12     // GEN2_I2C_SCL
+  // SENSOR_SDA/SCL intentionally not defined: GPIO 11/12 are the gen2 main I2C bus
+  // (expanders, PMIC, fuel gauge) managed exclusively by gen2_comm.cpp.
+  // Defining them would cause sensor_init() to scan the wrong bus and create I2C conflicts.
 #elif defined(BOARD_XTEINK_X4)
   #define EPD_SCK_PIN  8
   #define EPD_MOSI_PIN 10

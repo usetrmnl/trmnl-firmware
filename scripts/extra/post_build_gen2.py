@@ -13,12 +13,12 @@ def post_build(source, target, env):
         "--chip", "ESP32C5",
         "merge_bin",
         "-o", str(output),
-        "--flash_mode", "qio",
+        "--flash_mode", "dio",
         "--flash_freq", "80m",
-        "--flash_size", "4MB",
+        "--flash_size", "8MB",
         "0x2000", str(build_dir / "bootloader.bin"),
         "0x8000", str(build_dir / "partitions.bin"),
-        "0x10000", str(build_dir / "firmware.bin"),
+        "0x20000", str(build_dir / "firmware.bin"),
     ], check=True)
 
     print(f"Merged firmware: {output}")
