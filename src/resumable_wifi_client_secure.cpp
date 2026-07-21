@@ -3,12 +3,12 @@
 #include <WiFi.h>
 #include <errno.h>
 #include <esp32-hal-log.h>
+#include <esp_arduino_version.h>
 #include <lwip/sockets.h>
 #include <mbedtls/error.h>
 #include <mbedtls/ssl.h>
 
 #include "Arduino.h"
-#include "ssl_client.h" // framework: sslclient_context + mbedtls_net_send/recv
 
 #undef connect
 #undef write
@@ -157,8 +157,15 @@ int ResumableWiFiClientSecure::connect(const char *host, uint16_t port) {
 int ResumableWiFiClientSecure::connectResumable(IPAddress ip, uint16_t port, const char *host) {
   bool try_resume = (s_sess_magic == RWCS_SESS_MAGIC && s_sess_len > 0 && s_sess_len <= RWCS_SESS_MAX);
 
-  int sock = rwcs_start(sslclient, ip, port, host, _timeout, _alpn_protos, try_resume);
+  // &* bridges both cores: sslclient is a raw pointer on core 2.x, a shared_ptr on 3.x.
+  int sock = rwcs_start(&*sslclient, ip, port, host, _timeout, _alpn_protos, try_resume);
+
+#if ESP_ARDUINO_VERSION_MAJOR >= 3
+  sslclient->last_error = sock;
+#else
   _lastError = sock;
+#endif
+
   if (sock < 0) {
     s_sess_magic = 0; // drop the saved session so a genuine failure can't loop on a bad ticket
     stop();
