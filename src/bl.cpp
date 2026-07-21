@@ -50,6 +50,11 @@
 #include <sys/time.h>
 #include "messages.h"
 #include "displayed_image.h"
+#ifdef BOARD_TRMNL_GEN2
+#include "gen2_display.h"   // gen2_battery_voltage_mv()
+#include "gen2_battery.h"   // Gen2BatteryStatus, gen2_batteryRead()
+#endif
+
 #ifdef SENSOR_SDA
 #include <bb_scd41.h>
 #include <bb_temperature.h>
@@ -1686,7 +1691,23 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
     inputs.currentBatteryCapacity = -1;
     inputs.maxBatteryCapacity = -1;
   }
-#endif // BOARD_TRMNL_X
+#elif defined(BOARD_TRMNL_GEN2)
+  {
+    inputs.batteryCount = 1;
+    Gen2BatteryStatus g2batt = gen2_batteryRead();
+    if (g2batt.valid) {
+      inputs.stateOfCharge = (int)g2batt.soc_pct;
+      inputs.batteryCurrent = (int)g2batt.current_mA;
+    } else {
+      inputs.stateOfCharge = -1;
+      inputs.batteryCurrent = -1;
+    }
+    inputs.stateOfHealth = -1;
+    inputs.batteryTemperature = -1;
+    inputs.currentBatteryCapacity = -1;
+    inputs.maxBatteryCapacity = -1;
+  }
+#endif // BOARD_TRMNL_X / BOARD_TRMNL_GEN2
 
   return inputs;
 }
@@ -3578,6 +3599,17 @@ static float readBatteryVoltage(void)
   {
     Log.error("%s [%d]: BQ27427 not initialized. Cannot read battery voltage.\r\n", __FILE__, __LINE__);
     return -1.0;
+  }
+#elif defined(BOARD_TRMNL_GEN2)
+  {
+    uint16_t mv = gen2_battery_voltage_mv();
+    if (mv == 0) {
+      Log.error("%s [%d]: Gen2 battery read failed.\r\n", __FILE__, __LINE__);
+      return -1.0f;
+    }
+    float voltage = mv / 1000.0f;
+    Log.info("%s [%d]: Gen2 battery voltage: %.3f V\r\n", __FILE__, __LINE__, voltage);
+    return voltage;
   }
 #else
   #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002) || defined(BOARD_SEEED_RETERMINAL_E1003)

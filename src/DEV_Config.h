@@ -69,16 +69,14 @@
   #define SENSOR_SDA 21
   #define SENSOR_SCL 20
 #elif defined(BOARD_TRMNL_GEN2)
-  #define EPD_SCK_PIN  6
-  #define EPD_MOSI_PIN 1
-  #define EPD_CS_PIN   4
-  #define EPD_RST_PIN  2
-  #define EPD_DC_PIN   5
-  #define EPD_BUSY_PIN 0
-  #define SENSOR_SDA 11
-  #define SENSOR_SCL 12
-  #define BQ25616_STAT_PIN 24
-  #define BQ25616_PG_PIN 25
+  // Gen2 uses E2803 8-IC EPD driven via TCA9555 expanders — no direct EPD GPIO here.
+  // SPI pins, CS, RST and BQ25616 STAT/PG are all managed by lib/trmnl_gen2.
+  #define EPD_SCK_PIN  9    // GEN2_SPI_CLK  (kept for reference; SPI init is in gen2_comm.cpp)
+  #define EPD_MOSI_PIN 10   // GEN2_SPI_MOSI
+  #define EPD_MISO_PIN 8    // GEN2_SPI_MISO
+  #define EPD_BUSY_PIN 27   // GEN2_EPD_BUSY (MOSFET-inverted)
+  #define SENSOR_SDA 11     // GEN2_I2C_SDA
+  #define SENSOR_SCL 12     // GEN2_I2C_SCL
 #elif defined(BOARD_XTEINK_X4)
   #define EPD_SCK_PIN  8
   #define EPD_MOSI_PIN 10

@@ -1,0 +1,7 @@
+{
+  "name": "trmnl_gen2",
+  "description": "TRMNL Gen2 hardware drivers: E2803 8-IC ACeP EPD, IST9201 PMIC, TCA9555 expanders, BQ27427 fuel gauge",
+  "version": "0.1.0",
+  "frameworks": "arduino",
+  "platforms": "espressif32"
+}

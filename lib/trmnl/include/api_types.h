@@ -66,7 +66,7 @@ struct ApiDisplayInputs
   String macAddress;
   float batteryVoltage;
   ChargingStatus chargingStatus;
-#ifdef BOARD_TRMNL_X
+#if defined(BOARD_TRMNL_X) || defined(BOARD_TRMNL_GEN2)
   int batteryCount;
   int batteryCurrent;
   int currentBatteryCapacity;

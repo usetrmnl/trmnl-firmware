@@ -1,6 +1,6 @@
 #include <power.h>
 #include <Arduino.h>
-#include <DEV_Config.h> // BQ25616_PG_PIN / BQ25616_STAT_PIN (gen2)
+#include <DEV_Config.h>
 
 #ifdef BOARD_TRMNL_X
 #include "FastEPD.h"
@@ -12,15 +12,21 @@ extern FASTEPD bbep;
 #define BQ25616_STAT_PIN 2 // P0_2 — LOW = charging in progress
 #endif // BOARD_TRMNL_X
 
+#ifdef BOARD_TRMNL_GEN2
+// On Gen2, BQ25616 STAT/PG are on TCA9555 expander1 pins 14/15 (open-drain, LOW = active).
+// Use gen2_battery.h helpers which read via the expander directly.
+#include "gen2_battery.h"
+#endif
+
 UsbStatus get_usb_status(void)
 {
 #if defined(BOARD_TRMNL_X)
   bbep.ioPinMode(BQ25616_PG_PIN, INPUT);
   return (bbep.ioRead(BQ25616_PG_PIN) == 0) ? UsbStatus::CONNECTED : UsbStatus::DISCONNECTED;
 #elif defined(BOARD_TRMNL_GEN2)
-  // BQ25616 PG wired to a dedicated C5 GPIO; open-drain, LOW = VBUS present.
-  pinMode(BQ25616_PG_PIN, INPUT);
-  return (digitalRead(BQ25616_PG_PIN) == 0) ? UsbStatus::CONNECTED : UsbStatus::DISCONNECTED;
+  // PG# on expander1 pin 15: LOW = VBUS present
+  Gen2BatteryStatus s = gen2_batteryRead();
+  return (s.valid && s.power_good) ? UsbStatus::CONNECTED : UsbStatus::DISCONNECTED;
 #else
   return UsbStatus::UNKNOWN;
 #endif
@@ -29,13 +35,13 @@ UsbStatus get_usb_status(void)
 ChargingStatus get_charging_status(void)
 {
   // BQ25616 STAT: LOW = actively charging, HIGH = charge complete/disabled.
-  // TODO: detect ChargingStatus::FAULT (a fault blinks STAT, which reads HIGH).
 #if defined(BOARD_TRMNL_X)
   bbep.ioPinMode(BQ25616_STAT_PIN, INPUT);
   return (bbep.ioRead(BQ25616_STAT_PIN) == 0) ? ChargingStatus::CHARGING : ChargingStatus::NOT_CHARGING;
 #elif defined(BOARD_TRMNL_GEN2)
-  pinMode(BQ25616_STAT_PIN, INPUT);
-  return (digitalRead(BQ25616_STAT_PIN) == 0) ? ChargingStatus::CHARGING : ChargingStatus::NOT_CHARGING;
+  // STAT on expander1 pin 14: LOW = charging
+  Gen2BatteryStatus s = gen2_batteryRead();
+  return (s.valid && s.charging) ? ChargingStatus::CHARGING : ChargingStatus::NOT_CHARGING;
 #else
   return ChargingStatus::UNKNOWN;
 #endif
