@@ -4,11 +4,13 @@
 #include "button.h"
 #include "pins.h"
 #include "config.h"
+#include <DEV_Config.h>
 #include <ArduinoLog.h>
 #include <Preferences.h>
 #include "WifiCaptive.h"
 #include "logo_small.h"
 #include "logo_medium.h"
+extern TRMNL_DEVICE *pDevice;
 
 extern "C" {
   #include "esp_timer.h"   // esp_timer_get_time()
@@ -299,7 +301,7 @@ bool startQA(){
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
   pins_init();
   Log.info("QA Test started\n");
-  attachInterrupt(digitalPinToInterrupt(PIN_INTERRUPT), onBtnPress, FALLING);
+  attachInterrupt(digitalPinToInterrupt(pDevice->interrupt_pin), onBtnPress, FALLING);
 
   while(!stopRequested){
   

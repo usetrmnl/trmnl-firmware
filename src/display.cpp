@@ -39,18 +39,20 @@ const TRMNL_DEVICE device_list[] =
   "xiao_epaper_3clr", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 5,     0xff,   EPD_75_3CLR,
   "reterminal_e1001", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     0xff,   EPD_75,
   "reterminal_e1002", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     0xff,   EPD_75_6CLR,
+  "crowpanel42",   0,    0,     0,   0,    0,   0,    0xff, 0xff, 2,     0xff,   EPD_CROWPANEL, 
   NULL,            0,    0,     0,   0,    0,   0,    0,    0,    0,     0,      0
 }; // device_list
 TRMNL_DEVICE *pDevice = NULL;
 // TRMNL SPI ePaper panel types list. The list order is fixed and based on enumerated values
 // N.B. ALWAYS ADD NEW PANELS TO THE END OF THE LIST
-const DISPLAY_PROFILE dpList[6][3] = { // 1-bit and 2-bit display types for each profile
+const DISPLAY_PROFILE dpList[7][3] = { // 1-bit and 2-bit display types for each profile
     {{EP75_800x480, EP75_800x480_4GRAY}, {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, {EP75_800x480, EP75_800x480_4GRAY_V2}},
     {{EP426_800x480, EP426_800x480_4GRAY}, {EP426_800x480, EP426_800x480_4GRAY}, {EP426_800x480, EP426_800x480_4GRAY}},
     {{EP397_800x480, EP397_800x480_4GRAY}, {EP397_800x480, EP397_800x480_4GRAY}, {EP397_800x480, EP397_800x480_4GRAY}},
     {{EP75R_800x480, EP75R_800x480}, {EP75R_800x480, EP75R_800x480}, {EP75R_800x480, EP75R_800x480}}, 
     {{EP75YR_800x480, EP75YR_800x480}, {EP75YR_800x480, EP75YR_800x480}, {EP75YR_800x480, EP75YR_800x480}}, 
     {{EP73_SPECTRA_800x480, EP73_SPECTRA_800x480}, {EP73_SPECTRA_800x480, EP73_SPECTRA_800x480}, {EP73_SPECTRA_800x480, EP73_SPECTRA_800x480}},
+    {{EPD_CROWPANEL42, EPD_CROWPANEL42_4GRAY},{EPD_CROWPANEL42, EPD_CROWPANEL42_4GRAY},{EPD_CROWPANEL42, EPD_CROWPANEL42_4GRAY}},
 };
 #ifdef BOARD_SEEED_RETERMINAL_E1002
 uint8_t u8SpectraPal[512]; // RGB333 mapped to closest Spectra6 color
@@ -129,6 +131,19 @@ static bool display_update_epaper(int refreshMode, bool wait, bool writePlane = 
 }
 #endif
 
+void hw_config_init(void)
+{
+    int i = 0;
+    // Match the device name with the configuration in the list
+    while (device_list[i].device_name && strcmp(device_list[i].device_name, DEVICE_MODEL) != 0) {
+        i++;
+    }
+    if (device_list[i].device_name) {
+        Log_info("Found device model at index %d\n", i);
+        pDevice = (TRMNL_DEVICE *)&device_list[i];
+    }
+} /* hw_config_init() */
+
 /**
  * @brief Function to init the display
  * @param none
@@ -148,17 +163,12 @@ void display_init(void)
 #ifdef BOARD_SEEED_RETERMINAL_E1002
     spectra6_init_spi();
 #else
-    int i = 0;
-    // Match the device name with the configuration in the list
-    while (device_list[i].device_name && strcmp(device_list[i].device_name, DEVICE_MODEL) != 0) {
-        i++;
-    }
-    if (device_list[i].device_name) {
-        Log_info("Found device model at index %d\n", i);
-        pDevice = (TRMNL_DEVICE *)&device_list[i];
+    if (pDevice->epd_mosi_pin != 0) {
         bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit); // must be set BEFORE calling initio
         bbep.initIO(pDevice->epd_dc_pin, pDevice->epd_rst_pin, pDevice->epd_busy_pin, pDevice->epd_cs_pin,
-            pDevice->epd_mosi_pin, pDevice->epd_sck_pin, 8000000);
+        pDevice->epd_mosi_pin, pDevice->epd_sck_pin, 8000000);
+    } else { // it's a pre-defined PCB+display in bb_epaper
+        bbep.begin(dpList[pDevice->panel_set][0].OneBit);
     }
 #endif
 #else
@@ -1632,9 +1642,12 @@ PNG *png = new PNG();
                     png->decode(&iPlane, 0);
                 } // temp profile needs the second plane written
             } else { // 2-bpp (or greater, but reduced to 2-bpp)
-                bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].TwoBit);
-                if (bbep.getPanelType() == EP426_800x480_4GRAY || bbep.getPanelType() == EP397_800x480_4GRAY) {
-                    bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
+                if (pDevice->epd_mosi_pin != 0) {
+                    bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].TwoBit);
+                    bbep.initIO(pDevice->epd_dc_pin, pDevice->epd_rst_pin, pDevice->epd_busy_pin, pDevice->epd_cs_pin,
+                        pDevice->epd_mosi_pin, pDevice->epd_sck_pin, 8000000);
+                } else {
+                    bbep.begin(dpList[pDevice->panel_set][0].TwoBit);
                 }
                 rc = REFRESH_FULL; // 4gray mode must be full refresh
                 iUpdateCount = 0; // grayscale mode resets the partial update counter
@@ -1715,11 +1728,12 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
     }
 #endif
 #ifdef BB_EPAPER
-    if (i426Workaround && bbep.getPanelType() == dpList[pDevice->panel_set][iTempProfile].OneBit) {
-        // After a partial update, the 3.97" & 4.26" 800x480 needs to be 'reset' to accept writes
-        // This is only needed if the user pressed the WAKE button and there will be 2 updates
-        // while the power is on
-        bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
+    if (pDevice->epd_mosi_pin != 0) {
+        bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit);
+        bbep.initIO(pDevice->epd_dc_pin, pDevice->epd_rst_pin, pDevice->epd_busy_pin, pDevice->epd_cs_pin,
+            pDevice->epd_mosi_pin, pDevice->epd_sck_pin, 8000000);
+    } else {
+        bbep.begin(dpList[pDevice->panel_set][0].OneBit);
     }
 #endif // BB_EPAPER
     if (isPNG == true && data_size < MAX_IMAGE_SIZE)

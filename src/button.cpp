@@ -1,11 +1,13 @@
 #include <Arduino.h>
 #include "trmnl_log.h"
 #include <config.h>
+#include <DEV_Config.h>
 #include "button.h"
+extern TRMNL_DEVICE *pDevice;
 
 static unsigned long wait_for_button_release(unsigned long start_time) {
-  pinMode(PIN_INTERRUPT, INPUT);
-  while (digitalRead(PIN_INTERRUPT) == LOW && millis() - start_time < BUTTON_SOFT_RESET_TIME) {
+  pinMode(pDevice->interrupt_pin, INPUT);
+  while (digitalRead(pDevice->interrupt_pin) == LOW && millis() - start_time < BUTTON_SOFT_RESET_TIME) {
     delay(10);
   }
   return millis() - start_time;
@@ -29,7 +31,7 @@ static ButtonPressResult wait_for_second_press(unsigned long start_time) {
   auto release_time = millis();
 
   while (millis() - release_time < BUTTON_DOUBLE_CLICK_WINDOW) {
-    if (digitalRead(PIN_INTERRUPT) == LOW) {
+    if (digitalRead(pDevice->interrupt_pin) == LOW) {
       auto second_press_start = millis();
       auto second_duration = wait_for_button_release(second_press_start);
 
@@ -51,14 +53,14 @@ ButtonPressResult read_button_presses()
 {
   auto time_start = millis();
   Log_info("Button time=%lu: start", time_start);
-  pinMode(PIN_INTERRUPT, INPUT);
-  if (digitalRead(PIN_INTERRUPT) == HIGH) {
+  pinMode(pDevice->interrupt_pin, INPUT);
+  if (digitalRead(pDevice->interrupt_pin) == HIGH) {
     if (time_start < 2000) {
       Log_info("Button: already released at start (GPIO wakeup), waiting for second press");
       return wait_for_second_press(time_start);
     } else {
       Log_info("Button: waiting for button press");
-      while (digitalRead(PIN_INTERRUPT) == HIGH) {
+      while (digitalRead(pDevice->interrupt_pin) == HIGH) {
         delay(10);
       }
       time_start = millis();

@@ -11,6 +11,7 @@
 #include <WifiCaptive.h>
 #include <pins.h>
 #include <config.h>
+#include <DEV_Config.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <display.h>
@@ -58,6 +59,8 @@ bool bCO2 = false;
 int iSensorType = -1;
 int lastCO2 = 0, lastSCDTemp = 0, lastTemp = 0, lastSCDHumid = 0, lastHumid = 0, lastPressure = 0, lastType = -1, lastTime = 0;
 #endif // SENSOR_SDA
+void hw_config_init(void);
+extern TRMNL_DEVICE *pDevice;
 const char *szHTTPErrors[] = {
     "HTTPS_NO_ERR",
     "HTTPS_RESET",
@@ -863,6 +866,7 @@ void bl_init(void)
   }
   Log.info("%s [%d]: modem needed = %d\n\r", __FILE__, __LINE__, bModemNeeded);
 #endif // X
+  hw_config_init();
   pins_init();
   sensor_init();
 #ifdef BOARD_TRMNL_X
@@ -3193,12 +3197,12 @@ void goToSleep(void)
   // Configure GPIO pin for wakeup
 #if CONFIG_IDF_TARGET_ESP32
   #define BUTTON_PIN_BITMASK(GPIO) (1ULL << GPIO)  // 2 ^ GPIO_NUMBER in hex
-  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK(PIN_INTERRUPT), ESP_EXT1_WAKEUP_ALL_LOW);
+  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK(pDevice->interrupt_pin), ESP_EXT1_WAKEUP_ALL_LOW);
 #elif defined(CONFIG_IDF_TARGET_ESP32C3) || defined (CONFIG_IDF_TARGET_ESP32C5)
   pinMode(PIN_INTERRUPT, INPUT); // needed to not immediately wake up
-  esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
+  esp_deep_sleep_enable_gpio_wakeup(1 << pDevice->interrupt_pin, ESP_GPIO_WAKEUP_GPIO_LOW);
 #elif defined(CONFIG_IDF_TARGET_ESP32S3)
-  esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)pDevice->interrupt_pin, 0);
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
 #endif
@@ -3229,11 +3233,11 @@ static void goToSleepButtonOnly(void)
   preferences.end();
 #if CONFIG_IDF_TARGET_ESP32
   #define BUTTON_PIN_BITMASK_BTN(GPIO) (1ULL << GPIO)
-  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK_BTN(PIN_INTERRUPT), ESP_EXT1_WAKEUP_ALL_LOW);
+  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK_BTN(pDevice->interrupt_pin), ESP_EXT1_WAKEUP_ALL_LOW);
 #elif defined( CONFIG_IDF_TARGET_ESP32C3 ) || defined ( CONFIG_IDF_TARGET_ESP32C5 )
-  esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
+  esp_deep_sleep_enable_gpio_wakeup(1 << pDevice->interrupt_pin, ESP_GPIO_WAKEUP_GPIO_LOW);
 #elif CONFIG_IDF_TARGET_ESP32S3
-  esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)pDevice->interrupt_pin, 0);
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
 #endif
