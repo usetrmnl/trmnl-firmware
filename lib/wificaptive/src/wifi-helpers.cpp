@@ -24,7 +24,9 @@ const char *wifiStatusStr(wl_status_t wifi_status) {
   for (const WifiStatusNode &entry : wifiStatusMap) {
     if (wifi_status == entry.value) return entry.name;
   }
-  return nullptr;
+  // Callers strncpy this into a fixed-size log field, so it must never be null.
+  // The 3.x core adds status values this table does not list.
+  return "unknown";
 }
 
 void applyWifiHostname(const String &hostname) {
