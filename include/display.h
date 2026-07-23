@@ -185,6 +185,12 @@ void display_show_msg_qa(uint8_t *image_buffer, const float *voltage, const floa
  * @return none
  */
 void display_draw_touchbar_indicator(touchbar_side_t side, bool filled);
+// progress: 0.0 = empty (border only), 1.0 = fully filled; draws a growing left-to-right bar
+void display_draw_touchbar_progress(touchbar_side_t side, float progress);
+
+// Draws two touchbar pills in a single hardware refresh pass, so they update
+// simultaneously instead of one after another.
+void display_draw_touchbar_progress_pair(touchbar_side_t side_a, float progress_a, touchbar_side_t side_b, float progress_b);
 
 void display_set_light_sleep(uint8_t enabled);
 
