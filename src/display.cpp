@@ -1837,6 +1837,10 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
 
 #endif // DO_NOT_LIGHT_SLEEP
 #endif // !BOARD_SEEED_RETERMINAL_E1002
+    if (bbep.getPanelType() == EP397_800x480 && iRefreshMode == REFRESH_FAST) {
+        // Seeed Sticky: fast refresh on this panel isn't working and full refresh = fast
+        iRefreshMode = REFRESH_FULL;
+    }
     if (!display_update_epaper(iRefreshMode, bWait)) {
         Log_error("display_show_image: e-paper update failed");
         if (bAlloc) {
@@ -1845,7 +1849,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
         return;
     }
 
-    if ((bbep.getPanelType() == EP426_800x480 || bbep.getPanelType() == EP426_800x480_4GRAY || bbep.getPanelType() == EP397_800x480 || bbep.getPanelType() == EP397_800x480_4GRAY) && iRefreshMode == REFRESH_PARTIAL) {
+    if ((bbep.getPanelType() == EP426_800x480 || bbep.getPanelType() == EP426_800x480_4GRAY || bbep.getPanelType() == EP397_800x480 || bbep.getPanelType() == EP397_800x480_4GRAY) /* && iRefreshMode == REFRESH_PARTIAL*/) {
         i426Workaround = 1; // need to re-initialize the controller for another update before sleeping
     }
     if (bAlloc) {

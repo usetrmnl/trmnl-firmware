@@ -3426,10 +3426,12 @@ static float readBatteryVoltage(void)
     int32_t adc;
     int32_t sensorValue;
 
+    if (pDevice->battery_pin == 0xff) return 4.2f; // fake battery voltage
+
     adc = 0;
     analogRead(PIN_BATTERY); // This is needed to properly initialize the ADC BEFORE calling analogReadMilliVolts()
     for (uint8_t i = 0; i < 8; i++) {
-      adc += analogReadMilliVolts(PIN_BATTERY);
+      adc += analogReadMilliVolts(pDevice->battery_pin);
     }
   #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_XIAO_EPAPER_DISPLAY_3CLR) || defined(BOARD_SEEED_RETERMINAL_E1003)
     digitalWrite(PIN_VBAT_SWITCH, (VBAT_SWITCH_LEVEL == HIGH ? LOW : HIGH));
