@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Run clang-format on tracked C/C++ sources. Requires clang-format 22+ and repo .clang-format.
+# Run clang-format on tracked and untracked (non-ignored) C/C++ sources.
+# Requires clang-format 22+ and repo .clang-format.
 # Exclusions (vendor dirs, large open-PR files, generated constants) live in .clang-format-ignore.
 
 set -euo pipefail
@@ -15,12 +16,15 @@ fi
 
 # Find files needing changes (clang-format honors .clang-format-ignore); dry-run
 # emits a "code should be clang-formatted" warning per offending file.
+# Include untracked (non-ignored) sources so new files are formatted too.
+# clang-format --dry-run exits non-zero when reformatting is needed; keep going.
 NEED=$(
-  git ls-files -z '*.cpp' '*.h' '*.c' '*.hpp' '*.ino' \
+  git ls-files -z --cached --others --exclude-standard \
+      '*.cpp' '*.h' '*.c' '*.hpp' '*.ino' \
     | xargs -0 "$CF" -style=file --dry-run 2>&1 \
     | sed -n 's/:[0-9]*:[0-9]*: warning: code should be clang-formatted.*//p' \
     | sort -u
-)
+  ) || true
 
 if [ -z "$NEED" ]; then
   echo "All files already formatted."
