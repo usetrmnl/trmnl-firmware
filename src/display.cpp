@@ -67,26 +67,7 @@ uint8_t u8SpectraPal[512]; // RGB333 mapped to closest Spectra6 color
 #include "driver/rtc_io.h"
 #include "LittleFS.h"
 #define FS LittleFS
-#include "FastEPD.h"
-FASTEPD bbep;
-const uint8_t u8_graytable[] = {
-/* 0 */  0, 0, 0, 0, 0, 0, 1, 1, 1, 
-/* 1 */  0, 0, 1, 1, 1, 2, 2, 1, 1, 
-/* 2 */  0, 0, 0, 0, 1, 2, 2, 1, 1,
-/* 3 */  1, 1, 2, 2, 1, 1, 1, 1, 2, 
-/* 4 */  0, 0, 0, 1, 2, 1, 1, 1, 2, 
-/* 5 */  1, 2, 2, 2, 2, 1, 1, 1, 2, 
-/* 6 */  0, 0, 1, 1, 2, 2, 1, 1, 2, 
-/* 7 */  0, 1, 1, 2, 1, 1, 2, 1, 2, 
-/* 8 */  0, 1, 1, 1, 2, 1, 2, 1, 2, 
-/* 9 */  0, 1, 1, 1, 1, 2, 2, 1, 2, 
-/* 10 */  1, 1, 1, 2, 1, 1, 1, 2, 2, 
-/* 11 */  0, 0, 1, 2, 1, 1, 1, 2, 2, 
-/* 12 */  0, 0, 0, 1, 2, 1, 1, 2, 2, 
-/* 13 */  0, 0, 0, 0, 1, 2, 1, 2, 2, 
-/* 14 */  0, 1, 1, 1, 2, 2, 2, 2, 2, 
-/* 15 */  0, 0, 0, 0, 0, 0, 0, 0, 2
-};
+#include "displays/fastepd.h"
 #include "BQ27427.h"
 extern BQ27427 lipo; // Use lipo.[] to interact with the library in an Arduino 
 #endif
@@ -157,23 +138,7 @@ void display_init(void)
     bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
 #endif
 #else
-#ifdef BOARD_TRMNL_X
-    bbep.initPanel(BB_PANEL_TRMNL_X);
-    bbep.setPasses(3, 3);
-#elif defined( BOARD_TRMNL_X_SENSORIAS3 )
-    bbep.initPanel(BB_PANEL_V7_RAW);
-    bbep.setPanelSize(1280, 720, BB_PANEL_FLAG_MIRROR_X, -1600);
-#elif defined( BOARD_TRMNL_X_SENSORIAC5 )
-    bbep.initPanel(BB_PANEL_SENSORIA_C5);
-#elif defined(BOARD_TRMNL_X_PAPERS3)
-    bbep.initPanel(BB_PANEL_M5PAPERS3);
-#elif defined(BOARD_TRMNL_X_LILYGO)
-    bbep.initPanel(BB_PANEL_EPDIY_V7);
-    bbep.setPanelSize(960, 540);
-#elif defined (BOARD_SEEED_RETERMINAL_E1003)
-    bbep.initIT8951(EPD_MOSI_PIN, EPD_MISO_PIN, EPD_SCK_PIN, EPD_CS_PIN, EPD_BUSY_PIN, EPD_RST_PIN, EPD_EN_PIN, EPD_VCC_EN);
-    bbep.setPanelSize(BBEP_DISPLAY_ED103TC2);
-#endif // X
+    fastepd::init();
 #endif // bb_epaper
     Log_info("dev module end");
 }
@@ -1651,7 +1616,7 @@ PNG *png = new PNG();
                     bbep.setMode(BB_MODE_1BPP);
                 break;
                 case 2:
-                    // 2-bit PNGs are expanded to 4bpp in png_draw() so refresh uses u8_graytable
+                    // 2-bit PNGs are expanded to 4bpp in png_draw() for grayscale refresh
                     bbep.setMode(BB_MODE_4BPP);
                 break;
                 default:
@@ -1834,22 +1799,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
     }
 #else
  {
-    int rc = bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
-    Log_info("%s [%d]: setCustomMatrix returned %d\r\n", __FILE__, __LINE__, rc);
-
- //   if (bbep.getPreviousMode() != BB_MODE_NONE && (bbep.getMode() == BB_MODE_1BPP || bbep.getMode() == BB_MODE_2BPP)) {
- //       Log_info("%s [%d]: Using partial update since we have a copy of the previous image\n", __FILE__, __LINE__);
- //       bbep.setPasses(6,6);
- //       bbep.partialUpdate(false); // we have a previous image to diff against; use a non-flickering update
- //   } else {
-        // bWait=false means loading screen: skip clearing passes so it appears
-        // faster. Ghosting from the previous image is acceptable since the
-        // real content refresh (bWait=true) immediately follows.
-        int iClearMode = bSkipClear ? CLEAR_NONE
-                                   : ((iUpdateCount & 7) == 0 || (iTempProfile > 0)) ? CLEAR_SLOW : CLEAR_FAST;
-        Log_info("fullUpdate clear mode = %d\n", iClearMode);
-        bbep.fullUpdate(iClearMode, false);
- //   }
+    fastepd::update(bWait, bSkipClear, iUpdateCount, iTempProfile);
  }
 #endif
     iUpdateCount++;

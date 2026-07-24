@@ -3,10 +3,9 @@
 #include <power.h>
 
 #ifdef BOARD_TRMNL_X
-#include "FastEPD.h"
-// Defined in display.cpp. On TRMNL X the BQ25616 PG/STAT lines are wired to the
-// TCA9535 I/O expander, which is reached through the FastEPD io* helpers.
-extern FASTEPD bbep;
+#include "displays/fastepd.h"
+// On TRMNL X the BQ25616 PG/STAT lines are wired to the TCA9535 I/O expander,
+// which is reached through the FastEPD io* helpers (bbep owned by fastepd_x).
 // TCA9535 expander pins (open-drain, LOW = active).
 #define BQ25616_PG_PIN   0   // P0_0 — LOW = VBUS OK
 #define BQ25616_STAT_PIN 2 // P0_2 — LOW = charging in progress
