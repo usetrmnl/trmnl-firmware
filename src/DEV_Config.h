@@ -62,6 +62,7 @@ enum {
   EPD_75_4CLR,
   EPD_75_6CLR,
   EPD_CROWPANEL,
+  EPD_PAPER_MONO,
 };
 
 /**

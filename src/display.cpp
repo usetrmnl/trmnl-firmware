@@ -25,7 +25,7 @@ BBEPAPER bbep;
 // The final parameter is the panel type which is from an enumerated list
 const TRMNL_DEVICE device_list[] = 
 {
-// name            sck   mosi   cs   rst   dc   busy  sda   scl   intr   batt    panel
+// name            sck   mosi   cs   rst   dc   busy  sda   scl   intr   batt    pwr_fn    panel
   "og",            7,    8,     6,   10,   5,   4,    21,   20,   2,     3,      EPD_75,
   "og_4clr",       7,    8,     6,   10,   5,   4,    21,   20,   2,     3,      EPD_75_4CLR,
   "og_gen2",       6,    1,     4,   2,    5,   0,    11,   12,   3,     0xff,   EPD_75, // fake battery == 0xff
@@ -40,12 +40,13 @@ const TRMNL_DEVICE device_list[] =
   "reterminal_e1001", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     0xff,   EPD_75,
   "reterminal_e1002", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     0xff,   EPD_75_6CLR,
   "crowpanel42",   0,    0,     0,   0,    0,   0,    0xff, 0xff, 2,     0xff,   EPD_CROWPANEL, 
+  "m5_paper_mono", 0,    0,     0,   0,    0,   0,    0xff, 0xff, 2,     0xff,   EPD_PAPER_MONO, 
   NULL,            0,    0,     0,   0,    0,   0,    0,    0,    0,     0,      0
 }; // device_list
 TRMNL_DEVICE *pDevice = NULL;
 // TRMNL SPI ePaper panel types list. The list order is fixed and based on enumerated values
 // N.B. ALWAYS ADD NEW PANELS TO THE END OF THE LIST
-const DISPLAY_PROFILE dpList[7][3] = { // 1-bit and 2-bit display types for each profile
+const DISPLAY_PROFILE dpList[8][3] = { // 1-bit and 2-bit display types for each profile
     {{EP75_800x480, EP75_800x480_4GRAY}, {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, {EP75_800x480, EP75_800x480_4GRAY_V2}},
     {{EP426_800x480, EP426_800x480_4GRAY}, {EP426_800x480, EP426_800x480_4GRAY}, {EP426_800x480, EP426_800x480_4GRAY}},
     {{EP397_800x480, EP397_800x480_4GRAY}, {EP397_800x480, EP397_800x480_4GRAY}, {EP397_800x480, EP397_800x480_4GRAY}},
@@ -53,6 +54,7 @@ const DISPLAY_PROFILE dpList[7][3] = { // 1-bit and 2-bit display types for each
     {{EP75YR_800x480, EP75YR_800x480}, {EP75YR_800x480, EP75YR_800x480}, {EP75YR_800x480, EP75YR_800x480}}, 
     {{EP73_SPECTRA_800x480, EP73_SPECTRA_800x480}, {EP73_SPECTRA_800x480, EP73_SPECTRA_800x480}, {EP73_SPECTRA_800x480, EP73_SPECTRA_800x480}},
     {{EPD_CROWPANEL42, EPD_CROWPANEL42_4GRAY},{EPD_CROWPANEL42, EPD_CROWPANEL42_4GRAY},{EPD_CROWPANEL42, EPD_CROWPANEL42_4GRAY}},
+    {{EPD_M5_PAPER_MONO, EPD_M5_PAPER_MONO_4GRAY},{EPD_M5_PAPER_MONO, EPD_M5_PAPER_MONO_4GRAY},{EPD_M5_PAPER_MONO, EPD_M5_PAPER_MONO_4GRAY}},
 };
 #ifdef BOARD_SEEED_RETERMINAL_E1002
 uint8_t u8SpectraPal[512]; // RGB333 mapped to closest Spectra6 color
@@ -129,7 +131,6 @@ static bool display_update_epaper(int refreshMode, bool wait, bool writePlane = 
     return true;
 #endif
 }
-#endif
 
 void hw_config_init(void)
 {
@@ -143,6 +144,7 @@ void hw_config_init(void)
         pDevice = (TRMNL_DEVICE *)&device_list[i];
     }
 } /* hw_config_init() */
+#endif
 
 /**
  * @brief Function to init the display
