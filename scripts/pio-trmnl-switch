@@ -1,0 +1,233 @@
+#!/usr/bin/env bash
+# Prepare PlatformIO packages for a TRMNL firmware environment family.
+#
+# Two PlatformIO *families* share package names under ~/.platformio/packages
+# (framework-espidf, tool-esptoolpy, tool-cmake, …). Switching without cleanup
+# thrashs IDF 4.4 ↔ 5.5 and esptool 2.x ↔ 5.x, and can leave empty
+# packages/tool-*@src-* stubs (broken cmake / esptool).
+#
+# Families
+#   og  — PlatformIO registry espressif32@6.12, Arduino-as-IDF, ESP-IDF ~4.4
+#         Includes: TRMNL OG (mono), TRMNL BWRY (4-color), DIY/Seeed envs that
+#         inherit [env] platform, plus native tests (no firmware toolchain).
+#   x   — pioarduino platform-espressif32 (53.x / 55.x), ESP-IDF ~5.x
+#         Includes: TRMNL_X*, TRMNL_X_dev, gen2, Sensoria, partner boards, …
+#
+# Usage (from repository root):
+#   ./scripts/pio-trmnl-switch og                 # prep default OG env (trmnl)
+#   ./scripts/pio-trmnl-switch bwry               # prep BWRY (trmnl_4clr) — OG family
+#   ./scripts/pio-trmnl-switch x                  # prep default X env (TRMNL_X_dev)
+#   ./scripts/pio-trmnl-switch TRMNL_X            # prep production X env by name
+#   ./scripts/pio-trmnl-switch og && pio run -e trmnl
+#   ./scripts/pio-trmnl-switch bwry && pio run -e trmnl_4clr
+#   ./scripts/pio-trmnl-switch x && pio run -e TRMNL_X_dev
+#
+# See docs/building-og-x.md for the full guide.
+set -euo pipefail
+
+# Prefer PlatformIO's isolated penv when present (Python 3.11 tooling).
+if [[ -x "${HOME}/.platformio/penv/bin/pio" ]]; then
+  export PATH="${HOME}/.platformio/penv/bin:${PATH}"
+fi
+export PATH="${HOME}/.local/bin:${PATH}"
+
+PKG="${HOME}/.platformio/packages"
+TOOLS="${HOME}/.platformio/tools"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+usage() {
+  cat <<'EOF' >&2
+Usage: ./scripts/pio-trmnl-switch <target>
+
+Targets (aliases):
+  og | trmnl              OG mono  → env trmnl          (family: og)
+  bwry | trmnl_4clr       BWRY     → env trmnl_4clr     (family: og)
+  x | TRMNL_X_dev         X dev    → env TRMNL_X_dev    (family: x)
+  TRMNL_X                 X prod   → env TRMNL_X        (family: x)
+  <platformio env name>   any env in platformio.ini     (family inferred)
+
+BWRY is not a third PlatformIO stack: it uses the same og family as mono OG
+(espressif32@6.12). Only X/gen2/partner envs use the pioarduino (x) family.
+
+Docs: docs/building-og-x.md
+EOF
+  exit 2
+}
+
+TARGET="${1:-}"
+if [[ -z "${TARGET}" || "${TARGET}" == "-h" || "${TARGET}" == "--help" ]]; then
+  usage
+fi
+
+# Incomplete package dirs: metadata only, no real payload.
+is_incomplete_tool_pkg() {
+  local d="$1"
+  [[ -d "$d" ]] || return 1
+  if [[ -x "$d/bin/cmake" ]]; then return 1; fi
+  if [[ -f "$d/setup.py" || -f "$d/pyproject.toml" ]]; then return 1; fi
+  if [[ -x "$d/ninja" || -x "$d/bin/ninja" ]]; then return 1; fi
+  if compgen -G "$d/*.elf" > /dev/null; then return 1; fi
+  if [[ -f "$d/package.json" || -f "$d/tools.json" ]]; then
+    return 0
+  fi
+  return 1
+}
+
+purge_broken_tool_packages() {
+  local d
+  for d in \
+    "$PKG"/tool-esptoolpy@src-* \
+    "$PKG"/tool-cmake@src-* \
+    "$PKG"/tool-ninja@src-* \
+    "$PKG"/tool-esp-rom-elfs@src-*
+  do
+    [[ -e "$d" ]] || continue
+    if is_incomplete_tool_pkg "$d"; then
+      echo "==> Removing incomplete stub: $d"
+      rm -rf "$d"
+    fi
+  done
+
+  # Shared unversioned slots thrash between og (IDF 4.4 / esptool 2.x) and
+  # x (IDF 5.x / esptool 5.x). Clear so the next pkg install is consistent.
+  for d in \
+    "$PKG/tool-esptoolpy" \
+    "$PKG/tool-cmake" \
+    "$PKG/tool-ninja" \
+    "$PKG/tool-esp-rom-elfs" \
+    "$PKG/framework-espidf" \
+    "$PKG/framework-arduinoespressif32"
+  do
+    if [[ -L "$d" ]]; then
+      rm -f "$d"
+    elif [[ -d "$d" ]]; then
+      rm -rf "$d"
+    fi
+  done
+}
+
+# pioarduino may leave packages/ as stubs while tools/ has full trees.
+materialize_pioarduino_tools() {
+  local name src dst
+  for name in tool-esptoolpy tool-cmake tool-ninja tool-esp-rom-elfs; do
+    src="${TOOLS}/${name}"
+    dst="${PKG}/${name}"
+    [[ -d "$src" ]] || continue
+    if [[ ! -d "$dst" ]] || is_incomplete_tool_pkg "$dst"; then
+      echo "==> Materializing ${name} from tools/ into packages/"
+      rm -rf "$dst"
+      cp -a "$src" "$dst"
+    fi
+  done
+
+  if [[ ! -e "$PKG/framework-espidf" ]]; then
+    local idf
+    for idf in "$PKG"/framework-espidf@src-*; do
+      if [[ -d "$idf" ]] && [[ -f "$idf/tools/cmake/version.cmake" ]]; then
+        if grep -q 'IDF_VERSION_MAJOR 5' "$idf/tools/cmake/version.cmake" 2>/dev/null; then
+          ln -s "$(basename "$idf")" "$PKG/framework-espidf"
+          echo "==> Linked framework-espidf -> $(basename "$idf")"
+          break
+        fi
+      fi
+    done
+  fi
+}
+
+infer_family_for_env() {
+  local env_name="$1"
+  # Explicit x-class env names (pioarduino in platformio.ini)
+  case "${env_name}" in
+    TRMNL_X*|trmnl_gen2|seeed_sticky|esp32-c5-devkitc-1)
+      echo x
+      return
+      ;;
+    native|native-windows)
+      # Host unit tests — no ESP tool thrash; treat as og for pkg install only
+      echo og
+      return
+      ;;
+  esac
+  # Heuristic: if platformio.ini assigns pioarduino platform to this env
+  if grep -A 30 "^\[env:${env_name}\]" platformio.ini 2>/dev/null \
+    | grep -q 'pioarduino/platform-espressif32'; then
+    echo x
+    return
+  fi
+  echo og
+}
+
+case "${TARGET}" in
+  x|X|trmnl_x)
+    ENV_NAME="TRMNL_X_dev"
+    FAMILY="x"
+    PRODUCT="TRMNL X (dev)"
+    ;;
+  TRMNL_X)
+    ENV_NAME="TRMNL_X"
+    FAMILY="x"
+    PRODUCT="TRMNL X (production)"
+    ;;
+  og|OG|trmnl|TRMNL)
+    ENV_NAME="trmnl"
+    FAMILY="og"
+    PRODUCT="TRMNL OG (mono / 1-bit)"
+    ;;
+  bwry|BWRY|trmnl_4clr|4clr|BWR)
+    ENV_NAME="trmnl_4clr"
+    FAMILY="og"
+    PRODUCT="TRMNL BWRY (4-color) — OG PlatformIO family"
+    ;;
+  *)
+    ENV_NAME="${TARGET}"
+    FAMILY="$(infer_family_for_env "${ENV_NAME}")"
+    PRODUCT="env ${ENV_NAME}"
+    ;;
+esac
+
+if ! command -v pio >/dev/null 2>&1; then
+  echo "ERROR: pio not on PATH. Install PlatformIO Core, preferably via the" >&2
+  echo "       official installer (~/.platformio/penv), not system Python 3.14 pip." >&2
+  exit 1
+fi
+
+echo "==> Product: ${PRODUCT}"
+echo "==> PlatformIO env: ${ENV_NAME}  family: ${FAMILY}"
+echo "==> Using pio: $(command -v pio) ($(pio --version 2>/dev/null || true))"
+
+purge_broken_tool_packages
+
+if [[ -d ".pio/build/${ENV_NAME}" ]]; then
+  echo "==> Cleaning .pio/build/${ENV_NAME}"
+  rm -rf ".pio/build/${ENV_NAME}"
+fi
+
+if [[ "${FAMILY}" == "x" ]]; then
+  if [[ -d managed_components ]]; then
+    echo "==> Refreshing managed_components for x-family env"
+    rm -rf managed_components
+  fi
+  rm -f dependencies.lock
+fi
+
+echo "==> pio pkg install -e ${ENV_NAME}"
+pio pkg install -e "${ENV_NAME}"
+
+if [[ "${FAMILY}" == "x" ]]; then
+  materialize_pioarduino_tools
+  if [[ ! -x "${PKG}/tool-cmake/bin/cmake" ]]; then
+    echo "ERROR: tool-cmake/bin/cmake still missing after materialize" >&2
+    exit 1
+  fi
+  if [[ ! -f "${PKG}/tool-esptoolpy/setup.py" && ! -f "${PKG}/tool-esptoolpy/pyproject.toml" ]]; then
+    echo "ERROR: tool-esptoolpy is not a pip-installable package tree" >&2
+    exit 1
+  fi
+  echo "==> X tools OK (cmake + esptool package trees)"
+fi
+
+echo "==> Ready."
+echo "    pio run -e ${ENV_NAME}"
+echo "    pio run -e ${ENV_NAME} -t upload"
+echo "    pio device monitor -e ${ENV_NAME}"

@@ -239,28 +239,63 @@ There are technical and non-technical options to flashing firmware.
 
 
 ### **Via CLI**
-1. To build the binary run `pio run -e TRMNL_X_dev`
-2. To upload the binary to the device `pio run -e TRMNL_X_dev -t upload`
-3. If PlatformIO uses the wrong port use this
+
+Prefer PlatformIO from the official installer so `pio` uses `~/.platformio/penv` (not a system Python 3.14-only install).
+
+**TRMNL X** (ESP32-S3 class, pioarduino / ESP-IDF 5.x):
+
 ```bash
-pio device list # make sure JTAG device is visible
-pio run -e TRMNL_X_dev -t upload --upload-port /dev/cu.usbmodem1234
-```
-4. view serial monitor by
-```bash
+./scripts/pio-trmnl-switch x          # prepare X tool packages
+pio run -e TRMNL_X_dev
+pio run -e TRMNL_X_dev -t upload
 pio device monitor -e TRMNL_X_dev
+```
+
+**TRMNL OG** (mono / 1-bit, ESP32-C3, PlatformIO `espressif32@6.12` / ESP-IDF 4.4):
+
+```bash
+./scripts/pio-trmnl-switch og
+pio run -e trmnl
 pio device monitor -e trmnl
 ```
 
-When switching between TRMNL X and OG/BWRY, run `pio pkg install` once for the environment you are about to build (use the same `-e` value as `pio run`):
+**TRMNL BWRY** (4-color): same **PlatformIO family as OG**, different env and board define (`trmnl_4clr` / `BOARD_TRMNL_4CLR`). BWRY is not a third toolchain.
 
 ```bash
-pio pkg install -e TRMNL_X_dev   # TRMNL X
-pio pkg install -e trmnl         # TRMNL OG
-pio pkg install -e trmnl_4clr    # TRMNL BWRY
+./scripts/pio-trmnl-switch bwry       # same family as og
+pio run -e trmnl_4clr
 ```
 
-If you skip this step, the build may fail with `Error: Missing Arduino framework directory 'None'`.
+If PlatformIO picks the wrong serial port:
+
+```bash
+pio device list
+pio run -e TRMNL_X_dev -t upload --upload-port /dev/cu.usbmodem1234
+```
+
+#### Switching between X and OG/BWRY
+
+OG and BWRY share one tool stack; **X uses another**. Those stacks install into the same `~/.platformio/packages/*` names (ESP-IDF, Arduino core, esptool, cmake). Building both families without cleanup often fails with missing Arduino/IDF paths, broken `tool-cmake@src-*` stubs, or esptool “not a Python project” errors.
+
+**Always run the switch script when changing family**, then build:
+
+```bash
+./scripts/pio-trmnl-switch x     && pio run -e TRMNL_X_dev   # or TRMNL_X
+./scripts/pio-trmnl-switch og    && pio run -e trmnl         # OG mono
+./scripts/pio-trmnl-switch bwry  && pio run -e trmnl_4clr    # BWRY (og family)
+```
+
+Minimal alternative (same family only, or after a clean PlatformIO install):
+
+```bash
+pio pkg install -e TRMNL_X_dev   # X
+pio pkg install -e trmnl         # OG
+pio pkg install -e trmnl_4clr    # BWRY
+```
+
+If you skip package install after a family switch, you may see `Error: Missing Arduino framework directory 'None'`.
+
+Full environment tables, failure checklist, and CI notes: **[docs/building-og-x.md](docs/building-og-x.md)**.
 
 
 ### **Using VSCode plugin**
