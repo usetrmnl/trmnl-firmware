@@ -137,6 +137,9 @@ void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message, 
 
 void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool bSkipClear = false);
 
+/** Decode PNG into EPD buffer; bPrevious=true targets the "old" buffer for partial updates. */
+int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious);
+
 /**
  * @brief Function to read an image from the file system
  * @param filename

@@ -1,3 +1,5 @@
+#pragma once
+
 #include <HTTPClient.h>
 #include <api_types.h>
 #include <types.h>

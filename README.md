@@ -228,6 +228,19 @@ Even when your TRMNL is disconnected (power switch in the off position), its bat
 
 See [releases](https://github.com/usetrmnl/firmware/releases). For older versions go [here](https://github.com/usetrmnl/firmware/issues/95).
 
+## **Firmware modules**
+
+Application code is being split out of the historical “god modules” (`src/bl.cpp`, `src/display.cpp`):
+
+| Module | Role |
+|--------|------|
+| `src/display_session.cpp` | `/api/display` fetch, response handling, image download orchestration |
+| `src/image_pipeline.cpp` | Stream download, SPIFFS write, path/playlist keys, previous-frame EPD load |
+| `src/bl.cpp` | Boot, Wi-Fi/captive portal, setup credentials, sleep, X gestures |
+| `src/display.cpp` | E-paper HAL and system UI drawing |
+
+See **[docs/architecture-modules.md](docs/architecture-modules.md)** for the call graph, bridge globals, and next extraction steps.
+
 ## **Compilation guide**
 
 There are technical and non-technical options to flashing firmware.

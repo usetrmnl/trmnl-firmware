@@ -4,6 +4,14 @@
 #include "trmnl_log.h"
 
 /**
+ * Business logic orchestration (wake → connect → refresh → sleep).
+ *
+ * Network display session and image I/O live in display_session /
+ * image_pipeline (see docs/architecture-modules.md). Prefer extending those
+ * modules over adding large new blocks here.
+ */
+
+/**
  * @brief Function to init business logic module
  * @param none
  * @return none
