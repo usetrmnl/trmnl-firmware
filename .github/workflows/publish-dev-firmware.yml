@@ -26,15 +26,51 @@ jobs:
         with:
           path: |
             ~/.cache/pip
-            ~/.platformio/.cache
-          key: ${{ runner.os }}-pio
+            ~/.platformio
+          # Per-env caches avoid OG (espressif32@6.12) thrashing X (pioarduino 55.x).
+          key: ${{ runner.os }}-pio-dev-${{ matrix.env }}-${{ hashFiles('platformio.ini', 'src/idf_component.yml', 'dependencies.lock.esp32s3', 'dependencies.lock.esp32c3') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-dev-${{ matrix.env }}-
+            ${{ runner.os }}-pio-dev-
 
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.x"
+          python-version: "3.12"
 
-      - name: Install PlatformIO Core
-        run: pip install --upgrade platformio esptool
+      - name: Install PlatformIO Core and host deps
+        # littlefs/fatfs/intelhex required for pioarduino (TRMNL_X) builder scripts.
+        run: |
+          pip install --upgrade \
+            "platformio==6.1.19" \
+            esptool \
+            "littlefs-python>=0.12" \
+            "fatfs-ng>=0.1" \
+            "intelhex>=2.3"
+
+      - name: Install packages (${{ matrix.env }})
+        run: pio pkg install -e ${{ matrix.env }}
+
+      - name: Materialize pioarduino tools (X envs)
+        if: matrix.env == 'TRMNL_X'
+        run: |
+          set -euo pipefail
+          PKG="${HOME}/.platformio/packages"
+          TOOLS="${HOME}/.platformio/tools"
+          for name in tool-esptoolpy tool-cmake tool-ninja tool-esp-rom-elfs; do
+            src="${TOOLS}/${name}"
+            dst="${PKG}/${name}"
+            [[ -d "$src" ]] || continue
+            if [[ ! -d "$dst" ]] \
+              || { [[ "$name" == "tool-cmake" ]] && [[ ! -x "${dst}/bin/cmake" ]]; } \
+              || { [[ "$name" == "tool-esptoolpy" ]] && [[ ! -f "${dst}/setup.py" && ! -f "${dst}/pyproject.toml" ]]; }; then
+              echo "Materializing ${name}"
+              rm -rf "$dst"
+              cp -a "$src" "$dst"
+            fi
+          done
+          find "$PKG" -maxdepth 1 -type d \( \
+            -name 'tool-esptoolpy@src-*' -o -name 'tool-cmake@src-*' -o -name 'tool-ninja@src-*' \
+          \) -exec rm -rf {} + 2>/dev/null || true
 
       - name: Build dev firmware (${{ matrix.env }})
         env:

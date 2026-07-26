@@ -1,3 +1,15 @@
+# CI for trmnl-firmware
+#
+# Two independent build families (do not mix in one job — different PlatformIO
+# platforms thrash shared packages: espressif32@6.12 / IDF 4.4 vs pioarduino
+# 55.03.37 / IDF 5.5):
+#
+#   build-og  — TRMNL OG + native tests + clang-tidy (multi-OS)
+#   build-x   — TRMNL X production path (Ubuntu, always on PR/push)
+#   build-x-extended — additional X-class envs (main/tags/manual only)
+#
+# Publish workflows wait for both OG and the required X gate.
+
 name: build
 
 on:
@@ -5,10 +17,27 @@ on:
     branches: ["main"]
     tags: ["**"]
   pull_request:
+  # Weekly full X-class board matrix (optional partner/DIY envs)
+  schedule:
+    - cron: "17 6 * * 1" # Mondays 06:17 UTC
   workflow_dispatch:
+    inputs:
+      full_x_matrix:
+        description: "Also build the extended TRMNL X board matrix"
+        type: boolean
+        default: false
+
+# Cancel superseded runs on the same PR/branch
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build-test:
+  # ---------------------------------------------------------------------------
+  # OG family: PlatformIO espressif32@6.12, Arduino-as-IDF, ESP32-C3
+  # ---------------------------------------------------------------------------
+  build-og:
+    name: OG (${{ matrix.os }})
     strategy:
       fail-fast: false
       max-parallel: 3
@@ -16,7 +45,6 @@ jobs:
         os: [ubuntu-latest, macos-15, windows-latest]
 
     runs-on: ${{ matrix.os }}
-
     timeout-minutes: 30
 
     steps:
@@ -28,19 +56,23 @@ jobs:
             ~/.cache/pip
             ~/.platformio
             ~/.buildcache
-          key: ${{ runner.os }}-pio-${{ hashFiles('platformio.ini') }}
+          # Isolated from X cache — OG and X must not share a cold restore of
+          # each other's framework-espidf / tool-esptoolpy slots.
+          key: ${{ runner.os }}-pio-og-${{ hashFiles('platformio.ini', 'dependencies.lock.esp32c3') }}
           restore-keys: |
+            ${{ runner.os }}-pio-og-
             ${{ runner.os }}-pio-
 
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1
         with:
-          key: ${{ runner.os }}-ccache-${{ hashFiles('platformio.ini') }}
-          job-summary: "" # disabled
+          key: ${{ runner.os }}-ccache-og-${{ hashFiles('platformio.ini') }}
+          job-summary: ""
 
+      # 3.12: well-tested with PlatformIO; avoids bleeding-edge 3.14 host issues.
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          python-version: "3.12"
 
       - uses: maxim-lobanov/setup-xcode@v1
         if: matrix.os == 'macos-15'
@@ -48,17 +80,15 @@ jobs:
           xcode-version: latest-stable
 
       - name: Install PlatformIO Core
-        run: pip install --upgrade platformio
+        run: pip install --upgrade "platformio==6.1.19"
 
       - name: Configure ccache for PlatformIO (Unix)
         if: runner.os != 'Windows'
-        run: |
-          echo "PLATFORMIO_BUILD_CACHE_DIR=$HOME/.buildcache" >> $GITHUB_ENV
-          
+        run: echo "PLATFORMIO_BUILD_CACHE_DIR=$HOME/.buildcache" >> "$GITHUB_ENV"
+
       - name: Configure ccache for PlatformIO (Windows)
         if: runner.os == 'Windows'
-        run: |
-          echo "PLATFORMIO_BUILD_CACHE_DIR=$env:USERPROFILE\.buildcache" >> $env:GITHUB_ENV
+        run: echo "PLATFORMIO_BUILD_CACHE_DIR=$env:USERPROFILE\.buildcache" >> $env:GITHUB_ENV
 
       - name: Display PlatformIO Information
         run: |
@@ -66,25 +96,254 @@ jobs:
           g++ --version
           gcc --version
 
-      - name: build (trmnl)
-        run: pio run -j ${{ runner.os == 'Windows' && '1' || '4' }} -v
+      - name: Install packages (trmnl)
+        run: pio pkg install -e trmnl
 
-      #- name: build (TRMNL_X)
-      #  run: pio run -e TRMNL_X -j ${{ runner.os == 'Windows' && '1' || '4' }} -v
+      - name: Build OG (trmnl)
+        run: pio run -e trmnl -j ${{ runner.os == 'Windows' && '1' || '4' }}
 
-      - name: test
+      - name: Native unit tests
         if: matrix.os != 'windows-latest'
         run: pio test -e native -v
 
-      - name: test (windows)
+      - name: Native unit tests (Windows)
         if: matrix.os == 'windows-latest'
         run: pio test -e native-windows -v
 
-      - name: static analysis
-        run: pio check --skip-packages --fail-on-defect high
+      - name: Static analysis
+        # clang-tidy path is heaviest on Windows; run where toolchains are reliable.
+        if: matrix.os == 'ubuntu-latest'
+        run: pio check -e trmnl --skip-packages --fail-on-defect high
+
+  # ---------------------------------------------------------------------------
+  # X gate: production TRMNL_X (+ dev env). Always required for PR / main / tags.
+  # Ubuntu-only: full multi-OS X matrix is cost-heavy; tools are Linux-first in CI.
+  # ---------------------------------------------------------------------------
+  build-x:
+    name: X (${{ matrix.env }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        # TRMNL_X     — shipping / publish-dev path (BOARD_TRMNL_X, release flags)
+        # TRMNL_X_dev — contributor default from README (DEV_FIRMWARE, serial, etc.)
+        env: [TRMNL_X, TRMNL_X_dev]
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio
+            ~/.buildcache
+          key: ${{ runner.os }}-pio-x55-${{ matrix.env }}-${{ hashFiles('platformio.ini', 'src/idf_component.yml', 'dependencies.lock.esp32s3') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-x55-${{ matrix.env }}-
+            ${{ runner.os }}-pio-x55-
+            ${{ runner.os }}-pio-x-
+
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: ${{ runner.os }}-ccache-x55-${{ matrix.env }}-${{ hashFiles('platformio.ini') }}
+          job-summary: ""
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install PlatformIO + host modules for pioarduino
+        # littlefs / fatfs / intelhex: required by pioarduino builder/main.py and esptool.
+        run: |
+          pip install --upgrade \
+            "platformio==6.1.19" \
+            "littlefs-python>=0.12" \
+            "fatfs-ng>=0.1" \
+            "intelhex>=2.3"
+
+      - name: Configure ccache for PlatformIO
+        run: echo "PLATFORMIO_BUILD_CACHE_DIR=$HOME/.buildcache" >> "$GITHUB_ENV"
+
+      - name: Display PlatformIO Information
+        run: pio system info
+
+      - name: Install packages (${{ matrix.env }})
+        run: pio pkg install -e ${{ matrix.env }}
+
+      # pioarduino sometimes leaves packages/tool-* as metadata stubs while the
+      # real trees live under ~/.platformio/tools/. Materialize before the build
+      # so cmake/esptool resolution cannot hit empty @src-* stubs.
+      - name: Materialize pioarduino tool packages
+        run: |
+          set -euo pipefail
+          PKG="${HOME}/.platformio/packages"
+          TOOLS="${HOME}/.platformio/tools"
+          materialize() {
+            local name="$1"
+            local src="${TOOLS}/${name}"
+            local dst="${PKG}/${name}"
+            if [[ -d "$src" ]]; then
+              if [[ ! -d "$dst" ]] \
+                || { [[ "$name" == "tool-cmake" ]] && [[ ! -x "${dst}/bin/cmake" ]]; } \
+                || { [[ "$name" == "tool-esptoolpy" ]] && [[ ! -f "${dst}/setup.py" && ! -f "${dst}/pyproject.toml" ]]; } \
+                || { [[ "$name" == "tool-ninja" ]] && [[ ! -x "${dst}/ninja" && ! -x "${dst}/bin/ninja" ]]; }; then
+                echo "Materializing ${name} from tools/ -> packages/"
+                rm -rf "$dst"
+                cp -a "$src" "$dst"
+              fi
+            fi
+          }
+          # Drop incomplete versioned stubs that break resolution
+          find "$PKG" -maxdepth 1 -type d \( \
+            -name 'tool-esptoolpy@src-*' -o \
+            -name 'tool-cmake@src-*' -o \
+            -name 'tool-ninja@src-*' \
+          \) -exec rm -rf {} + 2>/dev/null || true
+          materialize tool-esptoolpy
+          materialize tool-cmake
+          materialize tool-ninja
+          materialize tool-esp-rom-elfs
+          test -x "${PKG}/tool-cmake/bin/cmake"
+          test -f "${PKG}/tool-esptoolpy/setup.py" -o -f "${PKG}/tool-esptoolpy/pyproject.toml"
+          echo "pioarduino tools OK"
+
+      - name: Build ${{ matrix.env }}
+        run: pio run -e ${{ matrix.env }} -j 4
+
+      - name: Upload firmware artifacts
+        if: success()
+        uses: actions/upload-artifact@v7
+        with:
+          name: firmware-x-${{ matrix.env }}
+          path: |
+            .pio/build/${{ matrix.env }}/firmware.bin
+            .pio/build/${{ matrix.env }}/merged_firmware.bin
+          if-no-files-found: warn
+          retention-days: 14
+
+  # ---------------------------------------------------------------------------
+  # Extended X-class matrix: partner / DIY / gen2 boards.
+  # Not a merge gate — runs on tags, weekly schedule, or manual full_x_matrix.
+  # ---------------------------------------------------------------------------
+  build-x-extended:
+    name: X ext (${{ matrix.env }})
+    if: (github.event_name == 'workflow_dispatch' && inputs.full_x_matrix) || github.event_name == 'schedule' || startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include:
+          # Same platform zip as TRMNL_X (55.03.37) — different boards/flags
+          - { env: TRMNL_X_E1003, platform_family: "55" }
+          - { env: TRMNL_X_SENSORIAS3, platform_family: "55" }
+          - { env: TRMNL_X_SENSORIAC5, platform_family: "55" }
+          - { env: trmnl_gen2, platform_family: "55" }
+          # Older pioarduino 53.03.13 DIY / partner boards
+          - { env: TRMNL_X_EPDIY, platform_family: "53" }
+          - { env: TRMNL_X_LILYGO_T5PRO, platform_family: "53" }
+          - { env: TRMNL_X_PAPERS3, platform_family: "53" }
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio
+            ~/.buildcache
+          key: ${{ runner.os }}-pio-x${{ matrix.platform_family }}-${{ matrix.env }}-${{ hashFiles('platformio.ini', 'src/idf_component.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-x${{ matrix.platform_family }}-${{ matrix.env }}-
+            ${{ runner.os }}-pio-x${{ matrix.platform_family }}-
+
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: ${{ runner.os }}-ccache-x${{ matrix.platform_family }}-${{ matrix.env }}
+          job-summary: ""
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install PlatformIO + host modules for pioarduino
+        run: |
+          pip install --upgrade \
+            "platformio==6.1.19" \
+            "littlefs-python>=0.12" \
+            "fatfs-ng>=0.1" \
+            "intelhex>=2.3"
+
+      - name: Configure ccache for PlatformIO
+        run: echo "PLATFORMIO_BUILD_CACHE_DIR=$HOME/.buildcache" >> "$GITHUB_ENV"
+
+      - name: Install packages (${{ matrix.env }})
+        run: pio pkg install -e ${{ matrix.env }}
+
+      - name: Materialize pioarduino tool packages
+        run: |
+          set -euo pipefail
+          PKG="${HOME}/.platformio/packages"
+          TOOLS="${HOME}/.platformio/tools"
+          materialize() {
+            local name="$1"
+            local src="${TOOLS}/${name}"
+            local dst="${PKG}/${name}"
+            if [[ -d "$src" ]]; then
+              if [[ ! -d "$dst" ]] \
+                || { [[ "$name" == "tool-cmake" ]] && [[ ! -x "${dst}/bin/cmake" ]]; } \
+                || { [[ "$name" == "tool-esptoolpy" ]] && [[ ! -f "${dst}/setup.py" && ! -f "${dst}/pyproject.toml" ]]; } \
+                || { [[ "$name" == "tool-ninja" ]] && [[ ! -x "${dst}/ninja" && ! -x "${dst}/bin/ninja" ]]; }; then
+                echo "Materializing ${name}"
+                rm -rf "$dst"
+                cp -a "$src" "$dst"
+              fi
+            fi
+          }
+          find "$PKG" -maxdepth 1 -type d \( \
+            -name 'tool-esptoolpy@src-*' -o \
+            -name 'tool-cmake@src-*' -o \
+            -name 'tool-ninja@src-*' \
+          \) -exec rm -rf {} + 2>/dev/null || true
+          materialize tool-esptoolpy
+          materialize tool-cmake
+          materialize tool-ninja
+          materialize tool-esp-rom-elfs
+
+      - name: Build ${{ matrix.env }}
+        run: pio run -e ${{ matrix.env }} -j 4
+
+  # Aggregate gate so publish only needs one `needs` entry for required checks.
+  ci-success:
+    name: CI success
+    if: always()
+    needs: [build-og, build-x]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check required jobs
+        run: |
+          echo "build-og: ${{ needs.build-og.result }}"
+          echo "build-x:  ${{ needs.build-x.result }}"
+          if [[ "${{ needs.build-og.result }}" != "success" ]]; then
+            echo "OG build failed"
+            exit 1
+          fi
+          if [[ "${{ needs.build-x.result }}" != "success" ]]; then
+            echo "X build failed"
+            exit 1
+          fi
+          echo "Required CI jobs passed"
+          # Extended matrix is informative; failures do not block merge/publish.
+          # (GitHub still shows build-x-extended status on main.)
 
   publish-engineering-build:
-    needs: build-test
+    needs: [ci-success]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     uses: ./.github/workflows/publish-firmware.yml
     with:
@@ -92,7 +351,7 @@ jobs:
       filename_suffix_type: git_short_hash
 
   publish-tagged-build:
-    needs: build-test
+    needs: [ci-success]
     if: startsWith(github.ref, 'refs/tags/')
     uses: ./.github/workflows/publish-firmware.yml
     with:
@@ -100,7 +359,7 @@ jobs:
       filename_suffix_type: git_tag
 
   publish-dev-builds:
-    needs: build-test
+    needs: [ci-success]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     uses: ./.github/workflows/publish-dev-firmware.yml
     secrets: inherit
