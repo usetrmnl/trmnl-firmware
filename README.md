@@ -232,12 +232,38 @@ See [releases](https://github.com/usetrmnl/firmware/releases). For older version
 
 There are technical and non-technical options to flashing firmware.
 
-**No code required**
+### **No code required**
 
 * Flash directly from a web browser: https://trmnl.com/flash
 * Enable OTA updates from your TRMNL dashboard > Device settings (native hardware only)
 
-**For developers**
+
+### **Via CLI**
+1. To build the binary run `pio run -e TRMNL_X_dev`
+2. To upload the binary to the device `pio run -e TRMNL_X_dev -t upload`
+3. If PlatformIO uses the wrong port use this
+```bash
+pio device list # make sure JTAG device is visible
+pio run -e TRMNL_X_dev -t upload --upload-port /dev/cu.usbmodem1234
+```
+4. view serial monitor by
+```bash
+pio device monitor -e TRMNL_X_dev
+pio device monitor -e trmnl
+```
+
+When switching between TRMNL X and OG/BWRY, run `pio pkg install` once for the environment you are about to build (use the same `-e` value as `pio run`):
+
+```bash
+pio pkg install -e TRMNL_X_dev   # TRMNL X
+pio pkg install -e trmnl         # TRMNL OG
+pio pkg install -e trmnl_4clr    # TRMNL BWRY
+```
+
+If you skip this step, the build may fail with `Error: Missing Arduino framework directory 'None'`.
+
+
+### **Using VSCode plugin**
 
 1. Install VS Code: https://code.visualstudio.com
 2. Install PlatformIO: https://platformio.org/install/ide?install=vscode
@@ -376,3 +402,12 @@ Environment    Test                  Status    Duration
 -------------  --------------------  --------  ------------
 trmnl_test     integration/test_all  PASSED    00:00:56.488
 ```
+
+## Code Formatting
+
+We use `clang-format` for formatting C/C++ source files. You can install it [via Homebrew](https://formulae.brew.sh/formula/clang-format) or your package manager of choice - it's part of `llvm`.
+
+Two ways to format files:
+
+1. Run `./scripts/format.sh` to format the entire repository.
+2. VS Code users: install [the C/C++ extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cpptools) which will automatically format-on-save using clang-format.

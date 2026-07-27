@@ -438,9 +438,10 @@ std::vector<Modem::ModemNetwork> Modem::scanNetworks() {
 // ---------------------------------------------------------------------------
 // connectToNetwork() / disconnectFromNetwork()
 // ---------------------------------------------------------------------------
-bool Modem::connectToNetwork(const String& ssid, const String& password) {
+bool Modem::connectToNetwork(const String& ssid, const String& password, const String& hostname) {
   String s = escape_modem_param(ssid);
   String p = escape_modem_param(password);
+  String h = escape_modem_param(hostname);
 
   while (ModemSerial.available()) ModemSerial.read();  // flush
 
@@ -448,6 +449,11 @@ bool Modem::connectToNetwork(const String& ssid, const String& password) {
   if (waitForResponse("OK", 3000).isEmpty()) {
     Serial.println("[MODEM] connectToNetwork: AT+CWMODE=1 failed");
     return false;
+  }
+
+  if (hostname.length() > 0) {
+    sendCommand(("AT+CWHOSTNAME=\"" + h + "\"").c_str());
+    waitForResponse("OK", 3000);
   }
 
   String cmd = "AT+CWJAP=\"" + s + "\",\"" + p + "\"";

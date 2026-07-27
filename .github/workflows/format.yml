@@ -1,0 +1,22 @@
+name: format
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  clang-format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # Verifies formatting only; does not modify code. clang-format honors the
+      # repo's .clang-format and .clang-format-ignore. Run scripts/format.sh to fix.
+      - name: Check formatting
+        uses: jidicula/clang-format-action@v4.18.0
+        with:
+          clang-format-version: "22"
