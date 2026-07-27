@@ -1,8 +1,8 @@
 #ifndef BL_H
 #define BL_H
 
-#include "trmnl_log.h"
 #include "display.h"
+#include "trmnl_log.h"
 
 /**
  * @brief Function to init business logic module

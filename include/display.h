@@ -187,7 +187,8 @@ void display_draw_touchbar_progress(touchbar_side_t side, float progress);
 
 // Draws two touchbar pills in a single hardware refresh pass, so they update
 // simultaneously instead of one after another.
-void display_draw_touchbar_progress_pair(touchbar_side_t side_a, float progress_a, touchbar_side_t side_b, float progress_b);
+void display_draw_touchbar_progress_pair(touchbar_side_t side_a, float progress_a, touchbar_side_t side_b,
+                                         float progress_b);
 
 void display_set_light_sleep(uint8_t enabled);
 
