@@ -535,7 +535,6 @@ void display_draw_touchbar_indicator(touchbar_side_t side, bool filled)
     display_draw_touchbar_progress(side, filled ? 1.0f : 0.0f);
 }
 
-#ifdef BOARD_X_CLASS
 // partialUpdate() only sends hardware refresh commands where the software
 // previousBuffer/currentBuffer actually differ - it has no idea the physical
 // panel still shows a stale full-color/grayscale image underneath (e-paper

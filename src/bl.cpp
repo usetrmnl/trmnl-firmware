@@ -103,7 +103,6 @@ static https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiRespo
 static void getDeviceCredentials();                  // receiveing API key and Friendly ID
 static bool performApiSetup();     // perform API setup call and return success
 static void downloadSetupImage();                    // download and display setup image
-static void resetDeviceCredentials(void);            // reset device credentials API key, Friendly ID, Wi-Fi SSID and password
 void goToSleep(void);                         // sleep preparing
 static void goToSleepButtonOnly(void);               // sleep until button press, no timer
 static bool setClock(void);                          // clock synchronization
@@ -265,6 +264,7 @@ void bl_init(void)
 #else
   uint32_t init_time = micros();
   startup_time = init_time/1000L; // convert to milliseconds
+#endif
 #ifdef DEV_FIRMWARE
   Serial.begin(115200);
   wait_for_serial();
