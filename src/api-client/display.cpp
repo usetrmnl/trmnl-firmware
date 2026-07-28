@@ -6,6 +6,7 @@
 #include <api_response_parsing.h>
 #include <config.h>
 #include <http_client.h>
+#include <inttypes.h>
 #include <trmnl_log.h>
 extern RTC_DATA_ATTR int iPrevWakeTime; // total wake time of the last cycle (for statistics collection)
 extern RTC_DATA_ATTR bool
@@ -131,7 +132,7 @@ ApiDisplayResult fetchApiDisplay(ApiDisplayInputs &apiDisplayInputs) {
       String payload = https->getString();
       size_t size = https->getSize();
       Log_info("Content size: %d", size);
-      Log_info("Free heap size: %d", ESP.getMaxAllocHeap());
+      Log_info("Free heap size: %" PRIu32, ESP.getMaxAllocHeap());
       Log_info("Payload - %s", payload.c_str());
 
       auto apiResponse = parseResponse_apiDisplay(payload);
