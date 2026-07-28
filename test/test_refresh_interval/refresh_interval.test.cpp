@@ -1,39 +1,6 @@
+#include <memory_persistence.h>
 #include <refresh_interval.h>
-#include <string>
 #include <unity.h>
-#include <unordered_map>
-
-class MemoryPersistence : public Persistence {
-public:
-  bool recordExists(const char *key) override { return storage.count(key) > 0; }
-  String readString(const char *key, const String defaultValue) override { return defaultValue; }
-  uint32_t readUint(const char *key, const uint32_t defaultValue) override {
-    return recordExists(key) ? (uint32_t)std::stoul(storage[key]) : defaultValue;
-  }
-  size_t writeUint(const char *key, const uint32_t value) override {
-    storage[key] = std::to_string(value);
-    writeCount++;
-    return sizeof(value);
-  }
-  size_t writeString(const char *key, const char *value) override { return 0; }
-  uint8_t readUChar(const char *key, const uint8_t defaultValue) override { return defaultValue; }
-  size_t writeUChar(const char *key, const uint8_t value) override { return 0; }
-  bool readBool(const char *key, const bool defaultValue) override { return defaultValue; }
-  size_t writeBool(const char *key, const bool value) override { return 0; }
-  bool clear() override {
-    storage.clear();
-    return true;
-  }
-  bool remove(const char *key) override {
-    storage.erase(key);
-    return true;
-  }
-
-  uint32_t writeCount = 0;
-
-private:
-  std::unordered_map<std::string, std::string> storage;
-};
 
 // Devices in the field already store these keys; renaming them would orphan
 // the persisted values on upgrade.

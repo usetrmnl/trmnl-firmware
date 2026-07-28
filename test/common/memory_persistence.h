@@ -1,9 +1,16 @@
-#include <unity.h>
-// #include <stored_logs.h>
+#pragma once
+
+#ifndef PIO_UNIT_TESTING
+#error "MemoryPersistence is a test-only fake and must not be included in firmware builds"
+#endif
+
 #include <persistence_interface.h>
 #include <string>
 #include <unordered_map>
 
+// In-memory Persistence fake shared by native unit tests. test/common/ is
+// exposed to test builds as a library via `lib_extra_dirs = test` in the
+// native envs; firmware envs never see it.
 class MemoryPersistence : public Persistence {
 public:
   bool recordExists(const char *key) override;
@@ -19,6 +26,9 @@ public:
   bool remove(const char *key) override;
 
   size_t size();
+
+  // Number of write* calls made; lets tests assert that redundant writes are skipped.
+  uint32_t writeCount = 0;
 
 private:
   std::unordered_map<std::string, std::string> storage;
