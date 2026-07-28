@@ -1,7 +1,7 @@
 #pragma once
 
-#include <stdint.h>
 #include <persistence_interface.h>
+#include <stdint.h>
 
 // A flat 5s sleep on "keep polling" responses (202 / 500 / empty_state) has no
 // ceiling: a state that never resolves (abandoned setup, playlist with nothing
