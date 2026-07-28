@@ -1,0 +1,6 @@
+# Flash overrides for env:trmnl_gen2.
+# Layered on top of sdkconfig.defaults via board_build.cmake_extra_args in platformio.ini.
+
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=n
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="16MB"

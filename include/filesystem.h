@@ -87,4 +87,11 @@ bool filesystem_file_delete(const char *name);
  */
 bool filesystem_file_rename(const char *old_name, const char *new_name);
 
+/**
+ * @brief Function to extract the timestamp from a filename
+ * @param filename filename
+ * @return timestamp as uint32_t (0 if timestamp suffix is not present or invalid)
+ */
+uint32_t filesystem_extract_timestamp(const char *filename);
+
 void list_files();
