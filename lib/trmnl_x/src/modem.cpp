@@ -43,6 +43,14 @@ Modem::Modem(uint32_t baudRate) : ModemSerial(0) {
     Serial.println("[MODEM] set to station mode");
   }
 
+  sendCommand("AT+CWAUTOCONN=0");
+  if (waitForResponse("OK", 5000).isEmpty()) {
+    Serial.println("[MODEM] AT+CWAUTOCONN failed.");
+    return;
+  } else {
+    Serial.println("[MODEM] Auto-connect disabled");
+  }
+
   // Switch modem to 5 Mbps with RTS/CTS (volatile; reverts on power cycle)
   sendCommand("AT+UART_CUR=5000000,8,1,0,3");
   if (waitForResponse("OK", 5000).isEmpty()) {
