@@ -17,7 +17,11 @@ static inline void buzzer_init(void) {}
 static inline void buzzer_on(void) {}
 static inline void buzzer_off(void) {}
 static inline void buzzer_beep(unsigned long duration_ms) { (void)duration_ms; }
-static inline void buzzer_beep_pattern(int count, unsigned long on_ms, unsigned long off_ms) { (void)count; (void)on_ms; (void)off_ms; }
+static inline void buzzer_beep_pattern(int count, unsigned long on_ms, unsigned long off_ms) {
+  (void)count;
+  (void)on_ms;
+  (void)off_ms;
+}
 
 #endif // PIN_BUZZER
 
