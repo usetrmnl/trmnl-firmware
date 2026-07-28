@@ -4,6 +4,7 @@
 #include <bl.h>
 #include <wifi_network.h>
 #include <power.h>
+#include <battery.h>
 #include <device_id.h>
 #include <trmnl_log.h>
 #include <types.h>
@@ -110,7 +111,6 @@ static void resetDeviceCredentials(void);            // reset device credentials
 void goToSleep(void);                         // sleep preparing
 static void goToSleepButtonOnly(void);               // sleep until button press, no timer
 static bool setClock(void);                          // clock synchronization
-static float readBatteryVoltage(void);               // battery voltage reading
 static void submitStoredLogs(void);
 static void writeSpecialFunction(SPECIAL_FUNCTION function);
 static void writeImageToFile(const char *name, uint8_t *in_buffer, size_t size);
@@ -1216,7 +1216,7 @@ void bl_init(void)
     Log_info("No battery detected - skipping BQ27427 initialization");
   }
 #endif // BOARD_TRMNL_X
-  vBatt = readBatteryVoltage(); // Read the battery voltage BEFORE WiFi is turned on
+  vBatt = battery().readVoltage(); // Read the battery voltage BEFORE WiFi is turned on
 
   Log_info("Firmware version %s", Messages::firmware_version().c_str());
   Log_info("Arduino version %d.%d.%d", ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH);
@@ -1627,7 +1627,7 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   WiFiStatus wifi = getWiFiStatus();
   inputs.rssi = wifi.rssi;
   inputs.wifiBand = wifi.band;
-  inputs.batteryVoltage = vBatt; //readBatteryVoltage();
+  inputs.batteryVoltage = vBatt;
   inputs.firmwareVersion = String(FW_VERSION_STRING);
   inputs.firmwareCommit = String(FW_COMMIT);
   inputs.displayWidth = display_width();
@@ -3347,53 +3347,6 @@ static bool setClock()
 }
 
 /**
- * @brief Function to read the battery voltage
- * @param none
- * @return float voltage in Volts
- */
-static float readBatteryVoltage(void)
-{
-#ifdef FAKE_BATTERY_VOLTAGE
-  Log.warning("%s [%d]: FAKE_BATTERY_VOLTAGE is defined. Returning 4.2V.\r\n", __FILE__, __LINE__);
-  return 4.2f;
-#elif defined(BOARD_TRMNL_X)
-  if (lipo._initialized)
-  {
-    float voltage = lipo.voltage() / 1000.0; // Convert mV to V
-    Log.info("%s [%d]: Battery voltage reading from BQ27427: %.3f V\r\n", __FILE__, __LINE__, voltage);
-    return voltage;
-  }
-  else
-  {
-    Log.error("%s [%d]: BQ27427 not initialized. Cannot read battery voltage.\r\n", __FILE__, __LINE__);
-    return -1.0;
-  }
-#else
-  #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002) || defined(BOARD_SEEED_RETERMINAL_E1003)
-    pinMode(PIN_VBAT_SWITCH, OUTPUT);
-    digitalWrite(PIN_VBAT_SWITCH, VBAT_SWITCH_LEVEL);
-    delay(10); // Wait for the switch to stabilize
-  #endif
-    Log.info("%s [%d]: Battery voltage reading...\r\n", __FILE__, __LINE__);
-    int32_t adc;
-    int32_t sensorValue;
-
-    adc = 0;
-    analogRead(PIN_BATTERY); // This is needed to properly initialize the ADC BEFORE calling analogReadMilliVolts()
-    for (uint8_t i = 0; i < 8; i++) {
-      adc += analogReadMilliVolts(PIN_BATTERY);
-    }
-  #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_XIAO_EPAPER_DISPLAY_3CLR) || defined(BOARD_SEEED_RETERMINAL_E1003)
-    digitalWrite(PIN_VBAT_SWITCH, (VBAT_SWITCH_LEVEL == HIGH ? LOW : HIGH));
-  #endif
-    sensorValue = (adc / 8) * 2;
-    Log.info("%s [%d]: Battery sensorValue = %d\r\n", __FILE__, __LINE__, (int)sensorValue);
-    float voltage = sensorValue / 1000.0;
-    return voltage;
-#endif // FAKE_BATTERY_VOLTAGE
-}
-
-/**
  * @brief Function to submit a log string to the API
  * @param log_buffer pointer to the buffer that contains log note
  * @return bool true if successful, false if failed
@@ -3678,7 +3631,7 @@ DeviceStatusStamp getDeviceStatusStamp()
   deviceStatus.time_since_last_sleep = time_since_sleep;
   snprintf(deviceStatus.current_fw_version, sizeof(deviceStatus.current_fw_version), "%s", FW_VERSION_STRING);
   parseSpecialFunctionToStr(deviceStatus.special_function, sizeof(deviceStatus.special_function), special_function);
-  deviceStatus.battery_voltage = vBatt; //readBatteryVoltage()
+  deviceStatus.battery_voltage = vBatt;
   parseWakeupReasonToStr(deviceStatus.wakeup_reason, sizeof(deviceStatus.wakeup_reason), esp_sleep_get_wakeup_cause());
   deviceStatus.free_heap_size = ESP.getFreeHeap();
   deviceStatus.max_alloc_size = ESP.getMaxAllocHeap();
