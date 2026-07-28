@@ -73,7 +73,13 @@ ApiSetupResult fetchApiSetup(ApiSetupInputs &apiSetupInputs) {
           // This allows handling of 404 (MAC not registered) and other status codes
                       return ApiSetupResult{
                           .error = https_request_err_e::HTTPS_NO_ERR,
-                          .response = {.outcome = ApiSetupOutcome::StatusError, .status = (uint16_t)httpCode},
+                          .response =
+                            {.outcome = ApiSetupOutcome::StatusError,
+                             .status = (uint16_t)httpCode,
+                             .api_key = "",
+                             .friendly_id = "",
+                             .image_url = "",
+                             .message = ""},
                           .error_detail = ""};
                     }
                   });

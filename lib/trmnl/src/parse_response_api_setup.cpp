@@ -9,7 +9,13 @@ ApiSetupResponse parseResponse_apiSetup(String &payload) {
 
   if (error) {
     Log_error("JSON deserialization error.");
-    return {.outcome = ApiSetupOutcome::DeserializationError};
+    return {
+        .outcome = ApiSetupOutcome::DeserializationError,
+        .status = 0,
+        .api_key = "",
+        .friendly_id = "",
+        .image_url = "",
+        .message = ""};
   }
 
   ApiSetupResponse response;
