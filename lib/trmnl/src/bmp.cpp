@@ -1,4 +1,5 @@
 #include <bmp.h>
+#include <inttypes.h>
 #include <trmnl_log.h>
 
 /**
@@ -30,8 +31,9 @@ bmp_err_e parseBMPHeader(uint8_t *data, bool &reversed) {
   uint32_t dataOffset = *(uint32_t *)&data[10];
 
   // Display BMP information
-  Log_info("BMP Header Information:\r\nWidth: %d\r\nHeight: %d\r\nBits per Pixel: %d\r\nCompression Method: "
-           "%d\r\nImage Data Size: %d\r\nColor Table Entries: %d\r\nData offset: %d",
+  Log_info("BMP Header Information:\r\nWidth: %" PRIu32 "\r\nHeight: %" PRIu32
+           "\r\nBits per Pixel: %u\r\nCompression Method: "
+           "%" PRIu32 "\r\nImage Data Size: %" PRIu32 "\r\nColor Table Entries: %" PRIu32 "\r\nData offset: %" PRIu32,
            width, height, bitsPerPixel, compressionMethod, imageDataSize, colorTableEntries, dataOffset);
 
   // Check if there's a color table
@@ -42,7 +44,8 @@ bmp_err_e parseBMPHeader(uint8_t *data, bool &reversed) {
     // Display color table
     Log_info("Color table");
     for (uint32_t i = 0; i < colorTableSize; i += 4) {
-      Log_info("Color %d: B-%d, R-%d, G-%d, A-%d", i / 4 + 1, data[54 + i], data[55 + i], data[56 + i], data[57 + i]);
+      Log_info("Color %" PRIu32 ": B-%d, R-%d, G-%d, A-%d", i / 4 + 1, data[54 + i], data[55 + i], data[56 + i],
+               data[57 + i]);
     }
 
     if (data[54] == 0 && data[55] == 0 && data[56] == 0 && data[57] == 0 && data[58] == 255 && data[59] == 255 &&
