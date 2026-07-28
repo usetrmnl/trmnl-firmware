@@ -127,6 +127,18 @@ void disableWpa2Enterprise() {
   esp_wifi_sta_wpa2_ent_clear_ca_cert();
 }
 
+static void setWiFiBand(const WifiCredentials &credentials) {
+#ifdef CONFIG_SOC_WIFI_SUPPORT_5G
+  if (credentials.is5GHz) {
+    Log_info("Configuring for 5GHz only");
+    esp_wifi_set_band_mode(WIFI_BAND_MODE_5G_ONLY);
+  } else {
+    Log_info("Configuring for 2.4GHz only");
+    esp_wifi_set_band_mode(WIFI_BAND_MODE_2G_ONLY);
+  }
+#endif
+}
+
 void captureEventData(WiFiEvent_t event, WiFiEventInfo_t info, WifiEventData *eventData) {
   switch (event) {
   case ARDUINO_EVENT_WIFI_STA_GOT_IP:
@@ -303,6 +315,8 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
     applyWifiHostname(hostname);
     Log_info("WiFi: hostname set to %s", hostname.c_str());
 
+    setWiFiBand(credentials);
+
         // Full channel scan to pick the strongest AP (see issue #285)
     usedFullScan = true;
     WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
@@ -314,6 +328,9 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
   } else {
         // regular connection
     WiFi.mode(WIFI_STA);
+
+    setWiFiBand(credentials);
+
     String hostname = WifiCaptivePortal.getHostname();
     applyWifiHostname(hostname);
 
