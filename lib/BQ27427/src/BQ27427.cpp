@@ -705,8 +705,7 @@ bool BQ27427::executeControlWord(uint16_t function)
 	uint8_t subCommandMSB = (function >> 8);
 	uint8_t subCommandLSB = (function & 0x00FF);
 	uint8_t command[2] = {subCommandLSB, subCommandMSB};
-	uint8_t data[2] = {0, 0};
-	
+
 	if (i2cWriteBytes((uint8_t) 0, command, 2))
 		return true;
 	
@@ -830,7 +829,7 @@ bool BQ27427::writeExtendedData(uint8_t classID, uint8_t offset, uint8_t * data,
 	
 	blockDataOffset(offset / 32); // Write 32-bit block offset (usually 0)
 	computeBlockChecksum(); // Compute checksum going in
-	uint8_t oldCsum = blockDataChecksum();
+	blockDataChecksum(); // read old checksum (value unused)
 
 	// Write data bytes:
 	for (int i = 0; i < len; i++)
