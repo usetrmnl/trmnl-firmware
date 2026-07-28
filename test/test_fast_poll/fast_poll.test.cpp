@@ -1,4 +1,4 @@
-#include <fast_poll_backoff.h>
+#include <fast_poll.h>
 #include <string>
 #include <unity.h>
 #include <unordered_map>
@@ -32,39 +32,50 @@ private:
   std::unordered_map<std::string, std::string> storage;
 };
 
+// Seed the persisted streak so the next poll is the streak-th one, then return
+// the sleep nextSleep() picks for it.
+uint32_t sleepAtStreak(uint32_t streak) {
+  MemoryPersistence persistence;
+  FastPoll fastPoll(persistence);
+  persistence.writeUint(FastPoll::STREAK_KEY, streak - 1);
+  return fastPoll.nextSleep();
+}
+
 void test_ladder_keeps_setup_window_at_five_seconds(void) {
-  TEST_ASSERT_EQUAL_UINT32(5, fastPollSleepSeconds(1));
-  TEST_ASSERT_EQUAL_UINT32(5, fastPollSleepSeconds(FAST_POLL_SNAPPY_POLLS));
+  TEST_ASSERT_EQUAL_UINT32(5, sleepAtStreak(1));
+  TEST_ASSERT_EQUAL_UINT32(5, sleepAtStreak(50));
 }
 
 void test_ladder_backs_off_past_the_setup_window(void) {
-  TEST_ASSERT_EQUAL_UINT32(60, fastPollSleepSeconds(FAST_POLL_SNAPPY_POLLS + 1));
-  TEST_ASSERT_EQUAL_UINT32(60, fastPollSleepSeconds(60));
-  TEST_ASSERT_EQUAL_UINT32(900, fastPollSleepSeconds(61));
-  TEST_ASSERT_EQUAL_UINT32(900, fastPollSleepSeconds(70));
+  TEST_ASSERT_EQUAL_UINT32(60, sleepAtStreak(51));
+  TEST_ASSERT_EQUAL_UINT32(60, sleepAtStreak(60));
+  TEST_ASSERT_EQUAL_UINT32(900, sleepAtStreak(61));
+  TEST_ASSERT_EQUAL_UINT32(900, sleepAtStreak(70));
 }
 
 void test_ladder_caps_at_one_hour(void) {
-  TEST_ASSERT_EQUAL_UINT32(3600, fastPollSleepSeconds(71));
-  TEST_ASSERT_EQUAL_UINT32(3600, fastPollSleepSeconds(1000000));
+  TEST_ASSERT_EQUAL_UINT32(3600, sleepAtStreak(71));
+  TEST_ASSERT_EQUAL_UINT32(3600, sleepAtStreak(1000000));
 }
 
 void test_next_sleep_advances_the_persisted_streak(void) {
   MemoryPersistence persistence;
-  TEST_ASSERT_EQUAL_UINT32(5, fastPollNextSleep(persistence));
-  TEST_ASSERT_EQUAL_UINT32(1, persistence.readUint(FAST_POLL_STREAK_KEY, 0));
-  for (int i = 0; i < FAST_POLL_SNAPPY_POLLS; i++)
-    fastPollNextSleep(persistence);
-  TEST_ASSERT_EQUAL_UINT32(60, fastPollNextSleep(persistence));
+  FastPoll fastPoll(persistence);
+  TEST_ASSERT_EQUAL_UINT32(5, fastPoll.nextSleep());
+  TEST_ASSERT_EQUAL_UINT32(1, persistence.readUint(FastPoll::STREAK_KEY, 0));
+  for (int i = 0; i < 50; i++)
+    fastPoll.nextSleep();
+  TEST_ASSERT_EQUAL_UINT32(60, fastPoll.nextSleep());
 }
 
 void test_reset_returns_the_ladder_to_five_seconds(void) {
   MemoryPersistence persistence;
+  FastPoll fastPoll(persistence);
   for (int i = 0; i < 100; i++)
-    fastPollNextSleep(persistence);
-  fastPollStreakReset(persistence);
-  TEST_ASSERT_EQUAL_UINT32(0, persistence.readUint(FAST_POLL_STREAK_KEY, 0));
-  TEST_ASSERT_EQUAL_UINT32(5, fastPollNextSleep(persistence));
+    fastPoll.nextSleep();
+  fastPoll.reset();
+  TEST_ASSERT_EQUAL_UINT32(0, persistence.readUint(FastPoll::STREAK_KEY, 0));
+  TEST_ASSERT_EQUAL_UINT32(5, fastPoll.nextSleep());
 }
 
 // A device stuck on a never-resolving "keep polling" response (abandoned setup,
@@ -75,12 +86,13 @@ void test_daily_wake_budget_is_bounded(void) {
   const uint32_t day_s = 24 * 3600;
 
   uint32_t wakes_flat = 0;
-  for (uint32_t t = 0; t < day_s; t += awake_overhead_s + FAST_POLL_SLEEP_SECONDS)
+  for (uint32_t t = 0; t < day_s; t += awake_overhead_s + 5)
     wakes_flat++;
 
   MemoryPersistence persistence;
+  FastPoll fastPoll(persistence);
   uint32_t wakes_ladder = 0;
-  for (uint32_t t = 0; t < day_s; t += awake_overhead_s + fastPollNextSleep(persistence))
+  for (uint32_t t = 0; t < day_s; t += awake_overhead_s + fastPoll.nextSleep())
     wakes_ladder++;
 
   TEST_ASSERT_GREATER_THAN_UINT32(6000, wakes_flat);

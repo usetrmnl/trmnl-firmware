@@ -30,7 +30,7 @@
 #include <api-client/setup.h>
 #include <special_function.h>
 #include <ota_schedule.h>
-#include <fast_poll_backoff.h>
+#include <fast_poll.h>
 #include <firmware_update.h>
 #include <api_response_parsing.h>
 #include "logging_parcers.h"
@@ -99,6 +99,7 @@ bool touchbar_tap_mode = true;  // false = "slide", true = "tap" (default)
 Preferences preferences;
 PreferencesPersistence preferencesPersistence(preferences);
 StoredLogs storedLogs(LOG_MAX_NOTES_NUMBER / 2, LOG_MAX_NOTES_NUMBER / 2, PREFERENCES_LOG_KEY, PREFERENCES_LOG_BUFFER_HEAD_KEY, preferencesPersistence);
+FastPoll fastPoll(preferencesPersistence);
 
 static https_request_err_e downloadAndShow(); // download and show the image
 static uint32_t downloadStream(WiFiClient *stream, int content_size, uint8_t *buffer);
@@ -1573,7 +1574,7 @@ void bl_init(void)
   break;
   case HTTPS_PLUGIN_NOT_ATTACHED:
   {
-    uint32_t fast_poll_sleep = fastPollNextSleep(preferencesPersistence);
+    uint32_t fast_poll_sleep = fastPoll.nextSleep();
     if (preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, 0) != fast_poll_sleep)
     {
       Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, fast_poll_sleep);
@@ -2290,7 +2291,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
         else
         {
           Log.info("%s [%d]: End with NO empty_state\r\n", __FILE__, __LINE__);
-          fastPollStreakReset(preferencesPersistence);
+          fastPoll.reset();
           if (flag)
           {
             if (preferences.getBool(PREFERENCES_DEVICE_REGISTERED_KEY, false) != false) // check the flag to avoid the re-writing
@@ -2346,7 +2347,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
     case 202:
     {
       result = HTTPS_NO_REGISTER;
-      uint32_t fast_poll_sleep = fastPollNextSleep(preferencesPersistence);
+      uint32_t fast_poll_sleep = fastPoll.nextSleep();
       Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, fast_poll_sleep);
       size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, fast_poll_sleep);
       Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
@@ -2356,7 +2357,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
     case 500:
     {
       result = HTTPS_RESET;
-      uint32_t fast_poll_sleep = fastPollNextSleep(preferencesPersistence);
+      uint32_t fast_poll_sleep = fastPoll.nextSleep();
       Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, fast_poll_sleep);
       preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, fast_poll_sleep);
       Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
@@ -2773,7 +2774,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
     case 202:
     {
       result = HTTPS_NO_REGISTER;
-      uint32_t fast_poll_sleep = fastPollNextSleep(preferencesPersistence);
+      uint32_t fast_poll_sleep = fastPoll.nextSleep();
       Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, fast_poll_sleep);
       preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, fast_poll_sleep);
       Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
@@ -2783,7 +2784,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
     case 500:
     {
       result = HTTPS_RESET;
-      uint32_t fast_poll_sleep = fastPollNextSleep(preferencesPersistence);
+      uint32_t fast_poll_sleep = fastPoll.nextSleep();
       Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, fast_poll_sleep);
       preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, fast_poll_sleep);
       Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
