@@ -68,6 +68,17 @@
 #define EPD_BUSY_PIN 4
 #define SENSOR_SDA   21
 #define SENSOR_SCL   20
+#elif defined(BOARD_ZECTRIX)
+#define EPD_SCK_PIN          12
+#define EPD_MOSI_PIN         13
+#define EPD_CS_PIN           11
+#define EPD_RST_PIN          9
+#define EPD_DC_PIN           10
+#define EPD_BUSY_PIN         8
+#define EPD_POWER_PIN        6
+#define VBAT_HOLD_PIN        17
+#define ZECTRIX_CHARGING_PIN 2
+#define ZECTRIX_CHARGED_PIN  1
 #elif defined(BOARD_TRMNL_GEN2)
 #define EPD_SCK_PIN      6
 #define EPD_MOSI_PIN     1

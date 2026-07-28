@@ -7,6 +7,7 @@ created for the [TRMNL](https://trmnl.com) e-ink display.
 >
 > to access production-ready firmware, check out the [tagged releases](https://github.com/usetrmnl/trmnl-firmware/releases/)
  or use the [Flash Assistant](https://trmnl.com/flash).
+
 ## **Algorithm block scheme**
 
 ```mermaid
@@ -355,6 +356,10 @@ Inside the Flash Tool click the “STOP” button.
 Next turn off (toggle DOWN) and unplug the PCB. you are now ready to flash another device - see Step 1.
 
 ## **Hacking guide**
+
+### Board-specific build notes
+
+- [ZecTrix Note 4 / Note 4C](docs/zectrix.md)
 
 ### Local unit tests
 

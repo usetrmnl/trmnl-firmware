@@ -11,6 +11,8 @@ extern FASTEPD bbep;
 static TCA9535Power powerInstance(bbep, TCA9535_PG_PIN, TCA9535_STAT_PIN);
 #elif defined(INCLUDE_GPIO_POWER)
 static GPIOPower powerInstance(BQ25616_PG_PIN, BQ25616_STAT_PIN);
+#elif defined(INCLUDE_ZECTRIX_POWER)
+static ZectrixPower powerInstance(ZECTRIX_CHARGING_PIN, ZECTRIX_CHARGED_PIN);
 #else
 static BasePower powerInstance;
 #endif

@@ -46,8 +46,8 @@
 
 #define DISPLAY_BMP_IMAGE_SIZE 48062 // in bytes - 62 bytes - header; 48000 bytes - bitmap (480*800 1bpp) / 8
 #define DEFAULT_IMAGE_SIZE     48000
-#if defined(BOARD_X_CLASS)
-#define MAX_IMAGE_SIZE 750000 // Use PSRAM on the ESP32-S3 (all X-class boards have PSRAM)
+#if defined(BOARD_X_CLASS) || defined(BOARD_ZECTRIX)
+#define MAX_IMAGE_SIZE 750000 // Use PSRAM on supported ESP32-S3 boards
 #else
 #define MAX_IMAGE_SIZE 90000 // largest compressed image we can receive
 #endif
@@ -64,6 +64,12 @@
 #if defined(BOARD_TRMNL) || defined(BOARD_TRMNL_4CLR)
 #define PIN_INTERRUPT 2
 #define DEVICE_MODEL  "og"
+#elif defined(BOARD_ZECTRIX_NOTE4)
+#define PIN_INTERRUPT 0
+#define DEVICE_MODEL  "zectrix_note4"
+#elif defined(BOARD_ZECTRIX_NOTE4C)
+#define PIN_INTERRUPT 0
+#define DEVICE_MODEL  "zectrix_note4c"
 #elif defined(BOARD_TRMNL_GEN2)
 #define PIN_INTERRUPT 3
 #define DEVICE_MODEL  "og_gen2"
@@ -161,6 +167,8 @@
 // DHCP hostname prefix (hyphens instead of spaces).
 #if defined(BOARD_X_CLASS)
 #define WIFI_CLIENT_HOSTNAME_PREFIX "TRMNL-X"
+#elif defined(BOARD_ZECTRIX)
+#define WIFI_CLIENT_HOSTNAME_PREFIX "TRMNL-ZECTRIX"
 #elif defined(BOARD_TRMNL) || defined(BOARD_TRMNL_GEN2)
 #define WIFI_CLIENT_HOSTNAME_PREFIX "TRMNL-OG"
 #elif defined(BOARD_TRMNL_4CLR)
@@ -172,6 +180,8 @@
 #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001) ||                                     \
   defined(BOARD_SEEED_RETERMINAL_E1002) || defined(BOARD_SEEED_RETERMINAL_E1003)
 #define PIN_BATTERY 1
+#elif defined(BOARD_ZECTRIX)
+#define PIN_BATTERY 4
 #elif defined(BOARD_XTEINK_X4)
 #define PIN_BATTERY 0
 #else

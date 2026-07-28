@@ -21,6 +21,10 @@ FirmwareUpdateService::FirmwareUpdateService(Persistence &persistence, Clock &cl
       _firmwareUrl{0} {}
 
 bool FirmwareUpdateService::isUpdateDue(bool update_firmware, const String &firmware_url) {
+#ifdef DISABLE_OTA
+  Log_info("%s [%d]: OTA is disabled for this build\r\n", __FILE__, __LINE__);
+  return false;
+#endif
   Log_info("%s [%d]: update_firmware: %d\r\n", __FILE__, __LINE__, update_firmware);
   if (!update_firmware) return false;
 

@@ -10,6 +10,8 @@
 #define INCLUDE_TCA9535_POWER
 #elif defined(BOARD_TRMNL_GEN2)
 #define INCLUDE_GPIO_POWER
+#elif defined(BOARD_ZECTRIX)
+#define INCLUDE_ZECTRIX_POWER
 #endif
 
 /// @brief USB/charger status source. The base class reports UNKNOWN, for
@@ -38,6 +40,21 @@ private:
   uint8_t _pgPin;
   uint8_t _statPin;
 };
+
+#ifdef INCLUDE_ZECTRIX_POWER
+/// @brief Reads the ZecTrix charger's active-low charging signal and
+///        active-high charge-complete signal on dedicated GPIOs.
+class ZectrixPower : public BasePower {
+public:
+  ZectrixPower(uint8_t chargingPin, uint8_t chargedPin);
+  UsbStatus usbStatus() override;
+  ChargingStatus chargingStatus() override;
+
+private:
+  uint8_t _chargingPin;
+  uint8_t _chargedPin;
+};
+#endif // INCLUDE_ZECTRIX_POWER
 
 #ifdef INCLUDE_TCA9535_POWER
 class FASTEPD;
