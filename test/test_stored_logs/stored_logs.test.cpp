@@ -1,10 +1,9 @@
 #include "stored_logs.h"
 
+#include <memory_persistence.h>
 #include <string>
 #include <unity.h>
 #include <unordered_map>
-
-#include "memory_persistence.h"
 
 void test_stores_several_strings() {
   MemoryPersistence persistence;

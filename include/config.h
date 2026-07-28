@@ -24,7 +24,6 @@
 #define PREFERENCES_FRIENDLY_ID              "friendly_id"
 #define PREFERENCES_FRIENDLY_ID_DEFAULT      ""
 #define PREFERENCES_HOSTNAME                 "hostname"
-#define PREFERENCES_SLEEP_TIME_KEY           "refresh_rate"
 #define PREFERENCES_TEMP_PROFILE             "temp_profile"
 #define PREFERENCES_LOG_KEY                  "log_"
 #define PREFERENCES_LOG_BUFFER_HEAD_KEY      "log_head"
@@ -52,32 +51,15 @@
 #else
 #define MAX_IMAGE_SIZE 90000 // largest compressed image we can receive
 #endif
-#define SLEEP_uS_TO_S_FACTOR                 1000000           /* Conversion factor for micro seconds to seconds */
-#define SLEEP_TIME_TO_SLEEP                  900                /* Time ESP32 will go to sleep (in seconds) */
-#define SLEEP_TIME_WHILE_NOT_CONNECTED       5       /* Time ESP32 will go to sleep (in seconds) */
-#define SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED 5 /* Time ESP32 will go to sleep (in seconds) */
+#define SLEEP_uS_TO_S_FACTOR 1000000           /* Conversion factor for micro seconds to seconds */
 
 // Different display profiles
-#define TEMP_PROFILE_DEFAULT                 0
-#define TEMP_PROFILE_A                       1
-#define TEMP_PROFILE_B                       2
-#define TEMP_PROFILE_C                       3
+#define TEMP_PROFILE_DEFAULT 0
+#define TEMP_PROFILE_A       1
+#define TEMP_PROFILE_B       2
+#define TEMP_PROFILE_C       3
 
-#define MS_TO_S_FACTOR                       1000 /* Conversion factor for milliseconds to seconds */
-
-enum API_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the API (in seconds)
-{
-  API_FIRST_RETRY = 15,
-  API_SECOND_RETRY = 30,
-  API_THIRD_RETRY = 60
-};
-
-enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi-Fi (in seconds)
-{
-  WIFI_FIRST_RETRY = 60,
-  WIFI_SECOND_RETRY = 180,
-  WIFI_THIRD_RETRY = 300
-};
+#define MS_TO_S_FACTOR       1000 /* Conversion factor for milliseconds to seconds */
 
 #if defined(BOARD_TRMNL) || defined(BOARD_TRMNL_4CLR)
 #define PIN_INTERRUPT 2
@@ -193,12 +175,15 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 
 // #define FAKE_BATTERY_VOLTAGE // Uncomment to report 4.2V instead of reading ADC
 
-#define BUTTON_HOLD_TIME           5000
-#define BUTTON_MEDIUM_HOLD_TIME    1000
-#define BUTTON_SOFT_RESET_TIME     15000
-#define BUTTON_DOUBLE_CLICK_WINDOW 800
+#define BUTTON_HOLD_TIME                   5000
+#define BUTTON_MEDIUM_HOLD_TIME            1000
+#define BUTTON_SOFT_RESET_TIME             15000
+#define BUTTON_DOUBLE_CLICK_WINDOW         800
 
-#define SERVER_MAX_RETRIES         3
-#define API_BASE_URL               "https://trmnl.app"
+#define SERVER_MAX_RETRIES                 3
+#define API_BASE_URL                       "https://trmnl.app"
+
+// Abort an image download when the stream goes this long with no data.
+#define IMAGE_STREAM_INACTIVITY_TIMEOUT_MS 15000
 
 #endif

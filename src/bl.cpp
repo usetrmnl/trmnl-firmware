@@ -29,6 +29,7 @@
 #include "api-client/submit_log.h"
 #include <api-client/setup.h>
 #include <special_function.h>
+#include <refresh_interval.h>
 #include <firmware_update.h>
 #include <api_response_parsing.h>
 #include "logging_parcers.h"
@@ -97,6 +98,7 @@ bool touchbar_tap_mode = true;  // false = "slide", true = "tap" (default)
 Preferences preferences;
 PreferencesPersistence preferencesPersistence(preferences);
 StoredLogs storedLogs(LOG_MAX_NOTES_NUMBER / 2, LOG_MAX_NOTES_NUMBER / 2, PREFERENCES_LOG_KEY, PREFERENCES_LOG_BUFFER_HEAD_KEY, preferencesPersistence);
+RefreshInterval refreshInterval(preferencesPersistence);
 
 static https_request_err_e downloadAndShow(); // download and show the image
 static uint32_t downloadStream(WiFiClient *stream, int content_size, uint8_t *buffer);
@@ -1439,32 +1441,19 @@ void bl_init(void)
     switch (retries)
     {
     case 1:
-      Log.info("%s [%d]: retry: %d - time to sleep: %d\r\n", __FILE__, __LINE__, retries, API_CONNECT_RETRY_TIME::API_FIRST_RETRY);
-      res = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, API_CONNECT_RETRY_TIME::API_FIRST_RETRY);
-      preferences.putInt(PREFERENCES_CONNECT_API_RETRY_COUNT, ++retries);
-      display_sleep();
-      goToSleep();
-      break;
-
     case 2:
-      Log.info("%s [%d]: retry:%d - time to sleep: %d\r\n", __FILE__, __LINE__, retries, API_CONNECT_RETRY_TIME::API_SECOND_RETRY);
-      res = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, API_CONNECT_RETRY_TIME::API_SECOND_RETRY);
-      preferences.putInt(PREFERENCES_CONNECT_API_RETRY_COUNT, ++retries);
-      display_sleep();
-      goToSleep();
-      break;
-
     case 3:
-      Log.info("%s [%d]: retry:%d - time to sleep: %d\r\n", __FILE__, __LINE__, retries, API_CONNECT_RETRY_TIME::API_THIRD_RETRY);
-      res = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, API_CONNECT_RETRY_TIME::API_THIRD_RETRY);
+    {
+      uint32_t retry_sleep = refreshInterval.applyApiRetry(retries);
+      Log.info("%s [%d]: retry: %d - time to sleep: %d\r\n", __FILE__, __LINE__, retries, retry_sleep);
       preferences.putInt(PREFERENCES_CONNECT_API_RETRY_COUNT, ++retries);
       display_sleep();
       goToSleep();
       break;
+    }
 
     default:
-      Log.info("%s [%d]: Max retries done. Time to sleep: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_TO_SLEEP);
-      preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
+      Log.info("%s [%d]: Max retries done. Time to sleep: %d\r\n", __FILE__, __LINE__, refreshInterval.applyApiRetry(retries));
       preferences.putInt(PREFERENCES_CONNECT_API_RETRY_COUNT, ++retries);
       break;
     }
@@ -1571,12 +1560,7 @@ void bl_init(void)
   break;
   case HTTPS_PLUGIN_NOT_ATTACHED:
   {
-    if (preferences.getInt(PREFERENCES_SLEEP_TIME_KEY, 0) != SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED)
-    {
-      Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED);
-      preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED);
-      Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED);
-    }
+    refreshInterval.applyFastPoll();
   }
   break;
   default:
@@ -1636,17 +1620,8 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
     Log.info("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_FRIENDLY_ID);
   }
 
-  inputs.refreshRate = SLEEP_TIME_TO_SLEEP;
-
-  if (preferences.isKey(PREFERENCES_SLEEP_TIME_KEY))
-  {
-    inputs.refreshRate = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
-    Log.info("%s [%d]: %s key exists. Value - %d\r\n", __FILE__, __LINE__, PREFERENCES_SLEEP_TIME_KEY, inputs.refreshRate);
-  }
-  else
-  {
-    Log.info("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_SLEEP_TIME_KEY);
-  }
+  inputs.refreshRate = refreshInterval.seconds();
+  Log.info("%s [%d]: refresh rate: %d\r\n", __FILE__, __LINE__, inputs.refreshRate);
 
   inputs.macAddress = device_mac_address();
   WiFiStatus wifi = getWiFiStatus();
@@ -1978,7 +1953,7 @@ static https_request_err_e downloadAndShow()
               buffer = (uint8_t *)malloc(counter);
               if (buffer) {
                 buffer_malloc = true;
-                while (iCount < counter && millis() < (lStartTime + API_FIRST_RETRY*1000)) {
+                while (iCount < counter && millis() < (lStartTime + IMAGE_STREAM_INACTIVITY_TIMEOUT_MS)) {
                   if (stream->available()) {
                     buffer[iCount++] = stream->read();
                     lStartTime = millis(); // reset start time
@@ -1988,7 +1963,7 @@ static https_request_err_e downloadAndShow()
                 }
               } // if buffer
               stream->stop(); // Important! If you don't do this, WiFi will have a memory exception later
-              if (millis() > (lStartTime + API_FIRST_RETRY*1000)) { // we timed out
+              if (millis() > (lStartTime + IMAGE_STREAM_INACTIVITY_TIMEOUT_MS)) { // we timed out
                   Log_error_submit("Receiving failed; download timed out. Image size = %" PRIu32, counter);
                   return HTTPS_TIMED_OUT;
               }
@@ -2287,6 +2262,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
         else
         {
           Log.info("%s [%d]: End with NO empty_state\r\n", __FILE__, __LINE__);
+          refreshInterval.resetFastPollStreak();
           if (flag)
           {
             if (preferences.getBool(PREFERENCES_DEVICE_REGISTERED_KEY, false) != false) // check the flag to avoid the re-writing
@@ -2319,11 +2295,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
         }
       }
       Log.info("%s [%d]: refresh_rate: %d\r\n", __FILE__, __LINE__, rate);
-      if (rate != preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP))
-      {
-        Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, rate);
-        preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, rate);
-      }
+      refreshInterval.applyServerRate(rate);
 
       if (reset_firmware)
       {
@@ -2342,18 +2314,14 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
     case 202:
     {
       result = HTTPS_NO_REGISTER;
-      Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
-      size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
-      Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
+      refreshInterval.applyFastPoll();
       status = false;
     }
     break;
     case 500:
     {
       result = HTTPS_RESET;
-      Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
-      preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
-      Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
+      refreshInterval.applyFastPoll();
       status = false;
     }
     break;
@@ -2442,12 +2410,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
         {
           uint64_t rate = apiResponse.refresh_rate;
           Log.info("%s [%d]: refresh_rate: %d\r\n", __FILE__, __LINE__, rate);
-          if (rate != preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP))
-          {
-            Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, rate);
-            preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, rate);
-            Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
-          }
+          refreshInterval.applyServerRate(rate);
           status = false;
           result = HTTPS_SUCCESS;
           Log.info("%s [%d]: sleep success\r\n", __FILE__, __LINE__);
@@ -2751,7 +2714,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
               status = true;
             }
           }
-          preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, rate);
+          refreshInterval.applyServerRate(rate);
         }
         else
         {
@@ -2767,18 +2730,14 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
     case 202:
     {
       result = HTTPS_NO_REGISTER;
-      Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
-      preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
-      Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
+      refreshInterval.applyFastPoll();
       status = false;
     }
     break;
     case 500:
     {
       result = HTTPS_RESET;
-      Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
-      preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
-      Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
+      refreshInterval.applyFastPoll();
       status = false;
     }
     break;
@@ -2902,7 +2861,7 @@ static bool performApiSetup()
 
     showMessageWithLogo(MAC_NOT_REGISTERED, apiResponse);
 
-    preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
+    refreshInterval.applyDefault();
 
     display_sleep();
     goToSleep();
@@ -3180,10 +3139,7 @@ void goToSleep(void)
 #endif
 
   filesystem_deinit();
-  uint32_t time_to_sleep = SLEEP_TIME_TO_SLEEP;
-
-  if (preferences.isKey(PREFERENCES_SLEEP_TIME_KEY))
-    time_to_sleep = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
+  uint32_t time_to_sleep = refreshInterval.seconds();
   iPrevWakeTime = millis() - startup_time; // save for statistics
   Log.info("%s [%d]: total awake time - %d ms\r\n", __FILE__, __LINE__, iPrevWakeTime); 
   Log.info("%s [%d]: time to sleep - %d\r\n", __FILE__, __LINE__, time_to_sleep);
@@ -3693,15 +3649,9 @@ static void wifiErrorDeepSleep()
   switch (retry_count)
   {
   case 1:
-    preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, WIFI_CONNECT_RETRY_TIME::WIFI_FIRST_RETRY);
-    break;
-
   case 2:
-    preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, WIFI_CONNECT_RETRY_TIME::WIFI_SECOND_RETRY);
-    break;
-
   case 3:
-    preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, WIFI_CONNECT_RETRY_TIME::WIFI_THIRD_RETRY);
+    refreshInterval.applyWifiRetry(retry_count);
     break;
 
   default:
@@ -3724,7 +3674,7 @@ DeviceStatusStamp getDeviceStatusStamp()
 
   deviceStatus.wifi_rssi_level = WiFi.RSSI();
   strncpy(deviceStatus.wifi_status, wifiStatusStr(WiFi.status()), sizeof(deviceStatus.wifi_status) - 1);
-  deviceStatus.refresh_rate = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY);
+  deviceStatus.refresh_rate = refreshInterval.seconds(0);
   deviceStatus.time_since_last_sleep = time_since_sleep;
   snprintf(deviceStatus.current_fw_version, sizeof(deviceStatus.current_fw_version), "%s", FW_VERSION_STRING);
   parseSpecialFunctionToStr(deviceStatus.special_function, sizeof(deviceStatus.special_function), special_function);

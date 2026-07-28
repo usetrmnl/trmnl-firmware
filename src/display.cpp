@@ -5,6 +5,7 @@
 #include <JPEGDEC.h>
 #include <Preferences.h>
 #include <preferences_persistence.h>
+#include <refresh_interval.h>
 #include "DEV_Config.h"
 #ifdef BOARD_SEEED_RETERMINAL_E1002
 #include "displays/spectra6.h"
@@ -108,6 +109,7 @@ RTC_DATA_ATTR bool bCanDoPartial = false;
 #include "Roboto_Black_24.h"
 extern char filename[];
 extern Preferences preferences;
+extern RefreshInterval refreshInterval;
 extern ApiDisplayResult apiDisplayResult;
 uint32_t iTempProfile;
 static uint8_t *pDither;
@@ -1800,7 +1802,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
         Log_info("%s [%d]: Forcing full refresh; desired refresh mode was: %d\r\n", __FILE__, __LINE__, iRefreshMode);
         iRefreshMode = REFRESH_FULL; // force full refresh every 8 partials
     }
-    int refresh_seconds = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
+    int refresh_seconds = refreshInterval.seconds();
     if (refresh_seconds >= 30*60 && iRefreshMode == REFRESH_PARTIAL) {
         // For users who set updates 30 minutes or longer, use the "fast" update to prevent ghosting
         Log_info("%s [%d]: Forcing fast refresh (not partial) since the TRMNL refresh_rate is set to > 30 min\n", __FILE__, __LINE__);
