@@ -51,7 +51,7 @@ static ApiDisplayInputs make_display_inputs(float battery_voltage) {
   inputs.apiKey = s_api_key;
   inputs.friendlyId = s_friendly_id;
   inputs.updateSource = "timer";            // matches wake-from-RTC case
-  inputs.refreshRate = SLEEP_TIME_TO_SLEEP; // 900s — production default
+  inputs.refreshRate = RefreshInterval::DEFAULT_SECONDS; // 900s — production default
   inputs.macAddress = TEST_MAC_ADDRESS;
   inputs.batteryVoltage = battery_voltage;
   inputs.firmwareVersion = FW_VERSION_STRING;
