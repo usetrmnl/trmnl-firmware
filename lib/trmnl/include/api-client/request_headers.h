@@ -1,9 +1,9 @@
 #pragma once
 
 #include <Arduino.h>
-#include <vector>
-#include <utility>
 #include <api_types.h>
+#include <utility>
+#include <vector>
 
 // A single HTTP request header as a (name, value) pair.
 using HttpHeader = std::pair<String, String>;

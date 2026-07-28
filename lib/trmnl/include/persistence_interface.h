@@ -4,8 +4,7 @@
 #include <stdint.h>
 
 /** interface */
-class Persistence
-{
+class Persistence {
 public:
   virtual bool recordExists(const char *key) = 0;
 

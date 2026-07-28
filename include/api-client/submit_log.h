@@ -1,8 +1,7 @@
 
 #include <WString.h>
 
-struct LogApiInput
-{
+struct LogApiInput {
   String api_key;
   const char *log_buffer;
 };
