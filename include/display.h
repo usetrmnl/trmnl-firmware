@@ -6,8 +6,7 @@
 #include "DEV_Config.h"
 #endif
 
-enum MSG
-{
+enum MSG {
   NONE,
   FRIENDLY_ID,
   OTG_TURNED_ON,
@@ -43,15 +42,14 @@ enum MSG
   CAPTIVE_WIFI_TIMEOUT,
 };
 
-typedef struct dp_tag
-{
+typedef struct dp_tag {
   uint32_t OneBit, TwoBit; // profiles for 1 and 2-bit modes
 } DISPLAY_PROFILE;
 
 typedef struct theBrand {
-char name[16];
-char api_url[128];
-uint8_t u8Images[3952];
+  char name[16];
+  char api_url[128];
+  uint8_t u8Images[3952];
 } BRAND;
 
 /**
@@ -65,16 +63,14 @@ uint8_t tca9535_interrupt_clear();
 void config_bma530_interrupt();
 void config_tca95535_pins_for_lp();
 void enter_shipment_sleep();
-bool check_usb_power();
-bool is_charging();
 void BQ27427_reset();
 void otg_turn_on();
 void otg_turn_off();
 
 typedef enum {
-    BATTERY_NONE = 0, // no battery — pin stayed HIGH (timeout >6000 µs)
-    BATTERY_ONE  = 1, // one 6K cell — discharge > 1100 µs
-    BATTERY_TWO  = 2, // two 6K cells — discharge ≤ 1100 µs
+  BATTERY_NONE = 0, // no battery — pin stayed HIGH (timeout >6000 µs)
+  BATTERY_ONE = 1,  // one 6K cell — discharge > 1100 µs
+  BATTERY_TWO = 2,  // two 6K cells — discharge ≤ 1100 µs
 } battery_count_t;
 
 battery_count_t detect_battery_count();
@@ -97,6 +93,12 @@ void display_show_battery(float f);
  * @return none
  */
 void display_reset(void);
+
+typedef enum {
+  TOUCHBAR_LEFT,
+  TOUCHBAR_MIDDLE,
+  TOUCHBAR_RIGHT,
+} touchbar_side_t;
 
 /**
  * @brief Function to read the display height
@@ -123,10 +125,8 @@ uint16_t display_width();
  * @param is_center_aligned If true, center the text; if false, left-align
  * @return none
  */
-void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message,
-                             uint16_t max_width, uint16_t font_width,
-                             UWORD color_fg, UWORD color_bg, void *font,
-                             bool is_center_aligned);
+void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message, uint16_t max_width, uint16_t font_width,
+                             UWORD color_fg, UWORD color_bg, const void *font, bool is_center_aligned);
 
 /**
  * @brief Function to show the image on the display
@@ -135,7 +135,7 @@ void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message,
  * @return none
  */
 
-void display_show_image(uint8_t *image_buffer, int data_size, bool bWait);
+void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool bSkipClear = false);
 
 /**
  * @brief Function to read an image from the file system
@@ -143,7 +143,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait);
  * @param pointer to file size returned
  * @return pointer to allocated buffer
  */
-uint8_t * display_read_file(const char *filename, int *file_size);
+uint8_t *display_read_file(const char *filename, int *file_size);
 
 /**
  * @brief Function to show the image with message on the display
@@ -163,7 +163,8 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
  * @param message additional message
  * @return none
  */
-void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_id, bool id, const char *fw_version, String message);
+void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_id, bool id, const char *fw_version,
+                      String message);
 
 /**
  * @brief Function to show the image with API response message on the display
@@ -180,6 +181,8 @@ void display_show_msg_qa(uint8_t *image_buffer, const float *voltage, const floa
  * @param enabled true to enable light sleep, false to disable
  * @return none
  */
+void display_draw_touchbar_indicator(touchbar_side_t side, bool filled);
+
 void display_set_light_sleep(uint8_t enabled);
 
 /**

@@ -12,7 +12,7 @@ dependencies:
   esp-serial-flasher:
     dependencies: []
     source:
-      path: C:\Work\trmnl\firmware\components\esp-serial-flasher
+      path: components/esp-serial-flasher
       type: local
     version: 1.11.0
   espressif/cbor:
@@ -42,7 +42,7 @@ dependencies:
       require: private
       version: '>=5.0'
     source:
-      registry_url: https://components.espressif.com
+      registry_url: https://components.espressif.com/
       type: service
     version: 0.4.0
   espressif/esp-dsp:
@@ -394,6 +394,7 @@ dependencies:
 direct_dependencies:
 - chmorgan/esp-libhelix-mp3
 - espressif/cbor
+- espressif/dl_fft
 - espressif/esp-dsp
 - espressif/esp-modbus
 - espressif/esp-sr
@@ -414,6 +415,6 @@ direct_dependencies:
 - espressif/usb_host_cp210x_vcp
 - idf
 - joltwallet/littlefs
-manifest_hash: 0f7cfff62ca57d0d29f698457da843026e779e4ff6b25c17513af0ad6a745950
+manifest_hash: 4547f754dacaa852dfde4d11869ba301405f180f2902c988379fe33c26f66f1d
 target: esp32s3
-version: 2.0.0
+version: 3.0.0

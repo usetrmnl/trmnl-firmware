@@ -1,9 +1,9 @@
 #pragma once
 
 #include <Arduino.h>
-#include <vector>
-#include <utility>
 #include <api_types.h>
+#include <utility>
+#include <vector>
 
 // A single HTTP request header as a (name, value) pair.
 using HttpHeader = std::pair<String, String>;
@@ -18,6 +18,10 @@ using HttpHeaderList = std::vector<HttpHeader>;
 HttpHeaderList buildDisplayHeaders(const ApiDisplayInputs &inputs);
 HttpHeaderList buildSetupHeaders(const ApiSetupInputs &inputs);
 HttpHeaderList buildLogHeaders(const ApiLogInputs &inputs);
+
+// Auth headers for fetching the image, sent only when the image is hosted on
+// the same server as the API (see callers in bl.cpp).
+HttpHeaderList buildImageHeaders(const ApiDisplayInputs &inputs);
 
 // Format a header list as a newline-separated "Name: value" string with no
 // trailing newline, as expected by Modem::httpGet() (TRMNL X 5 GHz path).
