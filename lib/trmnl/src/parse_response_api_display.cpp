@@ -11,7 +11,22 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
 
   if (error) {
     Log_error("JSON deserialization error.");
-    return ApiDisplayResponse{.outcome = ApiDisplayOutcome::DeserializationError, .error_detail = error.c_str()};
+    return ApiDisplayResponse{
+        .outcome = ApiDisplayOutcome::DeserializationError,
+        .error_detail = error.c_str(),
+        .status = 0,
+        .image_url = "",
+        .image_url_timeout = 0,
+        .filename = "",
+        .update_firmware = false,
+        .maximum_compatibility = false,
+        .firmware_url = "",
+        .refresh_rate = 0,
+        .temp_profile = 0,
+        .reset_firmware = false,
+        .special_function = SF_NONE,
+        .action = "",
+        .touchbar_mode = ""};
   }
   String special_function_str = doc["special_function"];
   // Convert the temperature profile ("default", "a", "b", "c")
