@@ -1616,7 +1616,7 @@ PNG *png = new PNG();
                     bbep.setMode(BB_MODE_1BPP);
                 break;
                 case 2:
-                    // 2-bit PNGs are expanded to 4bpp in png_draw() for grayscale refresh
+                    // 2-bit PNGs are expanded to 4bpp in png_draw() so refresh uses u8_graytable
                     bbep.setMode(BB_MODE_4BPP);
                 break;
                 default:
