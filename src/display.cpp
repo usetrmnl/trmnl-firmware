@@ -67,9 +67,31 @@ uint8_t u8SpectraPal[512]; // RGB333 mapped to closest Spectra6 color
 #include "driver/rtc_io.h"
 #include "LittleFS.h"
 #define FS LittleFS
+// Image size comparison for determining photos vs 'chart graphics'
+#define FASTEPD_LARGE_IMAGE_THRESHOLD (100 * 1024)
 #include "FastEPD.h"
 FASTEPD bbep;
+// 9-step table for fast grays
 const uint8_t u8_graytable[] = {
+/* 0 */  0, 0, 0, 0, 0, 0, 1, 1, 1, 
+/* 1 */  0, 0, 1, 1, 1, 2, 2, 1, 1, 
+/* 2 */  0, 0, 0, 0, 1, 2, 2, 1, 1,
+/* 3 */  1, 1, 2, 2, 1, 1, 1, 1, 2, 
+/* 4 */  0, 0, 0, 1, 2, 1, 1, 1, 2, 
+/* 5 */  1, 2, 2, 2, 2, 1, 1, 1, 2, 
+/* 6 */  0, 0, 1, 1, 2, 2, 1, 1, 2, 
+/* 7 */  0, 1, 1, 2, 1, 1, 2, 1, 2, 
+/* 8 */  0, 1, 1, 1, 2, 1, 2, 1, 2, 
+/* 9 */  0, 1, 1, 1, 1, 2, 2, 1, 2, 
+/* 10 */  1, 1, 1, 2, 1, 1, 1, 2, 2, 
+/* 11 */  0, 0, 1, 2, 1, 1, 1, 2, 2, 
+/* 12 */  0, 0, 0, 1, 2, 1, 1, 2, 2, 
+/* 13 */  0, 0, 0, 0, 1, 2, 1, 2, 2, 
+/* 14 */  0, 1, 1, 1, 2, 2, 2, 2, 2, 
+/* 15 */  0, 0, 0, 0, 0, 0, 0, 0, 2
+};
+// 38-step table for better photo rendering
+const uint8_t u8_graytable_big[] = {
 /*  0 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0,
 /*  1 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0,
 /*  2 */ 0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 0,
@@ -1835,8 +1857,18 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
     }
 #else
  {
-    int rc = bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
-    Log_info("%s [%d]: setCustomMatrix returned %d\r\n", __FILE__, __LINE__, rc);
+#ifdef BOARD_TRMNL_X
+    if (data_size > FASTEPD_LARGE_IMAGE_THRESHOLD) {
+      int rc = bbep.setCustomMatrix(u8_graytable_big, sizeof(u8_graytable_big));
+      Log_info("using 38-pass gray table (data_size=%d)", data_size);
+      Log_info("%s [%d]: setCustomMatrix returned %d\r\n", __FILE__, __LINE__, rc);
+    } else 
+#endif
+    {
+        int rc = bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
+        Log_info("using 9-pass gray table (data_size=%d)", data_size);
+        Log_info("%s [%d]: setCustomMatrix returned %d\r\n", __FILE__, __LINE__, rc);
+    }
 
  //   if (bbep.getPreviousMode() != BB_MODE_NONE && (bbep.getMode() == BB_MODE_1BPP || bbep.getMode() == BB_MODE_2BPP)) {
  //       Log_info("%s [%d]: Using partial update since we have a copy of the previous image\n", __FILE__, __LINE__);
