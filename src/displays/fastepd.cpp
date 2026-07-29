@@ -31,10 +31,6 @@ static const uint8_t u8_graytable_large[] = {
 /* 14 */ 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0,
 /* 15 */ 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0
 };
-static const uint16_t u8_phase_timing_large[] = {
-  50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 100, 180, 260, 340, 420, 500,
-  580, 660, 740, 820, 1000, 1500, 2000, 2500, 3000, 1500, 500
-};
 #endif
 static const uint8_t u8_graytable[] = {
 /* 0 */  0, 0, 0, 0, 0, 0, 1, 1, 1,
@@ -85,7 +81,6 @@ namespace fastepd {
     if (data_size > FASTEPD_LARGE_IMAGE_THRESHOLD) {
       rc = bbep.setCustomMatrix(u8_graytable_large, sizeof(u8_graytable_large));
       Log_info("using 38-pass graytable_large (data_size=%d)", data_size);
-      bbep.setPhaseTiming(u8_phase_timing_large);
     } else
 #endif
     {
