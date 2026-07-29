@@ -56,6 +56,7 @@ typedef struct tag_trmnl_device
 // These sets are what define the temperature profile - 3 per size (default, A, B)
 enum {
   EPD_75 = 0,
+  EPD_583,
   EPD_426,
   EPD_397,
   EPD_75_3CLR,
@@ -63,6 +64,7 @@ enum {
   EPD_75_6CLR,
   EPD_CROWPANEL,
   EPD_PAPER_MONO,
+  EPD_PAPER_COLOR,
 };
 
 /**

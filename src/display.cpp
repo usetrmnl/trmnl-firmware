@@ -18,6 +18,9 @@
 #define BB_EPAPER
 #include <bb_epaper.h>
 BBEPAPER bbep;
+#ifndef DEVICE_MODEL
+#error "Must have a device model name defined in platformio.ini!"
+#endif // DEVICE_MODEL
 #include <SPIFFS.h>
 #define FS SPIFFS
 
@@ -27,6 +30,7 @@ const TRMNL_DEVICE device_list[] =
 {
 // name            sck   mosi   cs   rst   dc   busy  sda   scl   intr   batt    pwr_fn    panel
   "og",            7,    8,     6,   10,   5,   4,    21,   20,   2,     3,      EPD_75,
+  "trmnl_steam",   7,    8,     6,   10,   5,   4,    21,   20,   2,     3,      EPD_583,
   "og_4clr",       7,    8,     6,   10,   5,   4,    21,   20,   2,     3,      EPD_75_4CLR,
   "og_gen2",       6,    1,     4,   2,    5,   0,    11,   12,   3,     0xff,   EPD_75, // fake battery == 0xff
   "xteink_x4",     8,    10,    21,  5,    4,   6,    0xff, 0xff, 3,     0xff,   EPD_426,
@@ -41,13 +45,15 @@ const TRMNL_DEVICE device_list[] =
   "reterminal_e1002", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     0xff,   EPD_75_6CLR,
   "crowpanel42",   0,    0,     0,   0,    0,   0,    0xff, 0xff, 2,     0xff,   EPD_CROWPANEL, 
   "m5_paper_mono", 0,    0,     0,   0,    0,   0,    0xff, 0xff, 2,     0xff,   EPD_PAPER_MONO, 
+  "m5_paper_color", 0,   0,     0,   0,    0,   0,    0xff, 0xff, 2,     0xff,   EPD_PAPER_COLOR, 
   NULL,            0,    0,     0,   0,    0,   0,    0,    0,    0,     0,      0
 }; // device_list
 TRMNL_DEVICE *pDevice = NULL;
 // TRMNL SPI ePaper panel types list. The list order is fixed and based on enumerated values
 // N.B. ALWAYS ADD NEW PANELS TO THE END OF THE LIST
-const DISPLAY_PROFILE dpList[8][3] = { // 1-bit and 2-bit display types for each profile
+const DISPLAY_PROFILE dpList[10][3] = { // 1-bit and 2-bit display types for each profile
     {{EP75_800x480, EP75_800x480_4GRAY}, {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, {EP75_800x480, EP75_800x480_4GRAY_V2}},
+    {{EP583_648x480, EP583_648x480_4GRAY}, {EP583_648x480, EP583_648x480_4GRAY}, {EP583_648x480, EP583_648x480_4GRAY}},
     {{EP426_800x480, EP426_800x480_4GRAY}, {EP426_800x480, EP426_800x480_4GRAY}, {EP426_800x480, EP426_800x480_4GRAY}},
     {{EP397_800x480, EP397_800x480_4GRAY}, {EP397_800x480, EP397_800x480_4GRAY}, {EP397_800x480, EP397_800x480_4GRAY}},
     {{EP75R_800x480, EP75R_800x480}, {EP75R_800x480, EP75R_800x480}, {EP75R_800x480, EP75R_800x480}}, 
@@ -55,10 +61,9 @@ const DISPLAY_PROFILE dpList[8][3] = { // 1-bit and 2-bit display types for each
     {{EP73_SPECTRA_800x480, EP73_SPECTRA_800x480}, {EP73_SPECTRA_800x480, EP73_SPECTRA_800x480}, {EP73_SPECTRA_800x480, EP73_SPECTRA_800x480}},
     {{EPD_CROWPANEL42, EPD_CROWPANEL42_4GRAY},{EPD_CROWPANEL42, EPD_CROWPANEL42_4GRAY},{EPD_CROWPANEL42, EPD_CROWPANEL42_4GRAY}},
     {{EPD_M5_PAPER_MONO, EPD_M5_PAPER_MONO_4GRAY},{EPD_M5_PAPER_MONO, EPD_M5_PAPER_MONO_4GRAY},{EPD_M5_PAPER_MONO, EPD_M5_PAPER_MONO_4GRAY}},
+    {{EPD_M5_PAPER_COLOR, EPD_M5_PAPER_COLOR},{EPD_M5_PAPER_COLOR, EPD_M5_PAPER_COLOR},{EPD_M5_PAPER_COLOR, EPD_M5_PAPER_COLOR}},
 };
-#ifdef BOARD_SEEED_RETERMINAL_E1002
 uint8_t u8SpectraPal[512]; // RGB333 mapped to closest Spectra6 color
-#endif // E1002
 
 #else // BOARD_X_CLASS
 #include "esp_sleep.h"
@@ -142,6 +147,8 @@ void hw_config_init(void)
     if (device_list[i].device_name) {
         Log_info("Found device model at index %d\n", i);
         pDevice = (TRMNL_DEVICE *)&device_list[i];
+    } else {
+        Log_info("Device name (%s) not found in supported list!", device_list[i].device_name);
     }
 } /* hw_config_init() */
 #endif
@@ -165,7 +172,7 @@ void display_init(void)
 #ifdef BOARD_SEEED_RETERMINAL_E1002
     spectra6_init_spi();
 #else
-    if (pDevice->epd_mosi_pin != 0) {
+    if (pDevice->epd_mosi_pin != 0 || pDevice->epd_sck_pin != 0) {
         bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit); // must be set BEFORE calling initio
         bbep.initIO(pDevice->epd_dc_pin, pDevice->epd_rst_pin, pDevice->epd_busy_pin, pDevice->epd_cs_pin,
         pDevice->epd_mosi_pin, pDevice->epd_sck_pin, 8000000);
@@ -915,7 +922,6 @@ unsigned char GetBWYRPixel(int r, int g, int b)
 } /* GetBWYRPixel() */
 #endif // BB_EPAPER
 
-#ifdef BOARD_SEEED_RETERMINAL_E1002
 //
 // bb_epaper colors to map to Spectra6 colors
 // The RGB values are not correct for the panel, but for simple mapping
@@ -970,14 +976,13 @@ uint16_t rgb333;
     c = u8SpectraPal[rgb333];
     return c;
 } /* GetSpectraPixel() */
-#endif // E1002
+
 /**
  * @brief Callback function for each line of PNG decoded
  * @param PNGDRAW structure containing the current line and relevant info
  * @return none
  */
 #ifdef BB_EPAPER
-#ifdef BOARD_SEEED_RETERMINAL_E1002
 //
 // Draw the PNG image into the local framebuffer memory using the drawPixel() method
 // to do color translation and to properly format the memory layout
@@ -1077,7 +1082,6 @@ int png_draw_6clr(PNGDRAW *pDraw)
         } // for x
     return 1; // continue decoding
 } /* png_draw_6clr() */
-#endif // E1002 (Spectra6 only)
 
 #ifdef BOARD_TRMNL_4CLR
 //
@@ -1593,19 +1597,19 @@ PNG *png = new PNG();
             Log_info("%s [%d]: Decoding %d-bpp png (current)\r\n", __FILE__, __LINE__, png->getBpp());
             // Prepare target memory window (entire display)
 #ifdef BB_EPAPER
-#ifdef BOARD_SEEED_RETERMINAL_E1002
-            CreateSpectra6Pal(); // create a fast color matching palette
-            if (bbep.allocBuffer() != BBEP_SUCCESS) {
-                Log_error("%s [%d]: bbep.AllocBuffer failed!\n\r", __FILE__, __LINE__);
-                return -1;
+            if (bbep.capabilities() & BBEP_7COLOR) { // Spectra6 panels
+                CreateSpectra6Pal(); // create a fast color matching palette
+                if (bbep.allocBuffer() != BBEP_SUCCESS) {
+                    Log_error("%s [%d]: bbep.AllocBuffer failed!\n\r", __FILE__, __LINE__);
+                    return -1;
+                }
+                Log_info("%s [%d]: decoding for 6-color EPD\r\n", __FILE__, __LINE__);
+                png->openRAM((uint8_t *)pPNG, iDataSize, png_draw_6clr);
+                png->decode(NULL, 0);
+                png->close();
+                delete(png); // free the decoder instance
+                return REFRESH_FULL;
             }
-            Log_info("%s [%d]: decoding for 6-color EPD\r\n", __FILE__, __LINE__);
-            png->openRAM((uint8_t *)pPNG, iDataSize, png_draw_6clr);
-            png->decode(NULL, 0);
-            png->close();
-            delete(png); // free the decoder instance
-            return REFRESH_FULL;
-#endif // E1002
 #ifdef BOARD_TRMNL_4CLR
             Log_info("%s [%d]: decoding for 4-color EPD\r\n", __FILE__, __LINE__);
             png->openRAM((uint8_t *)pPNG, iDataSize, png_draw_4clr);
@@ -1644,7 +1648,7 @@ PNG *png = new PNG();
                     png->decode(&iPlane, 0);
                 } // temp profile needs the second plane written
             } else { // 2-bpp (or greater, but reduced to 2-bpp)
-                if (pDevice->epd_mosi_pin != 0) {
+                if (pDevice->epd_mosi_pin != 0 || pDevice->epd_sck_pin != 0) {
                     bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].TwoBit);
                     bbep.initIO(pDevice->epd_dc_pin, pDevice->epd_rst_pin, pDevice->epd_busy_pin, pDevice->epd_cs_pin,
                         pDevice->epd_mosi_pin, pDevice->epd_sck_pin, 8000000);
@@ -1730,7 +1734,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
     }
 #endif
 #ifdef BB_EPAPER
-    if (pDevice->epd_mosi_pin != 0) {
+    if (pDevice->epd_mosi_pin != 0 || pDevice->epd_sck_pin != 0) {
         bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit);
         bbep.initIO(pDevice->epd_dc_pin, pDevice->epd_rst_pin, pDevice->epd_busy_pin, pDevice->epd_cs_pin,
             pDevice->epd_mosi_pin, pDevice->epd_sck_pin, 8000000);
