@@ -15,6 +15,22 @@ void PWMBuzzer::init() {
   Log_info("Buzzer initialized on GPIO %d", _pin);
 }
 
+// Breaking API change in Arduino-ESP32 core 3.x: LEDC channels are managed per-pin
+#if ESP_ARDUINO_VERSION_MAJOR >= 3
+
+void PWMBuzzer::on() {
+  ledcAttach(_pin, _freq, BUZZER_RESOLUTION);
+  ledcWrite(_pin, BUZZER_DUTY);
+}
+
+void PWMBuzzer::off() {
+  ledcWrite(_pin, 0);
+  ledcDetach(_pin);
+  digitalWrite(_pin, LOW);
+}
+
+#else // => ESP_ARDUINO_VERSION_MAJOR < 3
+
 void PWMBuzzer::on() {
   ledcSetup(BUZZER_CHANNEL, _freq, BUZZER_RESOLUTION);
   ledcAttachPin(_pin, BUZZER_CHANNEL);
@@ -26,6 +42,8 @@ void PWMBuzzer::off() {
   ledcDetachPin(_pin);
   digitalWrite(_pin, LOW);
 }
+
+#endif // ESP_ARDUINO_VERSION_MAJOR >= 3
 
 void PWMBuzzer::beep(unsigned long duration_ms) {
   on();
