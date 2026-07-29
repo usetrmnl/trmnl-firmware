@@ -1798,7 +1798,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
         bbep.freeBuffer();
     }
 #else
-    fastepd::update(bWait, bSkipClear, iUpdateCount, iTempProfile);
+    fastepd::update(bWait, bSkipClear, iUpdateCount, iTempProfile, data_size);
 #endif
     iUpdateCount++;
     Log_info("display_show_image end");

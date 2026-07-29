@@ -9,7 +9,7 @@ extern FASTEPD bbep;
 
 namespace fastepd {
   void init();
-  void update(bool bWait, bool bSkipClear, int iUpdateCount, uint32_t iTempProfile);
+  void update(bool bWait, bool bSkipClear, int iUpdateCount, uint32_t iTempProfile, int data_size);
 } // namespace fastepd
 
 #endif // BOARD_X_CLASS

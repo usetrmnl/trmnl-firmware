@@ -10,10 +10,10 @@
 
 FASTEPD bbep;
 
-#ifdef BOARD_TRMNL_X
-// Hybrid GC16-derived 4bpp waveform: 16 levels x 38 passes, level-major.
 // clang-format off
-static const uint8_t u8_graytable[] = {
+#ifdef BOARD_TRMNL_X
+#define FASTEPD_LARGE_IMAGE_THRESHOLD (100 * 1024)
+static const uint8_t u8_graytable_large[] = {
 /*  0 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0,
 /*  1 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0,
 /*  2 */ 0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 0,
@@ -31,16 +31,11 @@ static const uint8_t u8_graytable[] = {
 /* 14 */ 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0,
 /* 15 */ 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0
 };
-static const uint16_t u8_phase_timing[] = {
-	50,	50,	50, 50, 50, 50, 50, 50, 50, 50,
-	50, 50, 50, 50, 50, 50, 50, 50, 50, 50,
-	50, 100, 180, 260, 340, 420, 500, 580, 660, 740,
-  820, 1000, 1500, 2000, 2500, 3000, 1500, 500
+static const uint16_t u8_phase_timing_large[] = {
+  50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 100, 180, 260, 340, 420, 500,
+  580, 660, 740, 820, 1000, 1500, 2000, 2500, 3000, 1500, 500
 };
-// clang-format on
-#else
-// Stock 9-pass 4bpp waveform used by non-TRMNL_X FastEPD boards.
-// clang-format off
+#endif
 static const uint8_t u8_graytable[] = {
 /* 0 */  0, 0, 0, 0, 0, 0, 1, 1, 1,
 /* 1 */  0, 0, 1, 1, 1, 2, 2, 1, 1,
@@ -60,10 +55,8 @@ static const uint8_t u8_graytable[] = {
 /* 15 */ 0, 0, 0, 0, 0, 0, 0, 0, 2
 };
 // clang-format on
-#endif
 
 namespace fastepd {
-
   void init() {
 #ifdef BOARD_TRMNL_X
     bbep.initPanel(BB_PANEL_TRMNL_X, 40000000);
@@ -85,13 +78,21 @@ namespace fastepd {
 #endif
   }
 
-  void update(bool bWait, bool bSkipClear, int iUpdateCount, uint32_t iTempProfile) {
+  void update(bool bWait, bool bSkipClear, int iUpdateCount, uint32_t iTempProfile, int data_size) {
     (void)bWait;
-    int rc = bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
-    Log_info("%s [%d]: setCustomMatrix returned %d\r\n", __FILE__, __LINE__, rc);
+    int rc;
 #ifdef BOARD_TRMNL_X
-    bbep.setPhaseTiming(u8_phase_timing);
+    if (data_size > FASTEPD_LARGE_IMAGE_THRESHOLD) {
+      rc = bbep.setCustomMatrix(u8_graytable_large, sizeof(u8_graytable_large));
+      Log_info("using 38-pass graytable_large (data_size=%d)", data_size);
+      bbep.setPhaseTiming(u8_phase_timing_large);
+    } else
 #endif
+    {
+      rc = bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
+      Log_info("using 9-pass graytable (data_size=%d)", data_size);
+    }
+    Log_info("setCustomMatrix returned %d", rc);
 
     // bWait=false means loading screen: skip clearing passes so it appears
     // faster. Ghosting from the previous image is acceptable since the
@@ -104,10 +105,9 @@ namespace fastepd {
     } else {
       iClearMode = CLEAR_FAST;
     }
-    Log_info("fullUpdate clear mode = %d\n", iClearMode);
+    Log_info("fullUpdate clear mode = %d", iClearMode);
     bbep.fullUpdate(iClearMode, false);
   }
-
 } // namespace fastepd
 
 #endif // BOARD_X_CLASS
