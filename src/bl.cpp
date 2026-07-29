@@ -103,7 +103,6 @@ StoredLogs storedLogs(LOG_MAX_NOTES_NUMBER / 2, LOG_MAX_NOTES_NUMBER / 2, PREFER
 RefreshInterval refreshInterval(preferencesPersistence);
 
 static https_request_err_e downloadAndShow(); // download and show the image
-static uint32_t downloadStream(WiFiClient *stream, int content_size, uint8_t *buffer);
 static https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse);
 static void getDeviceCredentials();                  // receiveing API key and Friendly ID
 static bool performApiSetup();     // perform API setup call and return success
@@ -2163,35 +2162,6 @@ static https_request_err_e downloadAndShow()
   Log_info("Returned result - %s", szHTTPErrors[result]);
 
   return result;
-}
-
-uint32_t downloadStream(WiFiClient *stream, int content_size, uint8_t *buffer)
-{
-  int iteration_counter = 0;
-  int counter2 = content_size;
-  unsigned long download_start = millis();
-  unsigned long last_data_time = millis();
-  int counter = 0;
-
-  while (counter < content_size && millis() - download_start < 30000)
-  {
-    if (stream->available())
-    {
-      Log.info("%s [%d]: Downloading... Available bytes: %d\r\n", __FILE__, __LINE__, stream->available());
-      int bytes_to_read = min(stream->available(), counter2 - counter);
-      counter += stream->readBytes(buffer + counter, bytes_to_read);
-      iteration_counter++;
-      last_data_time = millis();
-    }
-    else if (!stream->connected() || millis() - last_data_time > 5000)
-    {
-      break;
-    }
-    delay(10);
-  }
-
-  Log_info("Download end: %d/%d bytes in %lu ms (%d iterations)", counter, content_size, millis() - download_start, iteration_counter);
-  return counter;
 }
 
 https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
