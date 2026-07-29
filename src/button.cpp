@@ -2,8 +2,8 @@
 
 #include <Arduino.h>
 #include <config.h>
+#include <misc/buzzer.h>
 
-#include "buzzer.h"
 #include "trmnl_log.h"
 
 static unsigned long wait_for_button_release(unsigned long start_time) {
@@ -11,7 +11,7 @@ static unsigned long wait_for_button_release(unsigned long start_time) {
   bool hold_buzzer_fired = false;
   while (digitalRead(PIN_INTERRUPT) == LOW && millis() - start_time < BUTTON_SOFT_RESET_TIME) {
     if (!hold_buzzer_fired && millis() - start_time >= BUTTON_HOLD_TIME) {
-      buzzer_beep_pattern(2, 100, 100);
+      buzzer().beepPattern(2, 100, 100);
       hold_buzzer_fired = true;
     }
     delay(10);
