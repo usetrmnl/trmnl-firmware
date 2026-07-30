@@ -3279,17 +3279,3 @@ void logWithAction(LogAction action, LogLevel level, const char *message, time_t
 
   preferences.putUInt(PREFERENCES_LOG_ID_KEY, ++log_id);
 }
-
-void Test_new_screens(void){
-    showMessageWithLogo(API_ERROR);
-    delay(000);
-    showMessageWithLogo(API_REQUEST_FAILED);
-    delay(2000);
-    showMessageWithLogo(API_IMAGE_DOWNLOAD_ERROR);
-    delay(2000);
-    showMessageWithLogo(API_FIRMWARE_UPDATE_ERROR);
-    delay(2000);
-    showMessageWithLogo(API_SETUP_FAILED);
-    delay(2000);
-    showMessageWithLogo(API_UNABLE_TO_CONNECT);
-};
