@@ -1,3 +1,4 @@
+#pragma once
 
 #include <Preferences.h>
 #include <persistence_interface.h>
