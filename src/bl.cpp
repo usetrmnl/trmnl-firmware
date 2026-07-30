@@ -1070,7 +1070,7 @@ void bl_init(void)
   }
 #ifdef BOARD_TRMNL_X
   battery_count = detect_battery_count();
-  battery_charging = (get_charging_status() == ChargingStatus::CHARGING);
+  battery_charging = (power().chargingStatus() == ChargingStatus::CHARGING);
   Log_info("BATTERY COUNT: %d", battery_count);
   Log_info("BATTERY CHARGING: %s", battery_charging ? "YES" : "NO");
 
@@ -1622,8 +1622,8 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   inputs.specialFunction = special_function;
   inputs.imageCached = bUsedCachedImage;
   inputs.prevWakeTime = iPrevWakeTime;
-  inputs.usbStatus = get_usb_status();
-  inputs.chargingStatus = get_charging_status();
+  inputs.usbStatus = power().usbStatus();
+  inputs.chargingStatus = power().chargingStatus();
 
 #ifdef BOARD_TRMNL_X
   inputs.batteryCount = battery_count;
