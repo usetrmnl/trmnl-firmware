@@ -66,6 +66,15 @@ bool filesystem_read_from_file(const char *name, uint8_t *out_buffer, size_t siz
 size_t filesystem_write_to_file(const char *name, uint8_t *in_buffer, size_t size);
 
 /**
+ * @brief Function to write an image buffer to a file, logging an error on short writes
+ * @param name filename
+ * @param in_buffer pointer to input buffer
+ * @param size size of the input buffer
+ * @return none
+ */
+void writeImageToFile(const char *name, uint8_t *in_buffer, size_t size);
+
+/**
  * @brief Function to check if file exists
  * @param name filename
  * @return result - true if exists; false - if not exists

@@ -289,3 +289,12 @@ uint32_t filesystem_extract_timestamp(const char *filename) {
     return 0;
   }
 }
+
+void writeImageToFile(const char *name, uint8_t *in_buffer, size_t size) {
+  size_t res = filesystem_write_to_file(name, in_buffer, size);
+  if (res != size) {
+    Log_error_submit("File writing ERROR. Result - %d", res);
+  } else {
+    Log_info("file %s writing success - %d bytes", name, res);
+  }
+}

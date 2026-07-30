@@ -113,7 +113,6 @@ static void goToSleepButtonOnly(void);               // sleep until button press
 static bool setClock(void);                          // clock synchronization
 static void submitStoredLogs(void);
 static void writeSpecialFunction(SPECIAL_FUNCTION function);
-static void writeImageToFile(const char *name, uint8_t *in_buffer, size_t size);
 void showMessageWithLogo(MSG message_type);
 static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, const char *fw_version, String message);
 static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiResponse);
