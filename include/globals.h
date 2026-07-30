@@ -6,9 +6,9 @@
 #include <config.h>
 #include <display.h>
 #include <esp_sleep.h>
-#include <firmware_update.h>
 #include <preferences_persistence.h>
 #include <refresh_interval.h>
+#include <services/firmware_update.h>
 #include <special_function.h>
 #include <stored_logs.h>
 

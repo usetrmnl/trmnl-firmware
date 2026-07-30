@@ -1,9 +1,9 @@
 #include <HTTPClient.h>
 #include <Update.h>
 #include <WiFi.h>
-#include <firmware_update.h>
 #include <http_client.h>
 #include <ota_schedule.h>
+#include <services/firmware_update.h>
 #include <trmnl_log.h>
 #include <wifi_network.h>
 

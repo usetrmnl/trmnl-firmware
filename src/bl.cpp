@@ -31,7 +31,7 @@
 #include <api-client/setup.h>
 #include <special_function.h>
 #include <refresh_interval.h>
-#include <firmware_update.h>
+#include <services/firmware_update.h>
 #include <api_response_parsing.h>
 #include "logging_parcers.h"
 #include <SPIFFS.h>
