@@ -39,7 +39,6 @@
 #include <api-client/display.h>
 #include <api-client/request_headers.h>
 #include "driver/gpio.h"
-#include "esp_sntp.h"
 #include "esp_flash.h"
 #include <nvs.h>
 #include <serialize_log.h>
@@ -50,7 +49,7 @@
 #include <wifi-helpers.h>
 #include <sys/time.h>
 #include <misc/buzzer.h>
-#include <misc/time.h>
+#include <misc/clock.h>
 #include <services/device_setup.h>
 #include "messages.h"
 #include "displayed_image.h"
@@ -81,7 +80,6 @@ static https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiRespo
 static void resetDeviceCredentials(void);            // reset device credentials API key, Friendly ID, Wi-Fi SSID and password
 void goToSleep(void);                         // sleep preparing
 static void goToSleepButtonOnly(void);               // sleep until button press, no timer
-static bool setClock(void);                          // clock synchronization
 static void submitStoredLogs(void);
 static void writeSpecialFunction(SPECIAL_FUNCTION function);
 void showMessageWithLogo(MSG message_type);
@@ -89,9 +87,7 @@ static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, c
 static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiResponse);
 static void wifiErrorDeepSleep();
 static uint8_t *storedLogoOrDefault(int iType);
-static bool checkCurrentFileName(String &newName);
 static DeviceStatusStamp getDeviceStatusStamp();
-void log_nvs_usage();
 void config_gpio_for_lp();
 int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious);
 
@@ -1347,10 +1343,10 @@ void bl_init(void)
 #endif
 
   // clock synchronization
-  if (setClock())
+  if (systemClock().setTimeFromNTP())
   {
     time_since_sleep = preferences.getUInt(PREFERENCES_LAST_SLEEP_TIME, 0);
-    time_since_sleep = time_since_sleep ? getTime() - time_since_sleep : 0; // may be can be used even if no sync
+    time_since_sleep = time_since_sleep ? systemClock().getTime() - time_since_sleep : 0; // may be can be used even if no sync
   }
   else
   {
@@ -1719,7 +1715,7 @@ static https_request_err_e downloadAndShow()
         load_prev_image(); // decode the older image into the previous buffer of FastEPD
       }
 #endif
-      fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
+      filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
       if (DisplayedImage::matches(szTemp)) {
         // We just displayed the same image, don't refresh the display
         Log.info("%s [%d]: The image hasn't changed since the last wakeup, don't refresh the display.\r\n", __FILE__, __LINE__);
@@ -1759,7 +1755,7 @@ static https_request_err_e downloadAndShow()
     Log_info("Downloading image via modem (5 GHz path)");
 
     char szTemp[36];
-    fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
+    filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
     Log_info("Modem: saving to %s", szTemp);
     filesystem_purge_old_file(szTemp);
 
@@ -1918,7 +1914,7 @@ static https_request_err_e downloadAndShow()
           bool isPNG = https.header("Content-Type") == "image/png";
           bool isJPEG = https.header("Content-Type") == "image/jpeg";
 
-          Log.info("%s [%d]: Starting a download at: %d\r\n", __FILE__, __LINE__, getTime());
+          Log.info("%s [%d]: Starting a download at: %d\r\n", __FILE__, __LINE__, systemClock().getTime());
           heap_caps_check_integrity_all(true);
 
           buffer = nullptr;
@@ -1993,7 +1989,7 @@ static https_request_err_e downloadAndShow()
           if (isPNG || isJPEG)
           {
             char szTemp[36];
-            fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
+            filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
             Log.info("%s [%d]: Writing %s to SPIFFS\r\n", __FILE__, __LINE__, szTemp);
             filesystem_purge_old_file(szTemp); // try to delete the old version or older than 24h
             writeImageToFile(szTemp, buffer, content_size);
@@ -2081,7 +2077,7 @@ static https_request_err_e downloadAndShow()
             display_show_image(buffer, content_size, true);
             {
               char szTemp[36];
-              fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
+              filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
               DisplayedImage::remember(szTemp);
             }
 
@@ -2128,7 +2124,7 @@ static https_request_err_e downloadAndShow()
           if (isPNG && png_res != PNG_NO_ERR)
           {
             char szTemp[36];
-            fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
+            filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
             filesystem_file_delete(szTemp);
             Log_error_submit("error parsing image file - %s", error.c_str());
 
@@ -2236,7 +2232,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
 
           // Print the extracted string
           Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
-          if (!checkCurrentFileName(new_filename))
+          if (!filesystem_fixed_file_exists(new_filename))
           {
             Log.info("%s [%d]: New image. Download and show it.\r\n", __FILE__, __LINE__);
             status = true;
@@ -2772,7 +2768,7 @@ void goToSleep(void)
   iPrevWakeTime = millis() - startup_time; // save for statistics
   Log.info("%s [%d]: total awake time - %d ms\r\n", __FILE__, __LINE__, iPrevWakeTime); 
   Log.info("%s [%d]: time to sleep - %d\r\n", __FILE__, __LINE__, time_to_sleep);
-  preferences.putUInt(PREFERENCES_LAST_SLEEP_TIME, getTime());
+  preferences.putUInt(PREFERENCES_LAST_SLEEP_TIME, systemClock().getTime());
   preferences.end();
   esp_sleep_enable_timer_wakeup((uint64_t)time_to_sleep * SLEEP_uS_TO_S_FACTOR);
   // Configure GPIO pin for wakeup
@@ -2884,96 +2880,6 @@ void config_gpio_for_lp() {
   pinMode(GPIO_NUM_2, INPUT); // RTS
 #endif // BOARD_TRMNL_X
 } /* config_gpio_for_lp() */
-
-// Not sure if WiFiClientSecure checks the validity date of the certificate.
-// Setting clock just to be sure...
-/**
- * @brief Function to clock synchronization
- * @param none
- * @return none
- */
-static bool setClock()
-{
-  bool sync_status = false;
-  struct tm timeinfo;
-  int iDeltaTime;
-  Preferences prefs;
-
-  prefs.begin("data");
-  uint32_t u32Epoch = prefs.getUInt("last_sync", 0); // Get the last time sync time
-  iDeltaTime = getTime() - u32Epoch; // Number of seconds since the last sync
-  Log.info("%s [%d]: epoch time: %d iDelta: %d\r\n", __FILE__, __LINE__, getTime(), iDeltaTime);
-  if (u32Epoch != 0 && iDeltaTime > 0 && iDeltaTime < 24*60*60) { // Less than 24h, no need to sync the time
-      Log.info("%s [%d]: Skipping time sync\r\n", __FILE__, __LINE__);
-      prefs.end();
-      return true;
-  }
-  String ntp = prefs.getString("ntp_server", "time.google.com");
-
-  Log.info("%s [%d]: Using NTP: %s, fallback: time.cloudflare.com\r\n", __FILE__, __LINE__, ntp.c_str());
-  #ifdef BOARD_TRMNL_X
-  if (g_modem && WifiCaptivePortal.getLastCredentials().is5GHz)
-  {
-    time_t t = g_modem->getSntpTime();
-    if (t > 0)
-    {
-      struct timeval tv = { t, 0 };
-      settimeofday(&tv, nullptr);
-      getLocalTime(&timeinfo);
-      sync_status = true;
-      Log.info("%s [%d]: Time synchronization via modem succeed!\r\n", __FILE__, __LINE__);
-      prefs.putUInt("last_sync", getTime()); // save epoch time of last sync
-    }
-    else
-    {
-      Log.info("%s [%d]: Time synchronization via modem failed...\r\n", __FILE__, __LINE__);
-    }
-    Log.info("%s [%d]: Current time - %s\r\n", __FILE__, __LINE__, asctime(&timeinfo));
-    prefs.end();
-    return sync_status;
-  }
-#endif
-
-  configTime(0, 0, ntp.c_str(), "pool.ntp.org"); //"time.cloudflare.com");
-
-#ifdef BOARD_TRMNL_GEN2
-  // This seems to be necessary only on the ESP32-C5, otherwise NTP will fail 100% of the time
-  // Wait until a valid time is received from the NTP server
-  // 1577836800 is the Unix time for Jan 1, 2020
-  time_t now = 0;
-  while (time(&now) < 1577836800) {
-    vTaskDelay(50);
-  }
-#endif
-
-  for (int i = 0; i < SNTP_MAX_SERVERS; i++)
-  {
-    const char *srv = esp_sntp_getservername(i);
-    if (srv && strlen(srv) > 0)
-    {
-      Log.info("%s [%d]: SNTP server[%d]: %s\r\n", __FILE__, __LINE__, i, srv);
-    }
-  }
-
-  Log.info("%s [%d]: Time synchronization...\r\n", __FILE__, __LINE__);
-
-  // Wait for time to be set
-  if (getLocalTime(&timeinfo))
-  {
-    sync_status = true;
-    Log.info("%s [%d]: Time synchronization succeed!\r\n", __FILE__, __LINE__);
-    prefs.putUInt("last_sync", getTime()); // save epoch time of last sync
-  }
-  else
-  {
-    Log.info("%s [%d]: Time synchronization failed...\r\n", __FILE__, __LINE__);
-  }
-
-  Log.info("%s [%d]: Current time - %s\r\n", __FILE__, __LINE__, asctime(&timeinfo));
-
-  prefs.end();
-  return sync_status;
-}
 
 /**
  * @brief Function to submit a log string to the API
@@ -3161,35 +3067,7 @@ static uint8_t *storedLogoOrDefault(int iType)
 }
 
 // Chop up long names to fit within the SPIFFS 31 character limit
-void fixFileName(const char *src, char *dest)
-{
-int iLen;
 
-  // SPIFFS only allows 32 bytes for the name, so if it's too long, fix it
-  dest[0] = '/'; // SPIFFS requires files to start with the root dir
-  iLen = strlen(src);
-  if (iLen > 31) {
-    memcpy(&dest[1], src, 7); // first 7 chars are "plugin-" or "mashup-"
-    strcpy(&dest[8], &src[iLen-17]); // get the prefix name and unique id plus timestamp (e.g. mashup-066cc3-1771674964)
-  } else {
-    strncpy(&dest[1], src, 31); // use it as-is
-  }
-} /* fixFileName() */
-
-//
-// Abstract:
-// Compares the current filename returned from the API server
-// with files we previously stored in FLASH (SPIFFS)
-//
-// returns: true if the file exists
-//
-static bool checkCurrentFileName(String &newName)
-{
-char szTemp[36];
-
-  fixFileName(newName.c_str(), szTemp); // shorten the name (if needed) to fit the SPIFFS file length limit of 31 chars + 0 terminator
-  return filesystem_file_exists(szTemp);
-} /* checkCurrentFileName() */
 
 static void wifiErrorDeepSleep()
 {
@@ -3280,34 +3158,3 @@ void logWithAction(LogAction action, LogLevel level, const char *message, time_t
 
   preferences.putUInt(PREFERENCES_LOG_ID_KEY, ++log_id);
 }
-
-void log_nvs_usage()
-{
-  nvs_stats_t nv;
-  esp_err_t ret = nvs_get_stats(NULL, &nv);
-  if (ret == ESP_OK)
-  {
-    float percent = (float)nv.used_entries / (float)nv.total_entries * 100.0f;
-    char percent_str[16];
-    dtostrf(percent, 0, 2, percent_str); // 2 decimal places
-    Log_info("NVS Usage: %d/%d entries (%s%%)", nv.used_entries, nv.total_entries, percent_str);
-  }
-  else
-  {
-    Log_error("Failed to get NVS stats: %s", esp_err_to_name(ret));
-  }
-}
-
-void Test_new_screens(void){
-    showMessageWithLogo(API_ERROR);
-    delay(000);
-    showMessageWithLogo(API_REQUEST_FAILED);
-    delay(2000);
-    showMessageWithLogo(API_IMAGE_DOWNLOAD_ERROR);
-    delay(2000);
-    showMessageWithLogo(API_FIRMWARE_UPDATE_ERROR);
-    delay(2000);
-    showMessageWithLogo(API_SETUP_FAILED);
-    delay(2000);
-    showMessageWithLogo(API_UNABLE_TO_CONNECT);
-};

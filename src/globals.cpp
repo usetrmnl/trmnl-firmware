@@ -1,5 +1,5 @@
 #include <globals.h>
-#include <misc/time.h>
+#include <misc/clock.h>
 
 // --- Persistence & long-lived services ---
 Preferences preferences;
@@ -7,7 +7,7 @@ PreferencesPersistence preferencesPersistence(preferences);
 StoredLogs storedLogs(LOG_MAX_NOTES_NUMBER / 2, LOG_MAX_NOTES_NUMBER / 2, PREFERENCES_LOG_KEY,
                       PREFERENCES_LOG_BUFFER_HEAD_KEY, preferencesPersistence);
 RefreshInterval refreshInterval(preferencesPersistence);
-FirmwareUpdateService firmwareUpdateService(preferencesPersistence, getTime, WIFI_CONNECTION_RSSI);
+FirmwareUpdateService firmwareUpdateService(preferencesPersistence, systemClock(), WIFI_CONNECTION_RSSI);
 
 // --- Image download / API state ---
 String new_filename = "";

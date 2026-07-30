@@ -3,7 +3,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <globals.h>
-#include <misc/time.h>
+#include <misc/clock.h>
 #include <stored_logs.h>
 #include <string_utils.h>
 #include <trmnl_log.h>
@@ -15,9 +15,9 @@ static void handle_store_submit(LogLevel level, const char *clean_message, const
                                 LogMode mode = LOG_STORE_ONLY) {
   if (level >= store_submit_threshold) {
     if (mode == LOG_STORE_ONLY) {
-      logWithAction(LOG_ACTION_STORE, level, clean_message, getTime(), line, file);
+      logWithAction(LOG_ACTION_STORE, level, clean_message, systemClock().getTime(), line, file);
     } else {
-      logWithAction(LOG_ACTION_SUBMIT_OR_STORE, level, clean_message, getTime(), line, file);
+      logWithAction(LOG_ACTION_SUBMIT_OR_STORE, level, clean_message, systemClock().getTime(), line, file);
     }
   }
 }
