@@ -50,6 +50,7 @@
 #include <wifi-helpers.h>
 #include <sys/time.h>
 #include <misc/buzzer.h>
+#include <misc/time.h>
 #include <services/device_setup.h>
 #include "messages.h"
 #include "displayed_image.h"
@@ -3016,19 +3017,6 @@ bool storeLogString(const char *log_buffer)
   return true;
 }
 
-
-uint32_t getTime(void)
-{
-  time_t now;
-  struct tm timeinfo;
-  if (!getLocalTime(&timeinfo, 200))
-  {
-    Log.info("%s [%d]: Failed to obtain time. \r\n", __FILE__, __LINE__);
-    return (0);
-  }
-  time(&now);
-  return now;
-}
 
 static void submitStoredLogs(void)
 {

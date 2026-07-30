@@ -3,6 +3,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <globals.h>
+#include <misc/time.h>
 #include <stored_logs.h>
 #include <string_utils.h>
 #include <trmnl_log.h>
