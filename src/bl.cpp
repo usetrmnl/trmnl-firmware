@@ -31,7 +31,7 @@
 #include <api-client/setup.h>
 #include <special_function.h>
 #include <refresh_interval.h>
-#include <firmware_update.h>
+#include <services/firmware_update.h>
 #include <api_response_parsing.h>
 #include "logging_parcers.h"
 #include <SPIFFS.h>
@@ -50,18 +50,11 @@
 #include <wifi-helpers.h>
 #include <sys/time.h>
 #include <misc/buzzer.h>
+#include <misc/time.h>
 #include <services/device_setup.h>
 #include "messages.h"
 #include "displayed_image.h"
-#ifdef SENSOR_SDA
-#include <bb_scd41.h>
-#include <bb_temperature.h>
-SCD41 scd41;
-BBTemp bbt;
-bool bCO2 = false;
-int iSensorType = -1;
-int lastCO2 = 0, lastSCDTemp = 0, lastTemp = 0, lastSCDHumid = 0, lastHumid = 0, lastPressure = 0, lastType = -1, lastTime = 0;
-#endif // SENSOR_SDA
+#include <globals.h>
 const char *szHTTPErrors[] = {
     "HTTPS_NO_ERR",
     "HTTPS_RESET",
@@ -81,27 +74,7 @@ const char *szHTTPErrors[] = {
     "HTTPS_OUT_OF_MEMORY"
 };
 
-String new_filename = "";
-ApiDisplayResult apiDisplayResult;
-uint8_t *buffer = nullptr;
-char filename[1024];      // image URL
-char message_buffer[128]; // message to show on the screen
-uint32_t time_since_sleep;
 static float vBatt;
-bool status = false;          // need to download a new image
-bool reset_firmware = false;  // need to reset credentials
-bool log_retry = false;                                              // need to log connection retry
-esp_sleep_wakeup_cause_t wakeup_reason = ESP_SLEEP_WAKEUP_UNDEFINED; // wake-up reason
-SPECIAL_FUNCTION special_function = SF_NONE;
-RTC_DATA_ATTR int iPrevWakeTime = 0; // total wake time of the last cycle (for statistics collection)
-RTC_DATA_ATTR bool bUsedCachedImage = false; // if the last image displayed was read from cache (for statistics collection)
-RTC_DATA_ATTR uint8_t need_to_refresh_display = 1;
-RTC_DATA_ATTR bool otg_state = false;  // Track OTG state across deep sleep
-bool touchbar_tap_mode = true;  // false = "slide", true = "tap" (default)
-Preferences preferences;
-PreferencesPersistence preferencesPersistence(preferences);
-StoredLogs storedLogs(LOG_MAX_NOTES_NUMBER / 2, LOG_MAX_NOTES_NUMBER / 2, PREFERENCES_LOG_KEY, PREFERENCES_LOG_BUFFER_HEAD_KEY, preferencesPersistence);
-RefreshInterval refreshInterval(preferencesPersistence);
 
 static https_request_err_e downloadAndShow(); // download and show the image
 static https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse);
@@ -114,7 +87,6 @@ static void writeSpecialFunction(SPECIAL_FUNCTION function);
 void showMessageWithLogo(MSG message_type);
 static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, const char *fw_version, String message);
 static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiResponse);
-FirmwareUpdateService firmwareUpdateService(preferencesPersistence, getTime, WIFI_CONNECTION_RSSI);
 static void wifiErrorDeepSleep();
 static uint8_t *storedLogoOrDefault(int iType);
 static bool checkCurrentFileName(String &newName);
@@ -129,7 +101,6 @@ static unsigned long startup_time = 0;
 // Create stub functions for the touchbar workaround
 void iqs323_task_i2c_lock(void) {}
 void iqs323_task_i2c_unlock(void) {}
-bool otg_message = false;
 #endif // !BOARD_TRMNL_X
 
 void wait_for_serial() {
@@ -160,12 +131,7 @@ void wait_for_serial() {
 
 void process_iqs323_data(void);
 
-IQS323 iqs323;
 #define IQS323_I2C_ADDRESS 0x44
-// Sensor states
-uint16_t slider_position = 65535;
-iqs323_gesture_events slider_event = IQS323_GESTURE_NONE;
-bool otg_message = false;
 // Touchbar indicator to redraw after a full-refresh (e.g. logo screen)
 static touchbar_side_t pending_indicator_side = TOUCHBAR_LEFT;
 static bool pending_indicator_filled = false;
@@ -744,17 +710,10 @@ void process_iqs323_data(void)
 
 // ############################ esp32c5 modem #########################
 #include "modem.h"
-
-// Global modem pointer — set once during bl_init(), used by download helpers
-// here and by getWiFiStatus() in wifi_network.cpp (5 GHz path on TRMNL_X), so
-// it needs external linkage.
-Modem* g_modem = nullptr;
 // ############################ esp32c5 modem #########################
 
 // ############################ Gas gauge #############################
 #include "BQ27427.h"
-battery_count_t battery_count = BATTERY_NONE;
-bool battery_charging = false;
 // ############################ Gas gauge #############################
 #endif
 
@@ -3058,19 +3017,6 @@ bool storeLogString(const char *log_buffer)
   return true;
 }
 
-
-uint32_t getTime(void)
-{
-  time_t now;
-  struct tm timeinfo;
-  if (!getLocalTime(&timeinfo, 200))
-  {
-    Log.info("%s [%d]: Failed to obtain time. \r\n", __FILE__, __LINE__);
-    return (0);
-  }
-  time(&now);
-  return now;
-}
 
 static void submitStoredLogs(void)
 {

@@ -1,9 +1,9 @@
 #include <HTTPClient.h>
 #include <Update.h>
 #include <WiFi.h>
-#include <firmware_update.h>
 #include <http_client.h>
 #include <ota_schedule.h>
+#include <services/firmware_update.h>
 #include <trmnl_log.h>
 #include <wifi_network.h>
 
@@ -11,8 +11,8 @@
 
 #ifdef BOARD_TRMNL_X
 #include <WifiCaptive.h>
+#include <globals.h>
 #include <modem.h>
-extern Modem *g_modem;
 #endif
 
 FirmwareUpdateService::FirmwareUpdateService(Persistence &persistence, GetTimeFn getTime,
