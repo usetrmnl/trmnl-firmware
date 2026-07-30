@@ -87,7 +87,6 @@ static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, c
 static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiResponse);
 static void wifiErrorDeepSleep();
 static uint8_t *storedLogoOrDefault(int iType);
-static bool checkCurrentFileName(String &newName);
 static DeviceStatusStamp getDeviceStatusStamp();
 void config_gpio_for_lp();
 int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious);
@@ -1716,7 +1715,7 @@ static https_request_err_e downloadAndShow()
         load_prev_image(); // decode the older image into the previous buffer of FastEPD
       }
 #endif
-      fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
+      filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
       if (DisplayedImage::matches(szTemp)) {
         // We just displayed the same image, don't refresh the display
         Log.info("%s [%d]: The image hasn't changed since the last wakeup, don't refresh the display.\r\n", __FILE__, __LINE__);
@@ -1756,7 +1755,7 @@ static https_request_err_e downloadAndShow()
     Log_info("Downloading image via modem (5 GHz path)");
 
     char szTemp[36];
-    fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
+    filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
     Log_info("Modem: saving to %s", szTemp);
     filesystem_purge_old_file(szTemp);
 
@@ -1990,7 +1989,7 @@ static https_request_err_e downloadAndShow()
           if (isPNG || isJPEG)
           {
             char szTemp[36];
-            fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
+            filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
             Log.info("%s [%d]: Writing %s to SPIFFS\r\n", __FILE__, __LINE__, szTemp);
             filesystem_purge_old_file(szTemp); // try to delete the old version or older than 24h
             writeImageToFile(szTemp, buffer, content_size);
@@ -2078,7 +2077,7 @@ static https_request_err_e downloadAndShow()
             display_show_image(buffer, content_size, true);
             {
               char szTemp[36];
-              fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
+              filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
               DisplayedImage::remember(szTemp);
             }
 
@@ -2125,7 +2124,7 @@ static https_request_err_e downloadAndShow()
           if (isPNG && png_res != PNG_NO_ERR)
           {
             char szTemp[36];
-            fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
+            filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
             filesystem_file_delete(szTemp);
             Log_error_submit("error parsing image file - %s", error.c_str());
 
@@ -2233,7 +2232,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
 
           // Print the extracted string
           Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
-          if (!checkCurrentFileName(new_filename))
+          if (!filesystem_fixed_file_exists(new_filename))
           {
             Log.info("%s [%d]: New image. Download and show it.\r\n", __FILE__, __LINE__);
             status = true;
@@ -3068,35 +3067,7 @@ static uint8_t *storedLogoOrDefault(int iType)
 }
 
 // Chop up long names to fit within the SPIFFS 31 character limit
-void fixFileName(const char *src, char *dest)
-{
-int iLen;
 
-  // SPIFFS only allows 32 bytes for the name, so if it's too long, fix it
-  dest[0] = '/'; // SPIFFS requires files to start with the root dir
-  iLen = strlen(src);
-  if (iLen > 31) {
-    memcpy(&dest[1], src, 7); // first 7 chars are "plugin-" or "mashup-"
-    strcpy(&dest[8], &src[iLen-17]); // get the prefix name and unique id plus timestamp (e.g. mashup-066cc3-1771674964)
-  } else {
-    strncpy(&dest[1], src, 31); // use it as-is
-  }
-} /* fixFileName() */
-
-//
-// Abstract:
-// Compares the current filename returned from the API server
-// with files we previously stored in FLASH (SPIFFS)
-//
-// returns: true if the file exists
-//
-static bool checkCurrentFileName(String &newName)
-{
-char szTemp[36];
-
-  fixFileName(newName.c_str(), szTemp); // shorten the name (if needed) to fit the SPIFFS file length limit of 31 chars + 0 terminator
-  return filesystem_file_exists(szTemp);
-} /* checkCurrentFileName() */
 
 static void wifiErrorDeepSleep()
 {

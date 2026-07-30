@@ -298,3 +298,27 @@ void writeImageToFile(const char *name, uint8_t *in_buffer, size_t size) {
     Log_info("file %s writing success - %d bytes", name, res);
   }
 }
+
+void filesystem_fix_filename(const char *src, char *dest) {
+  int iLen;
+
+  // SPIFFS only allows 32 bytes for the name, so if it's too long, fix it
+  dest[0] = '/'; // SPIFFS requires files to start with the root dir
+  iLen = strlen(src);
+  if (iLen > 31) {
+    memcpy(&dest[1], src, 7);          // first 7 chars are "plugin-" or "mashup-"
+    strcpy(&dest[8],
+           &src[iLen - 17]); // get the prefix name and unique id plus timestamp (e.g. mashup-066cc3-1771674964)
+  } else {
+    strncpy(&dest[1], src, 31); // use it as-is
+  }
+} /* filesystem_fix_filename() */
+
+bool filesystem_fixed_file_exists(String &newName) {
+  char szTemp[36];
+
+  filesystem_fix_filename(
+    newName.c_str(),
+    szTemp); // shorten the name (if needed) to fit the SPIFFS file length limit of 31 chars + 0 terminator
+  return filesystem_file_exists(szTemp);
+} /* filesystem_fixed_file_exists() */
