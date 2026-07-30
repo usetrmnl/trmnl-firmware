@@ -91,7 +91,6 @@ static void wifiErrorDeepSleep();
 static uint8_t *storedLogoOrDefault(int iType);
 static bool checkCurrentFileName(String &newName);
 static DeviceStatusStamp getDeviceStatusStamp();
-void log_nvs_usage();
 void config_gpio_for_lp();
 int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious);
 
@@ -3279,23 +3278,6 @@ void logWithAction(LogAction action, LogLevel level, const char *message, time_t
   }
 
   preferences.putUInt(PREFERENCES_LOG_ID_KEY, ++log_id);
-}
-
-void log_nvs_usage()
-{
-  nvs_stats_t nv;
-  esp_err_t ret = nvs_get_stats(NULL, &nv);
-  if (ret == ESP_OK)
-  {
-    float percent = (float)nv.used_entries / (float)nv.total_entries * 100.0f;
-    char percent_str[16];
-    dtostrf(percent, 0, 2, percent_str); // 2 decimal places
-    Log_info("NVS Usage: %d/%d entries (%s%%)", nv.used_entries, nv.total_entries, percent_str);
-  }
-  else
-  {
-    Log_error("Failed to get NVS stats: %s", esp_err_to_name(ret));
-  }
 }
 
 void Test_new_screens(void){
