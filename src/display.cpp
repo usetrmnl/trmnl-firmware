@@ -1744,7 +1744,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
             bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
 #ifdef BOARD_TRMNL_X
             // Show charging indicator if the USB power is connected (whether actually charging or not)
-            if (get_usb_status() == UsbStatus::CONNECTED) {
+            if (power().usbStatus() == UsbStatus::CONNECTED) {
                 Log_info("Displaying 'battery is charging' icon");
                 bbep.loadG5Image(battery_small, 40, bbep.height() - 120, BBEP_WHITE, BBEP_BLACK);
             } else { // show battery level

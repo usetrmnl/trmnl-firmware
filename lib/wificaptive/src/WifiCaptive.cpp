@@ -243,9 +243,9 @@ bool WifiCaptive::startPortal() {
 // Take different action for timeout (go to sleep)
   if ((millis() - lTime) > PORTAL_TIMEOUT) {
 #ifdef BOARD_TRMNL_X
-    if (get_usb_status() == UsbStatus::CONNECTED) {
+    if (power().usbStatus() == UsbStatus::CONNECTED) {
       showMessageWithLogo(READY_TO_SHIP);
-      while (get_usb_status() == UsbStatus::CONNECTED) {
+      while (power().usbStatus() == UsbStatus::CONNECTED) {
         Serial.println("USB power still detected, waiting...");
         delay(2000);
       }
