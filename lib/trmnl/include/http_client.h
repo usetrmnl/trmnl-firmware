@@ -1,5 +1,4 @@
-#ifndef HTTP_UTILS_H
-#define HTTP_UTILS_H
+#pragma once
 
 #include <Arduino.h>
 #include <HTTPClient.h>
@@ -16,6 +15,8 @@ enum HttpError {
   HTTPCLIENT_WIFICLIENT_ERROR = 101, // Failed to create client
   HTTPCLIENT_HTTPCLIENT_ERROR = 102  // Failed to connect
 };
+
+uint32_t downloadStream(WiFiClient *stream, int content_size, uint8_t *buffer);
 
 /**
  * @brief Higher-order function that sets up WiFiClient and HTTPClient, then runs a callback
@@ -76,5 +77,3 @@ ReturnType withHttp(const String &url, Callback callback, bool resumable = false
  * request_headers.h; this is the HTTPClient adapter for it.
  */
 void applyHeaders(HTTPClient &https, const HttpHeaderList &headers);
-
-#endif // HTTP_UTILS_H
