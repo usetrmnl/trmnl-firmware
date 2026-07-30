@@ -16,6 +16,11 @@ static unsigned long wait_for_button_release(unsigned long start_time) {
     }
     delay(10);
   }
+  if (millis() - start_time >= BUTTON_SOFT_RESET_TIME) {
+    buzzer().beepPattern(3, 100, 100);
+  } else if (!hold_buzzer_fired) {
+    buzzer().beep(100);
+  }
   return millis() - start_time;
 }
 
