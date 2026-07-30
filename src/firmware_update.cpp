@@ -11,8 +11,8 @@
 
 #ifdef BOARD_TRMNL_X
 #include <WifiCaptive.h>
+#include <globals.h>
 #include <modem.h>
-extern Modem *g_modem;
 #endif
 
 FirmwareUpdateService::FirmwareUpdateService(Persistence &persistence, GetTimeFn getTime,

@@ -6,6 +6,7 @@
 #include <config.h>
 #include <device_id.h>
 #include <filesystem.h>
+#include <globals.h>
 #include <http_client.h>
 #include <inttypes.h>
 #include <preferences_persistence.h>
@@ -202,10 +203,7 @@ void DeviceSetup::downloadSetupImage() {
   });
 }
 
-extern PreferencesPersistence preferencesPersistence; // global owned by bl.cpp
-
 #ifdef INCLUDE_DEVICE_SETUP_X
-extern Modem *g_modem; // global owned by bl.cpp
 static DeviceSetupX deviceSetupService(preferencesPersistence, g_modem);
 #else
 static DeviceSetup deviceSetupService(preferencesPersistence);

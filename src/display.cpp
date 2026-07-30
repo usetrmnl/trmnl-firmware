@@ -91,9 +91,6 @@ const uint8_t u8_graytable[] = {
 #include "BQ27427.h"
 extern BQ27427 lipo; // Use lipo.[] to interact with the library in an Arduino 
 #endif
-// Counts the number of partial updates to know when to do a full update
-RTC_DATA_ATTR int iUpdateCount = 0;
-RTC_DATA_ATTR bool bCanDoPartial = false;
 
 #include "Group5.h"
 #include <config.h>
@@ -107,11 +104,7 @@ RTC_DATA_ATTR bool bCanDoPartial = false;
 #include "nicoclean_8.h"
 #include "Inter_18.h"
 #include "Roboto_Black_24.h"
-extern char filename[];
-extern Preferences preferences;
-extern RefreshInterval refreshInterval;
-extern ApiDisplayResult apiDisplayResult;
-uint32_t iTempProfile;
+#include <globals.h>
 static uint8_t *pDither;
 
 #ifdef BB_EPAPER

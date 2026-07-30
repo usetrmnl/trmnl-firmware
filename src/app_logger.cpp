@@ -2,11 +2,10 @@
 #include <bl.h>
 #include <cstdarg>
 #include <cstdio>
+#include <globals.h>
 #include <stored_logs.h>
 #include <string_utils.h>
 #include <trmnl_log.h>
-
-extern StoredLogs storedLogs;
 
 /// Logs at or above this severity will be sent to the server
 static LogLevel store_submit_threshold = LogLevel::LOG_ERROR;
