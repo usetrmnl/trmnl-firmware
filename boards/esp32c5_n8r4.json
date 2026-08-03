@@ -40,7 +40,7 @@
         "arduino",
         "espidf"
     ],
-    "name": "ESP32-C5-WROOM-1-N8R8",
+    "name": "ESP32-C5-WROOM-1-N8R4",
     "upload": {
         "flash_size": "8MB",
         "maximum_ram_size": 327680,
