@@ -126,6 +126,7 @@ void wait_for_serial() {
 #include "IQS323.h"
 
 void process_iqs323_data(void);
+void display_wipe(void);
 
 #define IQS323_I2C_ADDRESS 0x44
 // Touchbar indicator to redraw after a full-refresh (e.g. logo screen)
@@ -1707,6 +1708,13 @@ static https_request_err_e downloadAndShow()
   }
 
   https_request_err_e result = handleApiDisplayResponse(apiDisplayResult.response);
+#ifdef BOARD_TRMNL_X
+  if (strcmp(apiDisplayResult.response.filename.c_str(), "screen_wiper.png")) {
+      Log_info("Detected screen wiper filename: %s, starting 20 passes of clearing...\n", apiDisplayResult.response.filename.c_str());
+      display_wipe();
+      return result; // no image to display
+  }
+#endif // BOARD_TRMNL_X
 
   if (!status && result == HTTPS_SUCCESS) { // this means we already have this image stored in SPIFFS
       char szTemp[36];
