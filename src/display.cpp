@@ -283,6 +283,17 @@ uint8_t tca9535_interrupt_clear()
     return bbep.ioRead(3);
 }
 
+// Clear any ghosting on the X display by wiping it black/white 20 times
+void display_wipe(void)
+{
+    bbep.setMode(BB_MODE_1BPP);
+    bbep.fillScreen(BBEP_WHITE);
+    for (int i=0; i<20; i++) {
+        bbep.fullUpdate(CLEAR_SLOW, true);
+    }
+    bbep.einkPower(0); // power off the display
+} /* display_wipe() */
+
 void otg_turn_on()
 {
     bbep.ioPinMode(1, OUTPUT);
