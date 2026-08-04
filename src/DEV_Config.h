@@ -65,6 +65,7 @@ enum {
   EPD_CROWPANEL,
   EPD_PAPER_MONO,
   EPD_PAPER_COLOR,
+  EPD_133_COLOR,
 };
 
 /**

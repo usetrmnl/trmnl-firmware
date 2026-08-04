@@ -46,12 +46,13 @@ const TRMNL_DEVICE device_list[] =
   "crowpanel42",   0,    0,     0,   0,    0,   0,    0xff, 0xff, 2,     0xff,   EPD_CROWPANEL, 
   "m5_paper_mono", 0,    0,     0,   0,    0,   0,    0xff, 0xff, 2,     0xff,   EPD_PAPER_MONO, 
   "m5_paper_color", 0,   0,     0,   0,    0,   0,    0xff, 0xff, 2,     0xff,   EPD_PAPER_COLOR, 
+  "reterminal_e1004", 0, 0,     0,   0,    0,   0,    0xff, 0xff, 4,     0xff,   EPD_133_COLOR,
   NULL,            0,    0,     0,   0,    0,   0,    0,    0,    0,     0,      0
 }; // device_list
 TRMNL_DEVICE *pDevice = NULL;
 // TRMNL SPI ePaper panel types list. The list order is fixed and based on enumerated values
 // N.B. ALWAYS ADD NEW PANELS TO THE END OF THE LIST
-const DISPLAY_PROFILE dpList[10][3] = { // 1-bit and 2-bit display types for each profile
+const DISPLAY_PROFILE dpList[11][3] = { // 1-bit and 2-bit display types for each profile
     {{EP75_800x480, EP75_800x480_4GRAY}, {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, {EP75_800x480, EP75_800x480_4GRAY_V2}},
     {{EP583_648x480, EP583_648x480_4GRAY}, {EP583_648x480, EP583_648x480_4GRAY}, {EP583_648x480, EP583_648x480_4GRAY}},
     {{EP426_800x480, EP426_800x480_4GRAY}, {EP426_800x480, EP426_800x480_4GRAY}, {EP426_800x480, EP426_800x480_4GRAY}},
@@ -62,6 +63,7 @@ const DISPLAY_PROFILE dpList[10][3] = { // 1-bit and 2-bit display types for eac
     {{EPD_CROWPANEL42, EPD_CROWPANEL42_4GRAY},{EPD_CROWPANEL42, EPD_CROWPANEL42_4GRAY},{EPD_CROWPANEL42, EPD_CROWPANEL42_4GRAY}},
     {{EPD_M5_PAPER_MONO, EPD_M5_PAPER_MONO_4GRAY},{EPD_M5_PAPER_MONO, EPD_M5_PAPER_MONO_4GRAY},{EPD_M5_PAPER_MONO, EPD_M5_PAPER_MONO_4GRAY}},
     {{EPD_M5_PAPER_COLOR, EPD_M5_PAPER_COLOR},{EPD_M5_PAPER_COLOR, EPD_M5_PAPER_COLOR},{EPD_M5_PAPER_COLOR, EPD_M5_PAPER_COLOR}},
+    {{EPD_SEEED_E1004, EPD_SEEED_E1004},{EPD_SEEED_E1004, EPD_SEEED_E1004},{EPD_SEEED_E1004, EPD_SEEED_E1004}},
 };
 uint8_t u8SpectraPal[512]; // RGB333 mapped to closest Spectra6 color
 
@@ -1758,7 +1760,10 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
             // G5 compressed image
             BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
 #ifdef BB_EPAPER
-            bbep.allocBuffer(false);
+            if (bbep.allocBuffer(false) != BBEP_SUCCESS) {
+                Log_info("Error allocating bb_epaper frame buffer");
+                return;
+            }
             bAlloc = true;
 #endif
         //    int x = (width - pBBB->width)/2;
