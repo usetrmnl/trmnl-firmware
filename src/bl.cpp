@@ -41,7 +41,6 @@
 #include "driver/gpio.h"
 #include "esp_flash.h"
 #include <nvs.h>
-#include <debug_log_mode.h>
 #include <serialize_log.h>
 #include <preferences_persistence.h>
 #include "logo_small.h"
@@ -1704,16 +1703,14 @@ static https_request_err_e downloadAndShow()
     }
   }
 
-  // Takes effect next wake, since the threshold is fixed for the cycle at
-  // beginDebugLogCapture(). A response without the field leaves the stored
-  // expiry alone; error responses omit it, and treating that as a cancel would
-  // drop a device out of capture exactly when it is being watched.
+  // Applies from the next wake, since beginDebugLogCapture() already fixed the
+  // decision for this one.
   uint32_t stored_expiry = preferences.getUInt(PREFERENCES_LOG_EXPIRES_AT_KEY, 0);
-  uint32_t next_expiry = debug_log_expiry_to_store(stored_expiry, apiDisplayResult.response.log_expires_at);
+  uint32_t next_expiry = DebugLogCapture::next_expiry(stored_expiry, apiDisplayResult.response.log_expires_at);
   if (next_expiry != stored_expiry)
   {
     preferences.putUInt(PREFERENCES_LOG_EXPIRES_AT_KEY, next_expiry);
-    Log_info("Debug log capture window updated to %u", next_expiry);
+    Log_info("Verbose log window now ends at %u", next_expiry);
   }
 
   if (apiDisplayResult.error != HTTPS_NO_ERR)
@@ -2927,9 +2924,9 @@ bool submitLogString(const char *log_buffer)
  */
 bool storeLogString(const char *log_buffer)
 {
-  if (app_logger_capturing())
+  if (debugLogCapture.active())
   {
-    return debugLogFile.append(String(log_buffer));
+    return debugLogCapture.store(String(log_buffer));
   }
 
   LogStoreResult store_result = storedLogs.store_log(String(log_buffer));
@@ -2954,7 +2951,7 @@ static void submitStoredLogs(void)
   }
   String log = storedLogs.gather_stored_logs();
 
-  String captured = debugLogFile.gather();
+  String captured = debugLogCapture.gather();
   if (captured.length() > 0)
   {
     log = log.length() > 0 ? log + "," + captured : captured;
@@ -2987,7 +2984,7 @@ static void submitStoredLogs(void)
   if (submitLogToApiResult == true)
   {
     storedLogs.clear_stored_logs();
-    debugLogFile.clear();
+    debugLogCapture.clear();
   }
 }
 
@@ -3150,14 +3147,13 @@ DeviceStatusStamp getDeviceStatusStamp()
 
 static void beginDebugLogCapture(void)
 {
-  app_logger_begin();
-  if (!app_logger_capturing()) return;
+  debugLogCapture.begin(preferences.getUInt(PREFERENCES_LOG_EXPIRES_AT_KEY, 0), systemClock().getTime());
+  if (!debugLogCapture.active()) return;
 
-  // One stamp per wake cycle. The capture file survives sleep and keeps
-  // accumulating while WiFi is down, so a single stamp per upload would
-  // attribute older entries to the wrong cycle.
-  debugLogFile.append(serialize_device_stamp(getDeviceStatusStamp(), systemClock().getTime()));
-  Log_info("Debug log capture active");
+  // Stored files outlive a single wake, so a stamp per upload would describe
+  // older entries with the wrong device state. One stamp per wake instead.
+  debugLogCapture.store(serialize_device_stamp(getDeviceStatusStamp(), systemClock().getTime()));
+  Log_info("Collecting verbose logs");
 }
 
 void logWithAction(LogAction action, LogLevel level, const char *message, time_t time, int line, const char *file)
@@ -3177,13 +3173,11 @@ void logWithAction(LogAction action, LogLevel level, const char *message, time_t
       .retryAttempt = log_retry ? preferences.getInt(PREFERENCES_CONNECT_API_RETRY_COUNT) : 0,
       .level = level};
 
-  // During capture the device stamp is written once per wake cycle rather than
-  // repeated on every entry, which is most of the payload.
-  String json_string = app_logger_capturing() ? serialize_log_lean(input) : serialize_log(input);
-
-  // Capture always stores for the batch upload rather than posting inline: a
-  // lone lean entry would reach the server with no stamp to attach it to.
-  LogAction effective_action = app_logger_capturing() ? LOG_ACTION_STORE : action;
+  // While collecting, the device stamp is written once per wake instead of on
+  // every entry, and entries are always stored rather than posted one at a
+  // time: a stampless entry sent on its own has nothing to attach it to.
+  String json_string = debugLogCapture.active() ? serialize_log_lean(input) : serialize_log(input);
+  LogAction effective_action = debugLogCapture.active() ? LOG_ACTION_STORE : action;
 
   switch (effective_action)
   {

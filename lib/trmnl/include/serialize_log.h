@@ -10,18 +10,17 @@
 String serialize_log(const LogWithDetails &input);
 
 /**
- * @brief Serialize a log entry without the device status stamp, for debug
- *        capture where the stamp is sent once per wake cycle instead of on
- *        every entry. Cuts a verbose cycle's payload by roughly five times.
+ * @brief Serialize a log entry without the device status stamp, which is most
+ *        of an entry's size. Used while collecting verbose logs, where the
+ *        stamp is written once per wake by serialize_device_stamp instead.
  * @param input LogWithDetails struct containing all log data
  * @return String JSON formatted log data
  */
 String serialize_log_lean(const LogWithDetails &input);
 
 /**
- * @brief Serialize the device status stamp as a standalone record, written
- *        once per wake cycle so that lean entries can be attributed to the
- *        cycle they came from.
+ * @brief Serialize the device status stamp on its own, so the entries that
+ *        follow it can be read against the device state of their own wake.
  * @param stamp device status at the time of the wake
  * @param timestamp epoch seconds
  * @return String JSON formatted stamp record, tagged `"type":"stamp"`

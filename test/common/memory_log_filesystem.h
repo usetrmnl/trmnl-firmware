@@ -4,7 +4,7 @@
 #error "MemoryLogFileSystem is a test-only fake and must not be included in firmware builds"
 #endif
 
-#include <debug_log_file.h>
+#include <debug_log_capture.h>
 #include <string>
 #include <unordered_map>
 

@@ -1,12 +1,11 @@
 #pragma once
 
 #include <Arduino.h>
-#include <debug_log_file.h>
+#include <debug_log_capture.h>
 
 /**
- * @brief The board's filesystem as a LogFileSystem, for DebugLogFile to append
- *        verbose capture to. Only valid between filesystem_init() and
- *        filesystem_deinit().
+ * @brief The board's filesystem as a LogFileSystem. Only usable between
+ *        filesystem_init() and filesystem_deinit().
  * @return reference to the singleton adapter
  */
 LogFileSystem &filesystem_log_store(void);

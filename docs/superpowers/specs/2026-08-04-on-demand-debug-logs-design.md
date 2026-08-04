@@ -69,18 +69,22 @@ is. `skip_processing_logs?` maps `it['message']` over the array; records without
 
 | File | Change |
 | --- | --- |
+| `lib/trmnl/include/debug_log_capture.h` | `DebugLogCapture`: window decision, rotation, gather |
 | `lib/trmnl/include/api_types.h` | `uint32_t log_expires_at` on `ApiDisplayResponse` |
 | `lib/trmnl/src/parse_response_api_display.cpp` | parse `doc["log_expires_at"]` |
 | `src/bl.cpp`, after `fetchApiDisplay` | persist the value to preferences |
-| `src/app_logger.cpp` | derive the threshold from preferences + clock |
-| `src/bl.cpp` `storeLogString` | capturing → append to the ping-pong file |
-| `src/bl.cpp` `submitStoredLogs` | file present → POST contents, delete on success |
+| `src/app_logger.cpp` | threshold follows `DebugLogCapture#active` |
+| `src/bl.cpp` `storeLogString` | collecting → store to the rotating files |
+| `src/bl.cpp` `submitStoredLogs` | records present → POST, clear on success |
+
+The window decision and the file rotation live on one object rather than two.
+Both describe the same thing, and callers only ever need one of them at a time.
 
 ### Mode evaluation
 
 Evaluated once per wake, at logger init:
 
-- `log_expires_at` absent from the response → leave the stored value unchanged
+- `log_expires_at` absent from the response → keep the stored value
 - stored value `0` or in the past → `LOG_ERROR`
 - stored value in the future → `LOG_VERBOSE`
 - `systemClock().getTime() == 0` (unsynced) → `LOG_ERROR`
@@ -95,14 +99,14 @@ battery safety is the better default. `Clock::getTime()` returns `0` when unsync
 NTP re-syncs at most every 24h, so a cycle of capture may be lost; the next successful
 response re-arms it.
 
-### Storage: two-file ping-pong
+### Storage: two rotating files
 
 Per-line eviction from a single file requires rewriting it on every append — flash
 churn on the 256KB OG partition, and a power cut mid-rewrite loses everything. Instead:
 
 - Append to `/dbg_a` until it reaches 8KB, then switch to `/dbg_b`
-- When the active file fills, delete the inactive one and swap
-- Retention is therefore 8–16KB, and the newest entries always survive
+- When the active file fills, delete the other one and swap
+- Total stays under 16KB, and the most recent entries are the ones kept
 
 Newest-survives is the correct direction: the lines immediately before a fault are the
 diagnostic ones. Stop-when-full would preserve the boot banner and discard the crash.
@@ -136,9 +140,8 @@ connection, which on the ESP32-C3 already consumes 40–50KB.
 
 ## Testing
 
-- `lib/trmnl` builds under `env:native`, so the ping-pong rotation, the mode-evaluation
-  table above, and record serialization are unit-testable there behind the existing
-  `Persistence` / filesystem seams
+- `lib/trmnl` builds under `env:native`, so rotation, the window decision above, and
+  record serialization are unit-testable there behind the `LogFileSystem` seam
 - Response parsing of `log_expires_at`, including absence, covered in the existing
   `parse_response_api_display` tests
 - On-device: enable for one device, confirm a capture cycle uploads and both files are

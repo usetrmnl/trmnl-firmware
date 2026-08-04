@@ -35,8 +35,7 @@ bool filesystem_init(void) {
 void filesystem_deinit(void) { FS.end(); }
 
 namespace {
-/// Adapts the board's filesystem to the LogFileSystem seam that DebugLogFile
-/// is written against, so the rotation logic stays unit-testable off-device.
+/// Binds DebugLogCapture to whichever filesystem the board uses.
 class FilesystemLogStore : public LogFileSystem {
 public:
   bool exists(const char *path) override { return FS.exists(path); }

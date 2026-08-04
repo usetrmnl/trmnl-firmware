@@ -46,9 +46,9 @@ struct ApiDisplayResponse {
   SPECIAL_FUNCTION special_function;
   String action;
   String touchbar_mode;
-  /// Epoch seconds until which the device should capture verbose logs. 0 when
-  /// the server did not send the field, which means "leave the current setting
-  /// alone" rather than "off" - see debug_log_mode.h.
+  /// Epoch seconds to collect verbose logs until. 0 when the response omitted
+  /// the field, which keeps the stored window rather than ending it - see
+  /// DebugLogCapture::next_expiry.
   uint32_t log_expires_at;
 };
 

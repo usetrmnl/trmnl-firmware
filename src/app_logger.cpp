@@ -2,30 +2,21 @@
 #include <bl.h>
 #include <cstdarg>
 #include <cstdio>
-#include <debug_log_mode.h>
 #include <globals.h>
 #include <misc/clock.h>
 #include <stored_logs.h>
 #include <string_utils.h>
 #include <trmnl_log.h>
 
-/// Logs at or above this severity will be sent to the server.
-///
-/// Stays at LOG_ERROR until app_logger_begin() raises it, because verbose
-/// capture needs the filesystem: routed to the ten NVS slots instead, a verbose
-/// boot would evict the errors those slots exist to hold.
-static LogLevel store_submit_threshold = LogLevel::LOG_ERROR;
-
-void app_logger_begin(void) {
-  store_submit_threshold =
-      debug_log_threshold(preferences.getUInt(PREFERENCES_LOG_EXPIRES_AT_KEY, 0), systemClock().getTime());
-}
-
-bool app_logger_capturing(void) { return store_submit_threshold == LogLevel::LOG_VERBOSE; }
+/// Severity at or above which entries are kept for submission. Collection is
+/// decided once per wake by DebugLogCapture::begin, which runs after the
+/// filesystem is mounted; until then this answers LOG_ERROR. Sending verbose
+/// entries to the ten NVS slots beforehand would evict the errors they hold.
+static LogLevel store_submit_threshold() { return debugLogCapture.active() ? LOG_VERBOSE : LOG_ERROR; }
 
 static void handle_store_submit(LogLevel level, const char *clean_message, const char *file, int line,
                                 LogMode mode = LOG_STORE_ONLY) {
-  if (level >= store_submit_threshold) {
+  if (level >= store_submit_threshold()) {
     if (mode == LOG_STORE_ONLY) {
       logWithAction(LOG_ACTION_STORE, level, clean_message, systemClock().getTime(), line, file);
     } else {
