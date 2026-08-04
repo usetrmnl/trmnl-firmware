@@ -28,6 +28,15 @@
 #define PREFERENCES_LOG_KEY                  "log_"
 #define PREFERENCES_LOG_BUFFER_HEAD_KEY      "log_head"
 #define PREFERENCES_LOG_ID_KEY               "log_id"
+#define PREFERENCES_LOG_EXPIRES_AT_KEY       "log_until"
+
+// Verbose capture writes to two files, dropping the older one when the newer
+// fills, so retention sits between one and two times this size. Sized to stay
+// clear of the image cache on the OG's 256KB partition, and so that the upload
+// still fits in heap alongside an open TLS connection.
+#define DEBUG_LOG_FILE_OLDER                 "/dbg_a"
+#define DEBUG_LOG_FILE_NEWER                 "/dbg_b"
+#define DEBUG_LOG_FILE_MAX_BYTES             8192
 #define PREFERENCES_DEVICE_REGISTERED_KEY    "plugin"
 #define PREFERENCES_SF_KEY                   "sf"
 #define PREFERENCES_FILENAME_KEY             "filename"

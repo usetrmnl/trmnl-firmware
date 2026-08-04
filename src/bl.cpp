@@ -41,6 +41,7 @@
 #include "driver/gpio.h"
 #include "esp_flash.h"
 #include <nvs.h>
+#include <debug_log_mode.h>
 #include <serialize_log.h>
 #include <preferences_persistence.h>
 #include "logo_small.h"
@@ -81,6 +82,7 @@ static void resetDeviceCredentials(void);            // reset device credentials
 void goToSleep(void);                         // sleep preparing
 static void goToSleepButtonOnly(void);               // sleep until button press, no timer
 static void submitStoredLogs(void);
+static void beginDebugLogCapture(void);
 static void writeSpecialFunction(SPECIAL_FUNCTION function);
 void showMessageWithLogo(MSG message_type);
 static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, const char *fw_version, String message);
@@ -898,6 +900,7 @@ void bl_init(void)
   otg_turn_off(); // Since OTG function was commented out, need to ensure that OTG is turned off
   iqs323_task_i2c_unlock();
   filesystem_init();
+  beginDebugLogCapture();
 
   Wire.setClock(100000);
 
@@ -999,6 +1002,7 @@ void bl_init(void)
 
   // Mount SPIFFS
   filesystem_init();
+  beginDebugLogCapture();
 #endif // !BOARD_TRMNL_X
 
 // #ifdef BOARD_TRMNL_X
@@ -1698,6 +1702,18 @@ static https_request_err_e downloadAndShow()
       Log_error_serial("Connection attempt %d/5 failed: %s", attempt, apiDisplayResult.error_detail.c_str());
       if (attempt < 5) delay(2000);
     }
+  }
+
+  // Takes effect next wake, since the threshold is fixed for the cycle at
+  // beginDebugLogCapture(). A response without the field leaves the stored
+  // expiry alone; error responses omit it, and treating that as a cancel would
+  // drop a device out of capture exactly when it is being watched.
+  uint32_t stored_expiry = preferences.getUInt(PREFERENCES_LOG_EXPIRES_AT_KEY, 0);
+  uint32_t next_expiry = debug_log_expiry_to_store(stored_expiry, apiDisplayResult.response.log_expires_at);
+  if (next_expiry != stored_expiry)
+  {
+    preferences.putUInt(PREFERENCES_LOG_EXPIRES_AT_KEY, next_expiry);
+    Log_info("Debug log capture window updated to %u", next_expiry);
   }
 
   if (apiDisplayResult.error != HTTPS_NO_ERR)
@@ -2911,6 +2927,11 @@ bool submitLogString(const char *log_buffer)
  */
 bool storeLogString(const char *log_buffer)
 {
+  if (app_logger_capturing())
+  {
+    return debugLogFile.append(String(log_buffer));
+  }
+
   LogStoreResult store_result = storedLogs.store_log(String(log_buffer));
   if (store_result.status != LogStoreResult::SUCCESS)
   {
@@ -2932,6 +2953,12 @@ static void submitStoredLogs(void)
     return;
   }
   String log = storedLogs.gather_stored_logs();
+
+  String captured = debugLogFile.gather();
+  if (captured.length() > 0)
+  {
+    log = log.length() > 0 ? log + "," + captured : captured;
+  }
 
   String api_key = "";
   if (preferences.isKey(PREFERENCES_API_KEY))
@@ -2960,6 +2987,7 @@ static void submitStoredLogs(void)
   if (submitLogToApiResult == true)
   {
     storedLogs.clear_stored_logs();
+    debugLogFile.clear();
   }
 }
 
@@ -3120,6 +3148,18 @@ DeviceStatusStamp getDeviceStatusStamp()
   return deviceStatus;
 }
 
+static void beginDebugLogCapture(void)
+{
+  app_logger_begin();
+  if (!app_logger_capturing()) return;
+
+  // One stamp per wake cycle. The capture file survives sleep and keeps
+  // accumulating while WiFi is down, so a single stamp per upload would
+  // attribute older entries to the wrong cycle.
+  debugLogFile.append(serialize_device_stamp(getDeviceStatusStamp(), systemClock().getTime()));
+  Log_info("Debug log capture active");
+}
+
 void logWithAction(LogAction action, LogLevel level, const char *message, time_t time, int line, const char *file)
 {
   uint32_t log_id = preferences.getUInt(PREFERENCES_LOG_ID_KEY, 1);
@@ -3137,9 +3177,15 @@ void logWithAction(LogAction action, LogLevel level, const char *message, time_t
       .retryAttempt = log_retry ? preferences.getInt(PREFERENCES_CONNECT_API_RETRY_COUNT) : 0,
       .level = level};
 
-  String json_string = serialize_log(input);
+  // During capture the device stamp is written once per wake cycle rather than
+  // repeated on every entry, which is most of the payload.
+  String json_string = app_logger_capturing() ? serialize_log_lean(input) : serialize_log(input);
 
-  switch (action)
+  // Capture always stores for the batch upload rather than posting inline: a
+  // lone lean entry would reach the server with no stamp to attach it to.
+  LogAction effective_action = app_logger_capturing() ? LOG_ACTION_STORE : action;
+
+  switch (effective_action)
   {
     case LOG_ACTION_STORE:
       storeLogString(json_string.c_str());

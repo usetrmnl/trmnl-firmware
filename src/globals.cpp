@@ -6,6 +6,8 @@ Preferences preferences;
 PreferencesPersistence preferencesPersistence(preferences);
 StoredLogs storedLogs(LOG_MAX_NOTES_NUMBER / 2, LOG_MAX_NOTES_NUMBER / 2, PREFERENCES_LOG_KEY,
                       PREFERENCES_LOG_BUFFER_HEAD_KEY, preferencesPersistence);
+DebugLogFile debugLogFile(filesystem_log_store(), DEBUG_LOG_FILE_OLDER, DEBUG_LOG_FILE_NEWER,
+                          DEBUG_LOG_FILE_MAX_BYTES);
 RefreshInterval refreshInterval(preferencesPersistence);
 FirmwareUpdateService firmwareUpdateService(preferencesPersistence, systemClock(), WIFI_CONNECTION_RSSI);
 

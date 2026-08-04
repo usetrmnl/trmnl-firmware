@@ -4,7 +4,9 @@
 #include <Preferences.h>
 #include <api-client/display.h>
 #include <config.h>
+#include <debug_log_file.h>
 #include <display.h>
+#include <filesystem.h>
 #include <esp_sleep.h>
 #include <preferences_persistence.h>
 #include <refresh_interval.h>
@@ -31,6 +33,7 @@ class Modem;
 extern Preferences preferences;
 extern PreferencesPersistence preferencesPersistence;
 extern StoredLogs storedLogs;
+extern DebugLogFile debugLogFile;
 extern RefreshInterval refreshInterval;
 extern FirmwareUpdateService firmwareUpdateService;
 
