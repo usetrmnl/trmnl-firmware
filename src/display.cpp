@@ -1610,6 +1610,7 @@ PNG *png = new PNG();
                 png->decode(NULL, 0);
                 png->close();
                 delete(png); // free the decoder instance
+                bbep.writePlane(); // send the pixels to the display panel
                 return REFRESH_FULL;
             }
 #ifdef BOARD_TRMNL_4CLR
