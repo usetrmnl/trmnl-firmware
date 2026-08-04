@@ -38,7 +38,7 @@ bool WifiCaptive::startPortal() {
 
     // APSTA: STA interface is needed for WiFi scanning (esp_wifi_scan_start
     // requires STA to be active). AP-only mode limits scan quality.
-    WiFi.mode(WIFI_MODE_APSTA);
+  WiFi.mode(WIFI_MODE_APSTA);
 
     // Define the subnet mask for the WiFi network
   const IPAddress subnetMask(255, 255, 255, 0);
@@ -51,35 +51,34 @@ bool WifiCaptive::startPortal() {
     // Pre-scan BEFORE the soft AP starts so the radio is free to dwell on every
     // channel without serving any AP client.  Once a client connects the single
     // radio must stay on the AP channel, crippling background scans.
-    if (_networks.empty())
-    {
+  if (_networks.empty()) {
 #ifdef CONFIG_IDF_TARGET_ESP32C5
-        Serial.println("[Portal] C5 pre-scan: setting country=00, band=AUTO");
-        wifi_country_t wc = {
-            .cc      = "00",
-            .schan   = 1,
-            .nchan   = 13,
-            .max_tx_power = 20,
-            .policy  = WIFI_COUNTRY_POLICY_MANUAL
-        };
-        esp_err_t cerr = esp_wifi_set_country(&wc);
-        Serial.printf("[Portal] esp_wifi_set_country: %s\n", esp_err_to_name(cerr));
-        WiFi.setBandMode(WIFI_BAND_MODE_AUTO);
+    Serial.println("[Portal] C5 pre-scan: setting country=00, band=AUTO");
+    wifi_country_t wc = {
+        .cc = "00",
+        .schan = 1,
+        .nchan = 13,
+        .max_tx_power = 20,
+        .policy = WIFI_COUNTRY_POLICY_MANUAL,
+    };
+    esp_err_t cerr = esp_wifi_set_country(&wc);
+    Serial.printf("[Portal] esp_wifi_set_country: %s\n", esp_err_to_name(cerr));
+    WiFi.setBandMode(WIFI_BAND_MODE_AUTO);
 #else
-        Serial.println("[Portal] Non-C5 pre-scan");
+    Serial.println("[Portal] Non-C5 pre-scan");
 #endif
-        Serial.println("[Portal] Pre-scanning networks (synchronous)...");
-        int raw_n = WiFi.scanNetworks(false);
-        Serial.printf("[Portal] Raw scan returned %d entries\n", raw_n);
-        for (int i = 0; i < raw_n; i++) {
-            Serial.printf("[Portal]   [%d] SSID='%s' ch=%d rssi=%d\n",
-                i, WiFi.SSID(i).c_str(), WiFi.channel(i), WiFi.RSSI(i));
-        }
-        std::vector<WifiNetwork> raw = getScannedUniqueNetworks(false);
-        for (const auto& n : raw)
-            _networks.push_back({n.ssid, n.rssi, n.open, n.is5GHz});
-        Serial.printf("[Portal] Pre-scan done: %d unique networks cached\n", (int)_networks.size());
+    Serial.println("[Portal] Pre-scanning networks (synchronous)...");
+    int raw_n = WiFi.scanNetworks(false);
+    Serial.printf("[Portal] Raw scan returned %d entries\n", raw_n);
+    for (int i = 0; i < raw_n; i++) {
+      Serial.printf("[Portal]   [%d] SSID='%s' ch=%d rssi=%d\n", i, WiFi.SSID(i).c_str(), WiFi.channel(i),
+                    WiFi.RSSI(i));
     }
+    std::vector<WifiNetwork> raw = getScannedUniqueNetworks(false);
+    for (const auto &n : raw)
+      _networks.push_back({n.ssid, n.rssi, n.open, n.is5GHz});
+    Serial.printf("[Portal] Pre-scan done: %d unique networks cached\n", (int)_networks.size());
+  }
 
     // Configure the soft access point with a specific IP and subnet mask
   WiFi.softAPConfig(localIP, gatewayIP, subnetMask);
@@ -92,14 +91,14 @@ bool WifiCaptive::startPortal() {
   delay(50);
 
     // Disable AMPDU RX on the ESP32 WiFi to fix a bug on Android
-    esp_wifi_stop();
-    esp_wifi_deinit();
-    wifi_init_config_t my_config = WIFI_INIT_CONFIG_DEFAULT();
-    my_config.ampdu_rx_enable = false;
-    my_config.ampdu_tx_enable = false;  // stop AP-initiated ADDBA that clients reject (DELBA storm)
-    esp_wifi_init(&my_config);
-    esp_wifi_start();
-    vTaskDelay(100 / portTICK_PERIOD_MS); // Add a small delay
+  esp_wifi_stop();
+  esp_wifi_deinit();
+  wifi_init_config_t my_config = WIFI_INIT_CONFIG_DEFAULT();
+  my_config.ampdu_rx_enable = false;
+  my_config.ampdu_tx_enable = false; // stop AP-initiated ADDBA that clients reject (DELBA storm)
+  esp_wifi_init(&my_config);
+  esp_wifi_start();
+  vTaskDelay(100 / portTICK_PERIOD_MS); // Add a small delay
 
     // configure DSN and WEB server
   setUpDNSServer(*_dnsServer, localIP);
@@ -154,12 +153,12 @@ bool WifiCaptive::startPortal() {
             return;
           }
 #endif
-            _networks.clear();  // invalidate pre-scan cache; next /scan uses live results
-            WiFi.scanDelete();
+          _networks.clear(); // invalidate pre-scan cache; next /scan uses live results
+          WiFi.scanDelete();
 #ifdef CONFIG_IDF_TARGET_ESP32C5
-            WiFi.setBandMode(WIFI_BAND_MODE_AUTO);
+          WiFi.setBandMode(WIFI_BAND_MODE_AUTO);
 #endif
-            WiFi.scanNetworks(true);
+          WiFi.scanNetworks(true);
         }};
 
 #ifdef BOARD_TRMNL_X
@@ -173,9 +172,9 @@ bool WifiCaptive::startPortal() {
 
     // Dump pre-scan cache so it's visible in the serial log even if the
     // monitor was connected after the pre-scan ran.
-    Serial.printf("[Portal] Server up. Cache: %d networks\n", (int)_networks.size());
-    for (const auto& n : _networks)
-        Serial.printf("[Portal]   '%s' rssi=%d %s\n", n.ssid.c_str(), n.rssi, n.is5GHz ? "5GHz" : "2.4GHz");
+  Serial.printf("[Portal] Server up. Cache: %d networks\n", (int)_networks.size());
+  for (const auto &n : _networks)
+    Serial.printf("[Portal]   '%s' rssi=%d %s\n", n.ssid.c_str(), n.rssi, n.is5GHz ? "5GHz" : "2.4GHz");
 
     // Start async WiFi scan only when no external network list is provided
   if (_networks.empty()) {

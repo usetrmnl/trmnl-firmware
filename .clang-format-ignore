@@ -7,6 +7,7 @@ components/**
 lib/BMA530_SensorAPI/**
 lib/BQ27427/**
 lib/IQS323/**
+lib/trmnl_gen2/**
 lib/trmnl_x/**
 
 # pre-generated constants
