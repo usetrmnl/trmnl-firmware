@@ -283,17 +283,6 @@ uint8_t tca9535_interrupt_clear()
     return bbep.ioRead(3);
 }
 
-// Clear any ghosting on the X display by wiping it black/white 20 times
-void display_wipe(void)
-{
-    bbep.setMode(BB_MODE_1BPP);
-    bbep.fillScreen(BBEP_WHITE);
-    for (int i=0; i<20; i++) {
-        bbep.fullUpdate(CLEAR_SLOW, true);
-    }
-    bbep.einkPower(0); // power off the display
-} /* display_wipe() */
-
 void otg_turn_on()
 {
     bbep.ioPinMode(1, OUTPUT);
@@ -515,6 +504,26 @@ void display_set_light_sleep(uint8_t enabled)
     bbep.setLightSleep(enabled);
 #endif
 }
+
+// Clear any ghosting on the X display by wiping it black/white 20 times
+void display_wipe(void)
+{
+#ifdef BB_EPAPER
+    bbep.setPanelType(dpList[iTempProfile].OneBit);
+    bbep.fillScreen(BBEP_WHITE);
+    for (int i=0; i<60; i++) {
+        bbep.refresh(REFRESH_FULL); // 2 to 3 minutes of Black/White clearing of the display
+    }
+    bbep.sleep(LIGHT_SLEEP);
+#else
+    bbep.setMode(BB_MODE_1BPP);
+    bbep.fillScreen(BBEP_WHITE);
+    for (int i=0; i<100; i++) { // 200 black/white cycles should remove any ghosting
+        bbep.fullUpdate(CLEAR_SLOW, true);
+    }
+    bbep.einkPower(0); // power off the display
+#endif
+} /* display_wipe() */
 
 /**
  * @brief Function to sleep the ESP32 while saving power
