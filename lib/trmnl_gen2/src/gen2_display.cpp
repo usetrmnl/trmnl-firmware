@@ -5,11 +5,16 @@
 #include "gen2_comm.h"
 #include "gen2_epd.h"
 #include "gen2_pmic.h"
-#include "gen2_status.h"
+//#include "gen2_status.h"
 #include "gen2_pins.h"
 #include "gen2_img.h"
 #include "gen2_battery.h"
 #include <Arduino.h>
+#include <bb_epaper.h>
+#include <PNGdec.h>
+extern BBEPAPER bbep;
+int png_draw_6clr(PNGDRAW *pDraw);
+void CreateSpectra6Pal(void);
 
 void gen2_display_init(void)
 {
@@ -49,12 +54,28 @@ void gen2_display_init(void)
 
 bool gen2_display_image(const uint8_t *buf, uint32_t len)
 {
+int rc;
+PNG *png;
+
     Serial.printf("[GEN2] gen2_display_image: %u bytes\n", len);
-    bool ok = gen2_imgDecodeBuffer(buf, len);
-    if (!ok) {
-        Serial.println("[GEN2] Decode failed — filling white");
-        gen2_imgSolid(EPD_WHITE);
+    png = new PNG();
+    if (!png) {
+        Serial.println("Error instantiating PNGdec - out of memory?");
+        return false;
     }
+    CreateSpectra6Pal(); // create a fast color matching palette
+    if (png->openRAM((uint8_t *)buf, len, png_draw_6clr) == PNG_SUCCESS) {
+        rc = png->decode(NULL, 0);
+        png->close();
+    } else {
+        Serial.println("Error opening PNG image, aborting...");
+        delete(png);
+        return false;
+    }
+    if (rc == PNG_DECODE_ERROR) {
+        Serial.println("Error decoding PNG image");
+    }
+    delete(png); // free the decoder instance
 
     // Init EPD immediately before write (matches source firmware sequence)
     epdInit();
@@ -66,26 +87,27 @@ bool gen2_display_image(const uint8_t *buf, uint32_t len)
     if (epdSetPower() != DONE)
         Serial.println("[GEN2] WARNING: epdSetPower failed — using default PMIC voltages");
 
-    for (int i = 0; i < GEN2_IMG_SECTIONS; i++) {
-        if (gen2_imgSections[i])
-            epdWriteImage((unsigned char)i, gen2_imgSections[i], GEN2_IMG_SECTION_BYTES);
-    }
+    epdWriteImage(bbep.getBuffer());
     epdDisplay();
 
     // Power down EPD supply rails (10 s total discharge time per E Ink spec)
     powerSwitchDisable();
-
-    gen2_imgFree();
-    return ok;
-}
+    return true;
+} /* gen2_display_image() */
 
 bool gen2_display_image_url(const char *url)
 {
     Serial.printf("[GEN2] gen2_display_image_url: %s\n", url);
+    int rc = bbep.createVirtual(2560, 1440, BBEP_7COLOR); // Allocate the framebuffer memory for drawing
+    if (rc != BBEP_SUCCESS) {
+        Serial.println("bbep.createVirtual() failed - have you enabled PSRAM?");
+        return false;
+    }
+    bbep.fillScreen(BBEP_WHITE); // start with white in case the decode doesn't succeed fully
     bool ok = gen2_imgFetchUrl(url);
     if (!ok) {
         Serial.println("[GEN2] Fetch failed — filling white");
-        gen2_imgSolid(EPD_WHITE);
+//        gen2_imgSolid(EPD_WHITE);
     }
 
     epdInit();
@@ -96,13 +118,10 @@ bool gen2_display_image_url(const char *url)
     if (epdSetPower() != DONE)
         Serial.println("[GEN2] WARNING: epdSetPower failed — using default PMIC voltages");
 
-    for (int i = 0; i < GEN2_IMG_SECTIONS; i++) {
-        if (gen2_imgSections[i])
-            epdWriteImage((unsigned char)i, gen2_imgSections[i], GEN2_IMG_SECTION_BYTES);
-    }
+    epdWriteImage(bbep.getBuffer());
     epdDisplay();
     powerSwitchDisable();
-    gen2_imgFree();
+    bbep.freeBuffer();
     return ok;
 }
 

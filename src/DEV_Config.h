@@ -68,8 +68,7 @@
 #define EPD_BUSY_PIN 4
 #define SENSOR_SDA   21
 #define SENSOR_SCL   20
-#elif defined(BOARD_TRMNL_GEN2)
-#ifdef BOARD_FRAME
+#elif defined( BOARD_FRAME )
 // N16R8 dev board: SPI on dedicated pins, EPD BUSY via MOSFET-inverted GPIO.
 // CS/RST/DC and BQ25616 PG/STAT are managed by lib/trmnl_gen2 via TCA9555.
 #define EPD_SCK_PIN  9   // GEN2_SPI_CLK
@@ -78,7 +77,7 @@
 #define EPD_BUSY_PIN 27  // GEN2_EPD_BUSY (MOSFET-inverted)
 // SENSOR_SDA/SCL intentionally not defined: GPIO 11/12 are the gen2 main I2C bus
 // (expanders, PMIC, fuel gauge) managed exclusively by gen2_comm.cpp.
-#else
+#elif defined(BOARD_TRMNL_GEN2)
 // N8R4 production board pin assignments
 #define EPD_SCK_PIN      6
 #define EPD_MOSI_PIN     1
@@ -90,7 +89,6 @@
 #define SENSOR_SCL       12
 #define BQ25616_STAT_PIN 24
 #define BQ25616_PG_PIN   25
-#endif
 #elif defined(BOARD_XTEINK_X4)
 #define EPD_SCK_PIN  8
 #define EPD_MOSI_PIN 10

@@ -8,8 +8,9 @@
 #include "gen2_pmic.h"
 #include "gen2_status.h"
 #include <Arduino.h>
+#include <SPI.h>
 #include <string.h>
-
+extern SPISettings spiSettings;
 // CS pin mapping: expander1 pins 0-7 in the correct IC order
 static const unsigned char spiCsPin[8] = {
     EXP1_SPI1_CS0, EXP1_SPI1_CS1, EXP1_SPI1_CS2, EXP1_SPI1_CS3,
@@ -176,13 +177,33 @@ void epdInit(void)
     Serial.println("[EPD] Init complete");
 }
 
-void epdWriteImage(unsigned char csx, const unsigned char *imageData, unsigned long len)
+void epdWriteImage(void *pFrameBuffer)
 {
-    Serial.printf("[EPD] Writing image to IC %d (%lu bytes)\n", csx, len);
-    epdSetCs(csx, GPIO_LOW);
-    spiTransmitLargeData(EPD_CMD_DTM, (unsigned char *)imageData, len);
-    epdSetCs(csx, GPIO_HIGH);
-}
+int x, y, tx, ty, i;
+int csx, iWidth, iPitch;
+uint8_t *s;
+
+    iPitch = 2560/2; // bytes per row of source image
+    Serial.println("[EPD] Writing image data to EPD");
+    for (y=0; y<2; y++) { // top/bottom half of display
+        for (x=0; x<4; x++) { // 4 horizontal regions
+            csx = (y * 4) + x;
+            s = (uint8_t *)pFrameBuffer;
+            s += (y * 720) * iPitch; // point to top or bottom half of the display
+            s += (x * 400); // 400 bytes per 800 pixel region
+            iWidth = (x < 3) ? 400 : 80; // 800 or 160 pixel wide sections
+            epdSetCs(csx, GPIO_LOW);
+            SPI.beginTransaction(spiSettings); // DEBUG - convert to QSPI
+            SPI.transfer(EPD_CMD_DTM);
+            for (ty = 0; ty < 720; ty++) { // write N x 720 pixels into this controller's RAM
+                SPI.writeBytes(s, iWidth);
+                s += iPitch; // next line
+            } // per row of this section
+            SPI.endTransaction();
+            epdSetCs(csx, GPIO_HIGH);
+        } // per horizontal section
+    } // per vertical section
+} /* epdWriteImage() */
 
 void epdDisplay(void)
 {

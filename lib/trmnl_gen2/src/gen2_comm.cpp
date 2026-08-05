@@ -8,7 +8,7 @@
 TCA9555 expander1(0x20);
 TCA9555 expander2(0x21);
 
-static SPISettings spiSettings(4000000, MSBFIRST, SPI_MODE0);
+SPISettings spiSettings(4000000, MSBFIRST, SPI_MODE0);
 static bool spiInitialized = false;
 
 void gen2_spiInit(void)

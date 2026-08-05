@@ -46,7 +46,7 @@ void          epdWrite(unsigned char cmd, const unsigned char *data, unsigned in
 void          epdRead(unsigned char cmd, unsigned char *data, unsigned int len);
 void          epdWriteCommand(unsigned char cmd);
 void          epdWriteData(const unsigned char *data, unsigned int len);
-void          epdWriteImage(unsigned char csx, const unsigned char *imageData, unsigned long len);
+void          epdWriteImage(void *imageData);
 void          epdDisplay(void);
 unsigned char epdSetPower(void);
 unsigned char epdCheckDriverICStatus(void);

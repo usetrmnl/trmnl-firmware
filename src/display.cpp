@@ -17,7 +17,8 @@
 #define MAX_BIT_DEPTH 8
 #ifdef BOARD_TRMNL_GEN2
 #include "gen2_display.h"
-#elif !defined(BOARD_X_CLASS)
+#endif
+#if !defined(BOARD_X_CLASS)
 #define BB_EPAPER
 #include "bb_epaper.h"
 #include <SPIFFS.h>
@@ -60,9 +61,7 @@ BBEPAPER bbep(EP73_SPECTRA_800x480);
 };
 BBEPAPER bbep(EP75_800x480);
 #endif
-#ifdef BOARD_SEEED_RETERMINAL_E1002
 uint8_t u8SpectraPal[512]; // RGB333 mapped to closest Spectra6 color
-#endif // E1002
 
 #else // BOARD_X_CLASS (and not BOARD_TRMNL_GEN2)
 #include "esp_sleep.h"
@@ -910,7 +909,6 @@ unsigned char GetBWYRPixel(int r, int g, int b)
 } /* GetBWYRPixel() */
 #endif // BB_EPAPER
 
-#ifdef BOARD_SEEED_RETERMINAL_E1002
 //
 // bb_epaper colors to map to Spectra6 colors
 // The RGB values are not correct for the panel, but for simple mapping
@@ -965,14 +963,13 @@ uint16_t rgb333;
     c = u8SpectraPal[rgb333];
     return c;
 } /* GetSpectraPixel() */
-#endif // E1002
+
 /**
  * @brief Callback function for each line of PNG decoded
  * @param PNGDRAW structure containing the current line and relevant info
  * @return none
  */
 #ifdef BB_EPAPER
-#ifdef BOARD_SEEED_RETERMINAL_E1002
 //
 // Draw the PNG image into the local framebuffer memory using the drawPixel() method
 // to do color translation and to properly format the memory layout
@@ -1072,7 +1069,6 @@ int png_draw_6clr(PNGDRAW *pDraw)
         } // for x
     return 1; // continue decoding
 } /* png_draw_6clr() */
-#endif // E1002 (Spectra6 only)
 
 #ifdef BOARD_TRMNL_4CLR
 //
