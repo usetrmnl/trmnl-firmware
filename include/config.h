@@ -47,10 +47,10 @@
 
 #define DISPLAY_BMP_IMAGE_SIZE 48062 // in bytes - 62 bytes - header; 48000 bytes - bitmap (480*800 1bpp) / 8
 #define DEFAULT_IMAGE_SIZE 48000
-#if defined(BOARD_X_CLASS)
-#define MAX_IMAGE_SIZE 750000 // Use PSRAM on the ESP32-S3 (all X-class boards have PSRAM)
+#if defined(BOARD_HAS_PSRAM)
+#define MAX_IMAGE_SIZE 750000 // Use PSRAM on the ESP32-S3/C5 (all X-class boards have PSRAM)
 #else
-#define MAX_IMAGE_SIZE 90000 // largest compressed image we can receive
+#define MAX_IMAGE_SIZE 90000 // largest compressed image we can receive in static RAM
 #endif
 #define SLEEP_uS_TO_S_FACTOR 1000000           /* Conversion factor for micro seconds to seconds */
 #define SLEEP_TIME_TO_SLEEP 900                /* Time ESP32 will go to sleep (in seconds) */
