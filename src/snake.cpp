@@ -6,7 +6,7 @@
  *   - 36 px cells -> exact 52 x 39 grid, no remainder.
  *   - Per tick only the new head, vacated tail, and (rarely) new food cell
  *     change, so each frame is a couple of fillRect() calls followed by a
- *     flicker-free bbep.partialUpdate(false).
+ *     flicker-free partial update (rails kept on between ticks for speed).
  *   - A fullUpdate() is forced every FULL_REFRESH_EVERY partials to clear
  *     ghosting, plus on game start and game over.
  *
@@ -16,7 +16,9 @@
  *     map. Every wait therefore releases the lock so the task can run, then
  *     retakes it and services RDY -- the same dance as tap_mode_is_hold().
  *     Edge detection on the CH0/CH2 touch states; taps are queued (depth 2)
- *     so a fast L-then-R double-turn between ticks isn't lost.
+ *     so a fast L-then-R double-turn between ticks isn't lost. Round arrow
+ *     buttons in the bottom corners mirror the touch zones and invert while
+ *     the zone is held, so taps get immediate on-screen feedback.
  ******************************************************************************/
 
 // BOARD_TRMNL_X, not BOARD_X_CLASS: the touchbar (iqs323) only exists on the
@@ -54,6 +56,20 @@ extern Preferences preferences;
 #define FULL_REFRESH_EVERY           128              // ghost-clearing cadence (in partial updates)
 #define IDLE_TIMEOUT_MS              90000            // no input on game-over screen -> exit
 #define EXIT_HOLD_MS                 2000             // hold middle this long during play to quit
+
+// On-screen touch controls: one round button per corner of the bottom edge,
+// mirroring the touchbar zones (left = CCW, right = CW). Normal state is a
+// black outline on white; while the zone is touched the button inverts.
+#define ICON_R                       64               // button radius
+#define ICON_MARGIN                  28               // button edge to panel edge
+#define ICON_CY                      (GRID_H * CELL_PX - ICON_MARGIN - ICON_R)
+#define ICON_CX_LEFT                 (ICON_MARGIN + ICON_R)
+#define ICON_CX_RIGHT                (GRID_W * CELL_PX - ICON_MARGIN - ICON_R)
+#define ICON_ARC_OUTER               38               // arrow ring radii
+#define ICON_ARC_INNER               24
+#define ICON_GAP_HW                  16               // half-width of the ring's top opening
+#define ICON_AH_LEN                  22               // arrowhead length
+#define ICON_AH_HW                   13               // arrowhead half-height
 
 #define MESSAGE_BOX_W                800              // STARTING / GAME OVER box
 #define MESSAGE_BOX_H                260
@@ -148,10 +164,73 @@ static void draw_food(cell_t c) {
   bbep.drawRect(c.x * CELL_PX + 7, c.y * CELL_PX + 7, CELL_PX - 14, CELL_PX - 14, BBEP_BLACK);
 }
 
+// ---------------------------------------------------------------------------
+// Touch control icons
+// ---------------------------------------------------------------------------
+// A partial update costs ~100ms of waveform passes no matter how few pixels
+// changed, so press feedback never gets its own update: poll_touch() only
+// latches state here and the next per-tick flush paints it. The flash timer
+// keeps a tap black for at least ICON_FLASH_MIN_MS so a press-and-release
+// that fits between two flushes still visibly blinks.
+#define ICON_FLASH_MIN_MS 250
+static bool icon_pressed[2]; // [0] left / CCW, [1] right / CW
+static unsigned long icon_flash_until[2];
+
+// Filled triangle pointing horizontally: vertical base at bx, tip at tx.
+static void fill_arrowhead(int bx, int tx, int cy, int half_h, uint8_t color) {
+  int len = abs(tx - bx);
+  int dir = (tx > bx) ? 1 : -1;
+  for (int i = 0; i <= len; i++) {
+    int half = half_h * (len - i) / len;
+    bbep.fillRect(bx + dir * i, cy - half, 1, 2 * half + 1, color);
+  }
+}
+
+// Round button holding a rotation arrow: a ring opened at the top with an
+// arrowhead on the direction-of-travel end (left button CCW, right CW).
+// Pressed inverts the whole button; the border stays black either way.
+static void draw_touch_icon(uint8_t side, bool pressed) {
+  const int cx = side ? ICON_CX_RIGHT : ICON_CX_LEFT;
+  const int cy = ICON_CY;
+  const uint8_t fg = pressed ? BBEP_WHITE : BBEP_BLACK;
+  const uint8_t bg = pressed ? BBEP_BLACK : BBEP_WHITE;
+
+  bbep.fillCircle(cx, cy, ICON_R, bg);
+  bbep.drawCircle(cx, cy, ICON_R, BBEP_BLACK);
+  bbep.drawCircle(cx, cy, ICON_R - 1, BBEP_BLACK);
+
+  // Arrow ring, then open a gap at the top for the arrowhead to hang off.
+  bbep.fillCircle(cx, cy, ICON_ARC_OUTER, fg);
+  bbep.fillCircle(cx, cy, ICON_ARC_INNER, bg);
+  bbep.fillRect(cx - ICON_GAP_HW, cy - ICON_ARC_OUTER - 2, 2 * ICON_GAP_HW, ICON_ARC_OUTER - 10, bg);
+
+  // At the top of the circle CW travel is +x and CCW is -x, so the arrowhead
+  // sits on that side of the gap, pointing outward, centred on the ring.
+  const int arc_mid = (ICON_ARC_OUTER + ICON_ARC_INNER) / 2;
+  if (side) {
+    fill_arrowhead(cx + ICON_GAP_HW - 2, cx + ICON_GAP_HW - 2 + ICON_AH_LEN, cy - arc_mid, ICON_AH_HW, fg);
+  } else {
+    fill_arrowhead(cx - ICON_GAP_HW + 2, cx - ICON_GAP_HW + 2 - ICON_AH_LEN, cy - arc_mid, ICON_AH_HW, fg);
+  }
+}
+
+static void draw_touch_icons(void) {
+  for (uint8_t i = 0; i < 2; i++) {
+    bool show = icon_pressed[i] || (long)(icon_flash_until[i] - millis()) > 0;
+    draw_touch_icon(i, show);
+  }
+}
+
+// keepOn=true holds the eink power rails up between updates; the TPS65185
+// power-up sequence (I2C writes plus PWRGOOD polling) otherwise costs ~10ms
+// on every tick. The rails are dropped on the exit paths of snake_run().
 static void flush_partial(void) {
-  bbep.partialUpdate(false);
+  // The icons live inside the play field, so the snake overdraws them as it
+  // passes; repainting them before every flush keeps them on top.
+  draw_touch_icons();
+  bbep.partialUpdate(true);
   if (++partials_since_full >= FULL_REFRESH_EVERY) {
-    bbep.fullUpdate();
+    bbep.fullUpdate(CLEAR_SLOW, true);
     partials_since_full = 0;
   }
 }
@@ -164,15 +243,26 @@ static uint8_t tap_queue_len;
 static bool prev_touch[3];
 
 // Read the touchbar state (refreshed by input_poll_delay); enqueue newly-
-// pressed L/R, return true if the middle channel is currently held.
+// pressed L/R, return true if the middle channel is currently held. L/R edges
+// only latch icon state -- the next per-tick flush paints it, so polling
+// never blocks on a display update.
 static bool poll_touch(void) {
   for (uint8_t ch = 0; ch < 3; ch++) {
     bool now = iqs323.channel_touchState((iqs323_channel_e)ch);
     bool pressed = now && !prev_touch[ch];
     prev_touch[ch] = now;
 
-    if (pressed && ch != 1 && tap_queue_len < sizeof(tap_queue)) {
-      tap_queue[tap_queue_len++] = (ch == 0) ? -1 : +1; // -1 turn CCW, +1 turn CW
+    if (ch == 1) {
+      continue;
+    }
+
+    uint8_t icon = (ch == 0) ? 0 : 1;
+    icon_pressed[icon] = now;
+    if (pressed) {
+      icon_flash_until[icon] = millis() + ICON_FLASH_MIN_MS;
+      if (tap_queue_len < sizeof(tap_queue)) {
+        tap_queue[tap_queue_len++] = (ch == 0) ? -1 : +1; // -1 turn CCW, +1 turn CW
+      }
     }
   }
   return prev_touch[1];
@@ -228,6 +318,8 @@ static void reset_game(void) {
   score = 0;
   tap_queue_len = 0;
   partials_since_full = 0;
+  icon_pressed[0] = icon_pressed[1] = false; // wait_for_release() ran before this
+  icon_flash_until[0] = icon_flash_until[1] = 0;
 
   for (uint8_t i = 0; i < 3; i++) {
     body[i] = (cell_t){(uint8_t)(GRID_W / 2 - 1 + i), (uint8_t)(GRID_H / 2)};
@@ -240,6 +332,7 @@ static void reset_game(void) {
   }
   randomSeed(esp_random());
   place_food();
+  draw_touch_icons();
   bbep.fullUpdate(CLEAR_NONE); // wipe_screen() just cleared; skip a second flash
 }
 
@@ -429,6 +522,7 @@ void snake_run(void) {
           middle_hold_start = millis();
         } else if (millis() - middle_hold_start >= EXIT_HOLD_MS) {
           Log_info("Snake: exit via middle hold");
+          bbep.einkPower(0); // flush_partial() left the rails up
           report_score(millis() - game_start);
           return;
         }
