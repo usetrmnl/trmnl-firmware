@@ -74,7 +74,6 @@ const char *szHTTPErrors[] = {
 };
 
 static float vBatt;
-
 static https_request_err_e downloadAndShow(); // download and show the image
 static https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse);
 static void resetDeviceCredentials(void);            // reset device credentials API key, Friendly ID, Wi-Fi SSID and password
@@ -1707,6 +1706,11 @@ static https_request_err_e downloadAndShow()
   }
 
   https_request_err_e result = handleApiDisplayResponse(apiDisplayResult.response);
+  if (strcmp(apiDisplayResult.response.filename.c_str(), "screen_wiper.png") == 0) {
+      Log_info("Detected screen wiper filename: %s, starting 20 passes of clearing...\n", apiDisplayResult.response.filename.c_str());
+      display_wipe();
+      return result; // no image to display
+  }
 
   if (!status && result == HTTPS_SUCCESS) { // this means we already have this image stored in SPIFFS
       char szTemp[36];
