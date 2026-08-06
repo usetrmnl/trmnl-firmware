@@ -163,23 +163,6 @@
       text-transform: uppercase; color: var(--ink-2); margin: 0;
     }
 
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      margin-bottom: 20px;
-      width: 100%;
-    }
-
-    textarea {
-      font-family: monospace;
-      resize: vertical;
-    }
-
-    select {
-      height: 35px;
-    }
-
     .fields { display: flex; flex-direction: column; gap: 16px; }
     .field { display: flex; flex-direction: column; gap: 6px; }
     .field label {
@@ -191,7 +174,7 @@
     .inp {
       font-family: var(--mono); font-size: 15px; color: var(--ink);
       background: var(--surface); border: 1px solid var(--rule); border-radius: 2px;
-      padding: 13px 12px; width: 100%; transition: border-color .1s steps(2);
+      padding: 13px 12px; width: 100%; min-height: 48px; transition: border-color .1s steps(2);
     }
     .inp::placeholder { color: var(--ink-3); }
     .inp:focus {
@@ -200,7 +183,7 @@
     .pw-wrap { position: relative; display: flex; }
     .pw-wrap .inp { padding-right: 62px; }
     .pw-toggle {
-      position: absolute; right: 1px; top: 1px; bottom: 1px; padding: 0 12px;
+      position: absolute; right: 1px; top: 0; bottom: 0; padding: 0 12px;
       background: none; border: 0; border-left: 1px solid var(--rule-soft);
       font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em;
       text-transform: uppercase; color: var(--ink-2); cursor: pointer;
@@ -288,7 +271,7 @@
         }
       }
 
-      // if custom server form-group is visible, validate the url
+      // if the custom server field is visible, validate the url
       var customServerVisible = !document.getElementById('custom_server_form_group').hidden;
       if (customServerVisible && server) {
         try {
@@ -509,15 +492,6 @@
     }
 
     function hideAlert() { document.getElementById('message').hidden = true; }
-
-    function showAdvanced(){
-      fetch('/advanced', {
-        method: 'GET',
-      })
-        .catch(_ => {
-          displayAlert('Failed to load advanced settings');
-        });
-    }
 
     async function loadServerFromDevice() {
       // pull value from advanced.html, if present
