@@ -5,48 +5,97 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>TRMNL Wi-Fi Configuration</title>
   <style>
-    table {
-      border-spacing: 1;
-      border-collapse: collapse;
-      background: white;
-      border-radius: 4px;
-      overflow: hidden;
-      width: 100%;
-      margin: 0 auto;
-      position: relative;
+    :root {
+      --paper: #F0F0EB; --surface: #FFFFFF; --ink: #1B1B19; --ink-2: #63635C;
+      --ink-3: #93938B; --rule: #CFCFC7; --rule-soft: #E1E1DA; --spark: #F86527;
+      --invert-fg: #F0F0EB; --warn-bg: #FBF0DC; --warn-ink: #6B4E12;
+      --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+      --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     }
-
-    table td,
-    table th {
-      padding-left: 8px;
-      text-align: left;
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --paper: #1A1A17; --surface: #242420; --ink: #EDEDE6; --ink-2: #9E9E95;
+        --ink-3: #6E6E66; --rule: #3A3A33; --rule-soft: #2C2C27; --spark: #FA7C41;
+        --invert-fg: #1A1A17; --warn-bg: #322A16; --warn-ink: #E3C77E;
+      }
     }
-
-    table td {
-      text-align: right;
-    }
-
-    table tbody tr {
-      height: 30px;
-      border-bottom: 1px solid #BBBB;
-      font-size: 16px;
-    }
-
-    table tbody.hoverable tr:hover {
-      background: #f2f2f2;
-    }
-
-    .selected {
-      background-color: #BBBB;
-    }
-
+    * { box-sizing: border-box; }
     body {
-      font: 400 14px 'Calibri', 'Arial';
+      margin: 0; background: var(--paper); color: var(--ink);
+      font: 400 13.5px/1.55 var(--sans); -webkit-text-size-adjust: 100%;
     }
-
-    blockquote {
-      color: white;
-      text-align: center;
+    .p-head {
+      display: flex; flex-direction: column; align-items: stretch; gap: 10px;
+      padding: 14px 20px 11px; border-bottom: 1px solid var(--rule);
+      position: sticky; top: 0; background: var(--paper); z-index: 2;
+    }
+    .p-head-row { display: flex; align-items: center; justify-content: space-between; }
+    .lockup { display: flex; align-items: center; gap: 9px; }
+    .lockup .word {
+      font-family: var(--mono); font-size: 15px; font-weight: 600; letter-spacing: .16em;
+    }
+    .spark { width: 20px; height: 20px; display: block; }
+    .spark path { fill: var(--spark); }
+    .spark g { transform-origin: 15px 15.2px; }
+    .spark.ticking g { animation: tick 1.4s steps(7, end) infinite; }
+    @keyframes tick { to { transform: rotate(360deg); } }
+    .mode {
+      font-family: var(--mono); font-size: 10px; letter-spacing: .12em;
+      text-transform: uppercase; color: var(--ink-2);
+      display: flex; align-items: center; gap: 6px;
+    }
+    .mode .dot {
+      width: 6px; height: 6px; background: var(--spark); border-radius: 50%;
+      animation: pulse 2s steps(2, end) infinite;
+    }
+    @keyframes pulse { 50% { opacity: .25; } }
+    .p-head-mac {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      padding-top: 9px; border-top: 1px solid var(--rule-soft);
+    }
+    .mac-value-hdr {
+      font-family: var(--mono); font-size: 16px; color: var(--ink);
+      font-variant-numeric: tabular-nums; letter-spacing: .01em;
+      -webkit-user-select: all; user-select: all;
+    }
+    .mac-band {
+      font-family: var(--mono); font-size: 9.5px; letter-spacing: .06em; line-height: 1.2;
+      padding: 2px 4px; border: 1px solid var(--ink-3); color: var(--ink-2);
+      border-radius: 2px; flex: 0 0 auto;
+    }
+    .p-body {
+      padding: 22px 20px 32px; display: flex; flex-direction: column; gap: 26px;
+      max-width: 480px; margin: 0 auto;
+    }
+    .p-title {
+      font-family: var(--mono); font-size: 21px; font-weight: 600;
+      letter-spacing: -.015em; margin: 0 0 6px;
+    }
+    .p-sub { color: var(--ink-2); margin: 0; }
+    .meta {
+      display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+      font-family: var(--mono); font-size: 11px; color: var(--ink-3);
+      padding-top: 14px; border-top: 1px solid var(--rule); letter-spacing: .04em;
+    }
+    .meta b { color: var(--ink-2); font-weight: 400; }
+    .mac-footer {
+      display: flex; flex-direction: column; gap: 5px;
+      padding-top: 14px; border-top: 1px solid var(--rule);
+    }
+    .mac-label {
+      font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em;
+      text-transform: uppercase; color: var(--ink-3);
+    }
+    .mac-alt {
+      font-family: var(--mono); font-size: 13.5px; color: var(--ink-2);
+      font-variant-numeric: tabular-nums; -webkit-user-select: all; user-select: all;
+    }
+    :focus-visible { outline: 2px solid var(--spark); outline-offset: 2px; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+        transition-duration: .001ms !important;
+      }
     }
 
     #loader-wrapper {
@@ -96,13 +145,6 @@
 
     #loader-wrapper {
       display: none;
-    }
-
-    .div-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      margin: 30px 30px 30px 30px;
     }
 
     .form-group {
@@ -183,10 +225,6 @@
       filter: saturate(0.8);
     }
 
-    h1 {
-      text-align: center;
-    }
-
     .alert-primary {
       color: #383d41;
       background-color: #e2e3e5;
@@ -215,13 +253,6 @@
       right: 50px;
       cursor: pointer;
       margin-top: 32px;
-    }
-
-    caption {
-      padding-top: .5rem;
-      padding-bottom: .5rem;
-      color: #6c757d;
-      text-align: left;
     }
 
     .bi::before {
@@ -531,7 +562,12 @@
       let response = await fetch('/scan' + (force ? '?force=1' : ''), {
         method: 'GET',
       })
-        .catch(_ => {
+        .catch(async _ => {
+          try {
+            const r = await fetch('/device-settings');
+            const d = await r.json();
+            if (d.mac) displayInfo(d.mac, d.mac_5ghz);
+          } catch (_) { }
           scanningLoader.style.display = 'none';
           scanningInfoBox.textContent =
             'There was an error while scanning networks. Please refresh the page or enter your wifi name manually';
@@ -544,7 +580,7 @@
         scanningLoader.style.display = 'none';
         setRefreshButtonState(false);
 
-        displayInfo(json.mac_5ghz ? `2.4GHz MAC: ${json.mac}\n5GHz MAC: ${json.mac_5ghz.toUpperCase()}` : `MAC: ${json.mac}`);
+        displayInfo(json.mac, json.mac_5ghz);
         var knownNetworks = json.networks.filter((item) => item.saved);
         var otherNetworks = json.networks.filter((item) => !item.saved);
         if (knownNetworks.length > 0) {
@@ -631,20 +667,21 @@
     }
 
     function displayWifiInfo(response) {
-      var mac = response.mac;
-      var macInfo = response.mac_5ghz ? `2.4GHz MAC: ${mac}\n5GHz MAC: ${response.mac_5ghz.toUpperCase()}` : `MAC: ${mac}`;
-
       if (response.ssid.length > 0) {
         displayAlert(`Connecting to: ${response.ssid}`, "alert-warning");
       }
-      displayInfo(macInfo);
+      displayInfo(response.mac, response.mac_5ghz);
     }
 
-    function displayInfo(message) {
-      var infoMessageBox = document.getElementById("info-message");
-      infoMessageBox.style.whiteSpace = "pre-wrap";
-      infoMessageBox.textContent = message;
-      infoMessageBox.style.display = "block";
+    function displayInfo(mac, mac5) {
+      if (mac) {
+        document.getElementById('mac24').textContent = mac;
+        document.getElementById('mac-row').hidden = false;
+      }
+      if (mac5) {
+        document.getElementById('mac5').textContent = mac5.toUpperCase();
+        document.getElementById('info-message').hidden = false;
+      }
     }
 
     function displayAlert(message, type) {
@@ -703,9 +740,24 @@
 </head>
 
 <body>
-  <img src="/logo.svg" style="margin-left: auto; margin-right: auto; width: 50%; display: block;" />
-  <h1>Wi-Fi Configuration</h1>
-  <div class="div-container">
+  <header class="p-head">
+    <div class="p-head-row">
+      <span class="lockup">
+        <svg class="spark" id="headSpark" viewBox="0 0 30 30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g fill-rule="evenodd" clip-rule="evenodd"><path d="M8.02188 2.11328L15.8862 5.07445L14.4258 8.98481L6.56146 6.02364L8.02188 2.11328Z"/><path d="M20.6315 1.14647L23.2291 9.16642L19.2738 10.458L16.6761 2.43807L20.6315 1.14647Z"/><path d="M29.244 10.4452L24.6188 17.4848L21.147 15.185L25.7722 8.14549L29.244 10.4452Z"/><path d="M27.374 23.0034L19.0089 23.7616L18.6349 19.6023L27 18.8441L27.374 23.0034Z"/><path d="M16.4297 29.3638L10.6237 23.2697L13.6293 20.3828L19.4352 26.4769L16.4297 29.3638Z"/><path d="M4.65232 24.7423L5.77753 16.3849L9.89932 16.9443L8.77411 25.3017L4.65232 24.7423Z"/><path d="M0.910558 12.6074L8.11961 8.28L10.2539 11.8645L3.04481 16.192L0.910558 12.6074Z"/></g></svg>
+        <span class="word">TRMNL</span>
+      </span>
+      <span class="mode"><i class="dot"></i> Setup mode</span>
+    </div>
+    <div class="p-head-mac" id="mac-row" hidden>
+      <span class="mac-value-hdr" id="mac24"></span>
+      <span class="mac-band">2.4G</span>
+    </div>
+  </header>
+  <div class="p-body">
+    <div>
+      <h1 class="p-title">Connect your TRMNL</h1>
+      <p class="p-sub">Pick your network and enter its password. Your TRMNL restarts once it's online.</p>
+    </div>
     <table id="saved-networks" style="display: none;">
       <caption>Saved Networks</caption>
       <tbody id="table-saved">
@@ -718,8 +770,6 @@
     </table>
     <p id="scanning-info">Scanning networks, please wait...</p>
     <div id="scanning-loader" class="loader"></div>
-  </div>
-  <div class="div-container">
     <div class="form-group">
       <label for="ssid">SSID</label>
       <input type="text" id="ssid" name="ssid" placeholder="Enter your Wi-Fi name" oninput="document.getElementById('band').value = ''">
@@ -758,8 +808,9 @@
     <span style="margin-top: 20px;">
       <button id="btnAdvanced" class="button button-primary" onclick="location.href='/advanced'">Advanced</button>
     </span>
-    <div class="form-group" style="margin-top: 10px;">
-      <div class="alert alert-primary" id="info-message" role="alert" style="display: none;"></div>
+    <div class="mac-footer" id="info-message" hidden>
+      <span class="mac-label">5 GHz MAC</span>
+      <span class="mac-alt" id="mac5"></span>
     </div>
   </div>
   <div id="loader-wrapper">
