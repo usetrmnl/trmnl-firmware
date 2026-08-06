@@ -561,16 +561,20 @@
 
     async function getInfo(force) {
       document.getElementById('headSpark').classList.add('ticking');
+      document.getElementById('scan-error').hidden = true;
       let scanningInfoBox = document.getElementById('scanning-info');
       let scanningLoader = document.getElementById('scanning-loader');
       let response = await fetch('/scan' + (force ? '?force=1' : ''), {
         method: 'GET',
       })
-        .catch(_ => {
-          showScanError();
-        });
+        .catch(_ => null);
 
-      if (response && response.status == 200) {
+      if (!response) {
+        showScanError(); // network-level failure
+        return;
+      }
+
+      if (response.status == 200) {
         var json = await response.json();
         scanningInfoBox.hidden = true;
         scanningLoader.hidden = true;
@@ -587,10 +591,10 @@
         otherNetworks.forEach((item, row) => {
           appendWifiToTable("table-others", item.name, item.open, item.rssi, item.enterprise, true, item.band);
         });
-      } else if (response && response.status == 202) {
+      } else if (response.status == 202) {
         setTimeout(getInfo, 2000); // repeat in 2s
       } else {
-        showScanError();
+        showScanError(); // any HTTP error status
       }
     }
 
