@@ -102,6 +102,67 @@
       }
     }
 
+    .grp-label {
+      font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em;
+      text-transform: uppercase; color: var(--ink-3);
+      display: flex; align-items: center; justify-content: space-between;
+      padding-bottom: 8px; border-bottom: 1px solid var(--rule);
+    }
+    .grp-label button {
+      font: inherit; background: none; border: 0; padding: 0; cursor: pointer;
+      color: var(--spark); border-bottom: 1px solid currentColor;
+    }
+    .grp-label button:disabled { color: var(--ink-3); cursor: default; }
+    .netlist { display: flex; flex-direction: column; }
+    .net {
+      display: flex; align-items: center; gap: 10px; min-height: 48px;
+      padding: 0 10px; margin: 0 -10px; width: calc(100% + 20px);
+      border: 0; border-bottom: 1px solid var(--rule-soft);
+      background: transparent; color: var(--ink); font: inherit; text-align: left;
+      transition: background-color .12s steps(3), color .12s steps(3);
+    }
+    .net:last-child { border-bottom: 0; }
+    button.net { cursor: pointer; }
+    button.net:hover { background: var(--rule-soft); }
+    .net:focus-visible { outline: 2px solid var(--spark); outline-offset: -2px; }
+    .net[aria-checked="true"] { background: var(--ink); color: var(--invert-fg); }
+    .net[aria-checked="true"] .badge { border-color: var(--invert-fg); color: var(--invert-fg); }
+    .net[aria-checked="true"] .bar { border-color: var(--invert-fg); }
+    .net[aria-checked="true"] .bar.on { background: var(--invert-fg); }
+    .net[aria-checked="true"] .lock { fill: var(--invert-fg); }
+    .net[aria-checked="true"] .caret { opacity: 1; }
+    .ssid {
+      font-family: var(--mono); font-size: 14.5px; flex: 1 1 auto;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .caret { color: var(--spark); font-family: var(--mono); font-size: 12px; opacity: 0; flex: 0 0 8px; }
+    .badge {
+      font-family: var(--mono); font-size: 9.5px; letter-spacing: .06em; line-height: 1.2;
+      padding: 2px 4px; border: 1px solid var(--ink-3); color: var(--ink-2); border-radius: 2px;
+      flex: 0 0 auto;
+    }
+    .lock { width: 11px; height: 11px; fill: var(--ink-3); flex: 0 0 auto; }
+    .bars { display: flex; align-items: flex-end; gap: 2px; height: 12px; flex: 0 0 auto; }
+    .bar { width: 3px; border: 1px solid var(--ink-3); border-radius: 1px; }
+    .bar:nth-child(1) { height: 5px; }
+    .bar:nth-child(2) { height: 8.5px; }
+    .bar:nth-child(3) { height: 12px; }
+    .bar.on { background: var(--ink); border-color: var(--ink); }
+    .dither {
+      background-image:
+        linear-gradient(45deg, var(--rule) 25%, transparent 25%, transparent 75%, var(--rule) 75%),
+        linear-gradient(45deg, var(--rule) 25%, transparent 25%, transparent 75%, var(--rule) 75%);
+      background-size: 4px 4px; background-position: 0 0, 2px 2px;
+    }
+    .skel { height: 48px; border-bottom: 1px solid var(--rule-soft); display: flex; align-items: center; }
+    .skel span { height: 9px; border-radius: 1px; opacity: .6; }
+    .scanning { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 26px 0 22px; }
+    .scanning .spark { width: 30px; height: 30px; }
+    .scanning p {
+      font-family: var(--mono); font-size: 11px; letter-spacing: .12em;
+      text-transform: uppercase; color: var(--ink-2); margin: 0;
+    }
+
     #loader-wrapper {
       position: fixed;
       top: 0;
@@ -269,58 +330,12 @@
       height: 20px;
     }
 
-    .bi-wifi::before {
-      background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='bi bi-wifi' viewBox='0 0 16 16'><path d='M15.384 6.115a.485.485 0 0 0-.047-.736A12.44 12.44 0 0 0 8 3C5.259 3 2.723 3.882.663 5.379a.485.485 0 0 0-.048.736.52.52 0 0 0 .668.05A11.45 11.45 0 0 1 8 4c2.507 0 4.827.802 6.716 2.164.205.148.49.13.668-.049'/><path d='M13.229 8.271a.482.482 0 0 0-.063-.745A9.46 9.46 0 0 0 8 6c-1.905 0-3.68.56-5.166 1.526a.48.48 0 0 0-.063.745.525.525 0 0 0 .652.065A8.46 8.46 0 0 1 8 7a8.46 8.46 0 0 1 4.576 1.336c.206.132.48.108.653-.065m-2.183 2.183c.226-.226.185-.605-.1-.75A6.5 6.5 0 0 0 8 9c-1.06 0-2.062.254-2.946.704-.285.145-.326.524-.1.75l.015.015c.16.16.407.19.611.09A5.5 5.5 0 0 1 8 10c.868 0 1.69.201 2.42.56.203.1.45.07.61-.091zM9.06 12.44c.196-.196.198-.52-.04-.66A2 2 0 0 0 8 11.5a2 2 0 0 0-1.02.28c-.238.14-.236.464-.04.66l.706.706a.5.5 0 0 0 .707 0l.707-.707z'/></svg>");
-    }
-
-    .bi-wifi-1::before {
-      background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='bi bi-wifi-1' viewBox='0 0 16 16'><path d='M11.046 10.454c.226-.226.185-.605-.1-.75A6.5 6.5 0 0 0 8 9c-1.06 0-2.062.254-2.946.704-.285.145-.326.524-.1.75l.015.015c.16.16.407.19.611.09A5.5 5.5 0 0 1 8 10c.868 0 1.69.201 2.42.56.203.1.45.07.611-.091zM9.06 12.44c.196-.196.198-.52-.04-.66A2 2 0 0 0 8 11.5a2 2 0 0 0-1.02.28c-.238.14-.236.464-.04.66l.706.706a.5.5 0 0 0 .707 0l.708-.707z'/></svg>");
-    }
-
-    .bi-wifi-2::before {
-      background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='bi bi-wifi-2' viewBox='0 0 16 16'><path d='M13.229 8.271c.216-.216.194-.578-.063-.745A9.46 9.46 0 0 0 8 6c-1.905 0-3.68.56-5.166 1.526a.48.48 0 0 0-.063.745.525.525 0 0 0 .652.065A8.46 8.46 0 0 1 8 7a8.46 8.46 0 0 1 4.577 1.336c.205.132.48.108.652-.065m-2.183 2.183c.226-.226.185-.605-.1-.75A6.5 6.5 0 0 0 8 9c-1.06 0-2.062.254-2.946.704-.285.145-.326.524-.1.75l.015.015c.16.16.408.19.611.09A5.5 5.5 0 0 1 8 10c.868 0 1.69.201 2.42.56.203.1.45.07.611-.091zM9.06 12.44c.196-.196.198-.52-.04-.66A2 2 0 0 0 8 11.5a2 2 0 0 0-1.02.28c-.238.14-.236.464-.04.66l.706.706a.5.5 0 0 0 .708 0l.707-.707z'/></svg>");
-    }
-
     .bi-eye::before {
       background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='bi bi-eye' viewBox='0 0 16 16'><path d='M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8M1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z'/><path d='M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0'/></svg>");
     }
 
     .bi-eye-slash::before {
       background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='bi bi-eye-slash' viewBox='0 0 16 16'><path d='M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7 7 0 0 0-2.79.588l.77.771A6 6 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755q-.247.248-.517.486z'/><path d='M11.297 9.176a3.5 3.5 0 0 0-4.474-4.474l.823.823a2.5 2.5 0 0 1 2.829 2.829zm-2.943 1.299.822.822a3.5 3.5 0 0 1-4.474-4.474l.823.823a2.5 2.5 0 0 0 2.829 2.829'/><path d='M3.35 5.47q-.27.24-.518.487A13 13 0 0 0 1.172 8l.195.288c.335.48.83 1.12 1.465 1.755C4.121 11.332 5.881 12.5 8 12.5c.716 0 1.39-.133 2.02-.36l.77.772A7 7 0 0 1 8 13.5C3 13.5 0 8 0 8s.939-1.721 2.641-3.238l.708.709zm10.296 8.884-12-12 .708-.708 12 12z'/></svg>");
-    }
-
-    .bi-lock::before {
-      background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='bi bi-lock' viewBox='0 0 16 16'><path d='M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2m3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2M5 8h6a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1'/></svg>");
-    }
-
-    .band-badge {
-      font-size: 10px;
-      font-weight: bold;
-      padding: 1px 4px;
-      border-radius: 3px;
-      margin-left: 5px;
-      vertical-align: middle;
-    }
-
-    .band-5ghz {
-      background-color: #F86527;
-      color: white;
-    }
-
-    .band-24ghz {
-      background-color: #adb5bd;
-      color: white;
-    }
-
-    .loader {
-      border: 6px solid #f3f3f3;
-      border-radius: 50%;
-      border-top: 6px solid #F86527;
-      width: 40px;
-      height: 40px;
-      -webkit-animation: spin 2s linear infinite;
-      /* Safari */
-      animation: spin 2s linear infinite;
     }
 
     .modal {
@@ -370,33 +385,12 @@
       text-align: right;
       margin-top: 20px;
     }
-
-    /* Safari */
-    @-webkit-keyframes spin {
-      0% {
-        -webkit-transform: rotate(0deg);
-      }
-
-      100% {
-        -webkit-transform: rotate(360deg);
-      }
-    }
-
-    @keyframes spin {
-      0% {
-        transform: rotate(0deg);
-      }
-
-      100% {
-        transform: rotate(360deg);
-      }
-    }
   </style>
   <script>
     function setRefreshButtonState(scanning) {
       var btn = document.getElementById('btnRefresh');
       btn.disabled = scanning;
-      btn.textContent = scanning ? 'Rescanning...' : 'Refresh';
+      btn.textContent = scanning ? 'Scanning…' : 'Scan again';
     }
 
     async function refresh() {
@@ -404,13 +398,11 @@
 
       document.getElementById('table-saved').innerHTML = '';
       document.getElementById('table-others').innerHTML = '';
-      document.getElementById('saved-networks').style.display = 'none';
-      document.getElementById('other-networks-caption').style.display = 'none';
+      document.getElementById('saved-networks').hidden = true;
 
-      let scanningInfoBox = document.getElementById('scanning-info');
-      scanningInfoBox.textContent = 'Scanning networks, please wait...';
-      scanningInfoBox.style.display = 'block';
-      document.getElementById('scanning-loader').style.display = 'block';
+      document.getElementById('headSpark').classList.add('ticking');
+      document.getElementById('scanning-info').hidden = false;
+      document.getElementById('scanning-loader').hidden = false;
 
       await getInfo(true);
     }
@@ -560,6 +552,14 @@
       }
     }
 
+    function showScanError() {
+      document.getElementById('scanning-loader').hidden = true;
+      document.getElementById('scanning-info').hidden = true;
+      document.getElementById('headSpark').classList.remove('ticking');
+      document.getElementById('scan-error').hidden = false;
+      setRefreshButtonState(false);
+    }
+
     async function getInfo(force) {
       let scanningInfoBox = document.getElementById('scanning-info');
       let scanningLoader = document.getElementById('scanning-loader');
@@ -567,25 +567,20 @@
         method: 'GET',
       })
         .catch(_ => {
-          scanningLoader.style.display = 'none';
-          scanningInfoBox.textContent =
-            'There was an error while scanning networks. Please refresh the page or enter your wifi name manually';
-          setRefreshButtonState(false);
+          showScanError();
         });
 
       if (response && response.status == 200) {
         var json = await response.json();
-        scanningInfoBox.style.display = 'none';
-        scanningLoader.style.display = 'none';
+        scanningInfoBox.hidden = true;
+        scanningLoader.hidden = true;
+        document.getElementById('headSpark').classList.remove('ticking');
         setRefreshButtonState(false);
 
         displayInfo(json.mac, json.mac_5ghz);
         var knownNetworks = json.networks.filter((item) => item.saved);
         var otherNetworks = json.networks.filter((item) => !item.saved);
-        if (knownNetworks.length > 0) {
-          document.getElementById('saved-networks').style.display = 'table';
-          document.getElementById('other-networks-caption').style.display = 'block';
-        }
+        document.getElementById('saved-networks').hidden = knownNetworks.length === 0;
         knownNetworks.forEach((item, row) => {
           appendWifiToTable("table-saved", item.name, item.open, item.rssi, item.enterprise, false, item.band);
         });
@@ -594,75 +589,59 @@
         });
       } else if (response && response.status == 202) {
         setTimeout(getInfo, 2000); // repeat in 2s
+      } else {
+        showScanError();
       }
+    }
+
+    var LOCK_SVG = '<svg class="lock" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2m3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2M5 8h6a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1"/></svg>';
+
+    function barsHTML(rssi) {
+      var n = rssi > -55 ? 3 : (rssi > -70 ? 2 : 1);
+      var s = '<span class="bars" aria-hidden="true">';
+      for (var i = 1; i <= 3; i++) s += '<i class="bar' + (i <= n ? ' on' : '') + '"></i>';
+      return s + '</span>';
     }
 
     function appendWifiToTable(table, name, open, rssi, enterprise, onClick, band) {
-      var newRow = document.createElement('tr');
-      newRow.setAttribute('data-enterprise', enterprise ? 'true' : 'false');
-      newRow.setAttribute('data-band', band || '');
+      var row = document.createElement(onClick ? 'button' : 'div');
+      row.className = 'net';
       if (onClick) {
-        newRow.onclick = function () {
-          onClickItemTable(this);
-        };
+        row.type = 'button';
+        row.setAttribute('role', 'radio');
+        row.setAttribute('aria-checked', 'false');
+        row.onclick = function () { selectNetwork(this); };
       }
-      var th = document.createElement('th');
-      var td = document.createElement('td');
-      th.appendChild(document.createTextNode(name));
-      if (band) {
-        var badgeSpan = document.createElement('span');
-        badgeSpan.classList.add('band-badge');
-        badgeSpan.classList.add(band === '5GHz' ? 'band-5ghz' : 'band-24ghz');
-        badgeSpan.textContent = band === '5GHz' ? '5G' : '2.4G';
-        th.appendChild(badgeSpan);
-      }
-      newRow.appendChild(th);
-      // append wifi strength
-      var wifiIco = document.createElement('i');
-      wifiIco.classList.add('bi');
-      if (rssi > -55) {
-        wifiIco.classList.add('bi-wifi');
-      } else if (rssi > -70) {
-        wifiIco.classList.add('bi-wifi-2');
-      } else if (rssi > -100) {
-        wifiIco.classList.add('bi-wifi-1');
-      }
-      td.appendChild(wifiIco);
-      if (!open) {
-        var lockIco = document.createElement('i');
-        lockIco.classList.add('bi');
-        lockIco.classList.add('bi-lock');
-        td.appendChild(lockIco);
-      }
-      newRow.appendChild(td);
-      document.getElementById(table).appendChild(newRow);
+      row.dataset.ssid = name;
+      row.dataset.band = band || '';
+      row.dataset.ent = enterprise ? '1' : '';
+
+      var label = band === '5GHz' ? '5G' : (band ? '2.4G' : '');
+      row.innerHTML =
+        '<span class="caret" aria-hidden="true">&#9654;</span>' +
+        '<span class="ssid"></span>' +
+        (label ? '<span class="badge">' + label + '</span>' : '') +
+        (open ? '' : LOCK_SVG) +
+        barsHTML(rssi);
+      row.querySelector('.ssid').textContent = name;
+
+      document.getElementById(table).appendChild(row);
     }
 
-    function onClickItemTable(x) {
-      x.classList.add('selected');
-      var siblings = Array.from(x.parentNode.children);
-      siblings.forEach((sibling) => {
-        if (sibling !== x) {
-          sibling.classList.remove('selected');
-        }
+    function selectNetwork(el) {
+      var group = document.getElementById('table-others');
+      Array.prototype.forEach.call(group.children, function (row) {
+        row.setAttribute('aria-checked', String(row === el));
       });
-      var value = x.querySelector('th').firstChild.textContent;
-      var isEnterprise = x.getAttribute('data-enterprise') === 'true';
 
-      if (value) {
-        document.getElementById('ssid').value = value;
-        document.getElementById('band').value = x.getAttribute('data-band') || '';
-        var passwordTag = document.getElementById('password');
-        passwordTag.value = '';
+      document.getElementById('ssid').value = el.dataset.ssid;
+      document.getElementById('band').value = el.dataset.band || '';
 
-        toggleEnterpriseFields(isEnterprise);
-
-        if (isEnterprise) {
-          document.getElementById('identity').focus();
-        } else {
-          passwordTag.focus();
-        }
-      }
+      var isEnterprise = el.dataset.ent === '1';
+      var pw = document.getElementById('password');
+      pw.value = '';
+      toggleEnterpriseFields(isEnterprise);
+      (isEnterprise ? document.getElementById('identity') : pw).focus();
     }
 
     function displayWifiInfo(response) {
@@ -757,18 +736,31 @@
       <h1 class="p-title">Connect your TRMNL</h1>
       <p class="p-sub">Pick your network and enter its password. Your TRMNL restarts once it's online.</p>
     </div>
-    <table id="saved-networks" style="display: none;">
-      <caption>Saved Networks</caption>
-      <tbody id="table-saved">
-      </tbody>
-    </table>
-    <table>
-      <caption style="display: none;" id="other-networks-caption">Other Networks</caption>
-      <tbody id="table-others" class="hoverable">
-      </tbody>
-    </table>
-    <p id="scanning-info">Scanning networks, please wait...</p>
-    <div id="scanning-loader" class="loader"></div>
+    <div id="saved-networks" hidden>
+      <div class="grp-label"><span>Saved</span></div>
+      <div class="netlist" id="table-saved"></div>
+    </div>
+
+    <div>
+      <div class="grp-label">
+        <span>In range</span>
+        <button id="btnRefresh" type="button" onclick="refresh()">Scan again</button>
+      </div>
+      <div id="scan-error" class="msg msg-warn" hidden>
+        <strong>Couldn't scan for networks</strong>
+        Type your network name below, or tap Scan again.
+      </div>
+      <div id="scanning-info" class="scanning">
+        <svg class="spark ticking" viewBox="0 0 30 30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g fill-rule="evenodd" clip-rule="evenodd"><path d="M8.02188 2.11328L15.8862 5.07445L14.4258 8.98481L6.56146 6.02364L8.02188 2.11328Z"/><path d="M20.6315 1.14647L23.2291 9.16642L19.2738 10.458L16.6761 2.43807L20.6315 1.14647Z"/><path d="M29.244 10.4452L24.6188 17.4848L21.147 15.185L25.7722 8.14549L29.244 10.4452Z"/><path d="M27.374 23.0034L19.0089 23.7616L18.6349 19.6023L27 18.8441L27.374 23.0034Z"/><path d="M16.4297 29.3638L10.6237 23.2697L13.6293 20.3828L19.4352 26.4769L16.4297 29.3638Z"/><path d="M4.65232 24.7423L5.77753 16.3849L9.89932 16.9443L8.77411 25.3017L4.65232 24.7423Z"/><path d="M0.910558 12.6074L8.11961 8.28L10.2539 11.8645L3.04481 16.192L0.910558 12.6074Z"/></g></svg>
+        <p>Scanning for networks</p>
+      </div>
+      <div id="scanning-loader">
+        <div class="skel"><span class="dither" style="width:58%"></span></div>
+        <div class="skel"><span class="dither" style="width:41%"></span></div>
+        <div class="skel"><span class="dither" style="width:66%"></span></div>
+      </div>
+      <div class="netlist" id="table-others" role="radiogroup" aria-label="Networks in range"></div>
+    </div>
     <div class="form-group">
       <label for="ssid">SSID</label>
       <input type="text" id="ssid" name="ssid" placeholder="Enter your Wi-Fi name" oninput="document.getElementById('band').value = ''">
