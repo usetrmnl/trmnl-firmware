@@ -20,6 +20,10 @@
       }
     }
     * { box-sizing: border-box; }
+    /* Author-origin display rules beat the UA's [hidden]{display:none}, so every
+       `display:` rule below would silently un-hide anything carrying the attribute.
+       This restores it once, globally, for every element in every task. */
+    [hidden] { display: none !important; }
     body {
       margin: 0; background: var(--paper); color: var(--ink);
       font: 400 13.5px/1.55 var(--sans); -webkit-text-size-adjust: 100%;
@@ -562,12 +566,7 @@
       let response = await fetch('/scan' + (force ? '?force=1' : ''), {
         method: 'GET',
       })
-        .catch(async _ => {
-          try {
-            const r = await fetch('/device-settings');
-            const d = await r.json();
-            if (d.mac) displayInfo(d.mac, d.mac_5ghz);
-          } catch (_) { }
+        .catch(_ => {
           scanningLoader.style.display = 'none';
           scanningInfoBox.textContent =
             'There was an error while scanning networks. Please refresh the page or enter your wifi name manually';
