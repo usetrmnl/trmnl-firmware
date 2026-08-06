@@ -50,6 +50,7 @@
 #include <sys/time.h>
 #include <misc/buzzer.h>
 #include <misc/clock.h>
+#include <misc/sensor.h>
 #include <services/device_setup.h>
 #include "messages.h"
 #include "displayed_image.h"
@@ -714,70 +715,6 @@ void process_iqs323_data(void)
 #endif
 
 /**
- * @brief Function to initialize and read from I2C sensors (if present)
- * @param none
- * @return none
- */
-void sensor_init(void)
-{
-#ifdef SENSOR_SDA
-  // check if there is a SCD41 or supported temperature sensor attached
-  if (scd41.init(SENSOR_SDA, SENSOR_SCL) == SCD41_SUCCESS) {
-    bCO2 = true;
-    Log.info("%s [%d]: SCD41 sensor found!\r\n", __FILE__, __LINE__);
-//    scd41.start(SCD41_MODE_PERIODIC);
-    scd41.wakeup();
-    // The SCD41 needs to be re-initialized after big Vcc variations from the last wakeup
-    // put it in a 'confused' state. If we don't re-initialize it, it won't generate more samples
-    scd41.sendCMD(SCD41_CMD_REINIT);
-    vTaskDelay(3); // allow time to reinitialize
-    scd41.triggerSample(); // trigger a 'one-shot' sample that takes about 5 seconds to complete
-  }
-  if (bbt.init(SENSOR_SDA, SENSOR_SCL) == BBT_SUCCESS) {
-    iSensorType = bbt.type();
-    Log.info("%s [%d]: supported sensor found! (%d)\r\n", __FILE__, __LINE__, iSensorType);
-    bbt.start(); // start the sensor
-  }
-  if (!bCO2 && iSensorType < 0) {
-    Log.info("%s [%d]: No sensor found on I2C bus %d/%d\r\n", __FILE__, __LINE__, SENSOR_SDA, SENSOR_SCL);
-  }
-  // wait for the sensor(s) to generate a sample
-  if (bCO2 || iSensorType >= 0) {
-    Log.info("%s [%d]: Light sleep for 5 seconds to allow sensor to generate a sample\r\n", __FILE__, __LINE__);
-    esp_sleep_enable_timer_wakeup(5000 * 1000L); // the SCD4x needs 5 seconds to get a sample
-    esp_light_sleep_start(); // use light sleep to save power
-  }
-  if (bCO2) {
-    if (scd41.getSample() == SCD41_SUCCESS) {
-        time((time_t *)&lastTime); // get the UTC epoch time that the same was captured
-        lastCO2 = scd41.co2();
-        lastSCDTemp = scd41.temperature();
-        lastSCDHumid = scd41.humidity();
-        Log.info("%s [%d]: Got SCD41 sample: CO2 = %dppm\r\n", __FILE__, __LINE__, lastCO2);
-    } else {
-        Log.info("%s [%d]: SCD41 sample failed\r\n", __FILE__, __LINE__);
-        lastCO2 = 0;
-    }
-    scd41.shutdown(); // conserve power since we completed getting a sample ready for the next TRMNL wakeup
-  }
-  if (iSensorType >= 0) {
-      BBT_SAMPLE bbts;
-      if (bbt.getSample(&bbts) == BBT_SUCCESS) {
-        time((time_t *)&lastTime); // get the UTC epoch time that the same was captured
-        lastTemp = bbts.temperature;
-        lastHumid = bbts.humidity;
-        lastPressure = bbts.pressure;
-        lastType = iSensorType;
-        Log.info("%s [%d]: Got bb_temperature sample: Temp = %d.%dC\r\n", __FILE__, __LINE__, lastTemp/10, lastTemp % 10);
-      } else {
-        lastType = -1;
-        Log.info("%s [%d]: bb_temperature sample failed\r\n", __FILE__, __LINE__);
-      }
-      bbt.stop(); // turn off the sensor to conserve power
-  }
-#endif // SENSOR_SDA
-} /* sensor_init() */
-/**
  * @brief Function to init business logic module
  * @param none
  * @return none
@@ -820,7 +757,7 @@ void bl_init(void)
 #endif // X
   pins_init();
   buzzer().init();
-  sensor_init();
+  sensor().init();
 #ifdef BOARD_TRMNL_X
   // Debug: Print all wakeup_stub_iqs_status structure fields
   Log_info("wakeup_stub_iqs_status.status: 0x%02X 0x%02X", wakeup_stub_iqs_status.status[0], wakeup_stub_iqs_status.status[1]);
