@@ -14,4 +14,8 @@ static ADCBattery batteryInstance(PIN_BATTERY);
 static FakeBattery batteryInstance;
 #endif
 
+#ifdef INCLUDE_BQ27427
+BQ27427Battery &battery() { return batteryInstance; }
+#else
 BaseBattery &battery() { return batteryInstance; }
+#endif
