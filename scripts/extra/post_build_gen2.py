@@ -1,13 +1,17 @@
 Import("env")
 import subprocess
+import sys
 from pathlib import Path
 
 def post_build(source, target, env):
     build_dir = Path(env.subst("$BUILD_DIR"))
     output = build_dir / "merged_firmware.bin"
 
+    esptool_dir = env.PioPlatform().get_package_dir("tool-esptoolpy")
+    esptool = Path(esptool_dir) / "esptool.py"
+
     subprocess.run([
-        "pio", "pkg", "exec", "-p", "tool-esptoolpy", "esptool.py", "--",
+        sys.executable, str(esptool),
         "--chip", "ESP32C5",
         "merge_bin",
         "-o", str(output),

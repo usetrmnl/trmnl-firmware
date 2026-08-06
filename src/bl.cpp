@@ -53,6 +53,10 @@
 #include <services/device_setup.h>
 #include "messages.h"
 #include "displayed_image.h"
+#ifdef BOARD_TRMNL_GEN2
+#include "gen2_battery.h" // Gen2BatteryStatus, gen2_batteryRead()
+#endif
+
 #include <globals.h>
 const char *szHTTPErrors[] = {
     "HTTPS_NO_ERR",
@@ -1639,7 +1643,23 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
     inputs.currentBatteryCapacity = -1;
     inputs.maxBatteryCapacity = -1;
   }
-#endif // BOARD_TRMNL_X
+#elif defined(BOARD_TRMNL_GEN2)
+  {
+    inputs.batteryCount = 1;
+    Gen2BatteryStatus g2batt = gen2_batteryRead();
+    if (g2batt.valid) {
+      inputs.stateOfCharge = (int)g2batt.soc_pct;
+      inputs.batteryCurrent = (int)g2batt.current_mA;
+    } else {
+      inputs.stateOfCharge = -1;
+      inputs.batteryCurrent = -1;
+    }
+    inputs.stateOfHealth = -1;
+    inputs.batteryTemperature = -1;
+    inputs.currentBatteryCapacity = -1;
+    inputs.maxBatteryCapacity = -1;
+  }
+#endif // BOARD_TRMNL_X / BOARD_TRMNL_GEN2
 
   return inputs;
 }
