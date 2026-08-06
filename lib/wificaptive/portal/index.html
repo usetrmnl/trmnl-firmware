@@ -163,75 +163,12 @@
       text-transform: uppercase; color: var(--ink-2); margin: 0;
     }
 
-    #loader-wrapper {
-      position: fixed;
-      top: 0;
-      right: 0;
-      bottom: 0;
-      left: 0;
-      background-color: rgba(0, 0, 0, 0.5);
-      z-index: 9999;
-    }
-
-    #loader {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 60px;
-      height: 60px;
-    }
-
-    #loader:before {
-      content: "";
-      display: block;
-      position: absolute;
-      border-style: solid;
-      border-color: #fff;
-      border-top-color: transparent;
-      border-width: 6px;
-      border-radius: 50%;
-      width: 60px;
-      height: 60px;
-      top: 10px;
-      left: 10px;
-      animation: loader-spin 1s linear infinite;
-    }
-
-    @keyframes loader-spin {
-      0% {
-        transform: rotate(0);
-      }
-
-      100% {
-        transform: rotate(360deg);
-      }
-    }
-
-    #loader-wrapper {
-      display: none;
-    }
-
     .form-group {
       display: flex;
       flex-direction: column;
       align-items: flex-start;
       margin-bottom: 20px;
       width: 100%;
-    }
-
-    label {
-      font-size: 18px;
-      margin-bottom: 5px;
-    }
-
-    input, select, textarea {
-      border-width: 1px;
-      border-radius: .75rem;
-      font-size: 16px;
-      padding: 5px;
-      width: 100%;
-      box-sizing: border-box;
     }
 
     textarea {
@@ -243,148 +180,65 @@
       height: 35px;
     }
 
-    input:focus {
-      outline: none;
-      border: 2px solid #F86527;
-      border-radius: .75rem;
+    .fields { display: flex; flex-direction: column; gap: 16px; }
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field label {
+      font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em;
+      text-transform: uppercase; color: var(--ink-3);
     }
-
-    input::placeholder {
-      opacity: 70%;
+    .field .opt { text-transform: none; letter-spacing: 0; }
+    .hint { font-size: 12.5px; color: var(--ink-3); margin: 0; }
+    .inp {
+      font-family: var(--mono); font-size: 15px; color: var(--ink);
+      background: var(--surface); border: 1px solid var(--rule); border-radius: 2px;
+      padding: 13px 12px; width: 100%; transition: border-color .1s steps(2);
     }
-
-    .button {
-      color: #fff;
-      border: none;
-      padding: 8px 18px;
-      font-size: 18px;
-      border-radius: 5px;
+    .inp::placeholder { color: var(--ink-3); }
+    .inp:focus {
+      outline: none; border-color: var(--spark); box-shadow: inset 0 0 0 1px var(--spark);
     }
-
-    .button:disabled {
-      opacity: .65;
+    .pw-wrap { position: relative; display: flex; }
+    .pw-wrap .inp { padding-right: 62px; }
+    .pw-toggle {
+      position: absolute; right: 1px; top: 1px; bottom: 1px; padding: 0 12px;
+      background: none; border: 0; border-left: 1px solid var(--rule-soft);
+      font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em;
+      text-transform: uppercase; color: var(--ink-2); cursor: pointer;
     }
-
-    .button-success {
-      background-color: #F86527;
+    .actions { display: flex; flex-direction: column; gap: 10px; }
+    .btn {
+      font-family: var(--mono); font-size: 14px; letter-spacing: .1em;
+      text-transform: uppercase; padding: 15px 18px; border-radius: 2px;
+      border: 1px solid transparent; cursor: pointer; width: 100%;
+      transition: background-color .12s steps(3), color .12s steps(3), border-color .12s steps(3);
     }
-
-    .button-primary {
-      background-color: #e4eaf0;
-      color: #212529;
+    .btn-primary { background: var(--spark); color: #FFF; border-color: var(--spark); }
+    .btn-primary:hover:not(:disabled) { background: var(--ink); border-color: var(--ink); color: var(--invert-fg); }
+    .btn:disabled { opacity: .55; cursor: default; }
+    .btn-quiet { background: transparent; color: var(--ink); border-color: var(--rule); }
+    .btn-quiet:hover { border-color: var(--ink); }
+    .btn-danger { background: transparent; color: var(--ink); border-color: var(--rule); }
+    .btn-danger:hover { background: var(--ink); color: var(--invert-fg); border-color: var(--ink); }
+    .msg {
+      border: 1px solid var(--rule); border-left: 3px solid var(--ink-3);
+      background: var(--surface); color: var(--ink-2);
+      padding: 12px 14px; border-radius: 2px;
     }
-
-    .button-primary:hover:not([disabled]) {
-      background-color: #d7dfe8;
+    .msg strong { color: var(--ink); font-weight: 600; display: block; margin-bottom: 2px; }
+    .msg-warn {
+      background: var(--warn-bg); color: var(--warn-ink);
+      border-color: transparent; border-left-color: var(--spark);
     }
-
-    .button-secondary {
-      background-color: #343a40;
+    .msg-warn strong { color: var(--warn-ink); }
+    .msg-live { border-left-color: var(--spark); }
+    .progress {
+      height: 4px; margin-top: 10px; border: 1px solid var(--rule);
+      border-radius: 1px; overflow: hidden;
     }
-
-    .button-secondary:hover:not([disabled]) {
-      background-color: #3e444a;
-    }
-
-    .button:hover:not([disabled]) {
-      filter: saturate(0.8);
-    }
-
-    .alert-primary {
-      color: #383d41;
-      background-color: #e2e3e5;
-      border-color: #d6d8db;
-    }
-
-    .alert-warning {
-      color: #856404;
-      background-color: #fff3cd;
-      border-color: #ffeeba;
-    }
-
-    .alert {
-      position: relative;
-      padding: .75rem 1.25rem;
-      margin-bottom: 1rem;
-      border: 1px solid transparent;
-      border-radius: .25rem;
-      margin-left: auto;
-      margin-right: auto;
-    }
-
-    #toggler {
-      position: absolute;
-      font-size: 20px;
-      right: 50px;
-      cursor: pointer;
-      margin-top: 32px;
-    }
-
-    .bi::before {
-      display: inline-block;
-      content: "";
-      vertical-align: -.125em;
-      background-repeat: no-repeat;
-      background-size: 1rem 1rem;
-      width: 20px;
-      height: 20px;
-    }
-
-    .bi-eye::before {
-      background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='bi bi-eye' viewBox='0 0 16 16'><path d='M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8M1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z'/><path d='M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0'/></svg>");
-    }
-
-    .bi-eye-slash::before {
-      background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='bi bi-eye-slash' viewBox='0 0 16 16'><path d='M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7 7 0 0 0-2.79.588l.77.771A6 6 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755q-.247.248-.517.486z'/><path d='M11.297 9.176a3.5 3.5 0 0 0-4.474-4.474l.823.823a2.5 2.5 0 0 1 2.829 2.829zm-2.943 1.299.822.822a3.5 3.5 0 0 1-4.474-4.474l.823.823a2.5 2.5 0 0 0 2.829 2.829'/><path d='M3.35 5.47q-.27.24-.518.487A13 13 0 0 0 1.172 8l.195.288c.335.48.83 1.12 1.465 1.755C4.121 11.332 5.881 12.5 8 12.5c.716 0 1.39-.133 2.02-.36l.77.772A7 7 0 0 1 8 13.5C3 13.5 0 8 0 8s.939-1.721 2.641-3.238l.708.709zm10.296 8.884-12-12 .708-.708 12 12z'/></svg>");
-    }
-
-    .modal {
-      display: none;
-      position: fixed;
-      z-index: 1;
-      left: 0;
-      top: 0;
-      width: 100%;
-      height: 100%;
-      overflow: auto;
-      background-color: rgb(0, 0, 0);
-      background-color: rgba(0, 0, 0, 0.4);
-    }
-
-    .modal-content {
-      background-color: #fefefe;
-      margin: 15% auto;
-      padding: 20px;
-      border: 1px solid #888;
-      width: 80%;
-      max-width: 500px;
-      position: relative;
-    }
-
-    .close {
-      color: #aaa;
-      float: right;
-      font-size: 28px;
-      font-weight: bold;
-    }
-
-    .close:hover,
-    .close:focus {
-      color: black;
-      text-decoration: none;
-      cursor: pointer;
-    }
-
-    .button {
-      padding: 10px 20px;
-      margin: 5px;
-      cursor: pointer;
-    }
-
-    .modal-footer {
-      text-align: right;
-      margin-top: 20px;
-    }
+    .progress i { display: block; height: 100%; width: 45%; animation: crawl 2.4s steps(9, end) infinite; }
+    @keyframes crawl { from { transform: translateX(-100%); } to { transform: translateX(230%); } }
+    .row2 { display: flex; gap: 10px; }
+    .row2 .btn { width: auto; flex: 1 1 0; }
   </style>
   <script>
     function setRefreshButtonState(scanning) {
@@ -407,22 +261,10 @@
     }
 
     function toggleEnterpriseFields(isEnterprise) {
-      var enterpriseFields = document.getElementById('enterprise_fields');
-      var enterpriseUsernameGroup = document.getElementById('enterprise_username_group');
-      var enterpriseIndicator = document.getElementById('enterprise_indicator');
-
-      // store the enterprise status in a hidden field
       document.getElementById('isEnterpriseHidden').value = isEnterprise ? 'true' : 'false';
-
-      if (isEnterprise) {
-        enterpriseFields.style.display = 'flex';
-        enterpriseUsernameGroup.style.display = 'flex';
-        enterpriseIndicator.style.display = 'block';
-      } else {
-        enterpriseFields.style.display = 'none';
-        enterpriseUsernameGroup.style.display = 'none';
-        enterpriseIndicator.style.display = 'none';
-      }
+      document.getElementById('enterprise_fields').hidden = !isEnterprise;
+      document.getElementById('enterprise_username_group').hidden = !isEnterprise;
+      document.getElementById('enterprise_indicator').hidden = !isEnterprise;
     }
 
     function connect() {
@@ -434,20 +276,20 @@
       var isEnterprise = document.getElementById('isEnterpriseHidden').value === 'true';
 
       if (!ssid) {
-        displayAlert('Please enter your Wi-Fi name', "warning");
+        displayAlert('Please enter your Wi-Fi name');
         return;
       }
 
       if (isEnterprise) {
         var identity = document.getElementById('identity').value;
         if (!identity) {
-          displayAlert('Please enter your identity for WPA2 Enterprise', "warning");
+          displayAlert('Please enter your identity for WPA2 Enterprise');
           return;
         }
       }
 
       // if custom server form-group is visible, validate the url
-      let customServerVisible = document.getElementById('custom_server_form_group').style.display != 'none';
+      var customServerVisible = !document.getElementById('custom_server_form_group').hidden;
       if (customServerVisible && server) {
         try {
           new URL(server);
@@ -456,7 +298,7 @@
             throw new Error();
           }
         } catch (_) {
-          displayAlert('Please enter a valid URL for your custom server', "warning");
+          displayAlert('Please enter a valid URL for your custom server');
           return;
         }
       }
@@ -495,9 +337,9 @@
 
       var btn = document.getElementById("btnConnect");
       btn.disabled = true;
-      btn.textContent = "Connecting...";
+      btn.textContent = "Connecting…";
+      document.getElementById('connect-status').hidden = false;
 
-      showLoader();
       fetch('/connect', {
         method: 'POST',
         headers: {
@@ -507,12 +349,12 @@
         body: JSON.stringify(body)
       })
         .then(response => response.json())
-        .then(response => {
-          displayWifiInfo(response);
-          hideLoader();
-        })
+        .then(response => { displayWifiInfo(response); })
         .catch(_ => {
-          hideLoader();
+          document.getElementById('connect-status').hidden = true;
+          btn.disabled = false;
+          btn.textContent = 'Connect';
+          displayAlert('Could not reach your TRMNL. Check that you are still on its Wi-Fi network, then try again.');
         });
     }
 
@@ -538,17 +380,11 @@
     }
 
     function togglePassword() {
-      var icon = document.getElementById("toggler");
-      var input = document.getElementById("password")
-      if (icon.classList.contains("bi-eye")) {
-        icon.classList.add("bi-eye-slash");
-        icon.classList.remove("bi-eye");
-        input.type = "text";
-      } else {
-        icon.classList.add("bi-eye");
-        icon.classList.remove("bi-eye-slash");
-        input.type = "password";
-      }
+      var btn = document.getElementById("toggler");
+      var input = document.getElementById("password");
+      var showing = input.type === "text";
+      input.type = showing ? "password" : "text";
+      btn.textContent = showing ? "Show" : "Hide";
     }
 
     function showScanError() {
@@ -649,8 +485,8 @@
     }
 
     function displayWifiInfo(response) {
-      if (response.ssid.length > 0) {
-        displayAlert(`Connecting to: ${response.ssid}`, "alert-warning");
+      if (response.ssid && response.ssid.length > 0) {
+        document.getElementById('connect-status-title').textContent = 'Connecting to ' + response.ssid;
       }
       displayInfo(response.mac, response.mac_5ghz);
     }
@@ -666,37 +502,20 @@
       }
     }
 
-    function displayAlert(message, type) {
-      var messageBox = document.getElementById("message");
-      messageBox.style.display = "block";
-      messageBox.textContent = message;
-      messageBox.classList.remove("alert-primary");
-      messageBox.classList.remove("alert-warning");
-
-      messageBox.classList.add(`alert-${type}`);
+    function displayAlert(message) {
+      var box = document.getElementById('message');
+      box.textContent = message;
+      box.hidden = false;
     }
 
-    function hideAlert() {
-      var messageBox = document.getElementById("message");
-      messageBox.style.display = "none";
-    }
-
-    function showLoader() {
-      var loader = document.getElementById("loader-wrapper");
-      loader.style.display = "block";
-    }
-
-    function hideLoader() {
-      var loader = document.getElementById("loader-wrapper");
-      loader.style.display = "none";
-    }
+    function hideAlert() { document.getElementById('message').hidden = true; }
 
     function showAdvanced(){
       fetch('/advanced', {
         method: 'GET',
       })
         .catch(_ => {
-          displayAlert('Failed to load advanced settings', "warning");
+          displayAlert('Failed to load advanced settings');
         });
     }
 
@@ -712,7 +531,7 @@
       }
       if (server) {
         document.getElementById('server').value = server;
-        document.getElementById('custom_server_form_group').style.display = 'flex';
+        document.getElementById('custom_server_form_group').hidden = false;
       }
     }
 
@@ -765,50 +584,60 @@
       </div>
       <div class="netlist" id="table-others" role="radiogroup" aria-label="Networks in range"></div>
     </div>
-    <div class="form-group">
-      <label for="ssid">SSID</label>
-      <input type="text" id="ssid" name="ssid" placeholder="Enter your Wi-Fi name" oninput="document.getElementById('band').value = ''">
-    </div>
-    <input type="hidden" id="isEnterpriseHidden" value="false">
-    <input type="hidden" id="band" name="band" value="">
-    <div class="form-group" id="enterprise_indicator" style="display: none;">
-      <div class="alert alert-primary" style="margin-bottom: 0;">
-        This network uses WPA2 Enterprise authentication. If you only have a username and password, use the identity field for your username.
+    <div class="fields">
+      <div class="field">
+        <label for="ssid">Network name</label>
+        <input class="inp" type="text" id="ssid" name="ssid" placeholder="Tap a network above"
+               oninput="document.getElementById('band').value = ''">
+      </div>
+
+      <input type="hidden" id="isEnterpriseHidden" value="false">
+      <input type="hidden" id="band" name="band" value="">
+
+      <div class="msg" id="enterprise_indicator" hidden>
+        <strong>This network uses WPA2 Enterprise</strong>
+        If you only have a username and password, put the username in Identity.
+      </div>
+      <div class="field" id="enterprise_fields" hidden>
+        <label for="identity">Identity</label>
+        <input class="inp" type="text" id="identity" name="identity" placeholder="you@company.com">
+      </div>
+      <div class="field" id="enterprise_username_group" hidden>
+        <label for="username">Username <span class="opt">— optional</span></label>
+        <input class="inp" type="text" id="username" name="username" placeholder="Only if different from identity">
+      </div>
+
+      <div class="field">
+        <label for="password">Password</label>
+        <div class="pw-wrap">
+          <input class="inp" type="password" id="password" name="password" placeholder="Network password">
+          <button class="pw-toggle" id="toggler" type="button" onclick="togglePassword()">Show</button>
+        </div>
+      </div>
+
+      <div class="field" id="custom_server_form_group" hidden>
+        <label for="server">API server</label>
+        <input class="inp" type="url" id="server" name="server" placeholder="https://trmnl.app">
+        <p class="hint">No trailing slash.</p>
+      </div>
+
+      <div class="msg msg-warn" id="message" role="alert" hidden></div>
+
+      <div class="msg msg-live" id="connect-status" hidden>
+        <strong id="connect-status-title">Connecting</strong>
+        <span>Keep this page open. Your TRMNL restarts when it's connected.</span>
+        <div class="progress"><i class="dither"></i></div>
       </div>
     </div>
-    <div class="form-group" id="enterprise_fields" style="display: none;">
-      <label for="identity">Identity (required)</label>
-      <input type="text" id="identity" name="identity" placeholder="Enter your identity (e.g. username@domain.com)">
+
+    <div class="actions">
+      <button id="btnConnect" class="btn btn-primary" type="button" onclick="connect()">Connect</button>
+      <button id="btnAdvanced" class="btn btn-quiet" type="button" onclick="location.href='/advanced'">Advanced settings</button>
     </div>
-    <div class="form-group" id="enterprise_username_group" style="display: none;">
-      <label for="username">Username (optional)</label>
-      <input type="text" id="username" name="username" placeholder="Enter username (if different from identity)">
-    </div>
-    <div class="form-group">
-      <label for="password">Password</label>
-      <input type="password" id="password" name="password" placeholder="Enter your Wi-Fi password">
-      <i id="toggler" class="bi bi-eye" onclick="togglePassword()"></i>
-    </div>
-    <div class="form-group" id="custom_server_form_group" style="display: none;">
-      <label for="server">API Server</label>
-      <input type="url" id="server" name="server" placeholder="Enter your custom server without a trailing / (e.g. https://trmnl.app)">
-    </div>
-    <div class="form-group">
-      <div class="alert alert-primary" id="message" role="alert" style="display: none;"></div>
-    </div>
-    <span>
-      <button id="btnConnect" class="button button-success" onclick="connect()">Connect</button>
-    </span>
-    <span style="margin-top: 20px;">
-      <button id="btnAdvanced" class="button button-primary" onclick="location.href='/advanced'">Advanced</button>
-    </span>
     <div class="mac-footer" id="info-message" hidden>
       <span class="mac-label">5 GHz MAC</span>
       <span class="mac-alt" id="mac5"></span>
     </div>
-  </div>
-  <div id="loader-wrapper">
-    <div id="loader"></div>
   </div>
   <!-- Confirmation Modal -->
 </body>
