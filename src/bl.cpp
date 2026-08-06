@@ -1025,6 +1025,12 @@ void bl_init(void)
     }
     if (bBQ27Alive) {
     Log_info("Connected to BQ27427!");
+
+    // Inverted coulomb-counter calibration with learned state means the
+    // gauge has been counting backwards — reset it so the golden-file
+    // reload below restarts Impedance Track learning from scratch.
+    bq27427Battery().resetIfPolarityInverted();
+
     if (lipo.flags() & BQ27427_FLAG_ITPOR) { // it got reset, reload the 'golden file' data
       if (battery_count == BATTERY_ONE) {
         Log_info("One battery detected");
@@ -1054,6 +1060,11 @@ void bl_init(void)
         Log_info("BQ27427: ITPOR cleared — device in NORMAL mode");
         lipo._initialized = true;
     }
+
+    // Correct the coulomb-counter polarity AFTER any reset/golden-file
+    // reload above, since those restore the inverted ROM default.
+    bq27427Battery().correctCurrentPolarity();
+
     uint8_t energyScale = lipo.designEnergyScale();
     unsigned int soc = lipo.soc();                               // State-of-charge (%) — use this for battery level display
     unsigned int volts = lipo.voltage();                         // Battery voltage (mV)

@@ -53,7 +53,31 @@ private:
 class BQ27427Battery : public BaseBattery {
 public:
   float readVoltage() override;
+
+  /// @brief Performs a reset if the BQ27427 current-sensing resistor
+  ///        is specified with the wrong polarity.
+  void resetIfPolarityInverted();
+
+  /// @brief Applies the correct polarity to the BQ27427 current-sensing resistor
+  ///        as-needed after a reset.
+  void correctCurrentPolarity();
+
+private:
+  /// @brief Checksum-verified read of one 32-byte gauge data-memory block in
+  ///        NORMAL mode, with the block-load settle delays the gauge needs.
+  bool readGaugeBlockVerified(uint8_t classID, uint8_t blockNum, uint8_t data[32]);
+
+  /// @brief The CC Cal byte holding the coulomb-counter sign (offset 5,
+  ///        bit 7), or -1 if it could not be read consistently.
+  int32_t readCCCalSignByte();
+
+  /// @brief Write the CC Cal sign byte through a CONFIG UPDATE session
+  ///        (TRM section 4.1 sequence) and verify it stuck.
+  bool writeCCCalSignByte(uint8_t value);
 };
+
+/// @brief Concrete accessor for gauge-specific operations on TRMNL X.
+BQ27427Battery &bq27427Battery();
 #endif // INCLUDE_BQ27427
 
 /// @brief Battery instance for the running board, selected at compile time.

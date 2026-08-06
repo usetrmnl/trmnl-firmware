@@ -15,3 +15,7 @@ static FakeBattery batteryInstance;
 #endif
 
 BaseBattery &battery() { return batteryInstance; }
+
+#if defined(BOARD_TRMNL_X) && !defined(FAKE_BATTERY_VOLTAGE)
+BQ27427Battery &bq27427Battery() { return batteryInstance; }
+#endif
