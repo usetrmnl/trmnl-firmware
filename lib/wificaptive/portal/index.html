@@ -123,7 +123,7 @@
     }
     .net:last-child { border-bottom: 0; }
     button.net { cursor: pointer; }
-    button.net:hover { background: var(--rule-soft); }
+    button.net:not([aria-checked="true"]):hover { background: var(--rule-soft); }
     .net:focus-visible { outline: 2px solid var(--spark); outline-offset: -2px; }
     .net[aria-checked="true"] { background: var(--ink); color: var(--invert-fg); }
     .net[aria-checked="true"] .badge { border-color: var(--invert-fg); color: var(--invert-fg); }
@@ -400,7 +400,6 @@
       document.getElementById('table-others').innerHTML = '';
       document.getElementById('saved-networks').hidden = true;
 
-      document.getElementById('headSpark').classList.add('ticking');
       document.getElementById('scanning-info').hidden = false;
       document.getElementById('scanning-loader').hidden = false;
 
@@ -561,6 +560,7 @@
     }
 
     async function getInfo(force) {
+      document.getElementById('headSpark').classList.add('ticking');
       let scanningInfoBox = document.getElementById('scanning-info');
       let scanningLoader = document.getElementById('scanning-loader');
       let response = await fetch('/scan' + (force ? '?force=1' : ''), {
@@ -794,7 +794,6 @@
     </div>
     <span>
       <button id="btnConnect" class="button button-success" onclick="connect()">Connect</button>
-      <button id="btnRefresh" class="button button-primary" onclick="refresh()">Refresh</button>
     </span>
     <span style="margin-top: 20px;">
       <button id="btnAdvanced" class="button button-primary" onclick="location.href='/advanced'">Advanced</button>
