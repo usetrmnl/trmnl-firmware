@@ -192,4 +192,11 @@ void display_set_light_sleep(uint8_t enabled);
  */
 void display_sleep(void);
 
+/**
+ * @brief Function to wipe the display
+ * @param none
+ * @return none
+ */
+void display_wipe(void);
+
 #endif

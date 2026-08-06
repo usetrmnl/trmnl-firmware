@@ -74,7 +74,6 @@ const char *szHTTPErrors[] = {
 };
 
 static float vBatt;
-void display_wipe(void);
 static https_request_err_e downloadAndShow(); // download and show the image
 static https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse);
 static void resetDeviceCredentials(void);            // reset device credentials API key, Friendly ID, Wi-Fi SSID and password
