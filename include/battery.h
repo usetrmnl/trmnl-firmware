@@ -70,6 +70,32 @@ public:
   int readCapacityFull() const { return _capacityFull; }     // mAh
 
 private:
+  /// @brief Connect to the gauge and fill a validated reading snapshot.
+  bool connectAndRead(bool oneCellPack, BQ27427Snapshot &snap);
+
+  /// @brief Performs a reset if the BQ27427 current-sensing resistor is
+  ///        specified with the wrong polarity, so Impedance Track relearns
+  ///        from scratch when the golden file is reloaded. Call BEFORE
+  ///        connectAndConfigure().
+  void resetIfPolarityInverted();
+
+  /// @brief Applies the correct polarity to the BQ27427 current-sensing
+  ///        resistor as-needed. Call AFTER connectAndConfigure(), since a
+  ///        reset/golden-file reload restores the inverted ROM default.
+  void correctCurrentPolarity();
+
+  /// @brief Checksum-verified read of one 32-byte gauge data-memory block in
+  ///        NORMAL mode, with the block-load settle delays the gauge needs.
+  bool readGaugeBlockVerified(uint8_t classID, uint8_t blockNum, uint8_t data[32]);
+
+  /// @brief The CC Cal byte holding the coulomb-counter sign (offset 5,
+  ///        bit 7), or -1 if it could not be read consistently.
+  int32_t readCCCalSignByte();
+
+  /// @brief Write the CC Cal sign byte through a CONFIG UPDATE session
+  ///        (TRM section 4.1 sequence) and verify it stuck.
+  bool writeCCCalSignByte(uint8_t value);
+
   int _soc = -1;
   int _health = -1;
   int _current = -1;
