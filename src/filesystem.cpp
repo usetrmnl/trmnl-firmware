@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <filesystem.h>
+#include <inttypes.h>
 #include <trmnl_log.h>
 
 #if defined(BOARD_X_CLASS)
@@ -132,7 +133,8 @@ void filesystem_purge_old_file(const char *name) {
     strcpy(szTemp, "/"); // needed on this file operation
     strcat(szTemp, file.name());
 
-    Log_info("Comparing name %s with %s, timestamp %u, current time %u", name, file.name(), timestamp, (uint32_t)now);
+    Log_info("Comparing name %s with %s, timestamp %" PRIu32 ", current time %" PRIu32, name, file.name(), timestamp,
+             (uint32_t)now);
     if (strncmp(name, szTemp, 14) == 0) { // older version of the same file
       Log_info("Deleting older version of plugin image %s - %s", name, file.name());
       bDel = true;
@@ -159,7 +161,7 @@ void filesystem_purge_old_file(const char *name) {
  */
 size_t filesystem_write_to_file(const char *name, uint8_t *in_buffer, size_t size) {
   uint32_t FS_freeBytes = (FS.totalBytes() - FS.usedBytes());
-  Log_info("FS free space - %d, total -%d", FS_freeBytes, FS.totalBytes());
+  Log_info("FS free space - %" PRIu32 ", total -%zu", FS_freeBytes, FS.totalBytes());
   if (FS.exists(name)) {
     Log_info("file %s exists. Deleting...", name);
     if (FS.remove(name))
@@ -287,3 +289,36 @@ uint32_t filesystem_extract_timestamp(const char *filename) {
     return 0;
   }
 }
+
+void writeImageToFile(const char *name, uint8_t *in_buffer, size_t size) {
+  size_t res = filesystem_write_to_file(name, in_buffer, size);
+  if (res != size) {
+    Log_error_submit("File writing ERROR. Result - %d", res);
+  } else {
+    Log_info("file %s writing success - %d bytes", name, res);
+  }
+}
+
+void filesystem_fix_filename(const char *src, char *dest) {
+  int iLen;
+
+  // SPIFFS only allows 32 bytes for the name, so if it's too long, fix it
+  dest[0] = '/'; // SPIFFS requires files to start with the root dir
+  iLen = strlen(src);
+  if (iLen > 31) {
+    memcpy(&dest[1], src, 7);          // first 7 chars are "plugin-" or "mashup-"
+    strcpy(&dest[8],
+           &src[iLen - 17]); // get the prefix name and unique id plus timestamp (e.g. mashup-066cc3-1771674964)
+  } else {
+    strncpy(&dest[1], src, 31); // use it as-is
+  }
+} /* filesystem_fix_filename() */
+
+bool filesystem_fixed_file_exists(String &newName) {
+  char szTemp[36];
+
+  filesystem_fix_filename(
+    newName.c_str(),
+    szTemp); // shorten the name (if needed) to fit the SPIFFS file length limit of 31 chars + 0 terminator
+  return filesystem_file_exists(szTemp);
+} /* filesystem_fixed_file_exists() */

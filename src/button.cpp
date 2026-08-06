@@ -2,13 +2,22 @@
 
 #include <Arduino.h>
 #include <config.h>
+#include <misc/buzzer.h>
 
 #include "trmnl_log.h"
 
 static unsigned long wait_for_button_release(unsigned long start_time) {
   pinMode(PIN_INTERRUPT, INPUT);
+  bool hold_buzzer_fired = false;
   while (digitalRead(PIN_INTERRUPT) == LOW && millis() - start_time < BUTTON_SOFT_RESET_TIME) {
+    if (!hold_buzzer_fired && millis() - start_time >= BUTTON_HOLD_TIME) {
+      buzzer().beepPattern(2, 100, 100);
+      hold_buzzer_fired = true;
+    }
     delay(10);
+  }
+  if (millis() - start_time >= BUTTON_SOFT_RESET_TIME) {
+    buzzer().beepPattern(3, 100, 100);
   }
   return millis() - start_time;
 }
@@ -49,7 +58,7 @@ static ButtonPressResult wait_for_second_press(unsigned long start_time) {
   return ShortPress;
 }
 
-ButtonPressResult read_button_presses() {
+static ButtonPressResult classify_button_presses() {
   auto time_start = millis();
   Log_info("Button time=%lu: start", time_start);
   pinMode(PIN_INTERRUPT, INPUT);
@@ -79,6 +88,14 @@ ButtonPressResult read_button_presses() {
   }
 
   return NoAction;
+}
+
+ButtonPressResult read_button_presses() {
+  auto result = classify_button_presses();
+  if (result == ShortPress || result == DoubleClick) {
+    buzzer().beep(100);
+  }
+  return result;
 }
 
 const char *ButtonPressResultNames[] = {"LongPress", "DoubleClick", "ShortPress", "SoftReset"};

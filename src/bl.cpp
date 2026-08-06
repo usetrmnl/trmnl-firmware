@@ -4,6 +4,7 @@
 #include <bl.h>
 #include <wifi_network.h>
 #include <power.h>
+#include <battery.h>
 #include <device_id.h>
 #include <trmnl_log.h>
 #include <types.h>
@@ -29,7 +30,8 @@
 #include "api-client/submit_log.h"
 #include <api-client/setup.h>
 #include <special_function.h>
-#include <firmware_update.h>
+#include <refresh_interval.h>
+#include <services/firmware_update.h>
 #include <api_response_parsing.h>
 #include "logging_parcers.h"
 #include <SPIFFS.h>
@@ -37,7 +39,6 @@
 #include <api-client/display.h>
 #include <api-client/request_headers.h>
 #include "driver/gpio.h"
-#include "esp_sntp.h"
 #include "esp_flash.h"
 #include <nvs.h>
 #include <serialize_log.h>
@@ -47,17 +48,13 @@
 #include "loading.h"
 #include <wifi-helpers.h>
 #include <sys/time.h>
+#include <misc/buzzer.h>
+#include <misc/clock.h>
+#include <misc/sensor.h>
+#include <services/device_setup.h>
 #include "messages.h"
 #include "displayed_image.h"
-#ifdef SENSOR_SDA
-#include <bb_scd41.h>
-#include <bb_temperature.h>
-SCD41 scd41;
-BBTemp bbt;
-bool bCO2 = false;
-int iSensorType = -1;
-int lastCO2 = 0, lastSCDTemp = 0, lastTemp = 0, lastSCDHumid = 0, lastHumid = 0, lastPressure = 0, lastType = -1, lastTime = 0;
-#endif // SENSOR_SDA
+#include <globals.h>
 const char *szHTTPErrors[] = {
     "HTTPS_NO_ERR",
     "HTTPS_RESET",
@@ -77,46 +74,18 @@ const char *szHTTPErrors[] = {
     "HTTPS_OUT_OF_MEMORY"
 };
 
-String new_filename = "";
-ApiDisplayResult apiDisplayResult;
-uint8_t *buffer = nullptr;
-char filename[1024];      // image URL
-char message_buffer[128]; // message to show on the screen
-uint32_t time_since_sleep;
 static float vBatt;
-bool status = false;          // need to download a new image
-bool reset_firmware = false;  // need to reset credentials
-bool log_retry = false;                                              // need to log connection retry
-esp_sleep_wakeup_cause_t wakeup_reason = ESP_SLEEP_WAKEUP_UNDEFINED; // wake-up reason
-SPECIAL_FUNCTION special_function = SF_NONE;
-RTC_DATA_ATTR int iPrevWakeTime = 0; // total wake time of the last cycle (for statistics collection)
-RTC_DATA_ATTR bool bUsedCachedImage = false; // if the last image displayed was read from cache (for statistics collection)
-RTC_DATA_ATTR uint8_t need_to_refresh_display = 1;
-RTC_DATA_ATTR bool otg_state = false;  // Track OTG state across deep sleep
-Preferences preferences;
-PreferencesPersistence preferencesPersistence(preferences);
-StoredLogs storedLogs(LOG_MAX_NOTES_NUMBER / 2, LOG_MAX_NOTES_NUMBER / 2, PREFERENCES_LOG_KEY, PREFERENCES_LOG_BUFFER_HEAD_KEY, preferencesPersistence);
 
 static https_request_err_e downloadAndShow(); // download and show the image
-static uint32_t downloadStream(WiFiClient *stream, int content_size, uint8_t *buffer);
 static https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse);
-static void getDeviceCredentials();                  // receiveing API key and Friendly ID
-static bool performApiSetup();     // perform API setup call and return success
-static void downloadSetupImage();                    // download and display setup image
 void goToSleep(void);                         // sleep preparing
 static void goToSleepButtonOnly(void);               // sleep until button press, no timer
-static bool setClock(void);                          // clock synchronization
-static float readBatteryVoltage(void);               // battery voltage reading
 static void submitStoredLogs(void);
 static void writeSpecialFunction(SPECIAL_FUNCTION function);
-static void writeImageToFile(const char *name, uint8_t *in_buffer, size_t size);
 static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiResponse);
-FirmwareUpdateService firmwareUpdateService(preferencesPersistence, getTime, WIFI_CONNECTION_RSSI);
 static void wifiErrorDeepSleep();
 static uint8_t *storedLogoOrDefault(int iType);
-static bool checkCurrentFileName(String &newName);
 static DeviceStatusStamp getDeviceStatusStamp();
-void log_nvs_usage();
 void config_gpio_for_lp();
 int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious);
 
@@ -130,7 +99,6 @@ unsigned long startup_time = 0;
 // Create stub functions for the touchbar workaround
 void iqs323_task_i2c_lock(void) {}
 void iqs323_task_i2c_unlock(void) {}
-bool otg_message = false;
 #endif // !BOARD_TRMNL_X
 
 void wait_for_serial() {
@@ -168,83 +136,13 @@ void wait_for_serial() {
 
 // ############################ esp32c5 modem #########################
 #include "modem.h"
-
-// Global modem pointer — set once during bl_init(), used by download helpers
-// here and by getWiFiStatus() in wifi_network.cpp (5 GHz path on TRMNL_X), so
-// it needs external linkage.
-Modem* g_modem = nullptr;
 // ############################ esp32c5 modem #########################
 
 // ############################ Gas gauge #############################
 #include "BQ27427.h"
-battery_count_t battery_count = BATTERY_NONE;
-bool battery_charging = false;
 // ############################ Gas gauge #############################
 #endif
-/**
- * @brief Function to initialize and read from I2C sensors (if present)
- * @param none
- * @return none
- */
-void sensor_init(void)
-{
-#ifdef SENSOR_SDA
-  // check if there is a SCD41 or supported temperature sensor attached
-  if (scd41.init(SENSOR_SDA, SENSOR_SCL) == SCD41_SUCCESS) {
-    bCO2 = true;
-    Log.info("%s [%d]: SCD41 sensor found!\r\n", __FILE__, __LINE__);
-//    scd41.start(SCD41_MODE_PERIODIC);
-    scd41.wakeup();
-    // The SCD41 needs to be re-initialized after big Vcc variations from the last wakeup
-    // put it in a 'confused' state. If we don't re-initialize it, it won't generate more samples
-    scd41.sendCMD(SCD41_CMD_REINIT);
-    vTaskDelay(3); // allow time to reinitialize
-    scd41.triggerSample(); // trigger a 'one-shot' sample that takes about 5 seconds to complete
-  }
-  if (bbt.init(SENSOR_SDA, SENSOR_SCL) == BBT_SUCCESS) {
-    iSensorType = bbt.type();
-    Log.info("%s [%d]: supported sensor found! (%d)\r\n", __FILE__, __LINE__, iSensorType);
-    bbt.start(); // start the sensor
-  }
-  if (!bCO2 && iSensorType < 0) {
-    Log.info("%s [%d]: No sensor found on I2C bus %d/%d\r\n", __FILE__, __LINE__, SENSOR_SDA, SENSOR_SCL);
-  }
-  // wait for the sensor(s) to generate a sample
-  if (bCO2 || iSensorType >= 0) {
-    Log.info("%s [%d]: Light sleep for 5 seconds to allow sensor to generate a sample\r\n", __FILE__, __LINE__);
-    esp_sleep_enable_timer_wakeup(5000 * 1000L); // the SCD4x needs 5 seconds to get a sample
-    esp_light_sleep_start(); // use light sleep to save power
-  }
-  if (bCO2) {
-    if (scd41.getSample() == SCD41_SUCCESS) {
-        time((time_t *)&lastTime); // get the UTC epoch time that the same was captured
-        lastCO2 = scd41.co2();
-        lastSCDTemp = scd41.temperature();
-        lastSCDHumid = scd41.humidity();
-        Log.info("%s [%d]: Got SCD41 sample: CO2 = %dppm\r\n", __FILE__, __LINE__, lastCO2);
-    } else {
-        Log.info("%s [%d]: SCD41 sample failed\r\n", __FILE__, __LINE__);
-        lastCO2 = 0;
-    }
-    scd41.shutdown(); // conserve power since we completed getting a sample ready for the next TRMNL wakeup
-  }
-  if (iSensorType >= 0) {
-      BBT_SAMPLE bbts;
-      if (bbt.getSample(&bbts) == BBT_SUCCESS) {
-        time((time_t *)&lastTime); // get the UTC epoch time that the same was captured
-        lastTemp = bbts.temperature;
-        lastHumid = bbts.humidity;
-        lastPressure = bbts.pressure;
-        lastType = iSensorType;
-        Log.info("%s [%d]: Got bb_temperature sample: Temp = %d.%dC\r\n", __FILE__, __LINE__, lastTemp/10, lastTemp % 10);
-      } else {
-        lastType = -1;
-        Log.info("%s [%d]: bb_temperature sample failed\r\n", __FILE__, __LINE__);
-      }
-      bbt.stop(); // turn off the sensor to conserve power
-  }
-#endif // SENSOR_SDA
-} /* sensor_init() */
+
 /**
  * @brief Function to init business logic module
  * @param none
@@ -287,7 +185,8 @@ void bl_init(void)
   Log.info("%s [%d]: modem needed = %d\n\r", __FILE__, __LINE__, bModemNeeded);
 #endif // X
   pins_init();
-  sensor_init();
+  buzzer().init();
+  sensor().init();
 #ifdef BOARD_TRMNL_X
   // Debug: Print all wakeup_stub_iqs_status structure fields
   Log_info("wakeup_stub_iqs_status.status: 0x%02X 0x%02X", wakeup_stub_iqs_status.status[0], wakeup_stub_iqs_status.status[1]);
@@ -527,7 +426,7 @@ void bl_init(void)
   }
 #ifdef BOARD_TRMNL_X
   battery_count = detect_battery_count();
-  battery_charging = (get_charging_status() == ChargingStatus::CHARGING);
+  battery_charging = (power().chargingStatus() == ChargingStatus::CHARGING);
   Log_info("BATTERY COUNT: %d", battery_count);
   Log_info("BATTERY CHARGING: %s", battery_charging ? "YES" : "NO");
 
@@ -631,7 +530,7 @@ void bl_init(void)
     Log_info("No battery detected - skipping BQ27427 initialization");
   }
 #endif // BOARD_TRMNL_X
-  vBatt = readBatteryVoltage(); // Read the battery voltage BEFORE WiFi is turned on
+  vBatt = battery().readVoltage(); // Read the battery voltage BEFORE WiFi is turned on
 
   Log_info("Firmware version %s", Messages::firmware_version().c_str());
   Log_info("Arduino version %d.%d.%d", ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH);
@@ -771,10 +670,10 @@ void bl_init(void)
 #endif
 
   // clock synchronization
-  if (setClock())
+  if (systemClock().setTimeFromNTP())
   {
     time_since_sleep = preferences.getUInt(PREFERENCES_LAST_SLEEP_TIME, 0);
-    time_since_sleep = time_since_sleep ? getTime() - time_since_sleep : 0; // may be can be used even if no sync
+    time_since_sleep = time_since_sleep ? systemClock().getTime() - time_since_sleep : 0; // may be can be used even if no sync
   }
   else
   {
@@ -784,15 +683,43 @@ void bl_init(void)
 
   Log.info("%s [%d]: Time since last sleep: %d\r\n", __FILE__, __LINE__, time_since_sleep);
 
-  if (!preferences.isKey(PREFERENCES_API_KEY) || !preferences.isKey(PREFERENCES_FRIENDLY_ID))
+  if (preferences.isKey(PREFERENCES_API_KEY) && preferences.isKey(PREFERENCES_FRIENDLY_ID))
   {
-    Log.info("%s [%d]: API key or friendly ID not saved\r\n", __FILE__, __LINE__);
-    // lets get the api key and friendly ID
-    getDeviceCredentials();
+    Log.info("%s [%d]: API key and friendly ID saved\r\n", __FILE__, __LINE__);
   }
   else
   {
-    Log.info("%s [%d]: API key and friendly ID saved\r\n", __FILE__, __LINE__);
+    Log.info("%s [%d]: API key or friendly ID not saved\r\n", __FILE__, __LINE__);
+
+    // attempt to get the API key and friendly ID
+    DeviceSetupResult setup = deviceSetup().perform();
+
+    // copy results into globals
+    setup.imageUrl.toCharArray(filename, sizeof(filename));
+    setup.message.toCharArray(message_buffer, sizeof(message_buffer));
+
+    // perform post-setup actions
+    if (setup.showSetupScreen)
+    {
+      display_show_msg(storedLogoOrDefault(0), FRIENDLY_ID, setup.friendlyId, true, "", setup.message);
+      need_to_refresh_display = 0;
+    }
+    else if (setup.errorScreen != NONE)
+    {
+      showMessageWithLogo(setup.errorScreen);
+    }
+
+    if (setup.outcome == DeviceSetupOutcome::MacNotRegistered)
+    {
+      showMessageWithLogo(MAC_NOT_REGISTERED, setup.apiResponse);
+      refreshInterval.applyDefault();
+    }
+
+    if (setup.shouldGoToSleep)
+    {
+      display_sleep();
+      goToSleep();
+    }
   }
 
   submitStoredLogs();
@@ -823,32 +750,19 @@ void bl_init(void)
     switch (retries)
     {
     case 1:
-      Log.info("%s [%d]: retry: %d - time to sleep: %d\r\n", __FILE__, __LINE__, retries, API_CONNECT_RETRY_TIME::API_FIRST_RETRY);
-      res = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, API_CONNECT_RETRY_TIME::API_FIRST_RETRY);
-      preferences.putInt(PREFERENCES_CONNECT_API_RETRY_COUNT, ++retries);
-      display_sleep();
-      goToSleep();
-      break;
-
     case 2:
-      Log.info("%s [%d]: retry:%d - time to sleep: %d\r\n", __FILE__, __LINE__, retries, API_CONNECT_RETRY_TIME::API_SECOND_RETRY);
-      res = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, API_CONNECT_RETRY_TIME::API_SECOND_RETRY);
-      preferences.putInt(PREFERENCES_CONNECT_API_RETRY_COUNT, ++retries);
-      display_sleep();
-      goToSleep();
-      break;
-
     case 3:
-      Log.info("%s [%d]: retry:%d - time to sleep: %d\r\n", __FILE__, __LINE__, retries, API_CONNECT_RETRY_TIME::API_THIRD_RETRY);
-      res = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, API_CONNECT_RETRY_TIME::API_THIRD_RETRY);
+    {
+      uint32_t retry_sleep = refreshInterval.applyApiRetry(retries);
+      Log.info("%s [%d]: retry: %d - time to sleep: %d\r\n", __FILE__, __LINE__, retries, retry_sleep);
       preferences.putInt(PREFERENCES_CONNECT_API_RETRY_COUNT, ++retries);
       display_sleep();
       goToSleep();
       break;
+    }
 
     default:
-      Log.info("%s [%d]: Max retries done. Time to sleep: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_TO_SLEEP);
-      preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
+      Log.info("%s [%d]: Max retries done. Time to sleep: %d\r\n", __FILE__, __LINE__, refreshInterval.applyApiRetry(retries));
       preferences.putInt(PREFERENCES_CONNECT_API_RETRY_COUNT, ++retries);
       break;
     }
@@ -955,12 +869,7 @@ void bl_init(void)
   break;
   case HTTPS_PLUGIN_NOT_ATTACHED:
   {
-    if (preferences.getInt(PREFERENCES_SLEEP_TIME_KEY, 0) != SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED)
-    {
-      Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED);
-      preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED);
-      Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED);
-    }
+    refreshInterval.applyFastPoll();
   }
   break;
   default:
@@ -1020,23 +929,14 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
     Log.info("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_FRIENDLY_ID);
   }
 
-  inputs.refreshRate = SLEEP_TIME_TO_SLEEP;
-
-  if (preferences.isKey(PREFERENCES_SLEEP_TIME_KEY))
-  {
-    inputs.refreshRate = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
-    Log.info("%s [%d]: %s key exists. Value - %d\r\n", __FILE__, __LINE__, PREFERENCES_SLEEP_TIME_KEY, inputs.refreshRate);
-  }
-  else
-  {
-    Log.info("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_SLEEP_TIME_KEY);
-  }
+  inputs.refreshRate = refreshInterval.seconds();
+  Log.info("%s [%d]: refresh rate: %d\r\n", __FILE__, __LINE__, inputs.refreshRate);
 
   inputs.macAddress = device_mac_address();
   WiFiStatus wifi = getWiFiStatus();
   inputs.rssi = wifi.rssi;
   inputs.wifiBand = wifi.band;
-  inputs.batteryVoltage = vBatt; //readBatteryVoltage();
+  inputs.batteryVoltage = vBatt;
   inputs.firmwareVersion = String(FW_VERSION_STRING);
   inputs.firmwareCommit = String(FW_COMMIT);
   inputs.displayWidth = display_width();
@@ -1045,8 +945,8 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   inputs.specialFunction = special_function;
   inputs.imageCached = bUsedCachedImage;
   inputs.prevWakeTime = iPrevWakeTime;
-  inputs.usbStatus = get_usb_status();
-  inputs.chargingStatus = get_charging_status();
+  inputs.usbStatus = power().usbStatus();
+  inputs.chargingStatus = power().chargingStatus();
 
 #ifdef BOARD_TRMNL_X
   inputs.batteryCount = battery_count;
@@ -1142,7 +1042,7 @@ static https_request_err_e downloadAndShow()
         load_prev_image(); // decode the older image into the previous buffer of FastEPD
       }
 #endif
-      fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
+      filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
       if (DisplayedImage::matches(szTemp)) {
         // We just displayed the same image, don't refresh the display
         Log.info("%s [%d]: The image hasn't changed since the last wakeup, don't refresh the display.\r\n", __FILE__, __LINE__);
@@ -1182,7 +1082,7 @@ static https_request_err_e downloadAndShow()
     Log_info("Downloading image via modem (5 GHz path)");
 
     char szTemp[36];
-    fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
+    filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
     Log_info("Modem: saving to %s", szTemp);
     filesystem_purge_old_file(szTemp);
 
@@ -1266,7 +1166,7 @@ static https_request_err_e downloadAndShow()
             {
               // To avoid surprising behaviour if the server returned a timeout of more than 65 seconds
               // we will send a log message back to the server and truncate the timeout to the maximum.
-              Log_info_submit("Requested image URL timeout too large (%d ms). Using maximum of %d ms.", requestedTimeout, UINT16_MAX);
+              Log_info_submit("Requested image URL timeout too large (%" PRIu32 " ms). Using maximum of %d ms.", requestedTimeout, UINT16_MAX);
               https.setTimeout(UINT16_MAX);
             }
             else
@@ -1341,7 +1241,7 @@ static https_request_err_e downloadAndShow()
           bool isPNG = https.header("Content-Type") == "image/png";
           bool isJPEG = https.header("Content-Type") == "image/jpeg";
 
-          Log.info("%s [%d]: Starting a download at: %d\r\n", __FILE__, __LINE__, getTime());
+          Log.info("%s [%d]: Starting a download at: %d\r\n", __FILE__, __LINE__, systemClock().getTime());
           heap_caps_check_integrity_all(true);
 
           buffer = nullptr;
@@ -1362,7 +1262,7 @@ static https_request_err_e downloadAndShow()
               buffer = (uint8_t *)malloc(counter);
               if (buffer) {
                 buffer_malloc = true;
-                while (iCount < counter && millis() < (lStartTime + API_FIRST_RETRY*1000)) {
+                while (iCount < counter && millis() < (lStartTime + IMAGE_STREAM_INACTIVITY_TIMEOUT_MS)) {
                   if (stream->available()) {
                     buffer[iCount++] = stream->read();
                     lStartTime = millis(); // reset start time
@@ -1372,8 +1272,8 @@ static https_request_err_e downloadAndShow()
                 }
               } // if buffer
               stream->stop(); // Important! If you don't do this, WiFi will have a memory exception later
-              if (millis() > (lStartTime + API_FIRST_RETRY*1000)) { // we timed out
-                  Log_error_submit("Receiving failed; download timed out. Image size = %d", counter);
+              if (millis() > (lStartTime + IMAGE_STREAM_INACTIVITY_TIMEOUT_MS)) { // we timed out
+                  Log_error_submit("Receiving failed; download timed out. Image size = %" PRIu32, counter);
                   return HTTPS_TIMED_OUT;
               }
             }
@@ -1388,13 +1288,13 @@ static https_request_err_e downloadAndShow()
 
           if (counter > MAX_IMAGE_SIZE)
           {
-            Log_error_submit("Receiving failed; file size too big: %d", counter);
+            Log_error_submit("Receiving failed; file size too big: %" PRIu32, counter);
             return HTTPS_IMAGE_FILE_TOO_BIG;
           }
 
           if (buffer == NULL)
           {
-            Log_error_submit("Failed to allocate %d bytes for image buffer", counter);
+            Log_error_submit("Failed to allocate %" PRIu32 " bytes for image buffer", counter);
             return HTTPS_OUT_OF_MEMORY;
           }
 
@@ -1416,7 +1316,7 @@ static https_request_err_e downloadAndShow()
           if (isPNG || isJPEG)
           {
             char szTemp[36];
-            fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
+            filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
             Log.info("%s [%d]: Writing %s to SPIFFS\r\n", __FILE__, __LINE__, szTemp);
             filesystem_purge_old_file(szTemp); // try to delete the old version or older than 24h
             writeImageToFile(szTemp, buffer, content_size);
@@ -1504,7 +1404,7 @@ static https_request_err_e downloadAndShow()
             display_show_image(buffer, content_size, true);
             {
               char szTemp[36];
-              fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
+              filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
               DisplayedImage::remember(szTemp);
             }
 
@@ -1551,7 +1451,7 @@ static https_request_err_e downloadAndShow()
           if (isPNG && png_res != PNG_NO_ERR)
           {
             char szTemp[36];
-            fixFileName(apiDisplayResult.response.filename.c_str(), szTemp);
+            filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
             filesystem_file_delete(szTemp);
             Log_error_submit("error parsing image file - %s", error.c_str());
 
@@ -1570,35 +1470,6 @@ static https_request_err_e downloadAndShow()
   Log_info("Returned result - %s", szHTTPErrors[result]);
 
   return result;
-}
-
-uint32_t downloadStream(WiFiClient *stream, int content_size, uint8_t *buffer)
-{
-  int iteration_counter = 0;
-  int counter2 = content_size;
-  unsigned long download_start = millis();
-  unsigned long last_data_time = millis();
-  int counter = 0;
-
-  while (counter < content_size && millis() - download_start < 30000)
-  {
-    if (stream->available())
-    {
-      Log.info("%s [%d]: Downloading... Available bytes: %d\r\n", __FILE__, __LINE__, stream->available());
-      int bytes_to_read = min(stream->available(), counter2 - counter);
-      counter += stream->readBytes(buffer + counter, bytes_to_read);
-      iteration_counter++;
-      last_data_time = millis();
-    }
-    else if (!stream->connected() || millis() - last_data_time > 5000)
-    {
-      break;
-    }
-    delay(10);
-  }
-
-  Log_info("Download end: %d/%d bytes in %d ms (%d iterations)", counter, content_size, millis() - download_start, iteration_counter);
-  return counter;
 }
 
 https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
@@ -1671,6 +1542,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
         else
         {
           Log.info("%s [%d]: End with NO empty_state\r\n", __FILE__, __LINE__);
+          refreshInterval.resetFastPollStreak();
           if (flag)
           {
             if (preferences.getBool(PREFERENCES_DEVICE_REGISTERED_KEY, false) != false) // check the flag to avoid the re-writing
@@ -1687,7 +1559,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
 
           // Print the extracted string
           Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
-          if (!checkCurrentFileName(new_filename))
+          if (!filesystem_fixed_file_exists(new_filename))
           {
             Log.info("%s [%d]: New image. Download and show it.\r\n", __FILE__, __LINE__);
             status = true;
@@ -1703,11 +1575,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
         }
       }
       Log.info("%s [%d]: refresh_rate: %d\r\n", __FILE__, __LINE__, rate);
-      if (rate != preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP))
-      {
-        Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, rate);
-        preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, rate);
-      }
+      refreshInterval.applyServerRate(rate);
 
       if (reset_firmware)
       {
@@ -1726,18 +1594,14 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
     case 202:
     {
       result = HTTPS_NO_REGISTER;
-      Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
-      size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
-      Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
+      refreshInterval.applyFastPoll();
       status = false;
     }
     break;
     case 500:
     {
       result = HTTPS_RESET;
-      Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
-      preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
-      Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
+      refreshInterval.applyFastPoll();
       status = false;
     }
     break;
@@ -1826,12 +1690,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
         {
           uint64_t rate = apiResponse.refresh_rate;
           Log.info("%s [%d]: refresh_rate: %d\r\n", __FILE__, __LINE__, rate);
-          if (rate != preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP))
-          {
-            Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, rate);
-            preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, rate);
-            Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
-          }
+          refreshInterval.applyServerRate(rate);
           status = false;
           result = HTTPS_SUCCESS;
           Log.info("%s [%d]: sleep success\r\n", __FILE__, __LINE__);
@@ -2135,7 +1994,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
               status = true;
             }
           }
-          preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, rate);
+          refreshInterval.applyServerRate(rate);
         }
         else
         {
@@ -2151,18 +2010,14 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
     case 202:
     {
       result = HTTPS_NO_REGISTER;
-      Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
-      preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
-      Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
+      refreshInterval.applyFastPoll();
       status = false;
     }
     break;
     case 500:
     {
       result = HTTPS_RESET;
-      Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
-      preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
-      Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
+      refreshInterval.applyFastPoll();
       status = false;
     }
     break;
@@ -2172,334 +2027,6 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
     }
   }
   return result;
-}
-
-/**
- * @brief Performs API setup call to get credentials and image URL
- * @return true if should continue to image download, false otherwise
- */
-static bool performApiSetup()
-{
-  // Set up the API inputs
-  ApiSetupInputs inputs;
-  inputs.baseUrl = preferences.getString(PREFERENCES_API_URL, API_BASE_URL);
-  inputs.macAddress = device_mac_address();
-  inputs.firmwareVersion = FW_VERSION_STRING;
-  inputs.model = String(DEVICE_MODEL);
-
-  Log.info("%s [%d]: [HTTPS] begin /api/setup ...\r\n", __FILE__, __LINE__);
-  Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
-  Log.info("%s [%d]: Device MAC address: %s\r\n", __FILE__, __LINE__, inputs.macAddress.c_str());
-
-  ApiSetupResult result;
-  // Call the API client
-#ifdef BOARD_TRMNL_X
-  if (g_modem && WifiCaptivePortal.getLastCredentials().is5GHz)
-  {
-    Log_info("API setup via modem (5 GHz path)");
-    String reqHeaders = formatHeaders(buildSetupHeaders(inputs));
-    auto httpRes = g_modem->httpGet(inputs.baseUrl + "/api/setup", "", 0, reqHeaders);
-    if (!httpRes.ok)
-    {
-      Log_error_submit("[MODEM] /api/setup request failed (%u bytes received)", httpRes.bytesReceived);
-      result = {HTTPS_RESPONSE_CODE_INVALID, {}, "Modem httpGet failed"};
-    }
-    else
-    {
-      auto apiResp = parseResponse_apiSetup(httpRes.body);
-      if (apiResp.outcome == ApiSetupOutcome::DeserializationError)
-        result = {HTTPS_JSON_PARSING_ERR, {}, "JSON deserialization error"};
-      else
-        result = {HTTPS_NO_ERR, apiResp, ""};
-    }
-  }
-  else
-#endif // BOARD_TRMNL_X
-  {
-    result = fetchApiSetup(inputs);
-  }
-  // Handle connection errors
-  if (result.error == HTTPS_UNABLE_TO_CONNECT)
-  {
-    showMessageWithLogo(WIFI_INTERNAL_ERROR);
-    Log_error_submit("[HTTPS] %s", result.error_detail.c_str());
-    return false;
-  }
-
-  // Handle JSON parsing errors
-  if (result.error == HTTPS_JSON_PARSING_ERR)
-  {
-    Log.error("%s [%d]: JSON deserialization error.\r\n", __FILE__, __LINE__);
-    return false;
-  }
-
-  // Handle HTTP request errors
-  if (result.error != HTTPS_NO_ERR)
-  {
-    if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
-    {
-      showMessageWithLogo(API_SETUP_FAILED);
-    }
-    else
-    {
-      showMessageWithLogo(WIFI_WEAK);
-    }
-    Log_error_submit("[HTTPS] Request failed: %s", result.error_detail.c_str());
-    return false;
-  }
-
-  // Process the successful response
-  auto &apiResponse = result.response;
-  uint16_t url_status = apiResponse.status;
-
-  Log.info("%s [%d]: GET... code: %d\r\n", __FILE__, __LINE__, url_status);
-
-  if (url_status == 200)
-  {
-    status = true;
-    Log.info("%s [%d]: status OK.\r\n", __FILE__, __LINE__);
-
-    String api_key = apiResponse.api_key;
-    Log.info("%s [%d]: API key - %s\r\n", __FILE__, __LINE__, api_key.c_str());
-    size_t res = preferences.putString(PREFERENCES_API_KEY, api_key);
-    Log.info("%s [%d]: api key saved in the preferences - %d\r\n", __FILE__, __LINE__, res);
-
-    String friendly_id = apiResponse.friendly_id;
-    Log.info("%s [%d]: friendly ID - %s\r\n", __FILE__, __LINE__, friendly_id.c_str());
-    res = preferences.putString(PREFERENCES_FRIENDLY_ID, friendly_id);
-    Log.info("%s [%d]: friendly ID saved in the preferences - %d\r\n", __FILE__, __LINE__, res);
-
-    String image_url = apiResponse.image_url;
-    Log.info("%s [%d]: image_url - %s\r\n", __FILE__, __LINE__, image_url.c_str());
-    image_url.toCharArray(filename, image_url.length() + 1);
-
-    String message_str = apiResponse.message;
-    Log.info("%s [%d]: message - %s\r\n", __FILE__, __LINE__, message_str.c_str());
-    message_str.toCharArray(message_buffer, message_str.length() + 1);
-
-    Log.info("%s [%d]: status - %d\r\n", __FILE__, __LINE__, status);
-    return true;
-  }
-  else if (url_status == 404)
-  {
-    Log_info("MAC Address is not registered on server");
-
-    showMessageWithLogo(MAC_NOT_REGISTERED, apiResponse);
-
-    preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
-
-    display_sleep();
-    goToSleep();
-    return false;
-  }
-  else
-  {
-    Log.info("%s [%d]: status FAIL.\r\n", __FILE__, __LINE__);
-    status = false;
-    return false;
-  }
-}
-
-/**
- * @brief Downloads and displays the setup image from the API response
- * @return none
- */
-static void downloadSetupImage()
-{
-  status = false;
-  Log.info("%s [%d]: filename - %s\r\n", __FILE__, __LINE__, filename);
-
-  #ifdef BOARD_TRMNL_X
-  if (WifiCaptivePortal.getLastCredentials().is5GHz && g_modem)
-  {
-    Log_info("Downloading setup image via modem (5 GHz path)");
-    auto httpRes = g_modem->httpGet(String(filename), "/logo.bmp");
-    if (!httpRes.ok || httpRes.bytesReceived != DISPLAY_BMP_IMAGE_SIZE)
-    {
-      Log_error_submit("Modem logo download failed: ok=%d bytes=%u expected=%u",
-                       httpRes.ok, httpRes.bytesReceived, DISPLAY_BMP_IMAGE_SIZE);
-      filesystem_file_delete("/logo.bmp");
-    }
-    String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
-    display_show_msg(storedLogoOrDefault(0), FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
-    need_to_refresh_display = 0;
-    return;
-  }
-#endif // BOARD_TRMNL_X
-
-  withHttp(filename, [&](HTTPClient *https, HttpError error) -> bool
-           {
-    if (error != HttpError::HTTPCLIENT_SUCCESS)
-    {
-      if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
-      {
-        showMessageWithLogo(API_IMAGE_DOWNLOAD_ERROR);
-      }
-      else
-      {
-        showMessageWithLogo(WIFI_WEAK);
-      }
-      Log_error_submit("[HTTPS] Unable to connect");
-      return false;
-    }
-
-    https->setTimeout(15000);
-    https->setConnectTimeout(15000);
-
-    Log.info("%s [%d]: [HTTPS] Request to %s\r\n", __FILE__, __LINE__, filename);
-    Log.info("%s [%d]: [HTTPS] GET..\r\n", __FILE__, __LINE__);
-
-    int httpCode = https->GET();
-
-    if(httpCode == HTTP_CODE_PERMANENT_REDIRECT ||httpCode == HTTP_CODE_TEMPORARY_REDIRECT){
-              https->end();
-              https->begin(https->getLocation());
-              Log_info("Redirected to: %s", https->getLocation().c_str());
-              https->setTimeout(15000);
-              https->setConnectTimeout(15000);
-              httpCode = https->GET();
-            }
-
-    // httpCode will be negative on error
-    if (httpCode <= 0)
-    {
-      if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
-      {
-        showMessageWithLogo(API_IMAGE_DOWNLOAD_ERROR);
-      }
-      else
-      {
-        showMessageWithLogo(WIFI_WEAK);
-      }
-      Log_error_submit("[HTTPS] GET... failed, error: %s", https->errorToString(httpCode).c_str());
-      return false;
-    }
-
-    // HTTP header has been send and Server response header has been handled
-    Log.info("%s [%d]: [HTTPS] GET... code: %d\r\n", __FILE__, __LINE__, httpCode);
-    
-    // file found at server
-    if (httpCode != HTTP_CODE_OK && httpCode != HTTP_CODE_MOVED_PERMANENTLY)
-    {
-      if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
-      {
-        showMessageWithLogo(API_IMAGE_DOWNLOAD_ERROR);
-      }
-      else
-      {
-        showMessageWithLogo(WIFI_WEAK);
-      }
-      Log_error_submit("[HTTPS] GET... failed, error: %s", https->errorToString(httpCode).c_str());
-      return false;
-    }
-
-    Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, https->getSize());
-
-    WiFiClient *stream = https->getStreamPtr();
-
-    uint32_t counter = 0;
-#ifdef BOARD_TRMNL_X
-    int contentSize = https->getSize();
-    buffer = (uint8_t *)malloc(contentSize > 0 ? contentSize : 1);
-    if (buffer == nullptr)
-    {
-      Log_error_submit("Failed to allocate buffer for setup image (%d bytes)", contentSize);
-      return false;
-    }
-    if (stream->available() && contentSize > 0)
-    {
-      counter = downloadStream(stream, contentSize, buffer);
-    }
-#else
-    // Read and save image data to buffer (BMP or PNG)
-    int contentSize = https->getSize();
-    buffer = (uint8_t *)malloc(contentSize > 0 ? contentSize : 1);
-    if (buffer == nullptr)
-    {
-      Log_error_submit("Failed to allocate buffer for setup image (%d bytes)", contentSize);
-      return false;
-    }
-    if (stream->available() && contentSize > 0)
-    {
-      counter = downloadStream(stream, contentSize, buffer);
-    }
-#endif
-
-    if (counter == DISPLAY_BMP_IMAGE_SIZE)
-    {
-      Log.info("%s [%d]: Received successfully\r\n", __FILE__, __LINE__);
-
-      writeImageToFile("/logo.bmp", buffer, DEFAULT_IMAGE_SIZE);
-
-      // show the image
-      String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
-      display_show_msg(storedLogoOrDefault(0), FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
-      need_to_refresh_display = 0;
-    }
-#ifdef BOARD_TRMNL_X 
-    else if (counter >= 4 && buffer[0] == 0x89 && buffer[1] == 'P' && buffer[2] == 'N' && buffer[3] == 'G')
-    {       
-      Log.info("%s [%d]: Received PNG setup logo (%d bytes)\r\n", __FILE__, __LINE__, counter);
-      writeImageToFile("/logo.png", buffer, counter);
-      free(buffer);
-      buffer = nullptr;
-
-      // show the image
-      String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
-      display_show_msg(storedLogoOrDefault(0), FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
-      need_to_refresh_display = 0;
-    }
-    else
-    {
-      free(buffer);
-      buffer = nullptr;
-      Log_error_submit("Setup image: unexpected format or size. Read: %d bytes (expected BMP %d)", counter, DISPLAY_BMP_IMAGE_SIZE);
-    }
-#else
-    else if (counter >= 4 && buffer[0] == 0x89 && buffer[1] == 'P' && buffer[2] == 'N' && buffer[3] == 'G')
-    {
-      Log.info("%s [%d]: Received PNG setup logo (%d bytes)\r\n", __FILE__, __LINE__, counter);
-      writeImageToFile("/logo.png", buffer, counter);
-      free(buffer);
-      buffer = nullptr;
-
-      String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
-      display_show_msg(storedLogoOrDefault(0), FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
-      need_to_refresh_display = 0;
-    }
-    else
-    {
-      if (buffer) {
-        free(buffer);
-        buffer = nullptr;
-      }
-      if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
-      {
-        showMessageWithLogo(API_SIZE_ERROR);
-      }
-      else
-      {
-        showMessageWithLogo(WIFI_WEAK);
-      }
-      Log_error_submit("Receiving failed. Read: %d", counter);
-    }
-#endif // !BOARD_TRMNL_X    
-    return true; });
-}
-
-/**
- * @brief Function to getting the friendly id and API key
- * @return none
- */
-static void getDeviceCredentials()
-{
-  bool shouldDownloadImage = performApiSetup();
-
-  Log.info("%s [%d]: status - %d\r\n", __FILE__, __LINE__, status);
-  if (shouldDownloadImage)
-  {
-    downloadSetupImage();
-  }
 }
 
 /**
@@ -2561,14 +2088,11 @@ void goToSleep(void)
 #endif
 
   filesystem_deinit();
-  uint32_t time_to_sleep = SLEEP_TIME_TO_SLEEP;
-
-  if (preferences.isKey(PREFERENCES_SLEEP_TIME_KEY))
-    time_to_sleep = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
+  uint32_t time_to_sleep = refreshInterval.seconds();
   iPrevWakeTime = millis() - startup_time; // save for statistics
   Log.info("%s [%d]: total awake time - %d ms\r\n", __FILE__, __LINE__, iPrevWakeTime); 
   Log.info("%s [%d]: time to sleep - %d\r\n", __FILE__, __LINE__, time_to_sleep);
-  preferences.putUInt(PREFERENCES_LAST_SLEEP_TIME, getTime());
+  preferences.putUInt(PREFERENCES_LAST_SLEEP_TIME, systemClock().getTime());
   preferences.end();
   esp_sleep_enable_timer_wakeup((uint64_t)time_to_sleep * SLEEP_uS_TO_S_FACTOR);
   // Configure GPIO pin for wakeup
@@ -2681,143 +2205,6 @@ void config_gpio_for_lp() {
 #endif // BOARD_TRMNL_X
 } /* config_gpio_for_lp() */
 
-// Not sure if WiFiClientSecure checks the validity date of the certificate.
-// Setting clock just to be sure...
-/**
- * @brief Function to clock synchronization
- * @param none
- * @return none
- */
-static bool setClock()
-{
-  bool sync_status = false;
-  struct tm timeinfo;
-  int iDeltaTime;
-  Preferences prefs;
-
-  prefs.begin("data");
-  uint32_t u32Epoch = prefs.getUInt("last_sync", 0); // Get the last time sync time
-  iDeltaTime = getTime() - u32Epoch; // Number of seconds since the last sync
-  Log.info("%s [%d]: epoch time: %d iDelta: %d\r\n", __FILE__, __LINE__, getTime(), iDeltaTime);
-  if (u32Epoch != 0 && iDeltaTime > 0 && iDeltaTime < 24*60*60) { // Less than 24h, no need to sync the time
-      Log.info("%s [%d]: Skipping time sync\r\n", __FILE__, __LINE__);
-      prefs.end();
-      return true;
-  }
-  String ntp = prefs.getString("ntp_server", "time.google.com");
-
-  Log.info("%s [%d]: Using NTP: %s, fallback: time.cloudflare.com\r\n", __FILE__, __LINE__, ntp.c_str());
-  #ifdef BOARD_TRMNL_X
-  if (g_modem && WifiCaptivePortal.getLastCredentials().is5GHz)
-  {
-    time_t t = g_modem->getSntpTime();
-    if (t > 0)
-    {
-      struct timeval tv = { t, 0 };
-      settimeofday(&tv, nullptr);
-      getLocalTime(&timeinfo);
-      sync_status = true;
-      Log.info("%s [%d]: Time synchronization via modem succeed!\r\n", __FILE__, __LINE__);
-      prefs.putUInt("last_sync", getTime()); // save epoch time of last sync
-    }
-    else
-    {
-      Log.info("%s [%d]: Time synchronization via modem failed...\r\n", __FILE__, __LINE__);
-    }
-    Log.info("%s [%d]: Current time - %s\r\n", __FILE__, __LINE__, asctime(&timeinfo));
-    prefs.end();
-    return sync_status;
-  }
-#endif
-
-  configTime(0, 0, ntp.c_str(), "pool.ntp.org"); //"time.cloudflare.com");
-
-#ifdef BOARD_TRMNL_GEN2
-  // This seems to be necessary only on the ESP32-C5, otherwise NTP will fail 100% of the time
-  // Wait until a valid time is received from the NTP server
-  // 1577836800 is the Unix time for Jan 1, 2020
-  time_t now = 0;
-  while (time(&now) < 1577836800) {
-    vTaskDelay(50);
-  }
-#endif
-
-  for (int i = 0; i < SNTP_MAX_SERVERS; i++)
-  {
-    const char *srv = esp_sntp_getservername(i);
-    if (srv && strlen(srv) > 0)
-    {
-      Log.info("%s [%d]: SNTP server[%d]: %s\r\n", __FILE__, __LINE__, i, srv);
-    }
-  }
-
-  Log.info("%s [%d]: Time synchronization...\r\n", __FILE__, __LINE__);
-
-  // Wait for time to be set
-  if (getLocalTime(&timeinfo))
-  {
-    sync_status = true;
-    Log.info("%s [%d]: Time synchronization succeed!\r\n", __FILE__, __LINE__);
-    prefs.putUInt("last_sync", getTime()); // save epoch time of last sync
-  }
-  else
-  {
-    Log.info("%s [%d]: Time synchronization failed...\r\n", __FILE__, __LINE__);
-  }
-
-  Log.info("%s [%d]: Current time - %s\r\n", __FILE__, __LINE__, asctime(&timeinfo));
-
-  prefs.end();
-  return sync_status;
-}
-
-/**
- * @brief Function to read the battery voltage
- * @param none
- * @return float voltage in Volts
- */
-static float readBatteryVoltage(void)
-{
-#ifdef FAKE_BATTERY_VOLTAGE
-  Log.warning("%s [%d]: FAKE_BATTERY_VOLTAGE is defined. Returning 4.2V.\r\n", __FILE__, __LINE__);
-  return 4.2f;
-#elif defined(BOARD_TRMNL_X)
-  if (lipo._initialized)
-  {
-    float voltage = lipo.voltage() / 1000.0; // Convert mV to V
-    Log.info("%s [%d]: Battery voltage reading from BQ27427: %.3f V\r\n", __FILE__, __LINE__, voltage);
-    return voltage;
-  }
-  else
-  {
-    Log.error("%s [%d]: BQ27427 not initialized. Cannot read battery voltage.\r\n", __FILE__, __LINE__);
-    return -1.0;
-  }
-#else
-  #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002) || defined(BOARD_SEEED_RETERMINAL_E1003)
-    pinMode(PIN_VBAT_SWITCH, OUTPUT);
-    digitalWrite(PIN_VBAT_SWITCH, VBAT_SWITCH_LEVEL);
-    delay(10); // Wait for the switch to stabilize
-  #endif
-    Log.info("%s [%d]: Battery voltage reading...\r\n", __FILE__, __LINE__);
-    int32_t adc;
-    int32_t sensorValue;
-
-    adc = 0;
-    analogRead(PIN_BATTERY); // This is needed to properly initialize the ADC BEFORE calling analogReadMilliVolts()
-    for (uint8_t i = 0; i < 8; i++) {
-      adc += analogReadMilliVolts(PIN_BATTERY);
-    }
-  #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_XIAO_EPAPER_DISPLAY_3CLR) || defined(BOARD_SEEED_RETERMINAL_E1003)
-    digitalWrite(PIN_VBAT_SWITCH, (VBAT_SWITCH_LEVEL == HIGH ? LOW : HIGH));
-  #endif
-    sensorValue = (adc / 8) * 2;
-    Log.info("%s [%d]: Battery sensorValue = %d\r\n", __FILE__, __LINE__, (int)sensorValue);
-    float voltage = sensorValue / 1000.0;
-    return voltage;
-#endif // FAKE_BATTERY_VOLTAGE
-}
-
 /**
  * @brief Function to submit a log string to the API
  * @param log_buffer pointer to the buffer that contains log note
@@ -2861,19 +2248,6 @@ bool storeLogString(const char *log_buffer)
 }
 
 
-uint32_t getTime(void)
-{
-  time_t now;
-  struct tm timeinfo;
-  if (!getLocalTime(&timeinfo, 200))
-  {
-    Log.info("%s [%d]: Failed to obtain time. \r\n", __FILE__, __LINE__);
-    return (0);
-  }
-  time(&now);
-  return now;
-}
-
 static void submitStoredLogs(void)
 {
   if (WiFi.isConnected() == false)
@@ -2910,19 +2284,6 @@ static void submitStoredLogs(void)
   if (submitLogToApiResult == true)
   {
     storedLogs.clear_stored_logs();
-  }
-}
-
-static void writeImageToFile(const char *name, uint8_t *in_buffer, size_t size)
-{
-  size_t res = filesystem_write_to_file(name, in_buffer, size);
-  if (res != size)
-  {
-    Log_error_submit("File writing ERROR. Result - %d", res);
-  }
-  else
-  {
-    Log.info("%s [%d]: file %s writing success - %d bytes\r\n", __FILE__, __LINE__, name, res);
   }
 }
 
@@ -2997,7 +2358,7 @@ static uint8_t *storedLogoOrDefault(int iType)
    BRAND *pBrand;
 
    u32Size = ESP.getFlashChipSize();
-   Log_info("%s [%d]: esp flash size: %d\r\n", __FILE__, __LINE__, u32Size);
+   Log_info("%s [%d]: esp flash size: %" PRIu32 "\r\n", __FILE__, __LINE__, u32Size);
    if (u32Size != 0) {
    pBrand = (BRAND *)malloc(sizeof(BRAND)); // DEBUG - we can leak this memory for now
    esp_flash_init(NULL);
@@ -3030,35 +2391,7 @@ static uint8_t *storedLogoOrDefault(int iType)
 }
 
 // Chop up long names to fit within the SPIFFS 31 character limit
-void fixFileName(const char *src, char *dest)
-{
-int iLen;
 
-  // SPIFFS only allows 32 bytes for the name, so if it's too long, fix it
-  dest[0] = '/'; // SPIFFS requires files to start with the root dir
-  iLen = strlen(src);
-  if (iLen > 31) {
-    memcpy(&dest[1], src, 7); // first 7 chars are "plugin-" or "mashup-"
-    strcpy(&dest[8], &src[iLen-17]); // get the prefix name and unique id plus timestamp (e.g. mashup-066cc3-1771674964)
-  } else {
-    strncpy(&dest[1], src, 31); // use it as-is
-  }
-} /* fixFileName() */
-
-//
-// Abstract:
-// Compares the current filename returned from the API server
-// with files we previously stored in FLASH (SPIFFS)
-//
-// returns: true if the file exists
-//
-static bool checkCurrentFileName(String &newName)
-{
-char szTemp[36];
-
-  fixFileName(newName.c_str(), szTemp); // shorten the name (if needed) to fit the SPIFFS file length limit of 31 chars + 0 terminator
-  return filesystem_file_exists(szTemp);
-} /* checkCurrentFileName() */
 
 static void wifiErrorDeepSleep()
 {
@@ -3074,15 +2407,9 @@ static void wifiErrorDeepSleep()
   switch (retry_count)
   {
   case 1:
-    preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, WIFI_CONNECT_RETRY_TIME::WIFI_FIRST_RETRY);
-    break;
-
   case 2:
-    preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, WIFI_CONNECT_RETRY_TIME::WIFI_SECOND_RETRY);
-    break;
-
   case 3:
-    preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, WIFI_CONNECT_RETRY_TIME::WIFI_THIRD_RETRY);
+    refreshInterval.applyWifiRetry(retry_count);
     break;
 
   default:
@@ -3105,11 +2432,11 @@ DeviceStatusStamp getDeviceStatusStamp()
 
   deviceStatus.wifi_rssi_level = WiFi.RSSI();
   strncpy(deviceStatus.wifi_status, wifiStatusStr(WiFi.status()), sizeof(deviceStatus.wifi_status) - 1);
-  deviceStatus.refresh_rate = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY);
+  deviceStatus.refresh_rate = refreshInterval.seconds(0);
   deviceStatus.time_since_last_sleep = time_since_sleep;
   snprintf(deviceStatus.current_fw_version, sizeof(deviceStatus.current_fw_version), "%s", FW_VERSION_STRING);
   parseSpecialFunctionToStr(deviceStatus.special_function, sizeof(deviceStatus.special_function), special_function);
-  deviceStatus.battery_voltage = vBatt; //readBatteryVoltage()
+  deviceStatus.battery_voltage = vBatt;
   parseWakeupReasonToStr(deviceStatus.wakeup_reason, sizeof(deviceStatus.wakeup_reason), esp_sleep_get_wakeup_cause());
   deviceStatus.free_heap_size = ESP.getFreeHeap();
   deviceStatus.max_alloc_size = ESP.getMaxAllocHeap();
@@ -3155,34 +2482,3 @@ void logWithAction(LogAction action, LogLevel level, const char *message, time_t
 
   preferences.putUInt(PREFERENCES_LOG_ID_KEY, ++log_id);
 }
-
-void log_nvs_usage()
-{
-  nvs_stats_t nv;
-  esp_err_t ret = nvs_get_stats(NULL, &nv);
-  if (ret == ESP_OK)
-  {
-    float percent = (float)nv.used_entries / (float)nv.total_entries * 100.0f;
-    char percent_str[16];
-    dtostrf(percent, 0, 2, percent_str); // 2 decimal places
-    Log_info("NVS Usage: %d/%d entries (%s%%)", nv.used_entries, nv.total_entries, percent_str);
-  }
-  else
-  {
-    Log_error("Failed to get NVS stats: %s", esp_err_to_name(ret));
-  }
-}
-
-void Test_new_screens(void){
-    showMessageWithLogo(API_ERROR);
-    delay(000);
-    showMessageWithLogo(API_REQUEST_FAILED);
-    delay(2000);
-    showMessageWithLogo(API_IMAGE_DOWNLOAD_ERROR);
-    delay(2000);
-    showMessageWithLogo(API_FIRMWARE_UPDATE_ERROR);
-    delay(2000);
-    showMessageWithLogo(API_SETUP_FAILED);
-    delay(2000);
-    showMessageWithLogo(API_UNABLE_TO_CONNECT);
-};

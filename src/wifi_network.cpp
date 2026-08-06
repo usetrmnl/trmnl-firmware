@@ -7,9 +7,9 @@
 #include <wifi_network.h>
 
 #ifdef BOARD_TRMNL_X
-// Defined in bl.cpp; set once during bl_init(). Only used on the 5 GHz path.
+#include <globals.h>
+
 #include "modem.h"
-extern Modem *g_modem;
 #endif // BOARD_TRMNL_X
 
 namespace {

@@ -22,7 +22,7 @@ void setup() {
 
     display_init();
 
-    if (shipmentStarted && get_usb_status() == UsbStatus::CONNECTED) {
+    if (shipmentStarted && power().usbStatus() == UsbStatus::CONNECTED) {
       // USB connected (e.g. battery died in transit and USB revived the device)
       enter_shipment_sleep();
       saveShipmentDone();

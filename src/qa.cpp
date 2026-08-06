@@ -99,9 +99,9 @@ bool enableShipmentMode() {
 
   Serial.println("Waiting for USB plug-off to enter shipment mode...");
 
-  if (get_usb_status() == UsbStatus::CONNECTED) {
+  if (power().usbStatus() == UsbStatus::CONNECTED) {
     display_show_msg(const_cast<uint8_t *>(logo_medium), READY_TO_SHIP);
-    while (get_usb_status() == UsbStatus::CONNECTED) {
+    while (power().usbStatus() == UsbStatus::CONNECTED) {
       Serial.println("USB power still detected, waiting...");
       delay(2000);
     }

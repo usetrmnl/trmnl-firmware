@@ -1,8 +1,6 @@
-#include <memory_persistence.h>
-#include <stored_logs.h>
-#include <string>
-#include <unity.h>
-#include <unordered_map>
+#include "memory_persistence.h"
+
+#include <cstring>
 
 bool MemoryPersistence::recordExists(const char *key) { return storage.find(key) != storage.end(); }
 
@@ -28,11 +26,13 @@ uint32_t MemoryPersistence::readUint(const char *key, const uint32_t defaultValu
 
 size_t MemoryPersistence::writeUint(const char *key, const uint32_t value) {
   storage[key] = std::to_string(value);
+  writeCount++;
   return sizeof(uint32_t);
 }
 
 size_t MemoryPersistence::writeString(const char *key, const char *value) {
   storage[key] = value;
+  writeCount++;
   return strlen(value);
 }
 
@@ -50,6 +50,7 @@ uint8_t MemoryPersistence::readUChar(const char *key, const uint8_t defaultValue
 
 size_t MemoryPersistence::writeUChar(const char *key, const uint8_t value) {
   storage[key] = std::to_string(static_cast<int>(value));
+  writeCount++;
   return sizeof(uint8_t);
 }
 
@@ -63,6 +64,7 @@ bool MemoryPersistence::readBool(const char *key, const bool defaultValue) {
 
 size_t MemoryPersistence::writeBool(const char *key, const bool value) {
   storage[key] = value ? "true" : "false";
+  writeCount++;
   return sizeof(bool);
 }
 

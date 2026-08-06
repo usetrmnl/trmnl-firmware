@@ -1,6 +1,10 @@
+#pragma once
 
 #include <Preferences.h>
 #include <persistence_interface.h>
+
+/// @brief Log the NVS partition's used/total entry counts.
+void log_nvs_usage();
 
 /**
  * NVMRAM-backed persistence on ESP32

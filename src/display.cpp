@@ -5,6 +5,7 @@
 #include <JPEGDEC.h>
 #include <Preferences.h>
 #include <preferences_persistence.h>
+#include <refresh_interval.h>
 #include "DEV_Config.h"
 #ifdef BOARD_SEEED_RETERMINAL_E1002
 #include "displays/spectra6.h"
@@ -67,8 +68,11 @@ uint8_t u8SpectraPal[512]; // RGB333 mapped to closest Spectra6 color
 #include "driver/rtc_io.h"
 #include "LittleFS.h"
 #define FS LittleFS
+// Image size comparison for determining photos vs 'chart graphics'
+#define FASTEPD_LARGE_IMAGE_THRESHOLD (100 * 1024)
 #include "FastEPD.h"
 FASTEPD bbep;
+// 9-step table for fast grays
 const uint8_t u8_graytable[] = {
 /* 0 */  0, 0, 0, 0, 0, 0, 1, 1, 1, 
 /* 1 */  0, 0, 1, 1, 1, 2, 2, 1, 1, 
@@ -87,12 +91,29 @@ const uint8_t u8_graytable[] = {
 /* 14 */  0, 1, 1, 1, 2, 2, 2, 2, 2, 
 /* 15 */  0, 0, 0, 0, 0, 0, 0, 0, 2
 };
+// 38-step table for better photo rendering
+const uint8_t u8_graytable_big[] = {
+/*  0 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0,
+/*  1 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0,
+/*  2 */ 0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 0,
+/*  3 */ 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 2, 0,
+/*  4 */ 0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 0, 0,
+/*  5 */ 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 2, 2, 0,
+/*  6 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 2, 2, 0, 0,
+/*  7 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 0, 2, 2, 0,
+/*  8 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 0, 0, 2, 2, 0,
+/*  9 */ 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 0,
+/* 10 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 0, 0, 0, 2, 2, 2, 0,
+/* 11 */ 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 2, 2, 2, 2, 0,
+/* 12 */ 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0,
+/* 13 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 2, 2, 2, 2, 2, 2, 0, 0,
+/* 14 */ 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0,
+/* 15 */ 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0
+};
+
 #include "BQ27427.h"
 extern BQ27427 lipo; // Use lipo.[] to interact with the library in an Arduino 
 #endif
-// Counts the number of partial updates to know when to do a full update
-RTC_DATA_ATTR int iUpdateCount = 0;
-RTC_DATA_ATTR bool bCanDoPartial = false;
 
 #include "Group5.h"
 #include <config.h>
@@ -100,15 +121,13 @@ RTC_DATA_ATTR bool bCanDoPartial = false;
 #include "wifi_failed_qr.h"
 #include <ctype.h> //iscntrl()
 #include <api-client/display.h>
+#include <inttypes.h>
 #include <trmnl_log.h>
 #include "png_flip.h"
 #include "nicoclean_8.h"
 #include "Inter_18.h"
 #include "Roboto_Black_24.h"
-extern char filename[];
-extern Preferences preferences;
-extern ApiDisplayResult apiDisplayResult;
-uint32_t iTempProfile;
+#include <globals.h>
 static uint8_t *pDither;
 
 #ifdef BB_EPAPER
@@ -143,7 +162,7 @@ void display_init(void)
 {
     Log_info("dev module start");
     iTempProfile = preferences.getUInt(PREFERENCES_TEMP_PROFILE, TEMP_PROFILE_DEFAULT);
-    Log_info("Saved temperature profile: %d", iTempProfile);
+    Log_info("Saved temperature profile: %" PRIu32, iTempProfile);
 #ifdef BB_EPAPER
 #ifdef BOARD_SEEED_STICKY
     pinMode(47, OUTPUT); // enable EPD power
@@ -1880,7 +1899,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
             bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
 #ifdef BOARD_TRMNL_X
             // Show charging indicator if the USB power is connected (whether actually charging or not)
-            if (get_usb_status() == UsbStatus::CONNECTED) {
+            if (power().usbStatus() == UsbStatus::CONNECTED) {
                 Log_info("Displaying 'battery is charging' icon");
                 bbep.loadG5Image(battery_small, 40, bbep.height() - 120, BBEP_WHITE, BBEP_BLACK);
             } else { // show battery level
@@ -1923,7 +1942,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
     Log_info("Display refresh start");
     if (iTempProfile != apiDisplayResult.response.temp_profile) {
         iTempProfile = apiDisplayResult.response.temp_profile;
-        Log_info("Saving new temperature profile (%d) to FLASH", iTempProfile);
+        Log_info("Saving new temperature profile (%" PRIu32 ") to FLASH", iTempProfile);
         preferences.putUInt(PREFERENCES_TEMP_PROFILE, iTempProfile);
     }
 #ifdef BB_EPAPER
@@ -1931,7 +1950,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
         Log_info("%s [%d]: Forcing full refresh; desired refresh mode was: %d\r\n", __FILE__, __LINE__, iRefreshMode);
         iRefreshMode = REFRESH_FULL; // force full refresh every 8 partials
     }
-    int refresh_seconds = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
+    int refresh_seconds = refreshInterval.seconds();
     if (refresh_seconds >= 30*60 && iRefreshMode == REFRESH_PARTIAL) {
         // For users who set updates 30 minutes or longer, use the "fast" update to prevent ghosting
         Log_info("%s [%d]: Forcing fast refresh (not partial) since the TRMNL refresh_rate is set to > 30 min\n", __FILE__, __LINE__);
@@ -1966,8 +1985,18 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
     }
 #else
  {
-    int rc = bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
-    Log_info("%s [%d]: setCustomMatrix returned %d\r\n", __FILE__, __LINE__, rc);
+#ifdef BOARD_TRMNL_X
+    if (data_size > FASTEPD_LARGE_IMAGE_THRESHOLD) {
+      int rc = bbep.setCustomMatrix(u8_graytable_big, sizeof(u8_graytable_big));
+      Log_info("using 38-pass gray table (data_size=%d)", data_size);
+      Log_info("%s [%d]: setCustomMatrix returned %d\r\n", __FILE__, __LINE__, rc);
+    } else 
+#endif
+    {
+        int rc = bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
+        Log_info("using 9-pass gray table (data_size=%d)", data_size);
+        Log_info("%s [%d]: setCustomMatrix returned %d\r\n", __FILE__, __LINE__, rc);
+    }
 
  //   if (bbep.getPreviousMode() != BB_MODE_NONE && (bbep.getMode() == BB_MODE_1BPP || bbep.getMode() == BB_MODE_2BPP)) {
  //       Log_info("%s [%d]: Using partial update since we have a copy of the previous image\n", __FILE__, __LINE__);
@@ -2670,11 +2699,11 @@ void display_show_msg_qa(uint8_t *image_buffer, const float *voltage, const floa
  */
 void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_id, bool id, const char *fw_version, String message)
 {
-    Log_info("Free heap in display_show_msg - %d", ESP.getMaxAllocHeap());
+    Log_info("Free heap in display_show_msg - %" PRIu32, ESP.getMaxAllocHeap());
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef BB_EPAPER
     bbep.allocBuffer(false);
-    Log_info("Free heap after bbep.allocBuffer() - %d", ESP.getMaxAllocHeap());
+    Log_info("Free heap after bbep.allocBuffer() - %" PRIu32, ESP.getMaxAllocHeap());
 #else
     bbep.setMode(BB_MODE_1BPP); // message screens are 1-bit
 #endif

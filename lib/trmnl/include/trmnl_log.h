@@ -1,11 +1,13 @@
 
 #pragma once
 
+#include <compiler_attrs.h>
+
 enum LogLevel { LOG_VERBOSE = 0, LOG_INFO = 1, LOG_WARN = 2, LOG_ERROR = 3, LOG_FATAL = 4 };
 
 enum LogMode { LOG_SERIAL_ONLY, LOG_STORE_ONLY, LOG_SUBMIT_OR_STORE };
 
-void log_impl(LogLevel level, LogMode mode, const char *file, int line, const char *format, ...);
+void log_impl(LogLevel level, LogMode mode, const char *file, int line, const char *format, ...) PRINTF_LIKE(5, 6);
 
 #define _LOG_IMPL(level, mode, format, ...) log_impl(level, mode, __FILE__, __LINE__, format, ##__VA_ARGS__)
 

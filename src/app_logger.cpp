@@ -2,11 +2,11 @@
 #include <bl.h>
 #include <cstdarg>
 #include <cstdio>
+#include <globals.h>
+#include <misc/clock.h>
 #include <stored_logs.h>
 #include <string_utils.h>
 #include <trmnl_log.h>
-
-extern StoredLogs storedLogs;
 
 /// Logs at or above this severity will be sent to the server
 static LogLevel store_submit_threshold = LogLevel::LOG_ERROR;
@@ -15,9 +15,9 @@ static void handle_store_submit(LogLevel level, const char *clean_message, const
                                 LogMode mode = LOG_STORE_ONLY) {
   if (level >= store_submit_threshold) {
     if (mode == LOG_STORE_ONLY) {
-      logWithAction(LOG_ACTION_STORE, level, clean_message, getTime(), line, file);
+      logWithAction(LOG_ACTION_STORE, level, clean_message, systemClock().getTime(), line, file);
     } else {
-      logWithAction(LOG_ACTION_SUBMIT_OR_STORE, level, clean_message, getTime(), line, file);
+      logWithAction(LOG_ACTION_SUBMIT_OR_STORE, level, clean_message, systemClock().getTime(), line, file);
     }
   }
 }

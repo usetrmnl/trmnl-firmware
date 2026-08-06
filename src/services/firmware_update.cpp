@@ -1,9 +1,9 @@
 #include <HTTPClient.h>
 #include <Update.h>
 #include <WiFi.h>
-#include <firmware_update.h>
 #include <http_client.h>
 #include <ota_schedule.h>
+#include <services/firmware_update.h>
 #include <trmnl_log.h>
 #include <wifi_network.h>
 
@@ -11,14 +11,14 @@
 
 #ifdef BOARD_TRMNL_X
 #include <WifiCaptive.h>
+#include <globals.h>
 #include <modem.h>
-extern Modem *g_modem;
 #endif
 
-FirmwareUpdateService::FirmwareUpdateService(Persistence &persistence, GetTimeFn getTime,
+FirmwareUpdateService::FirmwareUpdateService(Persistence &persistence, Clock &clock,
                                              int32_t wifiConnectionRssiThreshold)
-    : _persistence(persistence), _getTime(std::move(getTime)),
-      _wifiConnectionRssiThreshold(wifiConnectionRssiThreshold), _firmwareUrl{0} {}
+    : _persistence(persistence), _clock(clock), _wifiConnectionRssiThreshold(wifiConnectionRssiThreshold),
+      _firmwareUrl{0} {}
 
 bool FirmwareUpdateService::isUpdateDue(bool update_firmware, const String &firmware_url) {
   Log_info("%s [%d]: update_firmware: %d\r\n", __FILE__, __LINE__, update_firmware);
@@ -33,7 +33,7 @@ bool FirmwareUpdateService::isUpdateDue(bool update_firmware, const String &firm
   firmware_url.toCharArray(_firmwareUrl, sizeof(_firmwareUrl));
   Log_info("%s [%d]: firmware_url: %s\r\n", __FILE__, __LINE__, _firmwareUrl);
 
-  uint32_t now = _getTime();
+  uint32_t now = _clock.getTime();
   if (!otaAttemptDue(now, otaLastAttempt(_persistence))) {
     Log_info("%s [%d]: Last OTA attempt was < 24h ago, skipping...\r\n", __FILE__, __LINE__);
     return false;
@@ -154,7 +154,7 @@ FirmwareUpdateResult FirmwareUpdateService::performUpdate() {
   _failureMessage = NONE;
   FirmwareUpdateResult result;
 
-  uint32_t now = _getTime();
+  uint32_t now = _clock.getTime();
   if (!performFirmwareUpdate()) {
     Log_info("%s [%d]: OTA update failed, storing the timestamp to prevent boot looping.\r\n", __FILE__, __LINE__);
     otaRecordAttempt(_persistence, now);

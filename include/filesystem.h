@@ -66,6 +66,32 @@ bool filesystem_read_from_file(const char *name, uint8_t *out_buffer, size_t siz
 size_t filesystem_write_to_file(const char *name, uint8_t *in_buffer, size_t size);
 
 /**
+ * @brief Function to write an image buffer to a file, logging an error on short writes
+ * @param name filename
+ * @param in_buffer pointer to input buffer
+ * @param size size of the input buffer
+ * @return none
+ */
+void writeImageToFile(const char *name, uint8_t *in_buffer, size_t size);
+
+/**
+ * @brief Function to shorten a filename (if needed) to fit the SPIFFS file length
+ *        limit of 31 chars + 0 terminator, prefixing the root dir
+ * @param src source filename
+ * @param dest destination buffer (at least 33 bytes)
+ * @return none
+ */
+void filesystem_fix_filename(const char *src, char *dest);
+
+/**
+ * @brief Function to compare the current filename returned from the API server
+ *        with files we previously stored in FLASH (SPIFFS)
+ * @param newName filename returned by the API
+ * @return result - true if the file exists
+ */
+bool filesystem_fixed_file_exists(String &newName);
+
+/**
  * @brief Function to check if file exists
  * @param name filename
  * @return result - true if exists; false - if not exists
