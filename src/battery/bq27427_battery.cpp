@@ -3,16 +3,16 @@
 #ifdef INCLUDE_BQ27427
 
 #include <Arduino.h>
-#include <trmnl_log.h>
 #include <config.h>
 #include <display.h>
 #include <globals.h>
+#include <trmnl_log.h>
+
+#include "BQ27427.h"
 #include "driver/gpio.h"
 #include "iqs323_task.h"
-#include "BQ27427.h"
 
-void BQ27427Battery::gaugeInit()
-{
+void BQ27427Battery::gaugeInit() {
   if (battery_count == BATTERY_NONE) {
     Log_info("No battery detected - skipping BQ27427 initialization");
     return;
