@@ -28,6 +28,7 @@
 // Timing constants
 #define IQS323_INIT_LOOP_DELAY_MS   10
 #define IQS323_RUN_LOOP_DELAY_MS    100    // How often to check for RDY events
+#define IQS323_FAST_POLL_DELAY_MS   10     // Loop cadence while streaming mode is active
 #define IQS323_MCLR_SWITCHOVER_US   150    // Time for RDY->MCLR switchover
 #define IQS323_MCLR_PULSE_US        500    // MCLR pulse width (min 250ns, using 500us for safety)
 #define IQS323_RESET_RECOVERY_MS    50     // Time for device to recover after reset
@@ -44,16 +45,29 @@ static volatile bool gpio_wakeup_pending = false;
 static volatile bool wake_stub_data_valid = false;
 static volatile bool task_running = false;  // Track if task is actually running
 static volatile bool i2c_locked = false;    // When true, task skips I2C operations
+static volatile bool fast_poll_requested = false;  // When true, run loop uses a shorter wait timeout
 static iqs323_data_callback_t data_callback = NULL;  // Callback for new data notifications
 
-// External IQS323 instance (defined in bl.cpp)
-extern IQS323 iqs323;
+// Snapshot published under iqs323_mutex, see iqs323_publish_snapshot().
+static touchbar_snapshot_t g_touchbar_snapshot = {
+    false, false, false, IQS323_GESTURE_NONE, 65535, 0
+};
+
+// One-time copy taken at wake-stub validation; never updated again.
+static touchbar_snapshot_t g_wake_stub_snapshot = {
+    false, false, false, IQS323_GESTURE_NONE, 65535, 0
+};
+static bool g_wake_stub_snapshot_valid = false;
+
+// Sole accessor of the IQS323 object; other files use the snapshot/request API below.
+IQS323 iqs323;
 
 // Forward declarations
 static void iqs323_task_main(void *pvParameters);
 static bool iqs323_do_init(bool use_wake_stub);
 static void iqs323_do_prepare_sleep(void);
 static bool iqs323_hardware_reset(void);
+static void iqs323_publish_snapshot(void);
 
 /**
  * @brief Initialize the IQS323 task manager
@@ -250,6 +264,7 @@ void iqs323_task_deinit(void)
 
     current_state = IQS323_TASK_STATE_IDLE;
     i2c_locked = false;
+    fast_poll_requested = false;
     Serial.println("IQS323 Task: Cleanup complete");
 }
 
@@ -283,6 +298,99 @@ bool iqs323_task_i2c_is_locked(void)
 void iqs323_task_set_data_callback(iqs323_data_callback_t callback)
 {
     data_callback = callback;
+}
+
+// Decodes current IQS323 state into g_touchbar_snapshot. Caller must hold iqs323_mutex.
+static void iqs323_publish_snapshot(void)
+{
+    g_touchbar_snapshot.ch0_touch = iqs323.channel_touchState(IQS323_CH0);
+    g_touchbar_snapshot.ch1_touch = iqs323.channel_touchState(IQS323_CH1);
+    g_touchbar_snapshot.ch2_touch = iqs323.channel_touchState(IQS323_CH2);
+
+    Serial.printf("IQS323 Task: publish snapshot at t=%lu ch0=%d ch1=%d ch2=%d STATUS=0x%02X 0x%02X\n",
+        (unsigned long)millis(), g_touchbar_snapshot.ch0_touch, g_touchbar_snapshot.ch1_touch, g_touchbar_snapshot.ch2_touch,
+        iqs323.IQSMemoryMap.SYSTEM_STATUS[0], iqs323.IQSMemoryMap.SYSTEM_STATUS[1]);
+
+    g_touchbar_snapshot.slider_position = iqs323.sliderCoordinate();
+
+    if (iqs323.getSliderEvent()) {
+        iqs323_gesture_events gesture = iqs323.getGestureType();
+        if (gesture != IQS323_GESTURE_NONE) {
+            g_touchbar_snapshot.slider_event = gesture;
+        }
+    }
+
+    g_touchbar_snapshot.last_updated_ms = millis();
+}
+
+void iqs323_task_read_snapshot(touchbar_snapshot_t *out)
+{
+    if (out == NULL) {
+        return;
+    }
+    if (iqs323_mutex != NULL && xSemaphoreTake(iqs323_mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+        *out = g_touchbar_snapshot;
+        xSemaphoreGive(iqs323_mutex);
+    } else {
+        *out = g_touchbar_snapshot; // mutex unavailable, best-effort stale copy
+    }
+}
+
+bool iqs323_task_read_wake_stub_snapshot(touchbar_snapshot_t *out)
+{
+    if (out == NULL) {
+        return false;
+    }
+    if (iqs323_mutex != NULL && xSemaphoreTake(iqs323_mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+        *out = g_wake_stub_snapshot;
+        xSemaphoreGive(iqs323_mutex);
+    } else {
+        *out = g_wake_stub_snapshot;
+    }
+    return g_wake_stub_snapshot_valid;
+}
+
+// Switches streaming/event mode and the run loop's poll cadence to match.
+bool iqs323_task_set_streaming_mode(bool enable)
+{
+    if (iqs323_mutex == NULL || xSemaphoreTake(iqs323_mutex, pdMS_TO_TICKS(200)) != pdTRUE) {
+        Serial.println("IQS323 Task: Failed to acquire mutex for streaming mode switch");
+        return false;
+    }
+
+    if (enable) {
+        iqs323.clearEventMode(STOP);
+    } else {
+        iqs323.setEventMode(STOP);
+    }
+    fast_poll_requested = enable;
+
+    xSemaphoreGive(iqs323_mutex);
+    return true;
+}
+
+bool iqs323_task_set_gesture_config(bool tap_mode)
+{
+    if (iqs323_mutex == NULL || xSemaphoreTake(iqs323_mutex, pdMS_TO_TICKS(200)) != pdTRUE) {
+        Serial.println("IQS323 Task: Failed to acquire mutex for gesture config write");
+        return false;
+    }
+
+    iqs323.setGestureConfig(tap_mode, STOP);
+
+    xSemaphoreGive(iqs323_mutex);
+    return true;
+}
+
+void iqs323_task_clear_slider_event(void)
+{
+    if (iqs323_mutex == NULL || xSemaphoreTake(iqs323_mutex, pdMS_TO_TICKS(200)) != pdTRUE) {
+        return;
+    }
+
+    g_touchbar_snapshot.slider_event = IQS323_GESTURE_NONE;
+
+    xSemaphoreGive(iqs323_mutex);
 }
 
 /**
@@ -338,13 +446,16 @@ static void iqs323_task_main(void *pvParameters)
     // The IQS323 library handles RDY interrupt internally (sets iqs323_deviceRDY flag)
     // We periodically call run() which only does I2C when the flag is set
     while (task_running) {
-        // Wait for control events with timeout
+        // Shorter wait while streaming mode is active, to consume RDY windows promptly.
+        TickType_t loop_delay_ticks = fast_poll_requested
+            ? pdMS_TO_TICKS(IQS323_FAST_POLL_DELAY_MS)
+            : pdMS_TO_TICKS(IQS323_RUN_LOOP_DELAY_MS);
         EventBits_t events = xEventGroupWaitBits(
             iqs323_event_group,
             IQS323_EVT_SLEEP_REQUEST | IQS323_EVT_REINIT_REQUEST | IQS323_EVT_SHUTDOWN,
             pdTRUE,   // Clear bits on return
             pdFALSE,  // Wait for any bit
-            pdMS_TO_TICKS(IQS323_RUN_LOOP_DELAY_MS)
+            loop_delay_ticks
         );
 
         // Handle shutdown request - highest priority
@@ -412,6 +523,9 @@ static void iqs323_task_main(void *pvParameters)
                         iqs323.ReATI(STOP);
                     }
 
+                    // Data passed health checks - publish for touchbar consumers
+                    iqs323_publish_snapshot();
+
                     // Call user callback if registered - mutex is still held
                     if (data_callback != NULL) {
                         data_callback();
@@ -474,6 +588,9 @@ static bool iqs323_do_init(bool use_wake_stub)
                 iqs323.iqs323_state.state = IQS323_STATE_RUN;
                 iqs323.iqs323_state.init_state = IQS323_INIT_DONE;
                 iqs323.new_data_available = true;
+                iqs323_publish_snapshot();  // seed the snapshot from the wake-stub capture immediately
+                g_wake_stub_snapshot = g_touchbar_snapshot;
+                g_wake_stub_snapshot_valid = true;
                 success = true;
                 Serial.println("IQS323 Task: Wake stub data validated OK");
             }
