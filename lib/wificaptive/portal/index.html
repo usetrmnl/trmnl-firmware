@@ -224,7 +224,8 @@
        so no extra display rule is needed here. */
     .view { display: flex; flex-direction: column; gap: 26px; }
     .p-title[tabindex] { outline: none; }
-    .p-title[tabindex]:focus-visible { outline: 2px solid var(--spark); outline-offset: 4px; }
+    .p-title[tabindex]:focus,
+    .p-title[tabindex]:focus-visible { outline: none; }
     .adv-sec { display: flex; flex-direction: column; gap: 12px; }
     .adv-sec > h3 {
       font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em;
