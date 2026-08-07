@@ -8,6 +8,36 @@
 
 static unsigned long wait_for_button_release(unsigned long start_time) {
   pinMode(PIN_INTERRUPT, INPUT);
+#ifdef SHIP_MODE_SUPPORTED
+  // Boards that support user-triggered shipping mode allow the hold to run all
+  // the way to BUTTON_SHIP_MODE_TIME. Feedback is staged during the hold:
+  //   5 s  -> 2 beeps (long press / WiFi reset)
+  //   15 s -> 3 beeps (soft reset / credentials reset)
+  //   30 s -> 4 beeps (shipping mode)
+  bool hold_buzzer_fired = false;
+  bool soft_reset_buzzer_fired = false;
+  while (digitalRead(PIN_INTERRUPT) == LOW && millis() - start_time < BUTTON_SHIP_MODE_TIME) {
+    unsigned long held = millis() - start_time;
+    if (!hold_buzzer_fired && held >= BUTTON_HOLD_TIME) {
+      buzzer().beepPattern(2, 100, 100);
+      hold_buzzer_fired = true;
+    }
+    if (!soft_reset_buzzer_fired && held >= BUTTON_SOFT_RESET_TIME) {
+      buzzer().beepPattern(3, 100, 100);
+      soft_reset_buzzer_fired = true;
+    }
+    delay(10);
+  }
+  if (millis() - start_time >= BUTTON_SHIP_MODE_TIME) {
+    // Shipping-mode threshold reached, four beeps to signal the user can release.
+    buzzer().beepPattern(4, 120, 120);
+  } else if (!hold_buzzer_fired) {
+    // Single beep on release for a short press (e.g. the refresh trigger), unless
+    // the longer hold pattern already fired.
+    buzzer().beep(100);
+  }
+  return millis() - start_time;
+#else
   bool hold_buzzer_fired = false;
   while (digitalRead(PIN_INTERRUPT) == LOW && millis() - start_time < BUTTON_SOFT_RESET_TIME) {
     if (!hold_buzzer_fired && millis() - start_time >= BUTTON_HOLD_TIME) {
@@ -17,12 +47,24 @@ static unsigned long wait_for_button_release(unsigned long start_time) {
     delay(10);
   }
   if (millis() - start_time >= BUTTON_SOFT_RESET_TIME) {
+    // Soft reset threshold reached, triple beep to signal the user can release.
     buzzer().beepPattern(3, 100, 100);
+  } else if (!hold_buzzer_fired) {
+    // Single beep on release for a short press (e.g. the refresh trigger), unless
+    // the longer hold pattern already fired.
+    buzzer().beep(100);
   }
   return millis() - start_time;
+#endif // SHIP_MODE_SUPPORTED
 }
 
 static ButtonPressResult classify_press_duration(unsigned long duration) {
+#ifdef SHIP_MODE_SUPPORTED
+  if (duration >= BUTTON_SHIP_MODE_TIME) {
+    Log_info("Button time=%lu detected ship-mode press", duration);
+    return ShipMode;
+  }
+#endif
   if (duration >= BUTTON_SOFT_RESET_TIME) {
     Log_info("Button time=%lu detected extra-long press", duration);
     return SoftReset;
@@ -91,11 +133,14 @@ static ButtonPressResult classify_button_presses() {
 }
 
 ButtonPressResult read_button_presses() {
-  auto result = classify_button_presses();
-  if (result == ShortPress || result == DoubleClick) {
-    buzzer().beep(100);
-  }
-  return result;
+  // Short-press feedback is emitted immediately on release inside
+  // wait_for_button_release(), so no additional beep is needed here.
+  return classify_button_presses();
 }
 
-const char *ButtonPressResultNames[] = {"LongPress", "DoubleClick", "ShortPress", "SoftReset"};
+const char *ButtonPressResultNames[] = {
+    "LongPress",
+    "DoubleClick",
+    "ShortPress",
+    "SoftReset",
+    "ShipMode"};

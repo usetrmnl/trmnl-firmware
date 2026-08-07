@@ -4,6 +4,8 @@
 #include "esp_ota_ops.h"
 #include "power.h"
 #include "qa.h"
+#include "display.h"
+#include "ship_mode.h"
 
 #ifdef BOARD_TRMNL_X
 #include "display.h"
@@ -66,7 +68,14 @@ void setup() {
   bl_init();
 }
 #else // TRMNL OG setup()
-void setup() {
+void setup()
+{
+#ifdef SHIP_MODE_SUPPORTED
+  // Resume or complete an in-progress shipment. On each boot this either
+  // finishes shipping (charger present or the user pressed the button) or sends
+  // the device back to deep sleep while it waits. May not return.
+  ship_mode_boot_check();
+#endif // SHIP_MODE_SUPPORTED
 
   bool testPassed = checkIfAlreadyPassed();
   if (!testPassed) {

@@ -139,6 +139,12 @@ static void setWiFiBand(const WifiCredentials &credentials) {
 #endif
 }
 
+static std::function<void()> s_connectTickCallback = nullptr;
+
+void setConnectTickCallback(std::function<void()> cb) {
+  s_connectTickCallback = cb;
+}
+
 void captureEventData(WiFiEvent_t event, WiFiEventInfo_t info, WifiEventData *eventData) {
   switch (event) {
   case ARDUINO_EVENT_WIFI_STA_GOT_IP:
@@ -374,6 +380,10 @@ wl_status_t waitForConnectResult(uint32_t timeout) {
   wl_status_t status = WiFi.status();
 
   while (millis() < timeoutmillis) {
+    if (s_connectTickCallback) {
+      s_connectTickCallback();
+    }
+
     wl_status_t newStatus = WiFi.status();
     if (newStatus != status) {
       Log_info("WiFi: status changed from %s to %s", wifiStatusStr(status), wifiStatusStr(newStatus));
