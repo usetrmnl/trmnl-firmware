@@ -43,7 +43,7 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
 
   // Serve index.html
   server.on("/", HTTP_ANY, [&](AsyncWebServerRequest *request) {
-    AsyncWebServerResponse *response = request->beginResponse(200, "text/html", INDEX_HTML, INDEX_HTML_LEN);
+    AsyncWebServerResponse *response = request->beginResponse(200, "text/html; charset=utf-8", INDEX_HTML, INDEX_HTML_LEN);
     response->addHeader("Content-Encoding", "gzip");
     request->send(response); // redirect to the local IP URL
   });

@@ -2,6 +2,7 @@
 <html lang="en">
 
 <head>
+  <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>TRMNL Wi-Fi Configuration</title>
   <style>
@@ -218,7 +219,7 @@
     .row2 { display: flex; gap: 10px; }
     .row2 .btn { width: auto; flex: 1 1 0; }
 
-    /* Two views in one document. Only one is ever visible — the global
+    /* Two views in one document. Only one is ever visible - the global
        [hidden] { display: none !important } rule from Task 2 does the hiding,
        so no extra display rule is needed here. */
     .view { display: flex; flex-direction: column; gap: 26px; }
@@ -254,7 +255,7 @@
     function setRefreshButtonState(scanning) {
       var btn = document.getElementById('btnRefresh');
       btn.disabled = scanning;
-      btn.textContent = scanning ? 'Scanning…' : 'Scan again';
+      btn.textContent = scanning ? 'Scanning\u2026' : 'Scan again';
     }
 
     async function refresh() {
@@ -360,7 +361,7 @@
 
       var btn = document.getElementById("btnConnect");
       btn.disabled = true;
-      btn.textContent = "Connecting…";
+      btn.textContent = "Connecting\u2026";
       document.getElementById('connect-status').hidden = false;
 
       fetch('/connect', {
@@ -555,7 +556,7 @@
       closeModal();
       var btn = document.getElementById('btnReset');
       btn.disabled = true;
-      btn.textContent = 'Resetting…';
+      btn.textContent = 'Resetting\u2026';
       fetch('/soft-reset', { method: 'GET' })
         .then(_ => displayAdvancedAlert('Soft reset complete. Your TRMNL is back to its default settings.'))
         .catch(_ => displayAdvancedAlert('The reset did not complete. Try again, or contact support if it keeps failing.'))
@@ -566,16 +567,16 @@
       var btn = document.getElementById('btnTest');
       var out = document.getElementById('test-output');
       btn.disabled = true;
-      btn.textContent = 'Running…';
+      btn.textContent = 'Running\u2026';
       fetch('/run-test')
         .then(res => res.json())
         .then(data => {
           out.classList.toggle('msg-warn', !data.testPassed || data.Threshold);
           if (data.Threshold) {
-            out.innerHTML = '<strong>Test skipped</strong>The panel is above 55 °C. Let it cool, then run the test again.';
+            out.innerHTML = '<strong>Test skipped</strong>The panel is above 55 \u00b0C. Let it cool, then run the test again.';
           } else {
             out.innerHTML = '<strong>' + (data.testPassed ? 'Test passed' : 'Test failed') + '</strong>' +
-              'Initial ' + data.initialTemp + ' °C · Final ' + data.finalTemp + ' °C';
+              'Initial ' + data.initialTemp + ' \u00b0C \u00b7 Final ' + data.finalTemp + ' \u00b0C';
           }
           out.hidden = false;
         })
@@ -603,7 +604,7 @@
     window.addEventListener('hashchange', showView);
     // This script runs in <head>, before <body> exists, so the initial call
     // has to wait for the DOM rather than run inline like the listener
-    // registration above — otherwise #view-setup/#view-advanced are still
+    // registration above - otherwise #view-setup/#view-advanced are still
     // null and a direct load of /#advanced throws instead of opening it.
     document.addEventListener('DOMContentLoaded', showView);
 
@@ -680,7 +681,7 @@
         <input class="inp" type="text" id="identity" name="identity" placeholder="you@company.com">
       </div>
       <div class="field" id="enterprise_username_group" hidden>
-        <label for="username">Username <span class="opt">— optional</span></label>
+        <label for="username">Username <span class="opt">&mdash; optional</span></label>
         <input class="inp" type="text" id="username" name="username" placeholder="Only if different from identity">
       </div>
 
@@ -741,15 +742,15 @@
             <input class="inp" type="text" id="staticIP" placeholder="192.168.1.100">
           </div>
           <div class="field">
-            <label for="gateway">Gateway <span class="opt">— optional</span></label>
+            <label for="gateway">Gateway <span class="opt">&mdash; optional</span></label>
             <input class="inp" type="text" id="gateway" placeholder="Default: x.x.x.1 based on your IP">
           </div>
           <div class="field">
-            <label for="subnet">Subnet mask <span class="opt">— optional</span></label>
+            <label for="subnet">Subnet mask <span class="opt">&mdash; optional</span></label>
             <input class="inp" type="text" id="subnet" placeholder="Default: 255.255.255.0">
           </div>
           <div class="field">
-            <label for="dns1">DNS server <span class="opt">— optional</span></label>
+            <label for="dns1">DNS server <span class="opt">&mdash; optional</span></label>
             <input class="inp" type="text" id="dns1" placeholder="Default: 8.8.8.8">
           </div>
         </div>
@@ -789,7 +790,7 @@
       </div>
 
       <div class="actions">
-        <button class="btn btn-quiet" type="button" onclick="location.hash = '#setup'">← Back to Wi-Fi</button>
+        <button class="btn btn-quiet" type="button" onclick="location.hash = '#setup'">&larr; Back to Wi-Fi</button>
       </div>
 
     </div>
