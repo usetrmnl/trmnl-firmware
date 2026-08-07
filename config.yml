@@ -1,0 +1,121 @@
+# =============================================================================
+# Localization / white-label configuration
+# =============================================================================
+# All user-facing text, URLs, and the on-screen QR codes are defined here.
+# Defaults reproduce the stock TRMNL firmware exactly, so leaving this file
+# unchanged produces identical output.
+#
+# Run `python scripts/generate_branding.py` (or just build with PlatformIO,
+# which runs it automatically) to regenerate:
+#   include/branding.h                    (string / URL #defines)
+#   src/wifi_connect_qr.h, wifi_failed_qr.h (QR code bitmaps)
+#
+# In strings you may use:
+#   {device_name}  -> branding.device_name
+#   {setup_url}    -> urls.setup_url
+#   {api_base_url} -> urls.api_base_url
+# =============================================================================
+
+branding:
+  # Product / device name inserted into user-facing text via {device_name}.
+  device_name: "TRMNL"
+
+urls:
+  # Back-end API base URL (no trailing slash).
+  api_base_url: "https://trmnl.app"
+  # Onboarding URL shown on the pairing screen.
+  setup_url: "trmnl.com/start"
+
+# ---------------------------------------------------------------------------
+# QR codes rendered on the e-paper display. The bitmaps are regenerated from
+# these URLs at build time (requires the `segno` package; if it is missing the
+# committed default bitmaps are kept).
+# ---------------------------------------------------------------------------
+qr:
+  # Shown on the pairing / WiFi-connect screen (src/wifi_connect_qr.h).
+  connect_url: "https://trmnl.com/start"
+  # Shown on the WiFi-failure / help screens (src/wifi_failed_qr.h).
+  help_url: "https://help.usetrmnl.com"
+
+# ---------------------------------------------------------------------------
+# User-facing text strings (defaults match the stock firmware verbatim).
+# ---------------------------------------------------------------------------
+strings:
+  # -- OTG / modem --
+  otg_on: "OTG turned on!"
+  otg_off: "OTG turned off!"
+  modem_flashing: "Flashing modem firmware..."
+  modem_flash_failed_1: "Failed to flash modem firmware,"
+  modem_flash_failed_2: "device would only operate with 2.4Ghz WiFi."
+
+  # -- Shipment / first boot --
+  ready_to_ship: "Device is ready to ship!"
+  unplug_usb: "Unplug the USB-C to enter shipping mode."
+  welcome: "Welcome to {device_name}."
+  dock_instructions: "Attach the dock and a USB-C to get started."
+
+  # -- WiFi reset / power-off confirmation --
+  wifi_reset_confirm: "Are you sure you want to reset WiFi settings?"
+  power_off_confirm: "Turn off device?"
+  confirm_instructions: "Hold middle of touch bar to confirm, tap to cancel."
+
+  # -- WiFi connect (short status screen) --
+  wifi_connect_short: "Connect to {device_name} WiFi"
+  wifi_connect_subtitle: "on your phone or computer"
+
+  # -- WiFi failure --
+  wifi_failed: "Can't establish WiFi connection."
+  wifi_failed_help_button: "Hold button on the back to reset WiFi, or scan QR Code for help."
+  wifi_failed_help_touchbar: "Hold left and right corner of touch bar to reset WiFi, or scan QR Code for help."
+
+  # -- API / connectivity errors --
+  api_internal_error_1: "WiFi connected, but"
+  api_internal_error_2: "API connection cannot be"
+  api_internal_error_3: "established. Try to refresh,"
+  api_internal_error_4: "or scan QR Code for help."
+  wifi_weak: "WiFi connected but signal is weak"
+  api_request_failed: "WiFi connected, request to API failed."
+  api_unable_to_connect: "WiFi connected, unable connect to API."
+  api_setup_failed: "WiFi connected, /api/setup returned error."
+  api_size_error: "WiFi connected, {device_name} content malformed."
+  api_firmware_update_error: "WiFi connected, could not get firmware update from api."
+  api_image_download_error: "WiFi connected, API could not deliver image to device."
+  image_timeout: "Image download timed out; check your network status."
+
+  # -- Action prompts --
+  tap_button: "Short click the button on back,"
+  tap_touchbar: "Tap the middle of touch bar,"
+  check_internet: "otherwise check your internet."
+  hold_button_reset: "Wait or reset by holding button on back."
+  hold_touchbar_reset: "Wait or reset by holding left and right corner of touch bar."
+
+  # -- Firmware update --
+  fw_update_available: "Firmware update available! Starting now..."
+  fw_update_failed: "Firmware update failed. Device will restart..."
+  fw_update_success: "Firmware update success. Device will restart..."
+
+  # -- Image errors / QA --
+  qa_starting: "Starting QA test"
+  image_too_large: "The image file from this URL is too large."
+  png_max_prefix: "PNG images can be a maximum of"
+  image_format_incorrect: "The image format is incorrect"
+
+  # -- WiFi retry --
+  wifi_retry_limit: "Maximum WiFi retries reached."
+  wifi_retry_press: "Press button to manually refresh."
+  wifi_retry_hold: "Hold button to reset WiFi and try another network."
+
+  # -- Captive portal timeout --
+  portal_timeout: "Wifi Captive Portal timed out"
+  try_again_touchbar: "Tap touchbar to try again"
+  try_again_button: "Press button to try again"
+
+  # -- Pairing / setup (full WiFi-connect screen) --
+  setup_visit: "Please visit {setup_url}"
+  friendly_id_prefix: "with Friendly ID "
+  friendly_id_suffix: " to finish setup"
+  fw_prefix: "{device_name} firmware "
+  wifi_connect_message_prefix: "Connect your phone or computer to "
+  wifi_connect_default_name: "the {device_name}"
+  wifi_connect_message_suffix: " Wi-Fi"
+  scan_qr_help: "or scan the QR code for help"
