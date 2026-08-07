@@ -1,6 +1,6 @@
 #include <power.h>
 #include <Arduino.h>
-#include <DEV_Config.h> // BQ25616_PG_PIN / BQ25616_STAT_PIN (gen2)
+#include <config.h> // BQ25616_PG_PIN / BQ25616_STAT_PIN (gen2)
 
 #ifdef BOARD_TRMNL_X
 #include "FastEPD.h"

@@ -1,7 +1,6 @@
 #include <Arduino.h>
 #include <pins.h>
 #include <config.h>
-#include <DEV_Config.h>
 #ifndef BOARD_TRMNL_X
 extern TRMNL_DEVICE *pDevice;
 #endif

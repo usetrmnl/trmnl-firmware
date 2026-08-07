@@ -4,7 +4,6 @@
 #include "button.h"
 #include "pins.h"
 #include "config.h"
-#include <DEV_Config.h>
 #include <ArduinoLog.h>
 #include <Preferences.h>
 #include "WifiCaptive.h"

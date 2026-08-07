@@ -1,7 +1,6 @@
 #include <Arduino.h>
 #include "trmnl_log.h"
 #include <config.h>
-#include <DEV_Config.h>
 #include "button.h"
 extern TRMNL_DEVICE *pDevice;
 

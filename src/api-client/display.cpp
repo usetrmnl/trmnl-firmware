@@ -6,7 +6,7 @@
 #include <config.h>
 #include <api_response_parsing.h>
 #include <http_client.h>
-#include <DEV_Config.h>
+#include <config.h>
 extern RTC_DATA_ATTR int iPrevWakeTime; // total wake time of the last cycle (for statistics collection)
 extern RTC_DATA_ATTR bool bUsedCachedImage; // if the last image displayed was read from cache (for statistics collection)
 #ifdef SENSOR_SDA

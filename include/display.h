@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 #ifndef _NO_DEV_CONFIG_
-#include "DEV_Config.h"
+#include "config.h"
 #endif
 
 enum MSG

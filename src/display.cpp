@@ -5,7 +5,6 @@
 #include <JPEGDEC.h>
 #include <Preferences.h>
 #include <preferences_persistence.h>
-#include "DEV_Config.h"
 #ifdef BOARD_SEEED_RETERMINAL_E1002
 #include "displays/spectra6.h"
 #endif

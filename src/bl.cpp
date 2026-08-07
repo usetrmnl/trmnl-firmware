@@ -11,7 +11,6 @@
 #include <WifiCaptive.h>
 #include <pins.h>
 #include <config.h>
-#include <DEV_Config.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <display.h>
