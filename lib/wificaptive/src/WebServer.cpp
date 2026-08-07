@@ -48,14 +48,6 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
     request->send(response); // redirect to the local IP URL
   });
 
-  // Servce logo.svg
-  server.on("/logo.svg", HTTP_ANY, [&](AsyncWebServerRequest *request) {
-    AsyncWebServerResponse *response = request->beginResponse(200, "text/html", LOGO_SVG, LOGO_SVG_LEN);
-    response->addHeader("Content-Encoding", "gzip");
-    response->addHeader("Content-Type", "image/svg+xml");
-    request->send(response);
-  });
-
   server.on("/soft-reset", HTTP_ANY, [callbacks](AsyncWebServerRequest *request) {
     callbacks.resetSettings();
     request->send(200);
