@@ -138,9 +138,4 @@ ButtonPressResult read_button_presses() {
   return classify_button_presses();
 }
 
-const char *ButtonPressResultNames[] = {
-    "LongPress",
-    "DoubleClick",
-    "ShortPress",
-    "SoftReset",
-    "ShipMode"};
+const char *ButtonPressResultNames[] = {"LongPress", "DoubleClick", "ShortPress", "SoftReset", "ShipMode"};

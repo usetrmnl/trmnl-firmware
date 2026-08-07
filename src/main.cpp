@@ -1,10 +1,10 @@
 #include <Arduino.h>
 
 #include "bl.h"
+#include "display.h"
 #include "esp_ota_ops.h"
 #include "power.h"
 #include "qa.h"
-#include "display.h"
 #include "ship_mode.h"
 
 #ifdef BOARD_TRMNL_X
@@ -68,8 +68,7 @@ void setup() {
   bl_init();
 }
 #else // TRMNL OG setup()
-void setup()
-{
+void setup() {
 #ifdef SHIP_MODE_SUPPORTED
   // Resume or complete an in-progress shipment. On each boot this either
   // finishes shipping (charger present or the user pressed the button) or sends

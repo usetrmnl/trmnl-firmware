@@ -2,6 +2,7 @@
 
 #include <WiFiType.h>
 #include <functional>
+
 #include "wifi-helpers.h"
 #include "wifi-types.h"
 

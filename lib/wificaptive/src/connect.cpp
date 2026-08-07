@@ -141,9 +141,7 @@ static void setWiFiBand(const WifiCredentials &credentials) {
 
 static std::function<void()> s_connectTickCallback = nullptr;
 
-void setConnectTickCallback(std::function<void()> cb) {
-  s_connectTickCallback = cb;
-}
+void setConnectTickCallback(std::function<void()> cb) { s_connectTickCallback = cb; }
 
 void captureEventData(WiFiEvent_t event, WiFiEventInfo_t info, WifiEventData *eventData) {
   switch (event) {
