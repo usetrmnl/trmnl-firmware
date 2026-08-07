@@ -192,7 +192,7 @@
     .btn {
       font-family: var(--mono); font-size: 14px; letter-spacing: .1em;
       text-transform: uppercase; padding: 15px 18px; border-radius: 2px;
-      border: 1px solid transparent; cursor: pointer; width: 100%;
+      border: 1px solid transparent; cursor: pointer; width: 100%; min-height: 48px;
       transition: background-color .12s steps(3), color .12s steps(3), border-color .12s steps(3);
     }
     .btn-primary { background: var(--spark); color: #FFF; border-color: var(--spark); }
@@ -339,27 +339,6 @@
           btn.textContent = 'Connect';
           displayAlert('Could not reach your TRMNL. Check that you are still on its Wi-Fi network, then try again.');
         });
-    }
-
-    function confirmSoftReset() {
-      document.getElementById('confirmationModal').style.display = 'block';
-    }
-
-    function confirmCustomServer() {
-      document.getElementById('customServerWarningModal').style.display = 'block';
-    }
-
-    function showCustomServerInput() {
-      document.getElementById('custom_server_form_group').style.display = 'flex';
-      closeCustomServerModal();
-    }
-
-    function closeCustomServerModal() {
-      document.getElementById('customServerWarningModal').style.display = 'none';
-    }
-
-    function closeModal() {
-      document.getElementById('confirmationModal').style.display = 'none';
     }
 
     function togglePassword() {
