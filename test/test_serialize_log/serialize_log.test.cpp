@@ -95,6 +95,68 @@ void test_serialize_log_with_retry(void) {
   TEST_ASSERT_EQUAL_STRING(expected.c_str(), result.c_str());
 }
 
+void test_serialize_log_lean_omits_the_device_stamp(void) {
+  auto expected = compact(R"({
+    "created_at": 1609459200,
+    "id": 456,
+    "message": "Test log message",
+    "source_line": 123,
+    "source_path": "test.cpp",
+    "level": "info"
+  })");
+
+  auto result = serialize_log_lean(input);
+
+  TEST_ASSERT_EQUAL_STRING(expected.c_str(), result.c_str());
+}
+
+void test_serialize_log_lean_keeps_retry(void) {
+  auto inputWithRetry = input;
+  inputWithRetry.logRetry = true;
+  inputWithRetry.retryAttempt = 2;
+
+  auto expected = compact(R"({
+    "created_at": 1609459200,
+    "id": 456,
+    "message": "Test log message",
+    "source_line": 123,
+    "source_path": "test.cpp",
+    "level": "info",
+    "retry": 2
+  })");
+
+  auto result = serialize_log_lean(inputWithRetry);
+
+  TEST_ASSERT_EQUAL_STRING(expected.c_str(), result.c_str());
+}
+
+void test_serialize_log_lean_is_substantially_smaller(void) {
+  // The whole point of the lean record: a verbose cycle has to fit in heap
+  // alongside an open TLS connection.
+  TEST_ASSERT_LESS_THAN(serialize_log(input).length() / 2, serialize_log_lean(input).length());
+}
+
+void test_serialize_device_stamp(void) {
+  auto expected = compact(R"({
+    "type": "stamp",
+    "created_at": 1609459200,
+    "wifi_signal": -50,
+    "wifi_status": "Connected",
+    "refresh_rate": 30000,
+    "sleep_duration": 120,
+    "firmware_version": "1.2.3",
+    "special_function": "None",
+    "battery_voltage": 4.2,
+    "wake_reason": "Timer",
+    "free_heap_size": 50000,
+    "max_alloc_size": 40000
+  })");
+
+  auto result = serialize_device_stamp(input.deviceStatusStamp, input.timestamp);
+
+  TEST_ASSERT_EQUAL_STRING(expected.c_str(), result.c_str());
+}
+
 void setUp(void) {
   // set stuff up here
 }
@@ -107,6 +169,10 @@ void process() {
   UNITY_BEGIN();
   RUN_TEST(test_serialize_log);
   RUN_TEST(test_serialize_log_with_retry);
+  RUN_TEST(test_serialize_log_lean_omits_the_device_stamp);
+  RUN_TEST(test_serialize_log_lean_keeps_retry);
+  RUN_TEST(test_serialize_log_lean_is_substantially_smaller);
+  RUN_TEST(test_serialize_device_stamp);
   UNITY_END();
 }
 
