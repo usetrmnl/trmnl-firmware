@@ -222,6 +222,38 @@
     @keyframes crawl { from { transform: translateX(-100%); } to { transform: translateX(230%); } }
     .row2 { display: flex; gap: 10px; }
     .row2 .btn { width: auto; flex: 1 1 0; }
+
+    /* Two views in one document. Only one is ever visible — the global
+       [hidden] { display: none !important } rule from Task 2 does the hiding,
+       so no extra display rule is needed here. */
+    .view { display: flex; flex-direction: column; gap: 26px; }
+    .p-title[tabindex] { outline: none; }
+    .p-title[tabindex]:focus-visible { outline: 2px solid var(--spark); outline-offset: 4px; }
+    .adv-sec { display: flex; flex-direction: column; gap: 12px; }
+    .adv-sec > h3 {
+      font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em;
+      text-transform: uppercase; color: var(--ink-3); margin: 0;
+      padding-bottom: 8px; border-bottom: 1px solid var(--rule);
+    }
+    .switch { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+    .switch input { width: 18px; height: 18px; accent-color: var(--spark); flex: 0 0 auto; }
+    .danger-zone {
+      border: 1px solid var(--rule); border-radius: 2px; padding: 16px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .danger-zone p { margin: 0; color: var(--ink-2); }
+    .modal {
+      display: none; position: fixed; inset: 0; z-index: 10;
+      background: rgba(0, 0, 0, .45); padding: 20px;
+      align-items: center; justify-content: center;
+    }
+    .modal[open] { display: flex; }
+    .modal-content {
+      background: var(--paper); border: 1px solid var(--rule); border-radius: 2px;
+      padding: 20px; width: 100%; max-width: 420px;
+      display: flex; flex-direction: column; gap: 16px;
+    }
+    .modal-content p { margin: 0; }
   </style>
   <script>
     function setRefreshButtonState(scanning) {
@@ -271,9 +303,8 @@
         }
       }
 
-      // if the custom server field is visible, validate the url
-      var customServerVisible = !document.getElementById('custom_server_form_group').hidden;
-      if (customServerVisible && server) {
+      // if the server field carries a value, validate the url
+      if (server) {
         try {
           new URL(server);
 
@@ -302,21 +333,34 @@
         body.username = document.getElementById('username').value;
       }
 
-      // Include static IP settings from localStorage (configured in Advanced settings)
-      var useStaticIP = localStorage.getItem('useStaticIP') === 'true';
+      var useStaticIP = document.getElementById('useStaticIP').checked;
       if (useStaticIP) {
+        var staticIP = document.getElementById('staticIP').value.trim();
+        var ipPattern = /^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.){3}(25[0-5]|(2[0-4]|1\d|[1-9]|)\d)$/;
+        if (!staticIP || !ipPattern.test(staticIP)) {
+          location.hash = '#advanced';
+          displayAdvancedAlert('Enter a valid static IP address, like 192.168.1.100');
+          return;
+        }
         body.useStaticIP = true;
-        body.staticIP = localStorage.getItem('staticIP') || '';
-        body.gateway = localStorage.getItem('gateway') || '';
-        body.subnet = localStorage.getItem('subnet') || '';
-        body.dns1 = localStorage.getItem('dns1') || '';
+        body.staticIP = staticIP;
+        body.gateway = document.getElementById('gateway').value.trim();
+        body.subnet = document.getElementById('subnet').value.trim();
+        body.dns1 = document.getElementById('dns1').value.trim();
       }
 
-      var ntp = localStorage.getItem('ntpServer1');
-      if (ntp) body.ntpServer1 = ntp;
+      var hostname = document.getElementById('customHostname').value.trim();
+      if (hostname) {
+        if (!/^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/.test(hostname)) {
+          location.hash = '#advanced';
+          displayAdvancedAlert('Hostname can use letters, numbers and hyphens only, and cannot start or end with a hyphen.');
+          return;
+        }
+        body.hostname = hostname;
+      }
 
-      var hostname = localStorage.getItem('customHostname');
-      if (hostname) body.hostname = hostname;
+      var ntp = document.getElementById('ntpServer1').value.trim();
+      if (ntp) body.ntpServer1 = ntp;
 
       var btn = document.getElementById("btnConnect");
       btn.disabled = true;
@@ -470,23 +514,89 @@
       box.hidden = false;
     }
 
-    function hideAlert() { document.getElementById('message').hidden = true; }
+    function hideAlert() {
+      document.getElementById('message').hidden = true;
+      document.getElementById('adv-message').hidden = true;
+    }
+
+    // Advanced-field validation errors surface here rather than in #message:
+    // #message lives inside #view-setup, which is hidden the moment connect()
+    // switches the route to #advanced to show the offending field.
+    function displayAdvancedAlert(message) {
+      var box = document.getElementById('adv-message');
+      box.textContent = message;
+      box.hidden = false;
+    }
 
     async function loadServerFromDevice() {
-      // pull value from advanced.html, if present
-      let server = localStorage.getItem('customServer');
-      localStorage.removeItem('customServer');
-      if (!server) {
-        try {
-          const response = await fetch('/device-settings');
-          server = (await response.json()).api_url;
-        } catch (_) { }
-      }
-      if (server) {
-        document.getElementById('server').value = server;
-        document.getElementById('custom_server_form_group').hidden = false;
-      }
+      try {
+        const response = await fetch('/device-settings');
+        const server = (await response.json()).api_url;
+        if (server) document.getElementById('server').value = server;
+      } catch (_) { }
     }
+
+    function toggleStaticIP() {
+      document.getElementById('static_ip_fields').hidden = !document.getElementById('useStaticIP').checked;
+    }
+
+    function confirmSoftReset() { document.getElementById('confirmationModal').setAttribute('open', ''); }
+    function closeModal() { document.getElementById('confirmationModal').removeAttribute('open'); }
+
+    function softReset() {
+      closeModal();
+      var btn = document.getElementById('btnReset');
+      btn.disabled = true;
+      btn.textContent = 'Resetting…';
+      fetch('/soft-reset', { method: 'GET' })
+        .then(_ => displayAdvancedAlert('Soft reset complete. Your TRMNL is back to its default settings.'))
+        .catch(_ => displayAdvancedAlert('The reset did not complete. Try again, or contact support if it keeps failing.'))
+        .finally(() => { btn.disabled = false; btn.textContent = 'Soft reset this TRMNL'; });
+    }
+
+    function runTest() {
+      var btn = document.getElementById('btnTest');
+      var out = document.getElementById('test-output');
+      btn.disabled = true;
+      btn.textContent = 'Running…';
+      fetch('/run-test')
+        .then(res => res.json())
+        .then(data => {
+          out.classList.toggle('msg-warn', !data.testPassed || data.Threshold);
+          if (data.Threshold) {
+            out.innerHTML = '<strong>Test skipped</strong>The panel is above 55 °C. Let it cool, then run the test again.';
+          } else {
+            out.innerHTML = '<strong>' + (data.testPassed ? 'Test passed' : 'Test failed') + '</strong>' +
+              'Initial ' + data.initialTemp + ' °C · Final ' + data.finalTemp + ' °C';
+          }
+          out.hidden = false;
+        })
+        .catch(_ => {
+          out.classList.add('msg-warn');
+          out.innerHTML = '<strong>Test did not run</strong>Check that you are still on your TRMNL\'s Wi-Fi network.';
+          out.hidden = false;
+        })
+        .finally(() => { btn.disabled = false; btn.textContent = 'Run sensor test'; });
+    }
+
+    function showView() {
+      var advanced = location.hash === '#advanced';
+      document.getElementById('view-setup').hidden = advanced;
+      document.getElementById('view-advanced').hidden = !advanced;
+      document.getElementById('modeText').textContent = advanced ? 'Advanced' : 'Setup mode';
+      document.getElementById('modeDot').hidden = advanced;
+      window.scrollTo(0, 0);
+      var title = (advanced ? document.getElementById('view-advanced') : document.getElementById('view-setup'))
+        .querySelector('.p-title');
+      if (title) title.focus();
+    }
+
+    window.addEventListener('hashchange', showView);
+    // This script runs in <head>, before <body> exists, so the initial call
+    // has to wait for the DOM rather than run inline like the listener
+    // registration above — otherwise #view-setup/#view-advanced are still
+    // null and a direct load of /#advanced throws instead of opening it.
+    document.addEventListener('DOMContentLoaded', showView);
 
     setTimeout(getInfo, 500);
     setTimeout(loadServerFromDevice, 100);
@@ -500,7 +610,7 @@
         <svg class="spark" id="headSpark" viewBox="0 0 30 30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g fill-rule="evenodd" clip-rule="evenodd"><path d="M8.02188 2.11328L15.8862 5.07445L14.4258 8.98481L6.56146 6.02364L8.02188 2.11328Z"/><path d="M20.6315 1.14647L23.2291 9.16642L19.2738 10.458L16.6761 2.43807L20.6315 1.14647Z"/><path d="M29.244 10.4452L24.6188 17.4848L21.147 15.185L25.7722 8.14549L29.244 10.4452Z"/><path d="M27.374 23.0034L19.0089 23.7616L18.6349 19.6023L27 18.8441L27.374 23.0034Z"/><path d="M16.4297 29.3638L10.6237 23.2697L13.6293 20.3828L19.4352 26.4769L16.4297 29.3638Z"/><path d="M4.65232 24.7423L5.77753 16.3849L9.89932 16.9443L8.77411 25.3017L4.65232 24.7423Z"/><path d="M0.910558 12.6074L8.11961 8.28L10.2539 11.8645L3.04481 16.192L0.910558 12.6074Z"/></g></svg>
         <span class="word">TRMNL</span>
       </span>
-      <span class="mode"><i class="dot"></i> Setup mode</span>
+      <span class="mode" id="modeChip"><i class="dot" id="modeDot"></i> <span id="modeText">Setup mode</span></span>
     </div>
     <div class="p-head-mac" id="mac-row" hidden>
       <span class="mac-value-hdr" id="mac24"></span>
@@ -508,8 +618,9 @@
     </div>
   </header>
   <div class="p-body">
+    <div class="view" id="view-setup">
     <div>
-      <h1 class="p-title">Connect your TRMNL</h1>
+      <h1 class="p-title" tabindex="-1">Connect your TRMNL</h1>
       <p class="p-sub">Pick your network and enter its password. Your TRMNL restarts once it's online.</p>
     </div>
     <div id="saved-networks" hidden>
@@ -568,12 +679,6 @@
         </div>
       </div>
 
-      <div class="field" id="custom_server_form_group" hidden>
-        <label for="server">API server</label>
-        <input class="inp" type="url" id="server" name="server" placeholder="https://trmnl.app">
-        <p class="hint">No trailing slash.</p>
-      </div>
-
       <div class="msg msg-warn" id="message" role="alert" hidden></div>
 
       <div class="msg msg-live" id="connect-status" hidden>
@@ -585,13 +690,107 @@
 
     <div class="actions">
       <button id="btnConnect" class="btn btn-primary" type="button" onclick="connect()">Connect</button>
-      <button id="btnAdvanced" class="btn btn-quiet" type="button" onclick="location.href='/advanced'">Advanced settings</button>
+      <button id="btnAdvanced" class="btn btn-quiet" type="button" onclick="location.hash = '#advanced'">Advanced settings</button>
     </div>
     <div class="mac-footer" id="info-message" hidden>
       <span class="mac-label">5 GHz MAC</span>
       <span class="mac-alt" id="mac5"></span>
     </div>
+    </div>
+
+    <div class="view" id="view-advanced" hidden>
+
+      <div>
+        <h1 class="p-title" tabindex="-1">Advanced settings</h1>
+        <p class="p-sub">Most people never need anything here. Values apply when you tap Connect.</p>
+      </div>
+
+      <div class="msg msg-warn" id="adv-message" role="alert" hidden></div>
+
+      <div class="adv-sec">
+        <h3>Server</h3>
+        <div class="field">
+          <label for="server">API server</label>
+          <input class="inp" type="url" id="server" name="server" placeholder="https://trmnl.app">
+          <p class="hint">Point your TRMNL at your own server (BYOS). No trailing slash.</p>
+        </div>
+      </div>
+
+      <div class="adv-sec">
+        <h3>Network address</h3>
+        <label class="switch">
+          <input type="checkbox" id="useStaticIP" onchange="toggleStaticIP()">
+          Assign a static IP instead of using DHCP
+        </label>
+        <div id="static_ip_fields" class="fields" hidden>
+          <div class="field">
+            <label for="staticIP">IP address</label>
+            <input class="inp" type="text" id="staticIP" placeholder="192.168.1.100">
+          </div>
+          <div class="field">
+            <label for="gateway">Gateway <span class="opt">— optional</span></label>
+            <input class="inp" type="text" id="gateway" placeholder="Default: x.x.x.1 based on your IP">
+          </div>
+          <div class="field">
+            <label for="subnet">Subnet mask <span class="opt">— optional</span></label>
+            <input class="inp" type="text" id="subnet" placeholder="Default: 255.255.255.0">
+          </div>
+          <div class="field">
+            <label for="dns1">DNS server <span class="opt">— optional</span></label>
+            <input class="inp" type="text" id="dns1" placeholder="Default: 8.8.8.8">
+          </div>
+        </div>
+      </div>
+
+      <div class="adv-sec">
+        <h3>Name on your network</h3>
+        <div class="field">
+          <label for="customHostname">Hostname</label>
+          <input class="inp" type="text" id="customHostname" placeholder="trmnl-living-room">
+          <p class="hint">Letters, numbers and hyphens. Leave empty for the default (trmnl-xxxx).</p>
+        </div>
+      </div>
+
+      <div class="adv-sec">
+        <h3>Time source</h3>
+        <div class="field">
+          <label for="ntpServer1">NTP server</label>
+          <input class="inp" type="text" id="ntpServer1" placeholder="time.nist.gov">
+          <p class="hint">Leave empty to use time.google.com.</p>
+        </div>
+      </div>
+
+      <div class="adv-sec">
+        <h3>Diagnostics</h3>
+        <p class="hint">Runs the panel through a refresh cycle and reports the temperature before and after.</p>
+        <button id="btnTest" class="btn btn-quiet" type="button" onclick="runTest()">Run sensor test</button>
+        <div class="msg" id="test-output" role="status" hidden></div>
+      </div>
+
+      <div class="adv-sec">
+        <h3>Reset</h3>
+        <div class="danger-zone">
+          <p>A soft reset erases saved Wi-Fi networks, the device ID and the API key. You'll set the device up again from scratch.</p>
+          <button id="btnReset" class="btn btn-danger" type="button" onclick="confirmSoftReset()">Soft reset this TRMNL</button>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-quiet" type="button" onclick="location.hash = '#setup'">← Back to Wi-Fi</button>
+      </div>
+
+    </div>
   </div>
-  <!-- Confirmation Modal -->
+
+  <div id="confirmationModal" class="modal">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="resetTitle">
+      <p id="resetTitle"><strong>Soft reset this TRMNL?</strong></p>
+      <p>This erases saved Wi-Fi networks, the device ID and the API key. It can't be undone.</p>
+      <div class="row2">
+        <button class="btn btn-danger" type="button" onclick="softReset()">Soft reset</button>
+        <button class="btn btn-quiet" type="button" onclick="closeModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

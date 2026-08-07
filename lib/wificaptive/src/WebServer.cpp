@@ -62,9 +62,7 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
   });
 
   server.on("/advanced", HTTP_GET, [&](AsyncWebServerRequest *request) {
-    AsyncWebServerResponse *response = request->beginResponse(200, "text/html", ADVANCED_HTML, ADVANCED_HTML_LEN);
-    response->addHeader("Content-Encoding", "gzip");
-    request->send(response);
+    request->redirect("/#advanced");
   });
   server.on("/run-test", HTTP_GET, [](AsyncWebServerRequest *request) {
     Serial.println("Running sensor test from web...");
