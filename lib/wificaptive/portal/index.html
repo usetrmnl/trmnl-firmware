@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,7 +8,7 @@
     :root {
       --paper: #F0F0EB; --surface: #FFFFFF; --ink: #1B1B19; --ink-2: #63635C;
       --ink-3: #93938B; --rule: #CFCFC7; --rule-soft: #E1E1DA; --spark: #F86527;
-      --invert-fg: #F0F0EB; --warn-bg: #FBF0DC; --warn-ink: #6B4E12;
+      --invert-fg: #F0F0EB; --warn-bg: #FBF0DC; --warn-ink: #6B4E12; --spark-fg: #FFF;
       --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
       --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     }
@@ -76,12 +76,6 @@
       letter-spacing: -.015em; margin: 0 0 6px;
     }
     .p-sub { color: var(--ink-2); margin: 0; }
-    .meta {
-      display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
-      font-family: var(--mono); font-size: 11px; color: var(--ink-3);
-      padding-top: 14px; border-top: 1px solid var(--rule); letter-spacing: .04em;
-    }
-    .meta b { color: var(--ink-2); font-weight: 400; }
     .mac-footer {
       display: flex; flex-direction: column; gap: 5px;
       padding-top: 14px; border-top: 1px solid var(--rule);
@@ -109,8 +103,9 @@
       padding-bottom: 8px; border-bottom: 1px solid var(--rule);
     }
     .grp-label button {
-      font: inherit; background: none; border: 0; padding: 0; cursor: pointer;
+      font: inherit; background: none; border: 0; cursor: pointer;
       color: var(--spark); border-bottom: 1px solid currentColor;
+      padding: 15px 0; margin: -15px 0; min-height: 48px;
     }
     .grp-label button:disabled { color: var(--ink-3); cursor: default; }
     .netlist { display: flex; flex-direction: column; }
@@ -195,12 +190,11 @@
       border: 1px solid transparent; cursor: pointer; width: 100%; min-height: 48px;
       transition: background-color .12s steps(3), color .12s steps(3), border-color .12s steps(3);
     }
-    .btn-primary { background: var(--spark); color: #FFF; border-color: var(--spark); }
+    .btn-primary { background: var(--spark); color: var(--spark-fg); border-color: var(--spark); }
     .btn-primary:hover:not(:disabled) { background: var(--ink); border-color: var(--ink); color: var(--invert-fg); }
     .btn:disabled { opacity: .55; cursor: default; }
-    .btn-quiet { background: transparent; color: var(--ink); border-color: var(--rule); }
+    .btn-quiet, .btn-danger { background: transparent; color: var(--ink); border-color: var(--rule); }
     .btn-quiet:hover { border-color: var(--ink); }
-    .btn-danger { background: transparent; color: var(--ink); border-color: var(--rule); }
     .btn-danger:hover { background: var(--ink); color: var(--invert-fg); border-color: var(--ink); }
     .msg {
       border: 1px solid var(--rule); border-left: 3px solid var(--ink-3);
@@ -312,7 +306,8 @@
             throw new Error();
           }
         } catch (_) {
-          displayAlert('Please enter a valid URL for your custom server');
+          location.hash = '#advanced';
+          displayAdvancedAlert('Please enter a valid URL for your custom server');
           return;
         }
       }
@@ -402,8 +397,10 @@
     }
 
     async function getInfo(force) {
+      setRefreshButtonState(true);
       document.getElementById('headSpark').classList.add('ticking');
       document.getElementById('scan-error').hidden = true;
+      document.getElementById('no-networks').hidden = true;
       let scanningInfoBox = document.getElementById('scanning-info');
       let scanningLoader = document.getElementById('scanning-loader');
       let response = await fetch('/scan' + (force ? '?force=1' : ''), {
@@ -433,8 +430,9 @@
         otherNetworks.forEach((item, row) => {
           appendWifiToTable("table-others", item.name, item.open, item.rssi, item.enterprise, true, item.band);
         });
+        document.getElementById('no-networks').hidden = otherNetworks.length !== 0;
       } else if (response.status == 202) {
-        setTimeout(getInfo, 2000); // repeat in 2s
+        setTimeout(() => getInfo(force), 2000); // repeat in 2s, preserving force
       } else {
         showScanError(); // any HTTP error status
       }
@@ -540,8 +538,17 @@
       document.getElementById('static_ip_fields').hidden = !document.getElementById('useStaticIP').checked;
     }
 
-    function confirmSoftReset() { document.getElementById('confirmationModal').setAttribute('open', ''); }
+    function confirmSoftReset() {
+      document.getElementById('confirmationModal').setAttribute('open', '');
+      document.querySelector('#confirmationModal .btn-quiet').focus();
+    }
     function closeModal() { document.getElementById('confirmationModal').removeAttribute('open'); }
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && document.getElementById('confirmationModal').hasAttribute('open')) {
+        closeModal();
+      }
+    });
 
     function softReset() {
       closeModal();
@@ -580,6 +587,7 @@
     }
 
     function showView() {
+      closeModal();
       var advanced = location.hash === '#advanced';
       document.getElementById('view-setup').hidden = advanced;
       document.getElementById('view-advanced').hidden = !advanced;
@@ -610,7 +618,7 @@
         <svg class="spark" id="headSpark" viewBox="0 0 30 30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g fill-rule="evenodd" clip-rule="evenodd"><path d="M8.02188 2.11328L15.8862 5.07445L14.4258 8.98481L6.56146 6.02364L8.02188 2.11328Z"/><path d="M20.6315 1.14647L23.2291 9.16642L19.2738 10.458L16.6761 2.43807L20.6315 1.14647Z"/><path d="M29.244 10.4452L24.6188 17.4848L21.147 15.185L25.7722 8.14549L29.244 10.4452Z"/><path d="M27.374 23.0034L19.0089 23.7616L18.6349 19.6023L27 18.8441L27.374 23.0034Z"/><path d="M16.4297 29.3638L10.6237 23.2697L13.6293 20.3828L19.4352 26.4769L16.4297 29.3638Z"/><path d="M4.65232 24.7423L5.77753 16.3849L9.89932 16.9443L8.77411 25.3017L4.65232 24.7423Z"/><path d="M0.910558 12.6074L8.11961 8.28L10.2539 11.8645L3.04481 16.192L0.910558 12.6074Z"/></g></svg>
         <span class="word">TRMNL</span>
       </span>
-      <span class="mode" id="modeChip"><i class="dot" id="modeDot"></i> <span id="modeText">Setup mode</span></span>
+      <span class="mode"><i class="dot" id="modeDot"></i> <span id="modeText">Setup mode</span></span>
     </div>
     <div class="p-head-mac" id="mac-row" hidden>
       <span class="mac-value-hdr" id="mac24"></span>
@@ -633,7 +641,7 @@
         <span>In range</span>
         <button id="btnRefresh" type="button" onclick="refresh()">Scan again</button>
       </div>
-      <div id="scan-error" class="msg msg-warn" hidden>
+      <div id="scan-error" class="msg msg-warn" role="alert" hidden>
         <strong>Couldn't scan for networks</strong>
         Type your network name below, or tap Scan again.
       </div>
@@ -647,6 +655,10 @@
         <div class="skel"><span class="dither" style="width:66%"></span></div>
       </div>
       <div class="netlist" id="table-others" role="radiogroup" aria-label="Networks in range"></div>
+      <div id="no-networks" class="msg" hidden>
+        <strong>No networks found</strong>
+        Move closer to your router, or type your network name below.
+      </div>
     </div>
     <div class="fields">
       <div class="field">
@@ -681,7 +693,7 @@
 
       <div class="msg msg-warn" id="message" role="alert" hidden></div>
 
-      <div class="msg msg-live" id="connect-status" hidden>
+      <div class="msg msg-live" id="connect-status" role="status" hidden>
         <strong id="connect-status-title">Connecting</strong>
         <span>Keep this page open. Your TRMNL restarts when it's connected.</span>
         <div class="progress"><i class="dither"></i></div>
