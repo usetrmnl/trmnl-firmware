@@ -252,8 +252,11 @@
     .modal-content p { margin: 0; }
   </style>
   <script>
+    var emptyScanFocused = false;
+
     function setRefreshButtonState(scanning) {
       var btn = document.getElementById('btnRefresh');
+      if (scanning && document.activeElement === btn) btn.blur();
       btn.disabled = scanning;
       btn.textContent = scanning ? 'Scanning\u2026' : 'Scan again';
     }
@@ -432,9 +435,15 @@
         otherNetworks.forEach((item, row) => {
           appendWifiToTable("table-others", item.name, item.open, item.rssi, item.enterprise, true, item.band);
         });
-        document.getElementById('no-networks').hidden = otherNetworks.length !== 0;
+        var noneFound = otherNetworks.length === 0;
+        document.getElementById('no-networks').hidden = !noneFound;
+        if (noneFound && !emptyScanFocused) {
+          emptyScanFocused = true;
+          document.getElementById('ssid').focus();
+        }
+        if (!noneFound) emptyScanFocused = false; // a later successful scan re-arms it
       } else if (response.status == 202) {
-        setTimeout(() => getInfo(force), 2000); // repeat in 2s, preserving force
+        setTimeout(() => getInfo(false), 2000); // poll only - force would restart the scan
       } else {
         showScanError(); // any HTTP error status
       }
