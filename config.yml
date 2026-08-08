@@ -28,8 +28,7 @@ urls:
 
 # ---------------------------------------------------------------------------
 # QR codes rendered on the e-paper display. The bitmaps are regenerated from
-# these URLs at build time (requires the `segno` package; if it is missing the
-# committed default bitmaps are kept).
+# these URLs at build time via the `segno` package (installed automatically).
 # ---------------------------------------------------------------------------
 qr:
   # Shown on the pairing / WiFi-connect screen (src/wifi_connect_qr.h).

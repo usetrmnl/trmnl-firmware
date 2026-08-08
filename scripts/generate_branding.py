@@ -7,9 +7,9 @@ generate_branding.py - Read config.yml and emit:
 Defaults reproduce the stock TRMNL strings/URLs, so an unmodified config.yml
 produces byte-identical output.
 
-Runs standalone or as a PlatformIO pre-build script. Only the QR step needs an
-optional dependency (`segno`); when it is missing the committed QR bitmaps are
-kept untouched so the build still succeeds.
+Runs standalone or as a PlatformIO pre-build script. The QR step depends on the
+`segno` package (see scripts/requirements.txt); it is installed on demand so the
+QR bitmaps always regenerate from config.yml.
 """
 
 import os
@@ -242,15 +242,27 @@ def _write_g5_header(rows, width, height, var_name, out_path, source_note):
 
 
 # ---------------------------------------------------------------------------
-# QR code generation (optional dependency: segno)
+# QR code generation (dependency: segno, auto-installed on demand)
 # ---------------------------------------------------------------------------
 
-def _try_import_segno():
+def _ensure_segno():
+    """Import segno, installing it on demand so the QR codes always regenerate."""
     try:
         import segno
         return segno
     except ImportError:
-        return None
+        pass
+    import subprocess
+    import sys
+    print("[branding] installing 'segno' to generate QR codes...")
+    for extra in ([], ["--break-system-packages"]):
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "--quiet", "segno"] + extra)
+            break
+        except subprocess.CalledProcessError:
+            continue
+    import segno  # raises if the install did not succeed
+    return segno
 
 
 def _qr_rows(matrix, scale, border):
@@ -357,20 +369,16 @@ def main(project_dir=None):
 
     generate_branding_h(cfg, os.path.join(project_dir, "include", "branding.h"))
 
-    # --- QR codes (optional: needs segno) ---
+    # --- QR codes (regenerated from config.yml URLs) ---
     qr = cfg.get("qr", {})
     src_dir = os.path.join(project_dir, "src")
     specs = [
         (qr.get("connect_url", "https://trmnl.com/start"), "wifi_connect_qr", "wifi_connect_qr.h"),
         (qr.get("help_url", "https://help.usetrmnl.com"), "wifi_failed_qr", "wifi_failed_qr.h"),
     ]
-    segno = _try_import_segno()
-    if segno is None:
-        print("[branding] NOTE: 'segno' not installed - keeping committed QR bitmaps.")
-        print("[branding]   pip install segno   # to regenerate QR codes from config.yml")
-    else:
-        for url, var_name, out_name in specs:
-            generate_qr_header(url, var_name, os.path.join(src_dir, out_name), segno)
+    segno = _ensure_segno()
+    for url, var_name, out_name in specs:
+        generate_qr_header(url, var_name, os.path.join(src_dir, out_name), segno)
 
 
 # PlatformIO pre-script hook ------------------------------------------------
