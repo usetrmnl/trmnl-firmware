@@ -3,7 +3,7 @@
 #include <inttypes.h>
 #include <trmnl_log.h>
 
-#if defined(BOARD_X_CLASS)
+#if defined(BOARD_X_CLASS) && !defined(BOARD_M5STACK_PAPER)
 #include <LittleFS.h>
 #define FS LittleFS
 #else

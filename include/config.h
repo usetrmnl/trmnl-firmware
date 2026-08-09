@@ -79,6 +79,10 @@
 #define TCA9535_PG_PIN     0 // P0_0 — LOW = VBUS OK
 #define TCA9535_STAT_PIN   2 // P0_2 — LOW = charging in progress
 #define DEVICE_MODEL       "x"
+#elif defined(BOARD_M5STACK_PAPER)
+#define PIN_INTERRUPT 38 // center wake button (active-low)
+#define DEVICE_MODEL  "m5stack_paper"
+#define FAKE_BATTERY_VOLTAGE
 #elif defined(BOARD_TRMNL_X_EPDIY)
 #define PIN_INTERRUPT 0
 #define DEVICE_MODEL  "x"
