@@ -163,8 +163,8 @@
 #define EPD_EXT_PWR_EN  5  // enables the external EPD supply
 #define EPD_EN_PIN      23 // FastEPD IT8951 power-control argument
 #define EPD_VCC_EN      23 // shared EPD power-enable/reset line
-#define SENSOR_SDA       21
-#define SENSOR_SCL       22
+#define SENSOR_SDA      21
+#define SENSOR_SCL      22
 #elif defined(BOARD_SEEED_RETERMINAL_E1003)
 #define EPD_SCK_PIN  7
 #define EPD_MOSI_PIN 9
