@@ -4,11 +4,11 @@
 #include <vector>
 
 struct ParsedModemNetwork {
-  String  ssid;
+  String ssid;
   int32_t rssi;
-  bool    open;        // ecn == 0 (unencrypted)
-  bool    is5GHz;      // channel >= 36
-  bool    enterprise;  // ecn == 5 (WPA2-Enterprise)
+  bool open;        // ecn == 0 (unencrypted)
+  bool is5GHz;      // channel >= 36
+  bool enterprise;  // ecn == 5 (WPA2-Enterprise)
 };
 
 // Parse a raw `AT+CWLAP` response into deduplicated networks.

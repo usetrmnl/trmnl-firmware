@@ -2,13 +2,12 @@
 #include <unity.h>
 
 // One +CWLAP entry: (ecn,"ssid",rssi,"mac",channel)
-static const char *SAMPLE =
-    "AT+CWLAP\r\n"
-    "+CWLAP:(5,\"CorpNet\",-55,\"aa:aa:aa:aa:aa:aa\",6)\r\n"     // WPA2-Enterprise, 2.4GHz
-    "+CWLAP:(0,\"CafeGuest\",-70,\"bb:bb:bb:bb:bb:bb\",11)\r\n"  // open, 2.4GHz
-    "+CWLAP:(3,\"HomeNet\",-40,\"cc:cc:cc:cc:cc:cc\",1)\r\n"     // WPA2-PSK, 2.4GHz
-    "+CWLAP:(5,\"CorpNet5\",-60,\"dd:dd:dd:dd:dd:dd\",40)\r\n"   // WPA2-Enterprise, 5GHz
-    "OK\r\n";
+static const char *SAMPLE = "AT+CWLAP\r\n"
+                            "+CWLAP:(5,\"CorpNet\",-55,\"aa:aa:aa:aa:aa:aa\",6)\r\n"     // WPA2-Enterprise, 2.4GHz
+                            "+CWLAP:(0,\"CafeGuest\",-70,\"bb:bb:bb:bb:bb:bb\",11)\r\n"  // open, 2.4GHz
+                            "+CWLAP:(3,\"HomeNet\",-40,\"cc:cc:cc:cc:cc:cc\",1)\r\n"     // WPA2-PSK, 2.4GHz
+                            "+CWLAP:(5,\"CorpNet5\",-60,\"dd:dd:dd:dd:dd:dd\",40)\r\n"   // WPA2-Enterprise, 5GHz
+                            "OK\r\n";
 
 static ParsedModemNetwork *find(std::vector<ParsedModemNetwork> &v, const char *ssid, bool is5GHz) {
   for (auto &n : v)
