@@ -96,7 +96,7 @@ bool WifiCaptive::startPortal() {
                   saved = true;
                   break;
                 }
-              result.push_back({n.ssid, n.rssi, n.open, saved, n.is5GHz});
+              result.push_back({n.ssid, n.rssi, n.open, saved, n.is5GHz, n.enterprise});
             }
             return result;
           }
@@ -182,7 +182,7 @@ bool WifiCaptive::startPortal() {
       }
 
       bool res = false;
-      if (credentials.is5GHz && _modemConnectCallback) {
+      if (credentials.is5GHz && !credentials.isEnterprise && _modemConnectCallback) {
         res = _modemConnectCallback(credentials.ssid, credentials.pswd);
         if (res) connected_via_modem = true;
       } else {
