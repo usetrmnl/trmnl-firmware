@@ -49,6 +49,8 @@ private:
 };
 
 #ifdef INCLUDE_BQ27427
+struct BQ27427Snapshot;
+
 /// @brief Reads the battery voltage from the BQ27427 fuel gauge, and gathers
 ///        the full set of gas gauge readings (SOC, health, current, etc.).
 class BQ27427Battery : public BaseBattery {
