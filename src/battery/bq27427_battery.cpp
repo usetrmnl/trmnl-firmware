@@ -25,11 +25,9 @@ static bool gaugeWrite(uint8_t reg, const uint8_t *data, uint8_t len) {
 static bool gaugeRead(uint8_t reg, uint8_t *data, uint8_t len) {
   Wire.beginTransmission(BQ27427_I2C_ADDRESS);
   Wire.write(reg);
-  if (Wire.endTransmission(true) != 0)
-    return false;
+  if (Wire.endTransmission(true) != 0) return false;
   uint8_t addr = BQ27427_I2C_ADDRESS;
-  if (Wire.requestFrom(addr, len) != len)
-    return false;
+  if (Wire.requestFrom(addr, len) != len) return false;
   for (uint8_t i = 0; i < len; i++)
     data[i] = Wire.read();
   return true;
@@ -46,6 +44,14 @@ static bool gaugeControl(uint16_t subcommand) {
   return gaugeWrite(0x00, cmd, 2);
 }
 
+// Reject implausible capacity readings, especially after first charging from a dead
+// battery. Expected capacity of 6000 or 12000 mAh ± 50%
+static bool isSaneCapacity(const BQ27427Snapshot &snap, bool oneCellPack) {
+  int expectedFull = oneCellPack ? 6000 : 12000; // design capacity × scale, mAh
+  if (snap.capacityFull < expectedFull / 2 || snap.capacityFull > expectedFull * 3 / 2) return false;
+  return snap.capacityRemain >= 0 && snap.capacityRemain <= snap.capacityFull;
+}
+
 void BQ27427Battery::gaugeInit() {
   if (battery_count == BATTERY_NONE) {
     Log_info("No battery detected - skipping BQ27427 initialization");
@@ -56,12 +62,10 @@ void BQ27427Battery::gaugeInit() {
 
   iqs323_task_i2c_lock();
 
-  // Early bq27427 batches ship with an inverted coulomb-counter calibration
-  // sign, making the gauge count discharge as charge: SOC climbs while
-  // draining and FullChargeCapacity is "learned" above design capacity.
-  // A gauge that has been running that way must be reset BEFORE
-  // connectAndConfigure(), so the resulting ITPOR triggers its golden-file
-  // reload and Impedance Track relearns from scratch.
+  // Some bq27427 ship with an inverted coulomb-counter calibration
+  // sign, making the gauge count discharge as charge. If so, the gauge
+  // must be reset BEFORE connectAndConfigure(), so the resulting ITPOR
+  // triggers its golden-file reload and Impedance Track relearns from scratch.
   if (lipo.begin(PIN_INTERNAL_SDA, PIN_INTERNAL_SCL)) {
     resetIfPolarityInverted();
   }
@@ -73,6 +77,15 @@ void BQ27427Battery::gaugeInit() {
     correctCurrentPolarity();
   }
   bool readingsValid = ready && lipo.readSnapshot(snap);
+
+  if (readingsValid && !isSaneCapacity(snap, oneCellPack)) {
+    Log_warn("BQ27427: implausible capacities (RM/FCC=%d/%d mAh) - gauge learning is poisoned", snap.capacityRemain,
+             snap.capacityFull);
+    // full reset; will reload golden file as a result
+    lipo.reset();
+    delay(300); // POR + INITIALIZATION time before the gauge responds again
+    readingsValid = false;
+  }
 
   if (!readingsValid) {
     Log_warn("BQ27427: init failed or invalid readings (ready=%d) - resetting and retrying", ready);
@@ -86,7 +99,7 @@ void BQ27427Battery::gaugeInit() {
     if (ready) {
       correctCurrentPolarity();
     }
-    readingsValid = ready && lipo.readSnapshot(snap);
+    readingsValid = ready && lipo.readSnapshot(snap) && isSaneCapacity(snap, oneCellPack);
 
     if (!readingsValid) {
       Log_error("BQ27427: still not initialized or invalid readings after retry.");
@@ -145,15 +158,13 @@ bool BQ27427Battery::readGaugeBlockVerified(uint8_t classID, uint8_t blockNum, u
     if (!gaugeWrite(BQ27427_EXTENDED_CONTROL, &zero, 1)) // BlockDataControl(): enable access
       return false;
     delayMicroseconds(200);
-    if (!gaugeWrite(BQ27427_EXTENDED_DATACLASS, &classID, 1))
-      return false;
+    if (!gaugeWrite(BQ27427_EXTENDED_DATACLASS, &classID, 1)) return false;
     delayMicroseconds(200);
     gaugeWrite(BQ27427_EXTENDED_DATABLOCK, &blockNum, 1);
     delay(5); // allow the selected block to load into the BlockData() window
 
     uint8_t deviceCsum;
-    if (!gaugeRead(BQ27427_EXTENDED_BLOCKDATA, data, 32) ||
-        !gaugeRead(BQ27427_EXTENDED_CHECKSUM, &deviceCsum, 1))
+    if (!gaugeRead(BQ27427_EXTENDED_BLOCKDATA, data, 32) || !gaugeRead(BQ27427_EXTENDED_CHECKSUM, &deviceCsum, 1))
       continue;
 
     uint8_t csum = 0;
@@ -163,28 +174,24 @@ bool BQ27427Battery::readGaugeBlockVerified(uint8_t classID, uint8_t blockNum, u
 
     // A mismatch can mean a glitched read or the gauge updating the block
     // mid-read — retry either way
-    if (csum == deviceCsum)
-      return true;
+    if (csum == deviceCsum) return true;
   }
   return false;
 }
 
 int32_t BQ27427Battery::readCCCalSignByte() {
   uint8_t block[32];
-  if (!readGaugeBlockVerified(BQ27427_ID_CC_CAL, 0, block))
-    return -1;
+  if (!readGaugeBlockVerified(BQ27427_ID_CC_CAL, 0, block)) return -1;
   return block[5];
 }
 
 bool BQ27427Battery::writeCCCalSignByte(uint8_t value) {
   // Data memory update sequence from TRM section 4.1: enter CONFIG UPDATE,
   // select the block, replace the byte, commit via checksum, SOFT_RESET out.
-  if (!gaugeControl(BQ27427_CONTROL_SET_CFGUPDATE))
-    return false;
+  if (!gaugeControl(BQ27427_CONTROL_SET_CFGUPDATE)) return false;
   unsigned long t0 = millis();
   while (!(gaugeFlags() & BQ27427_FLAG_CFGUPMODE)) {
-    if (millis() - t0 > 2000)
-      return false; // never entered CONFIG UPDATE (sealed?)
+    if (millis() - t0 > 2000) return false; // never entered CONFIG UPDATE (sealed?)
     delay(10);
   }
 
@@ -199,8 +206,7 @@ bool BQ27427Battery::writeCCCalSignByte(uint8_t value) {
 
     // The block is still selected from the verified read above. Writing the
     // checksum to 0x60 is what commits the block to data memory.
-    wrote = gaugeWrite(BQ27427_EXTENDED_BLOCKDATA + 5, &value, 1) &&
-            gaugeWrite(BQ27427_EXTENDED_CHECKSUM, &csum, 1);
+    wrote = gaugeWrite(BQ27427_EXTENDED_BLOCKDATA + 5, &value, 1) && gaugeWrite(BQ27427_EXTENDED_CHECKSUM, &csum, 1);
     delay(10);
   }
 
@@ -208,8 +214,7 @@ bool BQ27427Battery::writeCCCalSignByte(uint8_t value) {
   gaugeControl(BQ27427_CONTROL_SOFT_RESET);
   t0 = millis();
   while (gaugeFlags() & BQ27427_FLAG_CFGUPMODE) {
-    if (millis() - t0 > 2000)
-      break;
+    if (millis() - t0 > 2000) break;
     delay(10);
   }
 
@@ -219,8 +224,7 @@ bool BQ27427Battery::writeCCCalSignByte(uint8_t value) {
 void BQ27427Battery::resetIfPolarityInverted() {
   int32_t ccSign = readCCCalSignByte();
   if (ccSign >= 0 && !(ccSign & 0x80)) {
-    Log_info("BQ27427: CC calibration sign OK (CC_CAL[5]=0x%02lX) - no reset required",
-             (unsigned long)ccSign);
+    Log_info("BQ27427: CC calibration sign OK (CC_CAL[5]=0x%02lX) - no reset required", (unsigned long)ccSign);
   } else if (ccSign >= 0 && !(gaugeFlags() & BQ27427_FLAG_ITPOR)) {
     // The gauge has been integrating with the wrong sign: everything it has
     // learned is untrustworthy.
@@ -238,8 +242,7 @@ void BQ27427Battery::correctCurrentPolarity() {
   } else if (ccSign & 0x80) {
     uint8_t corrected = (uint8_t)ccSign & 0x7F;
     if (writeCCCalSignByte(corrected)) {
-      Log_info("BQ27427: CC calibration sign corrected (0x%02lX -> 0x%02X)",
-               (unsigned long)ccSign, corrected);
+      Log_info("BQ27427: CC calibration sign corrected (0x%02lX -> 0x%02X)", (unsigned long)ccSign, corrected);
     } else {
       Log_error("BQ27427: CC calibration sign correction FAILED");
     }
