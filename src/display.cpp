@@ -29,9 +29,9 @@ const TRMNL_DEVICE device_list[] =
 {
 // name            sck   mosi   cs   rst   dc   busy  sda   scl   intr   batt    pwr_fn    panel
   "og",            7,    8,     6,   10,   5,   4,    21,   20,   2,     3,      EPD_75,
-  "trmnl_steam",   7,    8,     6,   10,   5,   4,    21,   20,   2,     3,      EPD_583,
   "og_4clr",       7,    8,     6,   10,   5,   4,    21,   20,   2,     3,      EPD_75_4CLR,
   "og_gen2",       6,    1,     4,   2,    5,   0,    11,   12,   3,     0xff,   EPD_75, // fake battery == 0xff
+  "og_gen2_4clr",  6,    1,     4,   2,    5,   0,    11,   12,   3,     0xff,   EPD_75_4CLR, // fake battery == 0xff
   "xteink_x4",     8,    10,    21,  5,    4,   6,    0xff, 0xff, 3,     0xff,   EPD_426,
   "waveshare",     13,   14,    15,  26,   27,  25,   0xff, 0xff, 33,    0xff,   EPD_75,
   "waveshare_397", 11,   12,    10,  46,   9,   3,    41,   42,   0,     0xff,   EPD_397,
@@ -44,9 +44,12 @@ const TRMNL_DEVICE device_list[] =
   "reterminal_e1001", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     0xff,   EPD_75,
   "reterminal_e1002", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     0xff,   EPD_75_6CLR,
   "crowpanel42",   0,    0,     0,   0,    0,   0,    0xff, 0xff, 2,     0xff,   EPD_CROWPANEL, 
+#ifdef CMD_CS1_CS2
   "m5_paper_mono", 0,    0,     0,   0,    0,   0,    0xff, 0xff, 2,     0xff,   EPD_PAPER_MONO, 
   "m5_paper_color", 0,   0,     0,   0,    0,   0,    0xff, 0xff, 2,     0xff,   EPD_PAPER_COLOR, 
   "reterminal_e1004", 0, 0,     0,   0,    0,   0,    0xff, 0xff, 4,     0xff,   EPD_133_COLOR,
+  "trmnl_steam",   7,    8,     6,   10,   5,   4,    21,   20,   2,     3,      EPD_583,
+#endif
   NULL,            0,    0,     0,   0,    0,   0,    0,    0,    0,     0,      0
 }; // device_list
 TRMNL_DEVICE *pDevice = NULL;
@@ -54,16 +57,18 @@ TRMNL_DEVICE *pDevice = NULL;
 // N.B. ALWAYS ADD NEW PANELS TO THE END OF THE LIST
 const DISPLAY_PROFILE dpList[11][3] = { // 1-bit and 2-bit display types for each profile
     {{EP75_800x480, EP75_800x480_4GRAY}, {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, {EP75_800x480, EP75_800x480_4GRAY_V2}},
-    {{EP583_648x480, EP583_648x480_4GRAY}, {EP583_648x480, EP583_648x480_4GRAY}, {EP583_648x480, EP583_648x480_4GRAY}},
     {{EP426_800x480, EP426_800x480_4GRAY}, {EP426_800x480, EP426_800x480_4GRAY}, {EP426_800x480, EP426_800x480_4GRAY}},
     {{EP397_800x480, EP397_800x480_4GRAY}, {EP397_800x480, EP397_800x480_4GRAY}, {EP397_800x480, EP397_800x480_4GRAY}},
     {{EP75R_800x480, EP75R_800x480}, {EP75R_800x480, EP75R_800x480}, {EP75R_800x480, EP75R_800x480}}, 
     {{EP75YR_800x480, EP75YR_800x480}, {EP75YR_800x480, EP75YR_800x480}, {EP75YR_800x480, EP75YR_800x480}}, 
     {{EP73_SPECTRA_800x480, EP73_SPECTRA_800x480}, {EP73_SPECTRA_800x480, EP73_SPECTRA_800x480}, {EP73_SPECTRA_800x480, EP73_SPECTRA_800x480}},
     {{EPD_CROWPANEL42, EPD_CROWPANEL42_4GRAY},{EPD_CROWPANEL42, EPD_CROWPANEL42_4GRAY},{EPD_CROWPANEL42, EPD_CROWPANEL42_4GRAY}},
+#ifdef CMD_CS1_CS2
+    {{EP583_648x480, EP583_648x480_4GRAY}, {EP583_648x480, EP583_648x480_4GRAY}, {EP583_648x480, EP583_648x480_4GRAY}},
     {{EPD_M5_PAPER_MONO, EPD_M5_PAPER_MONO_4GRAY},{EPD_M5_PAPER_MONO, EPD_M5_PAPER_MONO_4GRAY},{EPD_M5_PAPER_MONO, EPD_M5_PAPER_MONO_4GRAY}},
     {{EPD_M5_PAPER_COLOR, EPD_M5_PAPER_COLOR},{EPD_M5_PAPER_COLOR, EPD_M5_PAPER_COLOR},{EPD_M5_PAPER_COLOR, EPD_M5_PAPER_COLOR}},
     {{EPD_SEEED_E1004, EPD_SEEED_E1004},{EPD_SEEED_E1004, EPD_SEEED_E1004},{EPD_SEEED_E1004, EPD_SEEED_E1004}},
+#endif
 };
 uint8_t u8SpectraPal[512]; // RGB333 mapped to closest Spectra6 color
 

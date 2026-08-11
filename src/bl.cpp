@@ -98,6 +98,13 @@ Preferences preferences;
 PreferencesPersistence preferencesPersistence(preferences);
 StoredLogs storedLogs(LOG_MAX_NOTES_NUMBER / 2, LOG_MAX_NOTES_NUMBER / 2, PREFERENCES_LOG_KEY, PREFERENCES_LOG_BUFFER_HEAD_KEY, preferencesPersistence);
 
+#ifdef BOARD_TRMNL_GEN2
+#include "ulp_lp_core.h"
+#include "esp_err.h"
+extern const uint8_t bin_start[] asm("_binary_ulp_main_bin_start"); //refering to app name ulp_main defined in CMakelists.txt
+extern const uint8_t bin_end[]   asm("_binary_ulp_main_bin_end"); //refering to app name ulp_main defined in CMakelists.txt
+#endif
+
 static https_request_err_e downloadAndShow(); // download and show the image
 static uint32_t downloadStream(WiFiClient *stream, int content_size, uint8_t *buffer);
 static https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse);
@@ -3142,6 +3149,22 @@ static void resetDeviceCredentials(void)
   ESP.restart();
 }
 
+#ifdef BOARD_TRMNL_GEN2
+void start_ulp_program() {
+    // Change: Load the ULP binary into RTC memory
+    ESP_ERROR_CHECK(ulp_lp_core_load_binary(bin_start, (bin_end - bin_start)));
+
+    // Change: Configure the ULP LP core wake-up source and timer
+    ulp_lp_core_cfg_t cfg = {
+        .wakeup_source = ULP_LP_CORE_WAKEUP_SOURCE_LP_TIMER, // Wake up using LP timer
+        .lp_timer_sleep_duration_us = 1000000,              // 1-second sleep duration
+    };
+
+    // Change: Start the ULP LP core program
+    ESP_ERROR_CHECK(ulp_lp_core_run(&cfg));
+}
+#endif // BOARD_TRMNL_GEN2
+
 /**
  * @brief Function to sleep preparing and go to sleep
  * @param none
@@ -3223,6 +3246,10 @@ void goToSleep(void)
   gpio_deep_sleep_hold_en(); // Needed to keep the battery power enabled during RTC sleep
 #endif
 #endif
+#ifdef BOARD_TRMNL_GEN2
+// Use the ULP of the ESP32-C5 to do interesting things on the ePaper while the main CPU is sleeping
+#endif // BOARD_TRMNL_GEN2
+  start_ulp_program();
   esp_deep_sleep_start();
 }
 

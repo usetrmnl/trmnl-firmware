@@ -89,6 +89,8 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #elif defined(BOARD_TRMNL_GEN2)
 #define PIN_INTERRUPT 3
 #define DEVICE_MODEL "og_gen2"
+#define BQ25616_PG_PIN 25
+#define BQ25616_STAT_PIN 24
 #elif defined(BOARD_XTEINK_X4)
 #define DEVICE_MODEL "xteink_x4"
 #define PIN_INTERRUPT 3
@@ -224,13 +226,13 @@ typedef struct tag_trmnl_device
 // These sets are what define the temperature profile - 3 per size (default, A, B)
 enum {
   EPD_75 = 0,
-  EPD_583,
   EPD_426,
   EPD_397,
   EPD_75_3CLR,
   EPD_75_4CLR,
   EPD_75_6CLR,
   EPD_CROWPANEL,
+  EPD_583,
   EPD_PAPER_MONO,
   EPD_PAPER_COLOR,
   EPD_133_COLOR,
