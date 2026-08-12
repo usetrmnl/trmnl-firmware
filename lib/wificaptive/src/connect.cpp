@@ -372,16 +372,21 @@ wl_status_t waitForConnectResult(uint32_t timeout) {
 
   unsigned long timeoutmillis = millis() + timeout;
   wl_status_t status = WiFi.status();
+  // Neither WiFi.disconnect() nor WiFi.begin() clears the status, so this first read can be the
+  // previous attempt's verdict.
+  bool statusBelongsToThisAttempt = false;
 
   while (millis() < timeoutmillis) {
     wl_status_t newStatus = WiFi.status();
     if (newStatus != status) {
       Log_info("WiFi: status changed from %s to %s", wifiStatusStr(status), wifiStatusStr(newStatus));
+      statusBelongsToThisAttempt = true;
     }
     status = newStatus;
     // @todo detect additional states, connect happens, then dhcp then get ip, there is some delay here, make sure not
     // to timeout if waiting on IP
-    if (status == WL_CONNECTED || status == WL_CONNECT_FAILED || status == WL_NO_SSID_AVAIL) {
+    if (statusBelongsToThisAttempt &&
+        (status == WL_CONNECTED || status == WL_CONNECT_FAILED || status == WL_NO_SSID_AVAIL)) {
       return status;
     }
     delay(100);
