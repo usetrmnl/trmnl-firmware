@@ -153,8 +153,9 @@ void captureEventData(WiFiEvent_t event, WiFiEventInfo_t info, WifiEventData *ev
   case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
     eventData->disconnected = true;
     eventData->disconnectReason = (wifi_err_reason_t)info.wifi_sta_disconnected.reason;
-    Log_info("Wifi: Event STA_DISCONNECTED, reason: %s",
-             WiFi.disconnectReasonName((wifi_err_reason_t)info.wifi_sta_disconnected.reason));
+    // ERROR to clear store_submit_threshold; not the _submit variant, this runs in the event handler.
+    Log_error("Wifi: Event STA_DISCONNECTED, reason: %s",
+              WiFi.disconnectReasonName((wifi_err_reason_t)info.wifi_sta_disconnected.reason));
     break;
   default:
     Log_info("Wifi: Event (other): %s", WiFi.eventName((arduino_event_id_t)event));
