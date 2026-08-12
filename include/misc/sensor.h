@@ -1,6 +1,5 @@
 #pragma once
 
-#include <DEV_Config.h>
 #include <config.h>
 
 #ifdef SENSOR_SDA

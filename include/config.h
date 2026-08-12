@@ -1,5 +1,6 @@
 #ifndef CONFIG_H
 #define CONFIG_H
+#include <stdint.h>
 
 #define FW_MAJOR_VERSION 1
 #define FW_MINOR_VERSION 8
@@ -45,11 +46,11 @@
 #define WIFI_CONNECTION_RSSI                 (-100)
 
 #define DISPLAY_BMP_IMAGE_SIZE 48062 // in bytes - 62 bytes - header; 48000 bytes - bitmap (480*800 1bpp) / 8
-#define DEFAULT_IMAGE_SIZE     48000
-#if defined(BOARD_X_CLASS)
-#define MAX_IMAGE_SIZE 750000 // Use PSRAM on the ESP32-S3 (all X-class boards have PSRAM)
+#define DEFAULT_IMAGE_SIZE 48000
+#if defined(BOARD_HAS_PSRAM)
+#define MAX_IMAGE_SIZE 750000 // Use PSRAM on the ESP32-S3/C5 (all X-class boards have PSRAM)
 #else
-#define MAX_IMAGE_SIZE 90000 // largest compressed image we can receive
+#define MAX_IMAGE_SIZE 90000 // largest compressed image we can receive in static RAM
 #endif
 #define SLEEP_uS_TO_S_FACTOR 1000000           /* Conversion factor for micro seconds to seconds */
 
@@ -61,16 +62,7 @@
 
 #define MS_TO_S_FACTOR       1000 /* Conversion factor for milliseconds to seconds */
 
-#if defined(BOARD_TRMNL) || defined(BOARD_TRMNL_4CLR)
-#define PIN_INTERRUPT 2
-#define DEVICE_MODEL  "og"
-#elif defined(BOARD_TRMNL_GEN2)
-#define PIN_INTERRUPT 3
-#define DEVICE_MODEL  "og_gen2"
-#elif defined(BOARD_XTEINK_X4)
-#define DEVICE_MODEL  "xteink_x4"
-#define PIN_INTERRUPT 3
-#elif defined(BOARD_TRMNL_X)
+#if defined(BOARD_TRMNL_X)
 #define PIN_INTERRUPT      3
 #define PIN_INTERNAL_SDA   39
 #define PIN_INTERNAL_SCL   40
@@ -110,11 +102,6 @@
 #define PIN_INTERRUPT 33
 #define DEVICE_MODEL  "waveshare"
 #define FAKE_BATTERY_VOLTAGE
-#elif defined(BOARD_WAVESHARE_397)
-#define PIN_INTERRUPT 0
-#define DEVICE_MODEL  "waveshare_397"
-#define SENSOR_SDA    41
-#define SENSOR_SCL    42
 #elif defined(BOARD_SEEED_XIAO_ESP32C3)
 #define DEVICE_MODEL "seeed_esp32c3"
 #define PIN_INTERRUPT                                                                                                  \
@@ -136,26 +123,6 @@
 #endif // !MINI_EPD
 #define PIN_VBAT_SWITCH   6 // load switch enable pin for battery voltage measurement
 #define VBAT_SWITCH_LEVEL HIGH // load switch enable pin active level
-#elif defined(BOARD_SEEED_RETERMINAL_E1001)
-#define DEVICE_MODEL      "reterminal_e1001"
-#define PIN_INTERRUPT     3 // the green button
-#define PIN_VBAT_SWITCH   21 // load switch enable pin for battery voltage measurement
-#define VBAT_SWITCH_LEVEL HIGH // load switch enable pin active level
-#define PIN_BUZZER        45          // passive buzzer (MLT-8530) via NPN transistor
-#define BUZZER_FREQ       2700       // resonant frequency of MLT-8530 in Hz
-#elif defined(BOARD_SEEED_RETERMINAL_E1002)
-#define DEVICE_MODEL      "reterminal_e1002"
-#define PIN_INTERRUPT     3 // the green button
-#define PIN_VBAT_SWITCH   21 // load switch enable pin for battery voltage measurement
-#define VBAT_SWITCH_LEVEL HIGH // load switch enable pin active level
-#elif defined(BOARD_SEEED_STICKY)
-#define DEVICE_MODEL  "reTerminal Sticky"
-#define PIN_INTERRUPT 4 // the power button
-#elif defined(BOARD_SEEED_RETERMINAL_E1003)
-#define PIN_INTERRUPT     3 // green button
-#define PIN_VBAT_SWITCH   40
-#define VBAT_SWITCH_LEVEL HIGH
-#define DEVICE_MODEL      "reterminal_e1003"
 #endif
 
 // DHCP hostname prefix (hyphens instead of spaces).
@@ -190,5 +157,74 @@
 
 // Abort an image download when the stream goes this long with no data.
 #define IMAGE_STREAM_INACTIVITY_TIMEOUT_MS 15000
+
+// TRMNL Device structure - defines the GPIO connections for the display, button and battery
+// Only needed on "OG" class devices with SPI ePaper displays
+typedef struct tag_trmnl_device
+{
+   const char *device_name;
+   uint8_t epd_sck_pin;
+   uint8_t epd_mosi_pin;
+   uint8_t epd_cs_pin;
+   uint8_t epd_rst_pin;
+   uint8_t epd_dc_pin;
+   uint8_t epd_busy_pin;
+   uint8_t sensor_sda;
+   uint8_t sensor_scl;
+   uint8_t interrupt_pin;
+   uint8_t battery_pin;
+   uint8_t panel_set;
+} TRMNL_DEVICE;
+
+// This enum defines sets of display configurations for different SPI panel types
+// These sets are what define the temperature profile - 3 per size (default, A, B)
+enum {
+  EPD_75 = 0,
+  EPD_426,
+  EPD_397,
+  EPD_75_3CLR,
+  EPD_75_4CLR,
+  EPD_75_6CLR,
+  EPD_CROWPANEL,
+  EPD_583,
+  EPD_PAPER_MONO,
+  EPD_PAPER_COLOR,
+  EPD_133_COLOR,
+};
+
+/**
+ * data
+**/
+#define UBYTE   uint8_t
+#define UWORD   uint16_t
+#define UDOUBLE uint32_t
+
+#if defined (BOARD_SEEED_RETERMINAL_E1003)
+   #define EPD_SCK_PIN  7
+   #define EPD_MOSI_PIN 9
+   #define EPD_MISO_PIN 8
+   #define EPD_CS_PIN   10
+   #define EPD_RST_PIN  12
+   #define EPD_EN_PIN   11
+   #define EPD_BUSY_PIN 13
+   #define EPD_VCC_EN   21
+#endif
+
+#define GPIO_PIN_SET   1
+
+/**
+ * GPIO read and write
+**/
+#define DEV_Digital_Write(_pin, _value) digitalWrite(_pin, _value == 0? LOW:HIGH)
+#define DEV_Digital_Read(_pin) digitalRead(_pin)
+
+/**
+ * delay x ms
+**/
+#define DEV_Delay_ms(__xms) delay(__xms)
+
+/*------------------------------------------------------------------------------------------------------*/
+UBYTE DEV_Module_Init(void);
+void DEV_SPI_WriteByte(UBYTE data);
 
 #endif

@@ -76,6 +76,13 @@ const char *szHTTPErrors[] = {
 
 static float vBatt;
 
+#ifdef BOARD_TRMNL_GEN2
+#include "ulp_lp_core.h"
+#include "esp_err.h"
+extern const uint8_t bin_start[] asm("_binary_ulp_main_bin_start"); //refering to app name ulp_main defined in CMakelists.txt
+extern const uint8_t bin_end[]   asm("_binary_ulp_main_bin_end"); //refering to app name ulp_main defined in CMakelists.txt
+#endif
+
 static https_request_err_e downloadAndShow(); // download and show the image
 static https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse);
 static void resetDeviceCredentials(void);            // reset device credentials API key, Friendly ID, Wi-Fi SSID and password
@@ -98,6 +105,8 @@ static unsigned long startup_time = 0;
 // Create stub functions for the touchbar workaround
 void iqs323_task_i2c_lock(void) {}
 void iqs323_task_i2c_unlock(void) {}
+void hw_config_init(void);
+extern TRMNL_DEVICE *pDevice;
 #endif // !BOARD_TRMNL_X
 
 void wait_for_serial() {
@@ -751,6 +760,8 @@ void bl_init(void)
     bModemNeeded = true; // captive portal needs modem for 5 GHz
   }
   Log.info("%s [%d]: modem needed = %d\n\r", __FILE__, __LINE__, bModemNeeded);
+#else
+  hw_config_init();
 #endif // X
   pins_init();
   buzzer().init();
@@ -2549,6 +2560,22 @@ static void resetDeviceCredentials(void)
   ESP.restart();
 }
 
+#ifdef BOARD_TRMNL_GEN2
+void start_ulp_program() {
+    // Change: Load the ULP binary into RTC memory
+    ESP_ERROR_CHECK(ulp_lp_core_load_binary(bin_start, (bin_end - bin_start)));
+
+    // Change: Configure the ULP LP core wake-up source and timer
+    ulp_lp_core_cfg_t cfg = {
+        .wakeup_source = ULP_LP_CORE_WAKEUP_SOURCE_LP_TIMER, // Wake up using LP timer
+        .lp_timer_sleep_duration_us = 1000000,              // 1-second sleep duration
+    };
+
+    // Change: Start the ULP LP core program
+    ESP_ERROR_CHECK(ulp_lp_core_run(&cfg));
+}
+#endif // BOARD_TRMNL_GEN2
+
 /**
  * @brief Function to sleep preparing and go to sleep
  * @param none
@@ -2601,12 +2628,16 @@ void goToSleep(void)
   // Configure GPIO pin for wakeup
 #if CONFIG_IDF_TARGET_ESP32
   #define BUTTON_PIN_BITMASK(GPIO) (1ULL << GPIO)  // 2 ^ GPIO_NUMBER in hex
-  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK(PIN_INTERRUPT), ESP_EXT1_WAKEUP_ALL_LOW);
+  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK(pDevice->interrupt_pin), ESP_EXT1_WAKEUP_ALL_LOW);
 #elif defined(CONFIG_IDF_TARGET_ESP32C3) || defined (CONFIG_IDF_TARGET_ESP32C5)
-  pinMode(PIN_INTERRUPT, INPUT); // needed to not immediately wake up
-  esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
+  pinMode(pDevice->interrupt_pin, INPUT); // needed to not immediately wake up
+  esp_deep_sleep_enable_gpio_wakeup(1 << pDevice->interrupt_pin, ESP_GPIO_WAKEUP_GPIO_LOW);
 #elif defined(CONFIG_IDF_TARGET_ESP32S3)
+#ifdef BOARD_TRMNL_X
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
+#else
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)pDevice->interrupt_pin, 0);
+#endif
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
 #endif
@@ -2623,7 +2654,11 @@ void goToSleep(void)
   gpio_deep_sleep_hold_en(); // Needed to keep the battery power enabled during RTC sleep
 #endif
 #endif
-  esp_deep_sleep_start();
+#ifdef BOARD_TRMNL_GEN2
+// Use the ULP of the ESP32-C5 to do interesting things on the ePaper while the main CPU is sleeping
+//  start_ulp_program();
+//  esp_deep_sleep_start();
+#endif // BOARD_TRMNL_GEN2
 }
 
 static void goToSleepButtonOnly(void)
@@ -2637,11 +2672,15 @@ static void goToSleepButtonOnly(void)
   preferences.end();
 #if CONFIG_IDF_TARGET_ESP32
   #define BUTTON_PIN_BITMASK_BTN(GPIO) (1ULL << GPIO)
-  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK_BTN(PIN_INTERRUPT), ESP_EXT1_WAKEUP_ALL_LOW);
+  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK_BTN(pDevice->interrupt_pin), ESP_EXT1_WAKEUP_ALL_LOW);
 #elif defined( CONFIG_IDF_TARGET_ESP32C3 ) || defined ( CONFIG_IDF_TARGET_ESP32C5 )
-  esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
+  esp_deep_sleep_enable_gpio_wakeup(1 << pDevice->interrupt_pin, ESP_GPIO_WAKEUP_GPIO_LOW);
 #elif CONFIG_IDF_TARGET_ESP32S3
+#ifdef BOARD_TRMNL_X
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
+#else
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)pDevice->interrupt_pin, 0);
+#endif
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
 #endif
@@ -2707,6 +2746,55 @@ void config_gpio_for_lp() {
   pinMode(GPIO_NUM_2, INPUT); // RTS
 #endif // BOARD_TRMNL_X
 } /* config_gpio_for_lp() */
+
+/**
+ * @brief Function to read the battery voltage
+ * @param none
+ * @return float voltage in Volts
+ */
+static float readBatteryVoltage(void)
+{
+#ifdef FAKE_BATTERY_VOLTAGE
+  Log.warning("%s [%d]: FAKE_BATTERY_VOLTAGE is defined. Returning 4.2V.\r\n", __FILE__, __LINE__);
+  return 4.2f;
+#elif defined(BOARD_TRMNL_X)
+  if (lipo._initialized)
+  {
+    float voltage = lipo.voltage() / 1000.0; // Convert mV to V
+    Log.info("%s [%d]: Battery voltage reading from BQ27427: %.3f V\r\n", __FILE__, __LINE__, voltage);
+    return voltage;
+  }
+  else
+  {
+    Log.error("%s [%d]: BQ27427 not initialized. Cannot read battery voltage.\r\n", __FILE__, __LINE__);
+    return -1.0;
+  }
+#else
+  #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002) || defined(BOARD_SEEED_RETERMINAL_E1003)
+    pinMode(PIN_VBAT_SWITCH, OUTPUT);
+    digitalWrite(PIN_VBAT_SWITCH, VBAT_SWITCH_LEVEL);
+    delay(10); // Wait for the switch to stabilize
+  #endif
+    Log.info("%s [%d]: Battery voltage reading...\r\n", __FILE__, __LINE__);
+    int32_t adc;
+    int32_t sensorValue;
+
+    if (pDevice->battery_pin == 0xff) return 4.2f; // fake battery voltage
+
+    adc = 0;
+    analogRead(PIN_BATTERY); // This is needed to properly initialize the ADC BEFORE calling analogReadMilliVolts()
+    for (uint8_t i = 0; i < 8; i++) {
+      adc += analogReadMilliVolts(pDevice->battery_pin);
+    }
+  #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_XIAO_EPAPER_DISPLAY_3CLR) || defined(BOARD_SEEED_RETERMINAL_E1003)
+    digitalWrite(PIN_VBAT_SWITCH, (VBAT_SWITCH_LEVEL == HIGH ? LOW : HIGH));
+  #endif
+    sensorValue = (adc / 8) * 2;
+    Log.info("%s [%d]: Battery sensorValue = %d\r\n", __FILE__, __LINE__, (int)sensorValue);
+    float voltage = sensorValue / 1000.0;
+    return voltage;
+#endif // FAKE_BATTERY_VOLTAGE
+}
 
 /**
  * @brief Function to submit a log string to the API

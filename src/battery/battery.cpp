@@ -1,4 +1,3 @@
-#include <DEV_Config.h> // defines FAKE_BATTERY_VOLTAGE for some boards
 #include <battery.h>
 #include <config.h>
 
