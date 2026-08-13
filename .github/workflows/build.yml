@@ -72,6 +72,14 @@ jobs:
       #- name: build (TRMNL_X)
       #  run: pio run -e TRMNL_X -j ${{ runner.os == 'Windows' && '1' || '4' }} -v
 
+      # Compile only. The suite needs a board to run, so nothing else here catches it drifting
+      # out of sync with the code it tests.
+      - name: build (on-device integration suite)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          cp test/integration/test_config.h.example test/integration/test_config.h
+          pio test -e trmnl_test --without-uploading --without-testing
+
       - name: test
         if: matrix.os != 'windows-latest'
         run: pio test -e native -v

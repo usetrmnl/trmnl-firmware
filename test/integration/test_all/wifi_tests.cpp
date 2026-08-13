@@ -69,9 +69,26 @@ static void test_stale_fast_connect_hint_still_connects(void) {
                             "A stale BSSID must fall back to a full channel scan and still connect");
 }
 
+// The stale hint and the network are both gone, so the fallback scan finds nothing either and has
+// to report that rather than hang or inherit the fast connect's answer.
+static void test_stale_fast_connect_hint_on_an_absent_network_fails(void) {
+  disconnect_and_settle();
+
+  WifiCredentials creds("definitely-not-the-real-ssid", "definitely-not-the-real-password");
+  creds.bssid = "02:00:00:00:00:01";
+  creds.channel = 1;
+  creds.lastFullScanEpoch = (uint32_t)time(nullptr);
+
+  wl_status_t status = WifiCaptivePortal.connect(creds).status;
+
+  TEST_ASSERT_NOT_EQUAL_MESSAGE(WL_CONNECTED, status, "connect() should not report a connection it never made");
+  TEST_ASSERT_FALSE_MESSAGE(WiFi.isConnected(), "WiFi.isConnected() should be false after a failed connect()");
+}
+
 void test_wifi(void) {
   RUN_TEST(test_wifi_connects_with_valid_credentials);
   RUN_TEST(test_wifi_fails_with_wrong_password);
   RUN_TEST(test_wifi_fails_with_wrong_ssid);
   RUN_TEST(test_stale_fast_connect_hint_still_connects);
+  RUN_TEST(test_stale_fast_connect_hint_on_an_absent_network_fails);
 }
