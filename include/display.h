@@ -75,6 +75,21 @@ typedef enum {
 
 battery_count_t detect_battery_count();
 
+// Temporarily bypass the BQ27427 for battery capacity until we can fix it.
+// It's still used for voltage, current, and temperature.
+#if defined(BYPASS_BQ27427_SOC) && !defined(BOARD_TRMNL_X)
+#error "BYPASS_BQ27427_SOC only applies to boards with the BQ27427 gas gauge"
+#endif
+
+/// @brief Per-cell pack capacity (mAh) assumed when BYPASS_BQ27427_SOC is enabled.
+#define BQ27427_BYPASS_CELL_CAPACITY_MAH 6000
+
+/// @brief Estimate state of charge from a LiPo cell voltage (parallel cells
+///        share the same voltage, so this works for 1- and 2-cell packs).
+/// @param voltage cell voltage in Volts
+/// @return estimated state of charge, 0-100 %
+int batteryVoltageToPercent(float voltage);
+
 extern "C" {
   void modem_enter_bootloader();
   void modem_reset_target();
