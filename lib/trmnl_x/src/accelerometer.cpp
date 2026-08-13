@@ -1,10 +1,12 @@
 #ifdef BOARD_TRMNL_X
 
 #include <Arduino.h>
+#include <math.h>
 
 #include "Wire.h"
 
 #include "accelerometer.h"
+#include "iqs323_task.h"
 
 // ############################ ACCELEROMETER #############################
 
@@ -150,6 +152,89 @@ int8_t bma530_configure_low_power_mode(struct bma5_dev *dev) {
 }
 
 /**
+ * Wait for the accelerometer's first sample to become valid after being enabled
+ */
+int8_t bma530_wait_for_data_ready(struct bma5_dev *dev, uint32_t timeout_ms) {
+    struct bma5_sensor_status status;
+    int8_t rslt;
+    uint32_t elapsed_ms = 0;
+
+    while (true) {
+        rslt = bma5_get_sensor_status(&status, dev);
+        if (rslt != BMA5_OK) {
+            return rslt;
+        }
+
+        if (status.acc_data_rdy) {
+            return BMA5_OK;
+        }
+
+        if (elapsed_ms >= timeout_ms) {
+            return BMA5_E_COM_FAIL;
+        }
+
+        delay(2);
+        elapsed_ms += 2;
+    }
+}
+
+/**
+ * Bring up the BMA530 for orientation sensing (init, LPM config, data-ready wait)
+ */
+int8_t bma530_wake_and_init(struct bma5_dev *dev) {
+    int8_t rslt;
+
+    iqs323_task_i2c_lock();
+    rslt = bma530_init_device(dev);
+    iqs323_task_i2c_unlock();
+    if (rslt != BMA5_OK) {
+        Serial.println("Failed to initialize BMA530!");
+        return rslt;
+    }
+
+    iqs323_task_i2c_lock();
+    rslt = bma530_configure_low_power_mode(dev);
+    iqs323_task_i2c_unlock();
+    if (rslt != BMA5_OK) {
+        Serial.println("Failed to configure BMA530 low power mode!");
+        return rslt;
+    }
+
+    iqs323_task_i2c_lock();
+    rslt = bma530_wait_for_data_ready(dev, 50);
+    iqs323_task_i2c_unlock();
+    if (rslt != BMA5_OK) {
+        Serial.println("BMA530 data-ready timeout!");
+    }
+
+    return rslt;
+}
+
+/**
+ * Locked, flat-gated orientation read
+ */
+bma530_orient_read_t bma530_read_orientation(struct bma5_dev *dev, uint8_t *orientation_out) {
+    uint8_t computed_orientation;
+    bool is_flat = false;
+
+    iqs323_task_i2c_lock();
+    int8_t rslt = bma530_compute_orientation(dev, &computed_orientation, &is_flat, NULL, NULL);
+    iqs323_task_i2c_unlock();
+
+    if (rslt != BMA5_OK) {
+        Serial.printf("Failed to compute orientation: %d\n", rslt);
+        return BMA530_ORIENT_READ_FAILED;
+    }
+
+    if (is_flat) {
+        return BMA530_ORIENT_FLAT;
+    }
+
+    *orientation_out = computed_orientation;
+    return BMA530_ORIENT_VALID;
+}
+
+/**
  * Configure orientation detection
  */
 int8_t bma530_configure_orientation(struct bma5_dev *dev) {
@@ -169,7 +254,7 @@ int8_t bma530_configure_orientation(struct bma5_dev *dev) {
     conf.ud_en = 0;             // Enable upside-down (face up/down) detection
     conf.mode = 0;              // Symmetric mode
     conf.blocking = 0;          // No blocking during movement
-    conf.theta = 0x27;          // Tilt angle threshold (default: 0x27 = 39)
+    conf.theta = BMA530_ORIENT_THETA_RAW; // Tilt angle threshold, also reused in bma530_compute_orientation
     conf.hold_time = 0x5;       // Hold time for confirmation (default: 0x5)
     conf.slope_thres = 0xCD;    // Slope threshold to prevent false detection (default: 0xCD = 205)
     conf.hysteresis = 0x20;     // Hysteresis value (default: 0x20 = 32)
@@ -362,6 +447,74 @@ void bma530_process_orientation(struct bma5_dev *dev) {
         if (rslt != BMA5_OK) {
             Serial.printf("Failed to clear interrupt status: %d\n", rslt);
         }
+    }
+}
+
+/**
+ * Compute device orientation directly from raw accelerometer data.
+ */
+int8_t bma530_compute_orientation(struct bma5_dev *dev, uint8_t *orientation_out, bool *is_flat_out,
+                                   float *raw_phi_deg_out, float *corrected_phi_deg_out) {
+    int8_t rslt;
+    struct bma5_accel accel;
+
+    if (orientation_out == NULL) {
+        return BMA5_E_NULL_PTR;
+    }
+
+    rslt = bma5_get_acc(&accel, dev);
+    if (rslt != BMA5_OK) {
+        return rslt;
+    }
+
+    // Flat-state gate, reusing the same ORIENTATION_1.theta threshold configured
+    // on-chip (bma530_configure_orientation): tan(theta_actual)^2 = (ax^2+ay^2)/az^2,
+    // and theta_raw = 64*tan(theta_threshold)^2, so comparing without division/sqrt:
+    // is_flat  <=>  64*(ax^2+ay^2) < theta_raw*az^2
+    if (is_flat_out != NULL) {
+        int64_t horiz_sq = (int64_t)accel.x * accel.x + (int64_t)accel.y * accel.y;
+        int64_t az_sq = (int64_t)accel.z * accel.z;
+        *is_flat_out = (64 * horiz_sq) < ((int64_t)BMA530_ORIENT_THETA_RAW * az_sq);
+    }
+
+    // phi = atan2(-ay, ax), per BMA530 datasheet eq. 4.5, normalized to [0, 360)
+    float phi_deg = atan2f((float)-accel.y, (float)accel.x) * 180.0f / (float)M_PI;
+    if (phi_deg < 0) {
+        phi_deg += 360.0f;
+    }
+
+    float corrected_deg = phi_deg + BMA530_MOUNT_OFFSET_DEG;
+    if (corrected_deg >= 360.0f) {
+        corrected_deg -= 360.0f;
+    }
+
+    if (corrected_deg >= 315.0f || corrected_deg < 45.0f) {
+        *orientation_out = LANDSCAPE_LEFT;
+    } else if (corrected_deg < 135.0f) {
+        *orientation_out = PORTRAIT_UP_DOWN;
+    } else if (corrected_deg < 225.0f) {
+        *orientation_out = LANDSCAPE_RIGHT;
+    } else {
+        *orientation_out = PORTRAIT_UP_RIGHT;
+    }
+
+    if (raw_phi_deg_out != NULL) {
+        *raw_phi_deg_out = phi_deg;
+    }
+    if (corrected_phi_deg_out != NULL) {
+        *corrected_phi_deg_out = corrected_deg;
+    }
+
+    return BMA5_OK;
+}
+
+const char *bma530_orientation_to_string(uint8_t orientation) {
+    switch (orientation) {
+        case PORTRAIT_UP_RIGHT: return "portrait_upright";
+        case LANDSCAPE_LEFT:    return "landscape_left";
+        case PORTRAIT_UP_DOWN:  return "portrait_upside_down";
+        case LANDSCAPE_RIGHT:   return "landscape_right";
+        default:                return "unknown";
     }
 }
 

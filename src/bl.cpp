@@ -702,6 +702,42 @@ void process_iqs323_data(void)
 
 // ############################ ACCELERATOR ###########################
 #include "accelerometer.h"
+
+#ifdef BOARD_TRMNL_X
+static void handle_orientation_change_confirmation(struct bma5_dev *dev, uint8_t previous_orientation)
+{
+  const unsigned long ORIENTATION_POLL_INTERVAL_MS = 1000;
+  int dots_filled = 0;
+  bool reverted = false;
+  uint8_t *confirm_logo = storedLogoOrDefault(1);
+
+  display_show_orientation_confirm(confirm_logo, dots_filled);
+  unsigned long confirm_start = millis();
+
+  while (dots_filled < ORIENTATION_CONFIRM_DOT_COUNT) {
+    delay(ORIENTATION_POLL_INTERVAL_MS);
+
+    uint8_t polled_orientation;
+    if (bma530_read_orientation(dev, &polled_orientation) == BMA530_ORIENT_VALID &&
+        polled_orientation == previous_orientation) {
+      reverted = true;
+      break;
+    }
+
+    dots_filled++;
+    display_show_orientation_confirm(confirm_logo, dots_filled);
+  }
+
+  if (reverted) {
+    Log_info("Orientation change reverted within confirm window - aborting, restoring previous orientation");
+    device_orientation = previous_orientation;
+    display_set_orientation(device_orientation);
+    showLastImageAndSleep(); // does not return
+  }
+
+  Log_info("Orientation change confirmed after %lums", millis() - confirm_start);
+}
+#endif // BOARD_TRMNL_X
 // ############################ ACCELERATOR ###########################
 
 // ############################ esp32c5 modem #########################
@@ -897,6 +933,10 @@ void bl_init(void)
   display_init();
   otg_turn_off(); // Since OTG function was commented out, need to ensure that OTG is turned off
   iqs323_task_i2c_unlock();
+
+  // Apply the last-known (RTC-persisted) orientation
+  display_set_orientation(device_orientation);
+
   filesystem_init();
 
   Wire.setClock(100000);
@@ -1001,40 +1041,32 @@ void bl_init(void)
   filesystem_init();
 #endif // !BOARD_TRMNL_X
 
-// #ifdef BOARD_TRMNL_X
+#ifdef BOARD_TRMNL_X
 
-//   int8_t rslt;
-//   // I2C already initialized by IQS323 - do not call Wire.begin() again as it corrupts the bus on ESP32S3
-//   Serial.printf("Using I2C bus already initialized (SDA: %d, SCL: %d)\n\n", SENSOR_SDA_PIN, SENSOR_SCL_PIN);
+  // I2C already initialized by IQS323 - do not call Wire.begin() again as it corrupts the bus on ESP32S3
+  Serial.printf("Using I2C bus already initialized (SDA: %d, SCL: %d)\n\n", 39, 40);
 
-//   struct bma5_dev bma530_dev;
+  struct bma5_dev bma530_dev;
+  bma530_wake_and_init(&bma530_dev);
 
-//   rslt = bma530_init_device(&bma530_dev);
-//   if (rslt != BMA5_OK) {
-//     Serial.println("Failed to initialize BMA530!");
-//   }
+  config_bma530_interrupt();
+  pinMode(GPIO_NUM_38, INPUT);
 
-//   rslt = bma530_configure_low_power_mode(&bma530_dev);
-//   if (rslt != BMA5_OK) {
-//     Serial.println("Failed to configure BMA530 low power mode!");
-//   }
+  uint8_t orientation_before_confirm = device_orientation;
+  {
+    uint8_t computed_orientation;
+    if (bma530_read_orientation(&bma530_dev, &computed_orientation) == BMA530_ORIENT_VALID) {
+      device_orientation = computed_orientation;
+      display_set_orientation(device_orientation);
+    }
+  }
 
-//   rslt = bma530_configure_orientation(&bma530_dev);
-//   if (rslt != BMA5_OK) {
-//     Serial.println("Failed to configure BMA530 orientation!");
-//   }
+  if (device_orientation != orientation_before_confirm) {
+    Log_info("Device orientation changed: %d -> %d", orientation_before_confirm, device_orientation);
+    handle_orientation_change_confirmation(&bma530_dev, orientation_before_confirm);
+  }
 
-//   // Configure INT1 pin
-//   rslt = bma530_configure_int1(&bma530_dev);
-//   if (rslt != BMA5_OK) {
-//       Serial.println("Failed to configure BMA530 INT1!");
-//   }
-
-//   config_bma530_interrupt();
-
-//   pinMode(TCA9535_INT, INPUT);
-
-// #endif
+#endif
 
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
   {
@@ -1622,6 +1654,7 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   inputs.chargingStatus = power().chargingStatus();
 
 #ifdef BOARD_TRMNL_X
+  inputs.orientation = bma530_orientation_to_string(device_orientation);
   inputs.batteryCount = battery_count;
   if (lipo._initialized) { // only report SoC if battery was detected and BQ27427 initialized successfully
     inputs.stateOfCharge = lipo.soc();

@@ -65,6 +65,7 @@ struct ApiDisplayInputs {
   float batteryTemperature;
   int stateOfCharge;
   int stateOfHealth;
+  String orientation;
 #endif
   String firmwareVersion;
   String firmwareCommit;

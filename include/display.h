@@ -61,6 +61,13 @@ void display_init(void);
 
 uint8_t tca9535_interrupt_clear();
 void config_bma530_interrupt();
+
+/**
+ * @brief Rotate subsequent drawing to match the device's physical orientation
+ * @param orientation One of PORTRAIT_UP_RIGHT / LANDSCAPE_LEFT / PORTRAIT_UP_DOWN / LANDSCAPE_RIGHT (accelerometer.h)
+ * @return none
+ */
+void display_set_orientation(uint8_t orientation);
 void config_tca95535_pins_for_lp();
 void enter_shipment_sleep();
 void BQ27427_reset();
@@ -175,6 +182,20 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 void display_show_msg_api(uint8_t *image_buffer, String message);
 
 void display_show_msg_qa(uint8_t *image_buffer, const float *voltage, const float *temperature, bool qa_result);
+
+// Number of progress dots shown by display_show_orientation_confirm(), one
+// filling in per second over the orientation-change confirm window.
+#define ORIENTATION_CONFIRM_DOT_COUNT 5
+
+/**
+ * @brief Draw one frame of the "Changing device orientation..." confirmation screen
+ * @param logo_buffer G5-compressed logo image (e.g. storedLogoOrDefault(1))
+ * @param dots_filled Number of progress dots to show filled (0..ORIENTATION_CONFIRM_DOT_COUNT).
+ *                  0 does a full refresh (establishes the base image); any other
+ *                  value does a fast partial refresh.
+ * @return none
+ */
+void display_show_orientation_confirm(uint8_t *logo_buffer, int dots_filled);
 
 /**
  * @brief Enable or disable light sleep at runtime
