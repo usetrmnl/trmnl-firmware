@@ -1846,6 +1846,9 @@ static https_request_err_e downloadAndShow()
           }
           Serial.println();
           String error = "";
+          // Separate from `error`: both switches below always run, so a shared string would let
+          // the bmp one overwrite whatever the png one reported.
+          String png_error = "";
          // uint8_t *imagePointer = buffer;
 //          uint8_t *imagePointer = (decodedPng == nullptr) ? buffer : decodedPng;
         //  bool lastImageExists = filesystem_file_exists("/last.bmp") || filesystem_file_exists("/last.png");
@@ -1870,22 +1873,22 @@ static https_request_err_e downloadAndShow()
           break;
           case PNG_WRONG_FORMAT:
           {
-            error = "Wrong image format. Did not pass signature check";
+            png_error = "Wrong image format. Did not pass signature check";
           }
           break;
           case PNG_BAD_SIZE:
           {
-            error = "IMAGE width, height or size are invalid";
+            png_error = "IMAGE width, height or size are invalid";
           }
           break;
           case PNG_DECODE_ERR:
           {
-            error = "could not decode png image";
+            png_error = "could not decode png image";
           }
           break;
           case PNG_MALLOC_FAILED:
           {
-            error = "could not allocate memory for png image decoder";
+            png_error = "could not allocate memory for png image decoder";
           }
           break;
           default:
@@ -1953,7 +1956,7 @@ static https_request_err_e downloadAndShow()
             char szTemp[36];
             filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
             filesystem_file_delete(szTemp);
-            Log_error_submit("error parsing image file - %s", error.c_str());
+            Log_error_submit("error parsing image file - %s", png_error.c_str());
 
             return HTTPS_WRONG_IMAGE_FORMAT;
           }
