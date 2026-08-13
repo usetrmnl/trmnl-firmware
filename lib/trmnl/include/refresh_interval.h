@@ -13,6 +13,9 @@ public:
   static constexpr const char *STREAK_KEY = "fast_polls";
 
   static constexpr uint32_t DEFAULT_SECONDS = 900;
+  static constexpr uint32_t WIFI_OFFLINE_SECONDS = 3600;
+  static constexpr uint8_t WIFI_SHORT_ATTEMPTS = 3;
+  static constexpr uint8_t WIFI_OFFLINE_HOURS = 168;
 
   explicit RefreshInterval(Persistence &persistence);
 
@@ -32,8 +35,9 @@ public:
 
   // Retry ladders; attempt is 1-based.
   uint32_t applyApiRetry(uint8_t attempt);  // 15 / 30 / 60, then DEFAULT_SECONDS
-  uint32_t applyWifiRetry(uint8_t attempt); // 60 / 180, then 300
-  uint32_t applyDefault();                  // fixed fallback, e.g. /api/setup 404
+  // 60 / 180 / 300, then hourly for a week, then 0 once the device should stop waking on a timer.
+  uint32_t applyWifiRetry(uint8_t attempt);
+  uint32_t applyDefault(); // fixed fallback, e.g. /api/setup 404
 
 private:
   static uint32_t fastPollSeconds(uint32_t streak);

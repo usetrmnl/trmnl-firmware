@@ -373,8 +373,8 @@ wl_status_t waitForConnectResult(uint32_t timeout) {
 
   unsigned long timeoutmillis = millis() + timeout;
   wl_status_t status = WiFi.status();
-  // Neither WiFi.disconnect() nor WiFi.begin() clears the status, so this first read can be the
-  // previous attempt's verdict.
+  // Neither WiFi.disconnect() nor WiFi.begin() clears the status, so this first read can still
+  // belong to the previous attempt.
   bool statusBelongsToThisAttempt = false;
 
   while (millis() < timeoutmillis) {
