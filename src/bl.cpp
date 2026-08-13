@@ -1016,8 +1016,8 @@ void bl_init(void)
   Log_info("BATTERY CHARGING: %s", battery_charging ? "YES" : "NO");
 
   battery().gaugeInit();
-#endif // BOARD_TRMNL_X
-  vBatt = battery().readVoltage(); // Read the battery voltage BEFORE WiFi is turned on
+#endif
+  vBatt = battery().readVoltage(pDevice->battery_pin, pDevice->batt_en_pin); // Read the battery voltage BEFORE WiFi is turned on
 
   Log_info("Firmware version %s", Messages::firmware_version().c_str());
   Log_info("Arduino version %d.%d.%d", ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH);
@@ -2657,8 +2657,8 @@ void goToSleep(void)
 #ifdef BOARD_TRMNL_GEN2
 // Use the ULP of the ESP32-C5 to do interesting things on the ePaper while the main CPU is sleeping
 //  start_ulp_program();
-//  esp_deep_sleep_start();
 #endif // BOARD_TRMNL_GEN2
+  esp_deep_sleep_start();
 }
 
 static void goToSleepButtonOnly(void)
@@ -2746,55 +2746,6 @@ void config_gpio_for_lp() {
   pinMode(GPIO_NUM_2, INPUT); // RTS
 #endif // BOARD_TRMNL_X
 } /* config_gpio_for_lp() */
-
-/**
- * @brief Function to read the battery voltage
- * @param none
- * @return float voltage in Volts
- */
-static float readBatteryVoltage(void)
-{
-#ifdef FAKE_BATTERY_VOLTAGE
-  Log.warning("%s [%d]: FAKE_BATTERY_VOLTAGE is defined. Returning 4.2V.\r\n", __FILE__, __LINE__);
-  return 4.2f;
-#elif defined(BOARD_TRMNL_X)
-  if (lipo._initialized)
-  {
-    float voltage = lipo.voltage() / 1000.0; // Convert mV to V
-    Log.info("%s [%d]: Battery voltage reading from BQ27427: %.3f V\r\n", __FILE__, __LINE__, voltage);
-    return voltage;
-  }
-  else
-  {
-    Log.error("%s [%d]: BQ27427 not initialized. Cannot read battery voltage.\r\n", __FILE__, __LINE__);
-    return -1.0;
-  }
-#else
-  #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002) || defined(BOARD_SEEED_RETERMINAL_E1003)
-    pinMode(PIN_VBAT_SWITCH, OUTPUT);
-    digitalWrite(PIN_VBAT_SWITCH, VBAT_SWITCH_LEVEL);
-    delay(10); // Wait for the switch to stabilize
-  #endif
-    Log.info("%s [%d]: Battery voltage reading...\r\n", __FILE__, __LINE__);
-    int32_t adc;
-    int32_t sensorValue;
-
-    if (pDevice->battery_pin == 0xff) return 4.2f; // fake battery voltage
-
-    adc = 0;
-    analogRead(PIN_BATTERY); // This is needed to properly initialize the ADC BEFORE calling analogReadMilliVolts()
-    for (uint8_t i = 0; i < 8; i++) {
-      adc += analogReadMilliVolts(pDevice->battery_pin);
-    }
-  #if defined(BOARD_XIAO_EPAPER_DISPLAY) || defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_XIAO_EPAPER_DISPLAY_3CLR) || defined(BOARD_SEEED_RETERMINAL_E1003)
-    digitalWrite(PIN_VBAT_SWITCH, (VBAT_SWITCH_LEVEL == HIGH ? LOW : HIGH));
-  #endif
-    sensorValue = (adc / 8) * 2;
-    Log.info("%s [%d]: Battery sensorValue = %d\r\n", __FILE__, __LINE__, (int)sensorValue);
-    float voltage = sensorValue / 1000.0;
-    return voltage;
-#endif // FAKE_BATTERY_VOLTAGE
-}
 
 /**
  * @brief Function to submit a log string to the API

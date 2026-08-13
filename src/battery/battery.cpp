@@ -1,16 +1,10 @@
 #include <battery.h>
 #include <config.h>
 
-#if defined(FAKE_BATTERY_VOLTAGE)
-static FakeBattery batteryInstance;
-#elif defined(BOARD_TRMNL_X)
+#if defined(BOARD_TRMNL_X)
 static BQ27427Battery batteryInstance;
-#elif defined(PIN_VBAT_SWITCH)
-static SeeedBattery batteryInstance(PIN_BATTERY, PIN_VBAT_SWITCH, VBAT_SWITCH_LEVEL);
-#elif defined(PIN_BATTERY)
-static ADCBattery batteryInstance(PIN_BATTERY);
 #else
-static FakeBattery batteryInstance;
+static ADCBattery batteryInstance;
 #endif
 
 #ifdef INCLUDE_BQ27427
