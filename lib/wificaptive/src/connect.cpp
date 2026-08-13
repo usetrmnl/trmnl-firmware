@@ -139,6 +139,33 @@ static void setWiFiBand(const WifiCredentials &credentials) {
 #endif
 }
 
+static wifi_err_reason_t lastDisconnectReason = WIFI_REASON_UNSPECIFIED;
+
+const char *lastWifiFailureDescription() {
+  switch (lastDisconnectReason) {
+  case WIFI_REASON_NO_AP_FOUND:
+    return "WiFi network not found.";
+  case WIFI_REASON_AUTH_FAIL:
+  case WIFI_REASON_AUTH_EXPIRE:
+  case WIFI_REASON_HANDSHAKE_TIMEOUT:
+  case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:
+    return "WiFi password was refused.";
+  case WIFI_REASON_ASSOC_TOOMANY:
+    return "Router has no room for another device.";
+  case WIFI_REASON_ASSOC_FAIL:
+  case WIFI_REASON_NOT_AUTHED:
+  case WIFI_REASON_NOT_ASSOCED:
+    return "Router refused the connection.";
+  case WIFI_REASON_802_1X_AUTH_FAILED:
+    return "Network login was rejected.";
+  case WIFI_REASON_BEACON_TIMEOUT:
+  case WIFI_REASON_CONNECTION_FAIL:
+    return "WiFi signal is too weak.";
+  default:
+    return "Maximum WiFi retries reached.";
+  }
+}
+
 void captureEventData(WiFiEvent_t event, WiFiEventInfo_t info, WifiEventData *eventData) {
   switch (event) {
   case ARDUINO_EVENT_WIFI_STA_GOT_IP:
@@ -153,6 +180,7 @@ void captureEventData(WiFiEvent_t event, WiFiEventInfo_t info, WifiEventData *ev
   case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
     eventData->disconnected = true;
     eventData->disconnectReason = (wifi_err_reason_t)info.wifi_sta_disconnected.reason;
+    lastDisconnectReason = (wifi_err_reason_t)info.wifi_sta_disconnected.reason;
     // ERROR to clear store_submit_threshold; not the _submit variant, this runs in the event handler.
     Log_error("Wifi: Event STA_DISCONNECTED, reason: %s",
               WiFi.disconnectReasonName((wifi_err_reason_t)info.wifi_sta_disconnected.reason));
