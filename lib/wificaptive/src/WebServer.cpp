@@ -43,7 +43,8 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
 
   // Serve index.html
   server.on("/", HTTP_ANY, [&](AsyncWebServerRequest *request) {
-    AsyncWebServerResponse *response = request->beginResponse(200, "text/html; charset=utf-8", INDEX_HTML, INDEX_HTML_LEN);
+    AsyncWebServerResponse *response =
+      request->beginResponse(200, "text/html; charset=utf-8", INDEX_HTML, INDEX_HTML_LEN);
     response->addHeader("Content-Encoding", "gzip");
     request->send(response); // redirect to the local IP URL
   });
@@ -53,9 +54,7 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
     request->send(200);
   });
 
-  server.on("/advanced", HTTP_GET, [&](AsyncWebServerRequest *request) {
-    request->redirect("/#advanced");
-  });
+  server.on("/advanced", HTTP_GET, [&](AsyncWebServerRequest *request) { request->redirect("/#advanced"); });
   server.on("/run-test", HTTP_GET, [](AsyncWebServerRequest *request) {
     Serial.println("Running sensor test from web...");
     String json = testTemperature();
