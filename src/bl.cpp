@@ -1132,6 +1132,13 @@ void bl_init(void)
     }
     if (bBQ27Alive) {
     Log_info("Connected to BQ27427!");
+#ifdef BYPASS_BQ27427_SOC
+    // Charge gauging is bypassed: the IT algorithm's SoC/capacity values are
+    // never used, so skip the golden-file configuration and ITPOR wait. The
+    // chip only supplies direct measurements (voltage, current, temperature).
+    Log_info("BQ27427: charge gauging bypassed (BYPASS_BQ27427_SOC)");
+    lipo._initialized = true;
+#else
     if (lipo.flags() & BQ27427_FLAG_ITPOR) { // it got reset, reload the 'golden file' data
       if (battery_count == BATTERY_ONE) {
         Log_info("One battery detected");
@@ -1161,14 +1168,22 @@ void bl_init(void)
         Log_info("BQ27427: ITPOR cleared — device in NORMAL mode");
         lipo._initialized = true;
     }
-    uint8_t energyScale = lipo.designEnergyScale();
-    unsigned int soc = lipo.soc();                               // State-of-charge (%) — use this for battery level display
+#endif // BYPASS_BQ27427_SOC
     unsigned int volts = lipo.voltage();                         // Battery voltage (mV)
     int current = lipo.current(AVG);                            // Average current (mA)
     float temperature = float((lipo.temperature(BATTERY)) - 2732) / 10.0;         // Temperature (C)
+#ifdef BYPASS_BQ27427_SOC
+    unsigned int soc = batteryVoltageToPercent(volts / 1000.0f); // State-of-charge (%) derived from voltage
+    unsigned int fullCapacity = battery_count * BQ27427_BYPASS_CELL_CAPACITY_MAH;
+    unsigned int capacity = fullCapacity * soc / 100;            // Remaining capacity (mAh) derived from SoC
+    int health = -1;                                             // State-of-health unavailable without gauging
+#else
+    uint8_t energyScale = lipo.designEnergyScale();
+    unsigned int soc = lipo.soc();                               // State-of-charge (%) — use this for battery level display
     unsigned int fullCapacity = lipo.capacity(FULL) * energyScale; // Full capacity (mAh) — valid only in NORMAL mode
     unsigned int capacity = lipo.capacity(REMAIN) * energyScale;   // Remaining capacity (mAh) — valid only in NORMAL mode
     int health = lipo.soh();                                     // State-of-health (%)
+#endif // BYPASS_BQ27427_SOC
 
     // Assemble a string to print
     String toPrint = "[" + String(millis() / 1000) + "] ";
@@ -1667,12 +1682,21 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
 #ifdef BOARD_TRMNL_X
   inputs.batteryCount = battery_count;
   if (lipo._initialized) { // only report SoC if battery was detected and BQ27427 initialized successfully
+#ifdef BYPASS_BQ27427_SOC
+    // Charge gauging bypassed: derive SoC from the reported voltage and use
+    // fixed pack capacities (6000 mAh per cell).
+    inputs.stateOfCharge = batteryVoltageToPercent(vBatt);
+    inputs.stateOfHealth = -1;
+    inputs.maxBatteryCapacity = battery_count * BQ27427_BYPASS_CELL_CAPACITY_MAH;
+    inputs.currentBatteryCapacity = inputs.maxBatteryCapacity * inputs.stateOfCharge / 100;
+#else
     inputs.stateOfCharge = lipo.soc();
     inputs.stateOfHealth = lipo.soh();
-    inputs.batteryCurrent = lipo.current(AVG);
-    inputs.batteryTemperature = float((lipo.temperature(BATTERY)) - 2732) / 10.0; // convert from K to C
     inputs.currentBatteryCapacity = lipo.capacity(REMAIN) * lipo.designEnergyScale();
     inputs.maxBatteryCapacity = lipo.capacity(FULL) * lipo.designEnergyScale();
+#endif // BYPASS_BQ27427_SOC
+    inputs.batteryCurrent = lipo.current(AVG);
+    inputs.batteryTemperature = float((lipo.temperature(BATTERY)) - 2732) / 10.0; // convert from K to C
   }
   else {
     inputs.stateOfCharge = -1;

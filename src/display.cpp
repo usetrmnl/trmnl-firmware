@@ -1768,7 +1768,11 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
                 bbep.loadG5Image(battery_hollow, 40, y, BBEP_WHITE, BBEP_BLACK);
                 Log_info("Displaying 'battery charge level' icon");
                 if (lipo.begin(PIN_INTERNAL_SDA, PIN_INTERNAL_SCL)) { // only report SoC if battery was detected and BQ27427 initialized successfully
+#ifdef BYPASS_BQ27427_SOC
+                    int batt_percent = batteryVoltageToPercent(lipo.voltage() / 1000.0f);
+#else
                     int batt_percent = lipo.soc();
+#endif // BYPASS_BQ27427_SOC
                     if (batt_percent >= 97) batt_percent = 100; // can sometimes report 98% when full
                     // Draw a black rectangle to represent the battery charge level
                     bbep.fillRect(40+10, y+18, (97 * batt_percent)/100, 39, BBEP_BLACK);
