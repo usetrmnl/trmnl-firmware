@@ -183,11 +183,17 @@ void display_init(void)
     iTempProfile = preferences.getUInt(PREFERENCES_TEMP_PROFILE, TEMP_PROFILE_DEFAULT);
     Log_info("Saved temperature profile: %" PRIu32, iTempProfile);
 #ifdef BB_EPAPER
-#ifdef BOARD_SEEED_STICKY
-    pinMode(47, OUTPUT); // enable EPD power
-    digitalWrite(47, 1);
-#endif
     Log_info("BB e-Paper init");
+#ifdef BOARD_SEEED_STICKY
+// Special case for the Sticky - it shares the SPI bus with the uSD card, so the EPD CS line
+// must be the only one active at a time
+    pinMode(8, OUTPUT); // SD card CS (shared SPI with EPD)
+    digitalWrite(8, 1); // SD CS disabled
+    pinMode(47, OUTPUT);
+    digitalWrite(47, 1); // enable EPD power
+    pinMode(10, OUTPUT); // SD card enable (if it's powered down, the SPI bus may be blocked)
+    digitalWrite(10, 1);
+#endif // BOARD_SEEED_STICKY
     if (pDevice->epd_mosi_pin != 0 || pDevice->epd_sck_pin != 0) {
         bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit); // must be set BEFORE calling initio
         bbep.initIO(pDevice->epd_dc_pin, pDevice->epd_rst_pin, pDevice->epd_busy_pin, pDevice->epd_cs_pin,
