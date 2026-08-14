@@ -11,6 +11,7 @@
 #include <api-client/setup.h>
 #include <config.h>  // FW_VERSION_STRING, DEVICE_MODEL
 #include <display.h> // display_width(), display_height()
+#include <refresh_interval.h>
 #include <special_function.h>
 #include <test_helpers.h>
 #include <unity.h>

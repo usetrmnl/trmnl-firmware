@@ -23,7 +23,7 @@ static void test_wifi_connects_with_valid_credentials(void) {
   disconnect_and_settle();
 
   WifiCredentials creds(TEST_WIFI_SSID, TEST_WIFI_PASSWORD);
-  wl_status_t status = WifiCaptivePortal.connect(creds);
+  wl_status_t status = WifiCaptivePortal.connect(creds).status;
 
   TEST_ASSERT_EQUAL_MESSAGE(WL_CONNECTED, status, "Expected WL_CONNECTED after connect() with valid credentials");
   TEST_ASSERT_TRUE_MESSAGE(WiFi.isConnected(), "WiFi.isConnected() should be true after a successful connect()");
@@ -33,7 +33,7 @@ static void test_wifi_fails_with_wrong_password(void) {
   disconnect_and_settle();
 
   WifiCredentials creds(TEST_WIFI_SSID, "definitely-not-the-real-password");
-  wl_status_t status = WifiCaptivePortal.connect(creds);
+  wl_status_t status = WifiCaptivePortal.connect(creds).status;
 
   TEST_ASSERT_NOT_EQUAL_MESSAGE(WL_CONNECTED, status, "connect() should not return WL_CONNECTED with a wrong password");
   TEST_ASSERT_FALSE_MESSAGE(WiFi.isConnected(), "WiFi.isConnected() should be false after a failed connect()");
@@ -43,7 +43,7 @@ static void test_wifi_fails_with_wrong_ssid(void) {
   disconnect_and_settle();
 
   WifiCredentials creds("definitely-not-the-real-ssid", "definitely-not-the-real-password");
-  wl_status_t status = WifiCaptivePortal.connect(creds);
+  wl_status_t status = WifiCaptivePortal.connect(creds).status;
 
   TEST_ASSERT_NOT_EQUAL_MESSAGE(WL_CONNECTED, status, "connect() should not return WL_CONNECTED with a wrong SSID");
   TEST_ASSERT_FALSE_MESSAGE(WiFi.isConnected(), "WiFi.isConnected() should be false after a failed connect()");
