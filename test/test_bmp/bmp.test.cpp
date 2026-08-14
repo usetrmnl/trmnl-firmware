@@ -92,6 +92,44 @@ void test_parseBMPHeader_BMP_INVALID_OFFSET(void) {
   TEST_ASSERT_EQUAL(BMP_INVALID_OFFSET, parseBMPHeader(bmp_data.data(), image_reverse));
 }
 
+void test_bmpIsTruncated_whole_file(void) {
+  auto bmp_data = readBMPFile("./test.bmp");
+
+  TEST_ASSERT_FALSE(bmpIsTruncated(bmp_data.data(), bmp_data.size()));
+}
+
+void test_bmpIsTruncated_short_of_declared_length(void) {
+  auto bmp_data = readBMPFile("./test.bmp");
+
+  TEST_ASSERT_TRUE(bmpIsTruncated(bmp_data.data(), bmp_data.size() - 1));
+}
+
+// A partial write that stopped on a 4096-byte chunk boundary, which is how the filesystem cuts them.
+void test_bmpIsTruncated_first_chunk_only(void) {
+  auto bmp_data = readBMPFile("./test.bmp");
+
+  TEST_ASSERT_TRUE(bmpIsTruncated(bmp_data.data(), 4096));
+}
+
+void test_bmpIsTruncated_too_short_to_carry_its_length(void) {
+  uint8_t stub[4] = {'B', 'M', 0x00, 0x00};
+
+  TEST_ASSERT_TRUE(bmpIsTruncated(stub, sizeof(stub)));
+}
+
+// PNG and JPEG caches go through the same guard, and nothing in them declares a length.
+void test_bmpIsTruncated_ignores_other_formats(void) {
+  uint8_t png[8] = {0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
+
+  TEST_ASSERT_FALSE(bmpIsTruncated(png, sizeof(png)));
+}
+
+void test_bmpIsTruncated_accepts_a_zero_declared_length(void) {
+  uint8_t headerless[6] = {'B', 'M', 0x00, 0x00, 0x00, 0x00};
+
+  TEST_ASSERT_FALSE(bmpIsTruncated(headerless, sizeof(headerless)));
+}
+
 void setUp(void) {
   // set stuff up here
 }
@@ -108,6 +146,12 @@ void process() {
   RUN_TEST(test_parseBMPHeader_BMP_BAD_SIZE);
   RUN_TEST(test_parseBMPHeader_BMP_COLOR_SCHEME_FAILED);
   RUN_TEST(test_parseBMPHeader_BMP_INVALID_OFFSET);
+  RUN_TEST(test_bmpIsTruncated_whole_file);
+  RUN_TEST(test_bmpIsTruncated_short_of_declared_length);
+  RUN_TEST(test_bmpIsTruncated_first_chunk_only);
+  RUN_TEST(test_bmpIsTruncated_too_short_to_carry_its_length);
+  RUN_TEST(test_bmpIsTruncated_ignores_other_formats);
+  RUN_TEST(test_bmpIsTruncated_accepts_a_zero_declared_length);
   UNITY_END();
 }
 

@@ -9,3 +9,5 @@ enum bmp_err_e {
 };
 
 bmp_err_e parseBMPHeader(uint8_t *data, bool &reserved);
+
+bool bmpIsTruncated(const uint8_t *data, uint32_t length);

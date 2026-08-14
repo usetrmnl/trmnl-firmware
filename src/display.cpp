@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <bmp.h>
 #include <display.h>
 #include <power.h>
 #include <PNGdec.h>
@@ -1921,6 +1922,12 @@ uint8_t *buffer;
   }
   f.read(buffer, *file_size);
   f.close();
+  if (bmpIsTruncated(buffer, *file_size)) {
+    Serial.println("File lost bytes on the way to flash!");
+    free(buffer);
+    *file_size = 0;
+    return nullptr;
+  }
   return buffer;
 } /* display_read_file() */
 

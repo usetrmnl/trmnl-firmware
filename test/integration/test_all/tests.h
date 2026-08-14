@@ -5,6 +5,7 @@
 // runs them all. all.test.cpp drives the suite by calling these in order
 // between UNITY_BEGIN() and UNITY_END().
 
+void test_filesystem(void);  // filesystem_tests.cpp
 void test_smoke(void);       // smoke_tests.cpp
 void test_wifi(void);        // wifi_tests.cpp
 void test_api_setup(void);   // api_setup_tests.cpp

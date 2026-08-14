@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <bmp.h>
 #include <filesystem.h>
 #include <inttypes.h>
 #include <trmnl_log.h>
@@ -65,8 +66,13 @@ size_t filesystem_read_and_allocate(const char *name, uint8_t **out_buffer) {
         return 0;
       }
       file.readBytes((char *)buffer, size);
-      *out_buffer = buffer;
       file.close();
+      if (bmpIsTruncated(buffer, size)) {
+        Log_error("File %s lost bytes on the way to flash", name);
+        free(buffer);
+        return 0;
+      }
+      *out_buffer = buffer;
       return size;
     } else {
       Log_error("File %s open error", name);
@@ -111,7 +117,7 @@ void filesystem_purge_old_file(const char *name) {
   uint32_t timestamp;
   time_t now;
   File rootDir;
-  char *s, szTemp[32];
+  char *s, szTemp[36];
   bool bDel;
 
   time(&now); // get the current epoch time
@@ -130,8 +136,7 @@ void filesystem_purge_old_file(const char *name) {
     timestamp = filesystem_extract_timestamp(s);
     bDel = false;
 
-    strcpy(szTemp, "/"); // needed on this file operation
-    strcat(szTemp, file.name());
+    snprintf(szTemp, sizeof(szTemp), "/%s", file.name()); // needed on this file operation
 
     Log_info("Comparing name %s with %s, timestamp %" PRIu32 ", current time %" PRIu32, name, file.name(), timestamp,
              (uint32_t)now);
@@ -153,6 +158,64 @@ void filesystem_purge_old_file(const char *name) {
 } /* filesystem_purge_old_file() */
 
 /**
+ * @brief Function to delete the oldest cached image
+ *        Images with no timestamp are the setup logo and the last displayed image, the only
+ *        picture a device has when it cannot reach the API, so they are left alone.
+ * @param none
+ * @return true if an image was deleted; false if there was nothing we are willing to delete
+ */
+static bool filesystem_evict_oldest_image(void) {
+  char oldest[36] = "";
+  uint32_t oldestTimestamp = 0;
+
+  File rootDir = FS.open("/");
+  while (File file = rootDir.openNextFile()) {
+    uint32_t timestamp = filesystem_extract_timestamp(file.name());
+    if (!file.isDirectory() && timestamp != 0 && (oldest[0] == '\0' || timestamp < oldestTimestamp)) {
+      oldestTimestamp = timestamp;
+      snprintf(oldest, sizeof(oldest), "/%s", file.name());
+    }
+    file.close();
+  }
+  rootDir.close();
+
+  if (oldest[0] == '\0') {
+    Log_info("Nothing left to evict");
+    return false;
+  }
+
+  Log_info("Evicting %s", oldest);
+  return FS.remove(oldest);
+} /* filesystem_evict_oldest_image() */
+
+/**
+ * @brief Function to write a buffer to a file in chunks, without any recovery
+ * @param name filename
+ * @param in_buffer pointer to input buffer
+ * @param size size of the input buffer
+ * @return size of written bytes, less than size if the filesystem ran out of room
+ */
+static size_t filesystem_write_chunks(const char *name, uint8_t *in_buffer, size_t size) {
+  File file = FS.open(name, FILE_WRITE, true);
+  if (!file) {
+    Log_error("File open ERROR");
+    return 0;
+  }
+
+  size_t bytesWritten = 0;
+  while (bytesWritten < size) {
+    size_t chunkSize = _min(4096, size - bytesWritten);
+    if (file.write(in_buffer + bytesWritten, chunkSize) != chunkSize) {
+      break;
+    }
+    bytesWritten += chunkSize;
+  }
+
+  file.close();
+  return bytesWritten;
+} /* filesystem_write_chunks() */
+
+/**
  * @brief Function to write data to file
  * @param name filename
  * @param in_buffer pointer to input buffer
@@ -172,35 +235,27 @@ size_t filesystem_write_to_file(const char *name, uint8_t *in_buffer, size_t siz
     Log_info("file %s doesn't exist.", name);
   }
 //    delay(100);
-  File file = FS.open(name, FILE_WRITE, true);
-  if (file) {
-        // Write the buffer in chunks
-    size_t bytesWritten = 0;
-    while (bytesWritten < size) {
-
-      size_t diff = size - bytesWritten;
-      size_t chunkSize = _min(4096, diff);
-      uint16_t res = file.write(in_buffer + bytesWritten, chunkSize);
-      if (res != chunkSize) {
-        file.close();
-
-        Log_info("Erasing FS...");
-        if (FS.format()) {
-          Log_info("FS erased successfully.");
-        } else {
-          Log_error("Error erasing FS.");
-        }
-
-        return bytesWritten;
-      }
-      bytesWritten += chunkSize;
+  // SPIFFS hands out well under what it reports free, by an amount that moves with fragmentation
+  // (measured on an OG: a 12K write refused with 22K free), so make room by trying rather than by
+  // predicting. Formatting stays as the last resort, once there is nothing left to evict.
+  for (;;) {
+    size_t bytesWritten = filesystem_write_chunks(name, in_buffer, size);
+    if (bytesWritten == size) {
+      Log_info("file %s writing success - %d bytes", name, bytesWritten);
+      return bytesWritten;
     }
-    Log_info("file %s writing success - %d bytes", name, bytesWritten);
-    file.close();
-    return bytesWritten;
-  } else {
-    Log_error("File open ERROR");
-    return 0;
+
+    FS.remove(name); // the partial file is dead weight, and its space is worth reclaiming
+
+    if (!filesystem_evict_oldest_image()) {
+      Log_info("Erasing FS...");
+      if (FS.format()) {
+        Log_info("FS erased successfully.");
+      } else {
+        Log_error("Error erasing FS.");
+      }
+      return bytesWritten;
+    }
   }
 }
 
@@ -310,7 +365,7 @@ void filesystem_fix_filename(const char *src, char *dest) {
     strcpy(&dest[8],
            &src[iLen - 17]); // get the prefix name and unique id plus timestamp (e.g. mashup-066cc3-1771674964)
   } else {
-    strncpy(&dest[1], src, 31); // use it as-is
+    strcpy(&dest[1], src); // use it as-is; strncpy left a 31 character name unterminated
   }
 } /* filesystem_fix_filename() */
 

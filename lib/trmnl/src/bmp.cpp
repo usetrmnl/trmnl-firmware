@@ -3,6 +3,25 @@
 #include <trmnl_log.h>
 
 /**
+ * @brief Function to tell a whole BMP from one the filesystem cut short
+ *        A BMP carries its own byte count at offset 2, so a file shorter than that count lost
+ *        bytes on the way to flash and decodes as half a picture.
+ * @param data pointer to the buffer
+ * @param length bytes actually in the buffer
+ * @return true if the buffer is a BMP that is missing bytes; false for anything we cannot tell
+ */
+bool bmpIsTruncated(const uint8_t *data, uint32_t length) {
+  if (length < 2 || data[0] != 'B' || data[1] != 'M') return false; // not a BMP, so not ours to judge
+
+  if (length < 6) return true; // too short to even carry its own byte count
+
+  uint32_t declaredLength =
+    (uint32_t)data[2] | ((uint32_t)data[3] << 8) | ((uint32_t)data[4] << 16) | ((uint32_t)data[5] << 24);
+
+  return declaredLength > length;
+}
+
+/**
  * @brief Function to parse .bmp file header
  * @param data pointer to the buffer
  * @param reserved variable address to store parsed color schematic
