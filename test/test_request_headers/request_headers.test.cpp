@@ -121,6 +121,20 @@ void test_display_headers_image_cached_reflects_input(void) {
   TEST_ASSERT_EQUAL_STRING("true", valueOf(headers, "Image-Cached").c_str());
 }
 
+void test_display_headers_refresh_current_omitted_by_default(void) {
+  auto inputs = makeDisplayInputs();
+  auto headers = buildDisplayHeaders(inputs);
+  TEST_ASSERT_FALSE(has(headers, "Refresh-Current"));
+}
+
+void test_display_headers_refresh_current_present_when_set(void) {
+  auto inputs = makeDisplayInputs();
+  inputs.forceRefreshCurrent = true;
+  auto headers = buildDisplayHeaders(inputs);
+  TEST_ASSERT_TRUE(has(headers, "Refresh-Current"));
+  TEST_ASSERT_EQUAL_STRING("true", valueOf(headers, "Refresh-Current").c_str());
+}
+
 void test_display_headers_special_function_omitted_when_none(void) {
   auto inputs = makeDisplayInputs();
   inputs.specialFunction = SF_NONE;
@@ -213,6 +227,8 @@ void process() {
   RUN_TEST(test_display_headers_core_values);
   RUN_TEST(test_display_headers_include_update_source_and_temperature_profile);
   RUN_TEST(test_display_headers_image_cached_reflects_input);
+  RUN_TEST(test_display_headers_refresh_current_omitted_by_default);
+  RUN_TEST(test_display_headers_refresh_current_present_when_set);
   RUN_TEST(test_display_headers_special_function_omitted_when_none);
   RUN_TEST(test_display_headers_special_function_present_when_set);
   RUN_TEST(test_display_headers_wifi_band_2_4);

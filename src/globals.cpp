@@ -40,6 +40,9 @@ uint32_t iTempProfile;
 
 #ifdef BOARD_TRMNL_X
 // --- TRMNL X hardware ---
+// Set by the centre-tap gesture during process_iqs323_data(); read when the
+// /api/display request is built. Per-boot only — deep sleep resets it.
+bool force_refresh_current = false;
 // Set once during bl_init, used by download helpers and getWiFiStatus()
 Modem *g_modem = nullptr;
 battery_count_t battery_count = BATTERY_NONE;

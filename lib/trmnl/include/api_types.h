@@ -77,6 +77,10 @@ struct ApiDisplayInputs {
   UsbStatus usbStatus;
   bool imageCached;
   int prevWakeTime;
+  // Centre-tap touch refresh: ask the server to re-render the current
+  // playlist item instead of advancing. Sent as the Refresh-Current header;
+  // servers that don't know it simply ignore it.
+  bool forceRefreshCurrent = false;
 };
 
 struct ApiLogInputs {

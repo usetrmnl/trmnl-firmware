@@ -546,6 +546,11 @@ void check_channel_states(void)
             pending_indicator_side = TOUCHBAR_MIDDLE;
             pending_indicator_filled = false;
             has_pending_indicator = true;
+            // Centre tap = refresh the current page: fall through to the
+            // normal network poll, but mark it so the request carries
+            // Refresh-Current and the current image survives a WiFi failure.
+            force_refresh_current = true;
+            Log_info("FORCE_REFRESH_CURRENT requested by centre tap");
           }
           break;
         case 2:
@@ -578,6 +583,11 @@ void check_channel_states(void)
           case 1:
             display_draw_touchbar_indicator(TOUCHBAR_MIDDLE, slider_event == IQS323_GESTURE_HOLD);
             Log_info("Middle button pressed");
+            if (slider_event == IQS323_GESTURE_TAP) {
+              // Slide mode: a tap on the middle channel = refresh current page
+              force_refresh_current = true;
+              Log_info("FORCE_REFRESH_CURRENT requested by centre tap (slide mode)");
+            }
             // if (otg_state) {
             //   otg_turn_off();
             //   showMessageWithLogo(OTG_TURNED_OFF); otg_state = false;
@@ -976,7 +986,13 @@ void bl_init(void)
 
 #ifdef BOARD_TRMNL_X
 
-    if (!otg_message && WifiCaptivePortal.isSaved()) {
+    if (force_refresh_current) {
+      // Touch refresh: keep the current page on screen while fetching.
+      // DisplayedImage::clear() below still guarantees the fetched image
+      // repaints even if the server returns the same filename.
+      Log_info("Touch refresh: keeping current page, skipping logo screen");
+    }
+    else if (!otg_message && WifiCaptivePortal.isSaved()) {
       display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false, true);
       if (has_pending_indicator) {
         display_draw_touchbar_indicator(pending_indicator_side, pending_indicator_filled);
@@ -1104,6 +1120,16 @@ void bl_init(void)
     }
     else
     {
+#ifdef BOARD_TRMNL_X
+      if (force_refresh_current)
+      {
+        // A refresh gesture with no WiFi must not replace the page the user
+        // was looking at with an error screen: repaint the cached current
+        // image and go back to sleep on the normal schedule.
+        Log_info("Touch refresh: WiFi unavailable - keeping current page");
+        showLastImageAndSleep(); // never returns
+      }
+#endif
       if (current_msg != WIFI_FAILED)
       {
         showMessageWithLogo(WIFI_FAILED);
@@ -1417,6 +1443,14 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   {
     inputs.updateSource = "unknown";
   }
+
+#ifdef BOARD_TRMNL_X
+  if (force_refresh_current)
+  {
+    inputs.forceRefreshCurrent = true;
+    inputs.updateSource = "touch-refresh";
+  }
+#endif
 
   if (preferences.isKey(PREFERENCES_API_KEY))
   {

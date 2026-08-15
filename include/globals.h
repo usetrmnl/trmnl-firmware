@@ -59,6 +59,7 @@ extern uint32_t iTempProfile;
 
 #ifdef BOARD_TRMNL_X
 // --- TRMNL X hardware ---
+extern bool force_refresh_current; // centre tap: re-fetch the current page this wake
 extern Modem *g_modem;
 extern battery_count_t battery_count;
 extern bool battery_charging;
