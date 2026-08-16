@@ -4,6 +4,7 @@
 #include <bl.h>
 #include <wifi_network.h>
 #include <power.h>
+#include <config.h>
 #include <battery.h>
 #include <device_id.h>
 #include <trmnl_log.h>
@@ -11,7 +12,6 @@
 #include <ArduinoLog.h>
 #include <WifiCaptive.h>
 #include <pins.h>
-#include <config.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <display.h>
@@ -105,9 +105,9 @@ static unsigned long startup_time = 0;
 // Create stub functions for the touchbar workaround
 void iqs323_task_i2c_lock(void) {}
 void iqs323_task_i2c_unlock(void) {}
+#endif // !BOARD_TRMNL_X
 void hw_config_init(void);
 extern TRMNL_DEVICE *pDevice;
-#endif // !BOARD_TRMNL_X
 
 void wait_for_serial() {
 #ifdef WAIT_FOR_SERIAL
@@ -760,9 +760,8 @@ void bl_init(void)
     bModemNeeded = true; // captive portal needs modem for 5 GHz
   }
   Log.info("%s [%d]: modem needed = %d\n\r", __FILE__, __LINE__, bModemNeeded);
-#else
-  hw_config_init();
 #endif // X
+  hw_config_init();
   pins_init();
   buzzer().init();
   sensor().init();
@@ -1017,7 +1016,7 @@ void bl_init(void)
 
   battery().gaugeInit();
 #endif
-  vBatt = battery().readVoltage(pDevice->battery_pin, pDevice->batt_en_pin); // Read the battery voltage BEFORE WiFi is turned on
+  vBatt = battery().readVoltage(pDevice); // Read the battery voltage BEFORE WiFi is turned on
 
   Log_info("Firmware version %s", Messages::firmware_version().c_str());
   Log_info("Arduino version %d.%d.%d", ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH);
@@ -1548,7 +1547,7 @@ static https_request_err_e downloadAndShow()
 
   if (!status && result == HTTPS_SUCCESS) { // this means we already have this image stored in SPIFFS
       char szTemp[36];
-#if BOARD_X_CLASS && !defined(BOARD_SEEED_RETERMINAL_E1003)
+#if PARALLEL_EPD && !defined(BOARD_SEEED_RETERMINAL_E1003)
       if (DisplayedImage::exists()) {
         load_prev_image(); // decode the older image into the previous buffer of FastEPD
       }
@@ -2587,7 +2586,7 @@ void goToSleep(void)
   submitStoredLogs();
 
 // DEBUG - workaround to prevent crash in the WiFi stack of unknown origin
-#ifndef BOARD_X_CLASS
+#ifndef PARALLEL_EPD
   if (WiFi.status() == WL_CONNECTED) {
     WiFi.disconnect();
   }
@@ -2918,7 +2917,7 @@ static uint8_t *storedLogoOrDefault(int iType)
       }
    }
   }
-#ifdef BOARD_X_CLASS
+#ifdef PARALLEL_EPD
     return const_cast<uint8_t *>(logo_medium);
 #else
   if (iType == 0) {

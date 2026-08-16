@@ -70,31 +70,14 @@
 // TCA9535 expander pins for the BQ25616 charger (open-drain, LOW = active)
 #define TCA9535_PG_PIN     0 // P0_0 — LOW = VBUS OK
 #define TCA9535_STAT_PIN   2 // P0_2 — LOW = charging in progress
-#define DEVICE_MODEL       "x"
 #elif defined(BOARD_TRMNL_X_EPDIY)
 #define PIN_INTERRUPT 0
 #define DEVICE_MODEL  "x"
-#elif defined(BOARD_TRMNL_X_SENSORIAC5)
-#define PIN_INTERRUPT 0
-#define DEVICE_MODEL  "sensoria_c5"
-#define SENSOR_SDA    7
-#define SENSOR_SCL    6
 #elif defined(BOARD_TRMNL_X_SENSORIAS3)
 #define PIN_INTERRUPT 0
 #define DEVICE_MODEL  "sensoria_s3"
 #define SENSOR_SDA    39
 #define SENSOR_SCL    40
-#elif defined(BOARD_TRMNL_X_LILYGO)
-// touch interrupt
-#define PIN_INTERRUPT 0
-// to-do: this has a BQ27220 power management chip that can read the battery voltage
-#define FAKE_BATTERY_VOLTAGE
-#define DEVICE_MODEL "lilygo"
-#elif defined(BOARD_TRMNL_X_PAPERS3)
-// touch interrupt
-#define PIN_INTERRUPT 0
-#define FAKE_BATTERY_VOLTAGE
-#define DEVICE_MODEL "paper_s3"
 #elif defined(BOARD_ESP32_C5_DEVKITC_1)
 #define PIN_INTERRUPT 28
 #define DEVICE_MODEL  "gen-2"
@@ -117,7 +100,7 @@
 #endif
 
 // DHCP hostname prefix (hyphens instead of spaces).
-#if defined(BOARD_X_CLASS)
+#if defined(PARALLEL_EPD)
 #define WIFI_CLIENT_HOSTNAME_PREFIX "TRMNL-X"
 #elif defined(BOARD_TRMNL) || defined(BOARD_TRMNL_GEN2)
 #define WIFI_CLIENT_HOSTNAME_PREFIX "TRMNL-OG"
@@ -149,6 +132,30 @@
 // Abort an image download when the stream goes this long with no data.
 #define IMAGE_STREAM_INACTIVITY_TIMEOUT_MS 15000
 
+// Battery measurement types
+// BATT_NONE = use fake voltage
+enum {
+  BATT_NONE = 0,
+  BATT_ADC,
+  BATT_BQ27220,
+  BATT_BQ27427
+};
+
+#ifdef PARALLEL_EPD
+// TRMNL Device structure (slightly different for parallel eink panels)
+typedef struct tag_trmnl_device
+{
+   const char *device_name;
+   int iBoardType;
+   int iPanelSize; // set to 0 if the board type already includes the panel type (e.g. M5 PaperS3)
+   uint8_t sensor_sda;
+   uint8_t sensor_scl;
+   uint8_t interrupt_pin;
+   uint8_t batt_pin;
+   uint8_t batt_en_pin;
+   uint8_t batt_type; // ADC, BQxxx
+} TRMNL_DEVICE;
+#else 
 // TRMNL Device structure - defines the GPIO connections for the display, button and battery
 // Only needed on "OG" class devices with SPI ePaper displays
 typedef struct tag_trmnl_device
@@ -163,10 +170,12 @@ typedef struct tag_trmnl_device
    uint8_t sensor_sda;
    uint8_t sensor_scl;
    uint8_t interrupt_pin;
-   uint8_t battery_pin;
+   uint8_t batt_pin;
    uint8_t batt_en_pin;
+   uint8_t batt_type; // ADC, BQ27xx
    uint8_t panel_set;
 } TRMNL_DEVICE;
+#endif // PARALLEL_EPD
 
 // This enum defines sets of display configurations for different SPI panel types
 // These sets are what define the temperature profile - 3 per size (default, A, B)

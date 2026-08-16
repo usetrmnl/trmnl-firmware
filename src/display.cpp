@@ -11,7 +11,11 @@
 #include "messages.h"
 #include "config.h"
 #define MAX_BIT_DEPTH 8
-#ifndef BOARD_X_CLASS
+TRMNL_DEVICE *pDevice = NULL;
+#ifdef PARALLEL_EPD
+#include "FastEPD.h"
+FASTEPD bbep;
+#else
 #define BB_EPAPER
 #include <bb_epaper.h>
 BBEPAPER bbep;
@@ -20,37 +24,50 @@ BBEPAPER bbep;
 #endif // DEVICE_MODEL
 #include <SPIFFS.h>
 #define FS SPIFFS
+#endif // !PARALLEL_EPD
 
 // List of supported TRMNL devices with SPI ePaper displays. The list can be in any order since the name is matched
 // The final parameter is the panel type which is from an enumerated list
+#ifdef PARALLEL_EPD
 const TRMNL_DEVICE device_list[] = 
 {
-// name            sck   mosi   cs   rst   dc   busy  sda   scl   intr   batt  batt_en, panel
-  "og",            7,    8,     6,   10,   5,   4,    21,   20,   2,     3,    0xff,    EPD_75,
-  "og_4clr",       7,    8,     6,   10,   5,   4,    21,   20,   2,     3,    0xff,    EPD_75_4CLR,
-  "og_gen2",       6,    1,     4,   2,    5,   0,    11,   12,   3,     0xff, 0xff,    EPD_75, // fake battery == 0xff
-  "og_gen2_4clr",  6,    1,     4,   2,    5,   0,    11,   12,   3,     0xff, 0xff,    EPD_75_4CLR, // fake battery == 0xff
-  "xteink_x4",     8,    10,    21,  5,    4,   6,    0xff, 0xff, 3,     0xff, 0xff,    EPD_426,
-  "waveshare",     13,   14,    15,  26,   27,  25,   0xff, 0xff, 33,    0xff, 0xff,    EPD_75,
-  "waveshare_397", 11,   12,    10,  46,   9,   3,    41,   42,   0,     0xff, 0xff,    EPD_397,
-  "seeed_sticky",  13,   14,    15,  17,   16,  18,   0xff, 0xff, 4,     0xff, 0xff,    EPD_397,  
-  "seeed_esp32c3", 8,    10,    3,   2,    5,   4,    0xff, 0xff, 9,     0xff, 0xff,    EPD_75,
-  "seeed_esp32s3", 7,    9,     2,   1,    4,   3,    0xff, 0xff, 0,     0xff, 0xff,    EPD_75,
-  "xiao_epaper_mini", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 2,     1,    6,       EPD_426,
-  "xiao_epaper_display", 7, 9,  44,  38,   10,  4,    0xff, 0xff, 5,     1,    6,       EPD_75,
-  "xiao_epaper_3clr", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 5,     1,    6,       EPD_75_3CLR,
-  "reterminal_e1001", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     1,    21,      EPD_75,
-  "reterminal_e1002", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     1,    21,      EPD_75_6CLR,
-  "crowpanel42",   0,    0,     0,   0,    0,   0,    0xff, 0xff, 2,     0xff, 0xff,    EPD_CROWPANEL, 
+// name           board_name            panel_type.            sda    scl    intr   batt  batt_en batt_type
+  "x",            BB_PANEL_TRMNL_X,     BB_PANEL_NONE,         0xff,  0xff,  0xff,  0xff, 0xff,   BATT_ADC,
+  "m5_papers3",   BB_PANEL_M5PAPERS3,   BB_PANEL_NONE,         0xff,  0xff,  0xff,  3,    0xff,   BATT_ADC,
+  "sensoria_c5",  BB_PANEL_SENSORIA_C5, BB_PANEL_NONE,         7,     6,     0,     0xff, 0xff,   BATT_ADC,
+  "lilygo_t5pro", BB_PANEL_EPDIY_V7,    BBEP_DISPLAY_ED047TC1, 39,    40,    0,     0xff, 0xff,   BATT_BQ27220,
+  NULL, 0, 0, 0, 0, 0, 0, 0, 0,
+}; // Parallel Eink device list
+
+#else // BB_EPAPER boards
+const TRMNL_DEVICE device_list[] = 
+{
+// name            sck   mosi   cs   rst   dc   busy  sda   scl   intr   batt  batt_en, batt_type, panel
+  "og",            7,    8,     6,   10,   5,   4,    21,   20,   2,     3,    0xff,    BATT_ADC,  EPD_75,
+  "og_4clr",       7,    8,     6,   10,   5,   4,    21,   20,   2,     3,    0xff,    BATT_ADC,  EPD_75_4CLR,
+  "og_gen2",       6,    1,     4,   2,    5,   0,    11,   12,   3,     0xff, 0xff,    BATT_BQ27427,  EPD_75, // fake battery == 0xff
+  "og_gen2_4clr",  6,    1,     4,   2,    5,   0,    11,   12,   3,     0xff, 0xff,    BATT_BQ27427,  EPD_75_4CLR, // fake battery == 0xff
+  "xteink_x4",     8,    10,    21,  5,    4,   6,    0xff, 0xff, 3,     0xff, 0xff,    BATT_ADC,  EPD_426,
+  "waveshare",     13,   14,    15,  26,   27,  25,   0xff, 0xff, 33,    0xff, 0xff,    BATT_ADC,  EPD_75,
+  "waveshare_397", 11,   12,    10,  46,   9,   3,    41,   42,   0,     0xff, 0xff,    BATT_ADC,  EPD_397,
+  "seeed_sticky",  13,   14,    15,  17,   16,  18,   1,    0,    4,     0xff, 0xff,    BATT_BQ27220,  EPD_397,  
+  "seeed_esp32c3", 8,    10,    3,   2,    5,   4,    0xff, 0xff, 9,     0xff, 0xff,    BATT_ADC,  EPD_75,
+  "seeed_esp32s3", 7,    9,     2,   1,    4,   3,    0xff, 0xff, 0,     0xff, 0xff,    BATT_ADC,  EPD_75,
+  "xiao_epaper_mini", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 2,     1,    6,       BATT_ADC,  EPD_426,
+  "xiao_epaper_display", 7, 9,  44,  38,   10,  4,    0xff, 0xff, 5,     1,    6,       BATT_ADC,  EPD_75,
+  "xiao_epaper_3clr", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 5,     1,    6,       BATT_ADC,  EPD_75_3CLR,
+  "reterminal_e1001", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     1,    21,      BATT_ADC,  EPD_75,
+  "reterminal_e1002", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     1,    21,      BATT_ADC,  EPD_75_6CLR,
+  "crowpanel42",   0,    0,     0,   0,    0,   0,    0xff, 0xff, 2,     0xff, 0xff,    BATT_ADC,  EPD_CROWPANEL, 
 #ifdef CMD_CS1_CS2
-  "m5_paper_mono", 0,    0,     0,   0,    0,   0,    0xff, 0xff, 2,     0xff, 0xff,    EPD_PAPER_MONO, 
-  "m5_paper_color", 0,   0,     0,   0,    0,   0,    0xff, 0xff, 2,     0xff, 0xff,    EPD_PAPER_COLOR, 
-  "reterminal_e1004", 0, 0,     0,   0,    0,   0,    0xff, 0xff, 4,     1,    21,      EPD_133_COLOR,
-  "trmnl_steam",   7,    8,     6,   10,   5,   4,    21,   20,   2,     3,    0xff,    EPD_583,
+  "m5_paper_mono", 0,    0,     0,   0,    0,   0,    47,   48,   2,     0xff, 0xff,    BATT_NONE, EPD_PAPER_MONO, 
+  "m5_paper_color", 0,   0,     0,   0,    0,   0,    3,    2,    1,     0xff, 0xff,    BATT_NONE, EPD_PAPER_COLOR, 
+  "reterminal_e1004", 0, 0,     0,   0,    0,   0,    0xff, 0xff, 4,     1,    21,      BATT_ADC,  EPD_133_COLOR,
+  "trmnl_steam",   7,    8,     6,   10,   5,   4,    21,   20,   2,     3,    0xff,    BATT_ADC,  EPD_583,
 #endif
-  NULL,            0,    0,     0,   0,    0,   0,    0,    0,    0,     0,    0,       0
+  NULL,            0,    0,     0,   0,    0,   0,    0,    0,    0,     0,    0,       0,         0,
 }; // device_list
-TRMNL_DEVICE *pDevice = NULL;
+
 // TRMNL SPI ePaper panel types list. The list order is fixed and based on enumerated values
 // N.B. ALWAYS ADD NEW PANELS TO THE END OF THE LIST
 const DISPLAY_PROFILE dpList[11][3] = { // 1-bit and 2-bit display types for each profile
@@ -69,8 +86,9 @@ const DISPLAY_PROFILE dpList[11][3] = { // 1-bit and 2-bit display types for eac
 #endif
 };
 uint8_t u8SpectraPal[512]; // RGB333 mapped to closest Spectra6 color
+#endif // !PARALLEL_EPD
 
-#else // BOARD_X_CLASS
+#ifdef PARALLEL_EPD
 #include "esp_sleep.h"
 #include "driver/gpio.h"
 #include "driver/rtc_io.h"
@@ -78,8 +96,6 @@ uint8_t u8SpectraPal[512]; // RGB333 mapped to closest Spectra6 color
 #define FS LittleFS
 // Image size comparison for determining photos vs 'chart graphics'
 #define FASTEPD_LARGE_IMAGE_THRESHOLD (100 * 1024)
-#include "FastEPD.h"
-FASTEPD bbep;
 // 9-step table for fast grays
 const uint8_t u8_graytable[] = {
 /* 0 */  0, 0, 0, 0, 0, 0, 1, 1, 1, 
@@ -155,6 +171,7 @@ static bool display_update_epaper(int refreshMode, bool wait, bool writePlane = 
     bCanDoPartial = (bbep.getPanelType() == dpList[pDevice->panel_set][iTempProfile].OneBit);
     return true;
 }
+#endif
 
 void hw_config_init(void)
 {
@@ -170,7 +187,6 @@ void hw_config_init(void)
         Log_info("Device name (%s) not found in supported list!", device_list[i].device_name);
     }
 } /* hw_config_init() */
-#endif
 
 /**
  * @brief Function to init the display
@@ -201,24 +217,30 @@ void display_init(void)
     } else { // it's a pre-defined PCB+display in bb_epaper
         bbep.begin(dpList[pDevice->panel_set][0].OneBit);
     }
-#else
-#ifdef BOARD_TRMNL_X
-    bbep.initPanel(BB_PANEL_TRMNL_X);
-    bbep.setPasses(3, 3);
-#elif defined( BOARD_TRMNL_X_SENSORIAS3 )
-    bbep.initPanel(BB_PANEL_V7_RAW);
-    bbep.setPanelSize(1280, 720, BB_PANEL_FLAG_MIRROR_X, -1600);
-#elif defined( BOARD_TRMNL_X_SENSORIAC5 )
-    bbep.initPanel(BB_PANEL_SENSORIA_C5);
-#elif defined(BOARD_TRMNL_X_PAPERS3)
-    bbep.initPanel(BB_PANEL_M5PAPERS3);
-#elif defined(BOARD_TRMNL_X_LILYGO)
-    bbep.initPanel(BB_PANEL_EPDIY_V7);
-    bbep.setPanelSize(960, 540);
-#elif defined (BOARD_SEEED_RETERMINAL_E1003)
+#else // Parallel eink devices
+#if defined (BOARD_SEEED_RETERMINAL_E1003)
     bbep.initIT8951(EPD_MOSI_PIN, EPD_MISO_PIN, EPD_SCK_PIN, EPD_CS_PIN, EPD_BUSY_PIN, EPD_RST_PIN, EPD_EN_PIN, EPD_VCC_EN);
     bbep.setPanelSize(BBEP_DISPLAY_ED103TC2);
-#endif // X
+#else // normal parallel eink devices
+    bbep.initPanel(pDevice->iBoardType);
+    if (pDevice->iPanelSize != BB_PANEL_NONE) {
+        bbep.setPanelSize(pDevice->iPanelSize);
+    }
+#endif
+#ifdef BOARD_TRMNL_X
+//    bbep.initPanel(BB_PANEL_TRMNL_X);
+    bbep.setPasses(3, 3); // The 10.3" panel needs fewer pushes
+#endif
+//#elif defined( BOARD_TRMNL_X_SENSORIAS3 )
+//    bbep.initPanel(BB_PANEL_V7_RAW);
+//    bbep.setPanelSize(1280, 720, BB_PANEL_FLAG_MIRROR_X, -1600);
+//#elif defined( BOARD_TRMNL_X_SENSORIAC5 )
+//    bbep.initPanel(BB_PANEL_SENSORIA_C5);
+//#elif defined(BOARD_TRMNL_X_PAPERS3)
+//    bbep.initPanel(BB_PANEL_M5PAPERS3);
+//#elif defined(BOARD_TRMNL_X_LILYGO)
+//    bbep.initPanel(BB_PANEL_EPDIY_V7);
+//    bbep.setPanelSize(960, 540);
 #endif // bb_epaper
     Log_info("dev module end");
 }
@@ -574,7 +596,7 @@ uint16_t display_width()
     return bbep.width();
 }
 
-#ifdef BOARD_X_CLASS
+#ifdef PARALLEL_EPD
 void display_draw_touchbar_indicator(touchbar_side_t side, bool filled)
 {
     const int radius = 24;
@@ -941,7 +963,6 @@ unsigned char GetBWYRPixel(int r, int g, int b)
     }
     return ucOut;
 } /* GetBWYRPixel() */
-#endif // BB_EPAPER
 
 //
 // bb_epaper colors to map to Spectra6 colors
@@ -1003,7 +1024,6 @@ uint16_t rgb333;
  * @param PNGDRAW structure containing the current line and relevant info
  * @return none
  */
-#ifdef BB_EPAPER
 //
 // Draw the PNG image into the local framebuffer memory using the drawPixel() method
 // to do color translation and to properly format the memory layout
@@ -1993,7 +2013,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
 #endif
     }
 
-#ifdef BOARD_X_CLASS
+#ifdef PARALLEL_EPD
     bbep.setFont(Inter_18);
 #else
     bbep.setFont(nicoclean_8);
@@ -2413,7 +2433,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
     case FILL_WHITE:
     {
         Log_info("Display set to white");
-#ifdef BOARD_X_CLASS
+#ifdef PARALLEL_EPD
         if (bbep.getMode() == BB_MODE_4BPP) {
             bbep.fillScreen(15); // in 4-bit mode, color 15 = white
         } else {
@@ -2649,7 +2669,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 #endif
     }
 
-#if defined( BOARD_X_CLASS )
+#if defined( PARALLEL_EPD )
     bbep.setFont(Inter_18);
 #else
     bbep.setFont(nicoclean_8);

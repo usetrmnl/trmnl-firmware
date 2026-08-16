@@ -16,12 +16,14 @@ public:
 
   /// @brief Read the battery voltage.
   /// @return voltage in Volts, or a negative value if the reading failed
-  virtual float readVoltage(uint8_t pin, uint8_t enable) = 0;
+  virtual float readVoltage(TRMNL_DEVICE *pDevice) = 0;
+  virtual float readVoltage() = 0;
 };
 /// @brief Reads the battery through a 1:2 resistor divider on an ADC pin.
 class ADCBattery : public BaseBattery {
 public:
-  float readVoltage(uint8_t pin, uint8_t enable) override;
+  float readVoltage(TRMNL_DEVICE *pDevice) override;
+  float readVoltage() override;
 };
 
 #ifdef INCLUDE_BQ27427
@@ -31,6 +33,7 @@ class BQ27427Battery : public BaseBattery {
 public:
   /// @brief Battery voltage from the last gaugeInit() snapshot.
   /// @return voltage in Volts, or a negative value if the last reading failed
+  float readVoltage(TRMNL_DEVICE *pDevice) override { return 0.0f;}
   float readVoltage() override { return _voltage; } // V
 
   /// @brief Connects to the BQ27427 gas gauge, (re)configures it if needed,
