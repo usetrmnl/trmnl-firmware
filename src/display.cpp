@@ -505,6 +505,33 @@ void display_set_light_sleep(uint8_t enabled)
 #endif
 }
 
+// Clear any ghosting on the X display by wiping it black/white many times
+void display_wipe(void)
+{
+#ifdef BB_EPAPER
+
+#ifdef BOARD_TRMNL_4CLR
+    int refreshCount = 1;
+#else
+    int refreshCount = 60;
+#endif
+
+    bbep.setPanelType(dpList[iTempProfile].OneBit);
+    bbep.fillScreen(BBEP_WHITE);
+    for (int i=0; i<refreshCount; i++) {
+        bbep.refresh(REFRESH_FULL); // 2 to 3 minutes of Black/White clearing of the display
+    }
+    bbep.sleep(LIGHT_SLEEP);
+#else
+    bbep.setMode(BB_MODE_1BPP);
+    bbep.fillScreen(BBEP_WHITE);
+    for (int i=0; i<100; i++) { // 200 black/white cycles should remove any ghosting
+        bbep.fullUpdate(CLEAR_SLOW, true);
+    }
+    bbep.einkPower(0); // power off the display
+#endif
+} /* display_wipe() */
+
 /**
  * @brief Function to sleep the ESP32 while saving power
  * @param u32Millis represents the sleep time in milliseconds
