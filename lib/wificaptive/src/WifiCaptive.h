@@ -14,50 +14,37 @@
 #include "WifiCaptivePage.h"
 #include "wifi-types.h"
 
-#define WIFI_SSID                   "TRMNL"
-#define WIFI_PASSWORD               NULL
+#define WIFI_SSID                "TRMNL"
+#define WIFI_PASSWORD            NULL
 
 // Define the DNS interval in milliseconds between processing DNS requests
-#define DNS_INTERVAL                60
+#define DNS_INTERVAL             60
 // Define the maximum number of clients that can connect to the server
-#define MAX_CLIENTS                 4
+#define MAX_CLIENTS              4
 // Define the WiFi channel to be used (channel 6 in this case)
-#define WIFI_CHANNEL                6
+#define WIFI_CHANNEL             6
 // Define the maximum number of possible saved credentials
-#define WIFI_MAX_SAVED_CREDS        5
+#define WIFI_MAX_SAVED_CREDS     5
 // Define the maximum number of connection attempts
-#define WIFI_CONNECTION_ATTEMPTS    3
+#define WIFI_CONNECTION_ATTEMPTS 3
 // Define max connection timeout
-#define CONNECTION_TIMEOUT          15000
-// Shorter timeout for fast-connect attempt (specific BSSID+channel); falls back to full scan on expiry
-#define WIFI_FAST_CONNECT_TIMEOUT   5000
+#define CONNECTION_TIMEOUT       15000
 
-#define WIFI_SSID_KEY(i)            ("wifi_" + String(i) + "_ssid").c_str()
-#define WIFI_PSWD_KEY(i)            ("wifi_" + String(i) + "_pswd").c_str()
-#define WIFI_5GHZ_KEY(i)            ("wifi_" + String(i) + "_5g").c_str()
-#define WIFI_ENT_KEY(i)             ("wifi_" + String(i) + "_ent").c_str()
-#define WIFI_USERNAME_KEY(i)        ("wifi_" + String(i) + "_username").c_str()
-#define WIFI_IDENTITY_KEY(i)        ("wifi_" + String(i) + "_identity").c_str()
+#define WIFI_SSID_KEY(i)         ("wifi_" + String(i) + "_ssid").c_str()
+#define WIFI_PSWD_KEY(i)         ("wifi_" + String(i) + "_pswd").c_str()
+#define WIFI_5GHZ_KEY(i)         ("wifi_" + String(i) + "_5g").c_str()
+#define WIFI_ENT_KEY(i)          ("wifi_" + String(i) + "_ent").c_str()
+#define WIFI_USERNAME_KEY(i)     ("wifi_" + String(i) + "_username").c_str()
+#define WIFI_IDENTITY_KEY(i)     ("wifi_" + String(i) + "_identity").c_str()
 // Static IP keys
-#define WIFI_STATIC_IP_KEY(i)       ("wifi_" + String(i) + "_sip").c_str()
-#define WIFI_STATIC_GW_KEY(i)       ("wifi_" + String(i) + "_sgw").c_str()
-#define WIFI_STATIC_SN_KEY(i)       ("wifi_" + String(i) + "_ssn").c_str()
-#define WIFI_STATIC_DNS1_KEY(i)     ("wifi_" + String(i) + "_dns1").c_str()
-#define WIFI_STATIC_DNS2_KEY(i)     ("wifi_" + String(i) + "_dns2").c_str()
-#define WIFI_USE_STATIC_KEY(i)      ("wifi_" + String(i) + "_usip").c_str()
+#define WIFI_STATIC_IP_KEY(i)    ("wifi_" + String(i) + "_sip").c_str()
+#define WIFI_STATIC_GW_KEY(i)    ("wifi_" + String(i) + "_sgw").c_str()
+#define WIFI_STATIC_SN_KEY(i)    ("wifi_" + String(i) + "_ssn").c_str()
+#define WIFI_STATIC_DNS1_KEY(i)  ("wifi_" + String(i) + "_dns1").c_str()
+#define WIFI_STATIC_DNS2_KEY(i)  ("wifi_" + String(i) + "_dns2").c_str()
+#define WIFI_USE_STATIC_KEY(i)   ("wifi_" + String(i) + "_usip").c_str()
 
-#define WIFI_BSSID_KEY(i)           ("wifi_" + String(i) + "_bssid").c_str()
-#define WIFI_CHAN_KEY(i)            ("wifi_" + String(i) + "_chan").c_str()
-#define WIFI_FULLSCAN_KEY(i)        ("wifi_" + String(i) + "_fscan").c_str()
-
-#define WIFI_LAST_INDEX             "wifi_last_index"
-
-// Minimum RSSI (dBm) to keep a fast-connect result; weaker signal triggers a full scan
-#define WIFI_FAST_CONNECT_MIN_RSSI  (-75)
-
-// Force a full channel scan at least this often, even if the cached BSSID still connects fine,
-// so the device can roam to a better AP/channel.
-#define WIFI_FULL_SCAN_INTERVAL_SEC (24UL * 60 * 60)
+#define WIFI_LAST_INDEX          "wifi_last_index"
 
 struct ExternalNetwork {
   String ssid;
@@ -100,13 +87,13 @@ private:
   int readLastUsedWifiIndex();
   void saveApiServer(String url);
   int findSavedWifiIndex(const WifiCredentials credentials);
-  bool tryConnectWithRetries(WifiCredentials creds, int last_used_index);
+  bool tryConnectWithRetries(const WifiCredentials creds, int last_used_index);
   std::vector<WifiCredentials> matchNetworks(std::vector<WifiNetwork> &scanResults, WifiCredentials wifiCredentials[]);
   std::vector<WifiNetwork> getScannedUniqueNetworks(bool runScan);
   std::vector<WifiNetwork> combineNetworks(std::vector<WifiNetwork> &scanResults, WifiCredentials wifiCredentials[]);
 
 public:
-  WifiConnectionResult connect(const WifiCredentials credentials);
+  wl_status_t connect(const WifiCredentials credentials);
 
   /// @brief Starts WiFi configuration portal.
   /// @return True if successfully connected to provided SSID, false otherwise.
