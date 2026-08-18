@@ -51,6 +51,7 @@ struct ExternalNetwork {
   int32_t rssi;
   bool open;
   bool is5GHz;
+  bool enterprise;
 };
 
 class WifiCaptive {
