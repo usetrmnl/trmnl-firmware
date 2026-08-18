@@ -1,24 +1,26 @@
 #include <misc/sensor.h>
 
-#ifdef INCLUDE_ENV_SENSOR
-
 #include <Arduino.h>
 #include <esp_sleep.h>
 #include <time.h>
 #include <trmnl_log.h>
+#include <config.h>
+extern TRMNL_DEVICE *pDevice;
 
 // bb_temperature device names, indexed by SensorReadings::sensorType
 static const char *szDevices[] = {"None",    "AHT20",  "BMP180",  "BME280", "BMP388", "SHT3X",
-                                  "HDC1080", "HTS221", "MCP9808", "BME68x", "SHTC3"};
+                                  "HDC1080", "HTS221", "MCP9808", "BME68x", "SHTC3", "SHT40"};
 static const char *szMakers[] = {"None", "ASAIR",   "Bosch",     "Bosch", "Bosch",    "Sensirion",
-                                 "TI",   "STMicro", "MicroChip", "Bosch", "Sensirion"};
+                                 "TI",   "STMicro", "MicroChip", "Bosch", "Sensirion", "Sensirion"};
 
 void EnvironmentSensor::init() {
   bool co2Found = false;
   int sensorType = -1;
 
+  if (pDevice->sensor_sda == 0xff) return; // no I2C bus defined for this device
+
   // check if there is a SCD41 or supported temperature sensor attached
-  if (_scd41.init(_sdaPin, _sclPin) == SCD41_SUCCESS) {
+  if (_scd41.init(pDevice->sensor_sda, pDevice->sensor_scl) == SCD41_SUCCESS) {
     co2Found = true;
     Log_info("SCD41 sensor found!");
     _scd41.wakeup();
@@ -28,13 +30,13 @@ void EnvironmentSensor::init() {
     vTaskDelay(3);          // allow time to reinitialize
     _scd41.triggerSample(); // trigger a 'one-shot' sample that takes about 5 seconds to complete
   }
-  if (_bbt.init(_sdaPin, _sclPin) == BBT_SUCCESS) {
+  if (_bbt.init(pDevice->sensor_sda, pDevice->sensor_scl) == BBT_SUCCESS) {
     sensorType = _bbt.type();
     Log_info("supported sensor found! (%d)", sensorType);
     _bbt.start(); // start the sensor
   }
   if (!co2Found && sensorType < 0) {
-    Log_info("No sensor found on I2C bus %d/%d", _sdaPin, _sclPin);
+    Log_info("No sensor found on I2C bus %d/%d", pDevice->sensor_sda, pDevice->sensor_scl);
     return;
   }
 
@@ -114,5 +116,3 @@ bool EnvironmentSensor::buildSensorsHeader(char **szTemp) {
   }
   return true;
 }
-
-#endif // INCLUDE_ENV_SENSOR
