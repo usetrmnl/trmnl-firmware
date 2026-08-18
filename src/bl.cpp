@@ -1533,10 +1533,20 @@ static https_request_err_e downloadAndShow()
   }
 
   https_request_err_e result = handleApiDisplayResponse(apiDisplayResult.response);
-  if (strcmp(apiDisplayResult.response.filename.c_str(), "screen_wiper.png") == 0) {
-      Log_info("Detected screen wiper filename: %s, starting 20 passes of clearing...\n", apiDisplayResult.response.filename.c_str());
+  if (apiDisplayResult.response.filename == "screen_wiper.png") {
+      // Guard against re-fetching forever if the wiper is the only playlist item
+      static bool wiped_this_wake = false;
+      if (wiped_this_wake) {
+          Log_info("Screen wiper returned again; not wiping twice in one wake");
+          return result; // leave the wiped (white) screen as-is
+      }
+      wiped_this_wake = true;
+      Log_info("Detected screen wiper filename: %s, clearing display...", apiDisplayResult.response.filename.c_str());
       display_wipe();
-      return result; // no image to display
+      // Wiping leaves the screen blank; fetch and show the next playlist item
+      // right away instead of waiting for the next scheduled refresh.
+      Log_info("Screen wipe complete, fetching next playlist item");
+      return downloadAndShow();
   }
 
   if (!status && result == HTTPS_SUCCESS) { // this means we already have this image stored in SPIFFS
