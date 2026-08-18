@@ -174,7 +174,7 @@ bool spectra6_update() {
   const uint8_t btst1[] = {0x40, 0x1f, 0x1f, 0x2c};
   const uint8_t btst2[] = {0x6f, 0x1f, 0x17, 0x49};
   const uint8_t btst3[] = {0x6f, 0x1f, 0x1f, 0x22};
-  const uint8_t pll[] = {0x03};
+  const uint8_t pll[] = {0x04}; // previously 0x03; on E1002: 14690ms /refresh vs 19065ms
   const uint8_t cdi[] = {0x3f};
   const uint8_t tcon[] = {0x02, 0x00};
   const uint8_t tres[] = {0x03, 0x20, 0x01, 0xe0};
