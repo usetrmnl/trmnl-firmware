@@ -4,6 +4,7 @@
 #include <bl.h>
 #include <wifi_network.h>
 #include <power.h>
+#include <config.h>
 #include <battery.h>
 #include <device_id.h>
 #include <trmnl_log.h>
@@ -11,7 +12,6 @@
 #include <ArduinoLog.h>
 #include <WifiCaptive.h>
 #include <pins.h>
-#include <config.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <display.h>
@@ -76,6 +76,13 @@ const char *szHTTPErrors[] = {
 
 static float vBatt;
 
+#ifdef BOARD_TRMNL_GEN2
+#include "ulp_lp_core.h"
+#include "esp_err.h"
+extern const uint8_t bin_start[] asm("_binary_ulp_main_bin_start"); //refering to app name ulp_main defined in CMakelists.txt
+extern const uint8_t bin_end[]   asm("_binary_ulp_main_bin_end"); //refering to app name ulp_main defined in CMakelists.txt
+#endif
+
 static https_request_err_e downloadAndShow(); // download and show the image
 static https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse);
 static void resetDeviceCredentials(void);            // reset device credentials API key, Friendly ID, Wi-Fi SSID and password
@@ -99,6 +106,8 @@ static unsigned long startup_time = 0;
 void iqs323_task_i2c_lock(void) {}
 void iqs323_task_i2c_unlock(void) {}
 #endif // !BOARD_TRMNL_X
+void hw_config_init(void);
+extern TRMNL_DEVICE *pDevice;
 
 void wait_for_serial() {
 #ifdef WAIT_FOR_SERIAL
@@ -752,6 +761,7 @@ void bl_init(void)
   }
   Log.info("%s [%d]: modem needed = %d\n\r", __FILE__, __LINE__, bModemNeeded);
 #endif // X
+  hw_config_init();
   pins_init();
   buzzer().init();
   sensor().init();
@@ -1005,8 +1015,8 @@ void bl_init(void)
   Log_info("BATTERY CHARGING: %s", battery_charging ? "YES" : "NO");
 
   battery().gaugeInit();
-#endif // BOARD_TRMNL_X
-  vBatt = battery().readVoltage(); // Read the battery voltage BEFORE WiFi is turned on
+#endif
+  vBatt = battery().readVoltage(pDevice); // Read the battery voltage BEFORE WiFi is turned on
 
   Log_info("Firmware version %s", Messages::firmware_version().c_str());
   Log_info("Arduino version %d.%d.%d", ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH);
@@ -1537,7 +1547,7 @@ static https_request_err_e downloadAndShow()
 
   if (!status && result == HTTPS_SUCCESS) { // this means we already have this image stored in SPIFFS
       char szTemp[36];
-#if BOARD_X_CLASS && !defined(BOARD_SEEED_RETERMINAL_E1003)
+#if PARALLEL_EPD && !defined(BOARD_SEEED_RETERMINAL_E1003)
       if (DisplayedImage::exists()) {
         load_prev_image(); // decode the older image into the previous buffer of FastEPD
       }
@@ -2549,6 +2559,22 @@ static void resetDeviceCredentials(void)
   ESP.restart();
 }
 
+#ifdef BOARD_TRMNL_GEN2
+void start_ulp_program() {
+    // Change: Load the ULP binary into RTC memory
+    ESP_ERROR_CHECK(ulp_lp_core_load_binary(bin_start, (bin_end - bin_start)));
+
+    // Change: Configure the ULP LP core wake-up source and timer
+    ulp_lp_core_cfg_t cfg = {
+        .wakeup_source = ULP_LP_CORE_WAKEUP_SOURCE_LP_TIMER, // Wake up using LP timer
+        .lp_timer_sleep_duration_us = 1000000,              // 1-second sleep duration
+    };
+
+    // Change: Start the ULP LP core program
+    ESP_ERROR_CHECK(ulp_lp_core_run(&cfg));
+}
+#endif // BOARD_TRMNL_GEN2
+
 /**
  * @brief Function to sleep preparing and go to sleep
  * @param none
@@ -2560,7 +2586,7 @@ void goToSleep(void)
   submitStoredLogs();
 
 // DEBUG - workaround to prevent crash in the WiFi stack of unknown origin
-#ifndef BOARD_X_CLASS
+#ifndef PARALLEL_EPD
   if (WiFi.status() == WL_CONNECTED) {
     WiFi.disconnect();
   }
@@ -2601,12 +2627,16 @@ void goToSleep(void)
   // Configure GPIO pin for wakeup
 #if CONFIG_IDF_TARGET_ESP32
   #define BUTTON_PIN_BITMASK(GPIO) (1ULL << GPIO)  // 2 ^ GPIO_NUMBER in hex
-  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK(PIN_INTERRUPT), ESP_EXT1_WAKEUP_ALL_LOW);
+  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK(pDevice->interrupt_pin), ESP_EXT1_WAKEUP_ALL_LOW);
 #elif defined(CONFIG_IDF_TARGET_ESP32C3) || defined (CONFIG_IDF_TARGET_ESP32C5)
-  pinMode(PIN_INTERRUPT, INPUT); // needed to not immediately wake up
-  esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
+  pinMode(pDevice->interrupt_pin, INPUT); // needed to not immediately wake up
+  esp_deep_sleep_enable_gpio_wakeup(1 << pDevice->interrupt_pin, ESP_GPIO_WAKEUP_GPIO_LOW);
 #elif defined(CONFIG_IDF_TARGET_ESP32S3)
+#ifdef BOARD_TRMNL_X
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
+#else
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)pDevice->interrupt_pin, 0);
+#endif
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
 #endif
@@ -2623,6 +2653,10 @@ void goToSleep(void)
   gpio_deep_sleep_hold_en(); // Needed to keep the battery power enabled during RTC sleep
 #endif
 #endif
+#ifdef BOARD_TRMNL_GEN2
+// Use the ULP of the ESP32-C5 to do interesting things on the ePaper while the main CPU is sleeping
+//  start_ulp_program();
+#endif // BOARD_TRMNL_GEN2
   esp_deep_sleep_start();
 }
 
@@ -2637,11 +2671,15 @@ static void goToSleepButtonOnly(void)
   preferences.end();
 #if CONFIG_IDF_TARGET_ESP32
   #define BUTTON_PIN_BITMASK_BTN(GPIO) (1ULL << GPIO)
-  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK_BTN(PIN_INTERRUPT), ESP_EXT1_WAKEUP_ALL_LOW);
+  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK_BTN(pDevice->interrupt_pin), ESP_EXT1_WAKEUP_ALL_LOW);
 #elif defined( CONFIG_IDF_TARGET_ESP32C3 ) || defined ( CONFIG_IDF_TARGET_ESP32C5 )
-  esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
+  esp_deep_sleep_enable_gpio_wakeup(1 << pDevice->interrupt_pin, ESP_GPIO_WAKEUP_GPIO_LOW);
 #elif CONFIG_IDF_TARGET_ESP32S3
+#ifdef BOARD_TRMNL_X
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
+#else
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)pDevice->interrupt_pin, 0);
+#endif
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
 #endif
@@ -2879,7 +2917,7 @@ static uint8_t *storedLogoOrDefault(int iType)
       }
    }
   }
-#ifdef BOARD_X_CLASS
+#ifdef PARALLEL_EPD
     return const_cast<uint8_t *>(logo_medium);
 #else
   if (iType == 0) {

@@ -1,9 +1,9 @@
+#include <config.h>
 #include <battery.h>
 
 #ifdef INCLUDE_BQ27427
 
 #include <Arduino.h>
-#include <config.h>
 #include <display.h>
 #include <globals.h>
 #include <trmnl_log.h>
