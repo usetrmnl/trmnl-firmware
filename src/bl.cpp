@@ -2907,25 +2907,23 @@ static void wifiErrorDeepSleep()
 
   Log_info("WIFI connection failed! Retry count: %d \n", retry_count);
 
-  switch (retry_count)
-  {
-  case 1:
-  case 2:
-  case 3:
-    refreshInterval.applyWifiRetry(retry_count);
-    break;
+  uint32_t sleep_seconds = refreshInterval.applyWifiRetry(retry_count);
 
-  default:
-    preferences.putInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT, 1);
+  // The panel holds its image while asleep, so draw the message once rather than on every wake.
+  if (retry_count == RefreshInterval::WIFI_SHORT_ATTEMPTS + 1)
+  {
     showMessageWithLogo(WIFI_RETRY_LIMIT);
-    display_sleep();
+  }
+
+  display_sleep();
+
+  if (sleep_seconds == 0)
+  {
     goToSleepButtonOnly();
     return;
   }
-  retry_count++;
-  preferences.putInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT, retry_count);
 
-  display_sleep();
+  preferences.putInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT, retry_count + 1);
   goToSleep();
 }
 

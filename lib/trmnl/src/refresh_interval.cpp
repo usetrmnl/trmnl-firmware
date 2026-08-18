@@ -45,6 +45,8 @@ uint32_t RefreshInterval::applyApiRetry(uint8_t attempt) {
 }
 
 uint32_t RefreshInterval::applyWifiRetry(uint8_t attempt) {
+  if (attempt > WIFI_SHORT_ATTEMPTS + WIFI_OFFLINE_HOURS) return 0;
+
   uint32_t sleep;
   switch (attempt) {
   case 1:
@@ -53,8 +55,11 @@ uint32_t RefreshInterval::applyWifiRetry(uint8_t attempt) {
   case 2:
     sleep = 180;
     break;
-  default:
+  case 3:
     sleep = 300;
+    break;
+  default:
+    sleep = WIFI_OFFLINE_SECONDS;
     break;
   }
   writeIfChanged(sleep);

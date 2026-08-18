@@ -6,6 +6,7 @@
 // declare it in tests.h, and call it from setup() between UNITY_BEGIN/END.
 
 #include <Arduino.h>
+#include <ArduinoLog.h>
 #include <Preferences.h>
 #include <device_id.h>
 #include <unity.h>
@@ -24,6 +25,8 @@ void setup_bl() {
 
 void setup() {
   Serial.begin(115200);
+  // bl_init() normally does this; without it every Log_* in the code under test is dropped.
+  Log.begin(LOG_LEVEL_VERBOSE, &Serial);
 
   setup_bl();
 
@@ -34,7 +37,7 @@ void setup() {
   test_api_setup();
   test_tls_resume();
   // test_api_display();
-  // test_wifi(); // must be last in the suite, until production bug is fixed
+  test_wifi(); // must be last in the suite, until production bug is fixed
 
   UNITY_END();
 }

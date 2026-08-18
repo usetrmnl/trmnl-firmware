@@ -120,6 +120,22 @@ void test_wifi_retry_ladder(void) {
   TEST_ASSERT_EQUAL_UINT32(300, refreshInterval.seconds());
 }
 
+void test_wifi_retry_falls_back_to_hourly(void) {
+  MemoryPersistence persistence;
+  RefreshInterval refreshInterval(persistence);
+  TEST_ASSERT_EQUAL_UINT32(3600, refreshInterval.applyWifiRetry(4));
+  TEST_ASSERT_EQUAL_UINT32(3600, refreshInterval.applyWifiRetry(171));
+  TEST_ASSERT_EQUAL_UINT32(3600, refreshInterval.seconds());
+}
+
+void test_wifi_retry_stops_after_a_week_of_hourly_attempts(void) {
+  MemoryPersistence persistence;
+  RefreshInterval refreshInterval(persistence);
+  refreshInterval.applyWifiRetry(171);
+  TEST_ASSERT_EQUAL_UINT32(0, refreshInterval.applyWifiRetry(172));
+  TEST_ASSERT_EQUAL_UINT32(3600, refreshInterval.seconds());
+}
+
 void test_default_fallback_is_fifteen_minutes(void) {
   MemoryPersistence persistence;
   RefreshInterval refreshInterval(persistence);
@@ -154,6 +170,8 @@ void process() {
   RUN_TEST(test_server_rate_writes_when_key_is_absent_even_at_the_default);
   RUN_TEST(test_api_retry_ladder);
   RUN_TEST(test_wifi_retry_ladder);
+  RUN_TEST(test_wifi_retry_falls_back_to_hourly);
+  RUN_TEST(test_wifi_retry_stops_after_a_week_of_hourly_attempts);
   RUN_TEST(test_default_fallback_is_fifteen_minutes);
   RUN_TEST(test_seconds_defaults);
   UNITY_END();

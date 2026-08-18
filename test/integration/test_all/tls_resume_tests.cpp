@@ -20,6 +20,7 @@
 #include <api-client/setup.h>
 #include <config.h>
 #include <display.h>
+#include <refresh_interval.h>
 #include <resumable_wifi_client_secure.h>
 #include <special_function.h>
 #include <test_helpers.h>

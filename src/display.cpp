@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <connect.h>
 #include <display.h>
 #include <power.h>
 #include <PNGdec.h>
@@ -2415,7 +2416,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
     break;
     case WIFI_RETRY_LIMIT:
     {
-        const char string1[] = "Maximum WiFi retries reached.";
+        const char *string1 = lastWifiFailureDescription();
         bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
         bbep.setCursor((bbep.width() - rect.w) / 2, 340);
