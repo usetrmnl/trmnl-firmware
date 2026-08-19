@@ -511,7 +511,7 @@ void display_wipe(void)
 #ifdef BB_EPAPER
 
 #ifdef BOARD_TRMNL_4CLR
-    int refreshCount = 1;
+    int refreshCount = 2;
 #else
     int refreshCount = 60;
 #endif
