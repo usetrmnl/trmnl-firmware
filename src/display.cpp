@@ -7,6 +7,10 @@
 #include <preferences_persistence.h>
 #include <refresh_interval.h>
 #include "DEV_Config.h"
+#ifdef BOARD_ZECTRIX_NOTE4C
+#include <algorithm>
+#include <SPI.h>
+#endif
 #ifdef BOARD_SEEED_RETERMINAL_E1002
 #include "displays/spectra6.h"
 #endif
@@ -39,6 +43,18 @@ BBEPAPER bbep(EP397_800x480);
     {EP75R_800x480, EP75R_800x480}, // b = darker grays
 };
 BBEPAPER bbep(EP75R_800x480);
+#elif defined(BOARD_ZECTRIX_NOTE4)
+    {EP42B_400x300, EP42B_400x300}, // default
+    {EP42B_400x300, EP42B_400x300}, // a
+    {EP42B_400x300, EP42B_400x300}, // b
+};
+BBEPAPER bbep(EP42B_400x300);
+#elif defined(BOARD_ZECTRIX_NOTE4C)
+    {EP42YR_400x300, EP42YR_400x300}, // default
+    {EP42YR_400x300, EP42YR_400x300}, // a
+    {EP42YR_400x300, EP42YR_400x300}, // b
+};
+BBEPAPER bbep(EP42YR_400x300);
 #elif defined(BOARD_TRMNL_4CLR)
     {EP75YR_800x480, EP75YR_800x480}, // default (for original EPD)
     {EP75YR_800x480, EP75YR_800x480}, // a = uses built-in fast + 4-gray
@@ -131,10 +147,163 @@ extern BQ27427 lipo; // Use lipo.[] to interact with the library in an Arduino
 static uint8_t *pDither;
 
 #ifdef BB_EPAPER
+#ifdef BOARD_ZECTRIX_NOTE4C
+namespace {
+
+constexpr size_t ZECTRIX_NOTE4C_ROW_BYTES = 400 / 4;
+constexpr size_t ZECTRIX_NOTE4C_ROWS = 300;
+constexpr uint32_t ZECTRIX_NOTE4C_SPI_HZ = 40000000;
+SPIClass zectrix_note4c_spi(HSPI);
+
+void zectrix_note4c_write_command(uint8_t command)
+{
+    digitalWrite(EPD_DC_PIN, LOW);
+    digitalWrite(EPD_CS_PIN, LOW);
+    zectrix_note4c_spi.transfer(command);
+    digitalWrite(EPD_CS_PIN, HIGH);
+}
+
+void zectrix_note4c_write_data(const uint8_t *data, size_t length)
+{
+    digitalWrite(EPD_DC_PIN, HIGH);
+    digitalWrite(EPD_CS_PIN, LOW);
+    zectrix_note4c_spi.transferBytes(data, nullptr, length);
+    digitalWrite(EPD_CS_PIN, HIGH);
+}
+
+void zectrix_note4c_write_data(uint8_t value)
+{
+    zectrix_note4c_write_data(&value, 1);
+}
+
+bool zectrix_note4c_wait_idle(const char *stage, uint32_t timeout_ms)
+{
+    const uint32_t started_at = millis();
+    while (digitalRead(EPD_BUSY_PIN) == LOW) {
+        if (millis() - started_at >= timeout_ms) {
+            Log_error("EPD busy timeout: stage=%s gpio=%d level=%d elapsed_ms=%lu",
+                      stage, EPD_BUSY_PIN, digitalRead(EPD_BUSY_PIN), millis() - started_at);
+            return false;
+        }
+        delay(1);
+    }
+    Log_info("EPD idle: stage=%s elapsed_ms=%lu", stage, millis() - started_at);
+    return true;
+}
+
+bool zectrix_note4c_update()
+{
+    auto *buffer = static_cast<uint8_t *>(bbep.getBuffer());
+    if (buffer == nullptr) {
+        Log_error("EPD update failed: framebuffer is not allocated");
+        return false;
+    }
+
+#ifdef DEV_FIRMWARE
+    {
+        uint32_t frame_hash = 2166136261u;
+        uint32_t color_counts[4] = {};
+        for (size_t index = 0; index < ZECTRIX_NOTE4C_ROW_BYTES * ZECTRIX_NOTE4C_ROWS; ++index) {
+            const uint8_t value = buffer[index];
+            frame_hash = (frame_hash ^ value) * 16777619u;
+            for (uint8_t shift = 0; shift < 8; shift += 2) {
+                ++color_counts[(value >> shift) & 0x03];
+            }
+        }
+        Log_info("EPD frame: hash=%08lx colors=[%lu,%lu,%lu,%lu] first=%02x %02x %02x %02x %02x %02x %02x %02x",
+                 frame_hash, color_counts[0], color_counts[1], color_counts[2], color_counts[3],
+                 buffer[0], buffer[1], buffer[2], buffer[3],
+                 buffer[4], buffer[5], buffer[6], buffer[7]);
+    }
+#endif
+
+    digitalWrite(EPD_POWER_PIN, HIGH);
+    digitalWrite(EPD_CS_PIN, HIGH);
+
+    // Sequence recovered from the ZecTrix Note4C factory firmware.
+    delay(10);
+    digitalWrite(EPD_RST_PIN, HIGH);
+    delay(10);
+    digitalWrite(EPD_RST_PIN, LOW);
+    delay(20);
+    digitalWrite(EPD_RST_PIN, HIGH);
+    delay(10);
+    if (!zectrix_note4c_wait_idle("reset", 60000)) {
+        return false;
+    }
+
+    zectrix_note4c_spi.beginTransaction(SPISettings(ZECTRIX_NOTE4C_SPI_HZ, MSBFIRST, SPI_MODE0));
+
+    zectrix_note4c_write_command(0xE9);
+    zectrix_note4c_write_data(0x01);
+
+    zectrix_note4c_write_command(0x10);
+    if (!zectrix_note4c_wait_idle("image_write", 60000)) {
+        zectrix_note4c_spi.endTransaction();
+        digitalWrite(EPD_CS_PIN, HIGH);
+        return false;
+    }
+    for (size_t row = 0; row < ZECTRIX_NOTE4C_ROWS; ++row) {
+        zectrix_note4c_write_data(buffer + row * ZECTRIX_NOTE4C_ROW_BYTES,
+                                  ZECTRIX_NOTE4C_ROW_BYTES);
+        if ((row % 16) == 15) {
+            delay(1);
+        }
+    }
+
+    zectrix_note4c_write_command(0x04);
+    if (!zectrix_note4c_wait_idle("power_on", 60000)) {
+        zectrix_note4c_spi.endTransaction();
+        digitalWrite(EPD_CS_PIN, HIGH);
+        return false;
+    }
+    delay(10);
+
+    zectrix_note4c_write_command(0x12);
+    zectrix_note4c_write_data(0x00);
+    delay(10);
+    if (!zectrix_note4c_wait_idle("display_refresh", 180000)) {
+        zectrix_note4c_spi.endTransaction();
+        digitalWrite(EPD_CS_PIN, HIGH);
+        return false;
+    }
+
+    zectrix_note4c_write_command(0x02);
+    zectrix_note4c_write_data(0x00);
+    if (!zectrix_note4c_wait_idle("controller_power_off", 60000)) {
+        zectrix_note4c_spi.endTransaction();
+        digitalWrite(EPD_CS_PIN, HIGH);
+        return false;
+    }
+
+    delay(20);
+    zectrix_note4c_write_command(0x07);
+    zectrix_note4c_write_data(0xA5);
+    digitalWrite(EPD_CS_PIN, HIGH);
+    zectrix_note4c_spi.endTransaction();
+    digitalWrite(EPD_POWER_PIN, LOW);
+    return true;
+}
+
+} // namespace
+#endif
+
 static bool display_update_epaper(int refreshMode, bool wait, bool writePlane = false, uint8_t plane = PLANE_0)
 {
 #ifdef BOARD_SEEED_RETERMINAL_E1002
     return spectra6_update();
+#elif defined(BOARD_ZECTRIX_NOTE4C)
+    (void)refreshMode;
+    (void)wait;
+    (void)writePlane;
+    (void)plane;
+    Log_info("ZecTrix Note4C native EPD update start: busy=%d millis=%lu",
+             digitalRead(EPD_BUSY_PIN), millis());
+    const bool result = zectrix_note4c_update();
+    Log_info("ZecTrix Note4C native EPD update end: ok=%d busy=%d millis=%lu",
+             result, digitalRead(EPD_BUSY_PIN), millis());
+    bCanDoPartial = false;
+    return result;
 #else
     if (writePlane) {
         bbep.writePlane(plane);
@@ -172,6 +341,25 @@ void display_init(void)
     Log_info("BB e-Paper init");
 #ifdef BOARD_SEEED_RETERMINAL_E1002
     spectra6_init_spi();
+#elif defined(BOARD_ZECTRIX_NOTE4C)
+    // bb_epaper owns the framebuffer/rendering API, while the physical panel
+    // uses ZecTrix's native command sequence. Suppress bb_epaper's generic
+    // GDEM042F52 initialization during SPI setup.
+    const auto *init_full = bbep._bbep.pInitFull;
+    const auto *init_fast = bbep._bbep.pInitFast;
+    const auto *init_part = bbep._bbep.pInitPart;
+    bbep._bbep.pInitFull = nullptr;
+    bbep._bbep.pInitFast = nullptr;
+    bbep._bbep.pInitPart = nullptr;
+    bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN,
+                ZECTRIX_NOTE4C_SPI_HZ);
+    bbep._bbep.pInitFull = init_full;
+    bbep._bbep.pInitFast = init_fast;
+    bbep._bbep.pInitPart = init_part;
+    // The ZecTrix reference firmware drives the panel from SPI3_HOST. Arduino's
+    // global SPI instance is SPI2_HOST on ESP32-S3, so keep a dedicated HSPI
+    // instance for the physical panel while bb_epaper remains rendering-only.
+    zectrix_note4c_spi.begin(EPD_SCK_PIN, -1, EPD_MOSI_PIN, -1);
 #else
     bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
 #endif
@@ -1127,7 +1315,7 @@ int png_draw_6clr(PNGDRAW *pDraw)
 } /* png_draw_6clr() */
 #endif // E1002 (Spectra6 only)
 
-#ifdef BOARD_TRMNL_4CLR
+#if defined(BOARD_TRMNL_4CLR) || defined(BOARD_ZECTRIX_NOTE4C)
 //
 // Draw the PNG image into the local framebuffer memory using the drawPixel() method
 // to do color translation and to properly format the memory layout
@@ -1231,10 +1419,26 @@ int png_draw_4clr(PNGDRAW *pDraw)
                 *d++ = uc;
             }
         } // for x
+#ifdef BOARD_ZECTRIX_NOTE4C
+    if ((pDraw->iWidth & 3) != 0) {
+        uc <<= 2 * (4 - (pDraw->iWidth & 3));
+        *d++ = uc;
+    }
+    if (pDraw->y >= 0 && pDraw->y < static_cast<int>(ZECTRIX_NOTE4C_ROWS)) {
+        auto *framebuffer = static_cast<uint8_t *>(bbep.getBuffer());
+        if (framebuffer == nullptr) {
+            return 0;
+        }
+        const size_t decoded_bytes = (pDraw->iWidth + 3) / 4;
+        const size_t copy_bytes = std::min(decoded_bytes, ZECTRIX_NOTE4C_ROW_BYTES);
+        memcpy(framebuffer + pDraw->y * ZECTRIX_NOTE4C_ROW_BYTES, pTemp, copy_bytes);
+    }
+#else
     bbep.writeData(pTemp, (pDraw->iWidth+3)/4);
+#endif
     return 1; // continue decoding
 } /* png_draw4clr() */
-#endif // BOARD_TRMNL_4CLR (4 color only)
+#endif // four-color displays
 
 int png_draw(PNGDRAW *pDraw)
 {
@@ -1654,15 +1858,33 @@ PNG *png = new PNG();
             delete(png); // free the decoder instance
             return REFRESH_FULL;
 #endif // E1002
-#ifdef BOARD_TRMNL_4CLR
+#if defined(BOARD_TRMNL_4CLR) || defined(BOARD_ZECTRIX_NOTE4C)
             Log_info("%s [%d]: decoding for 4-color EPD\r\n", __FILE__, __LINE__);
+#ifdef BOARD_ZECTRIX_NOTE4C
+            if (bbep.allocBuffer() != BBEP_SUCCESS) {
+                Log_error("%s [%d]: bbep.allocBuffer failed\n\r", __FILE__, __LINE__);
+                png->close();
+                delete(png);
+                return -1;
+            }
+            bbep.fillScreen(BBEP_WHITE);
+#endif
             png->openRAM((uint8_t *)pPNG, iDataSize, png_draw_4clr);
+#ifndef BOARD_ZECTRIX_NOTE4C
             bbep.startWrite(PLANE_1); // start writing image data
-            png->decode(NULL, 0);
+#endif
+            rc = png->decode(NULL, 0);
             png->close();
             delete(png); // free the decoder instance
+            if (rc != PNG_SUCCESS) {
+#ifdef BOARD_ZECTRIX_NOTE4C
+                bbep.freeBuffer();
+#endif
+                Log_error("Four-color PNG decode failed: %d", rc);
+                return -1;
+            }
             return REFRESH_FULL;
-#endif // BOARD_TRMNL_4CLR
+#endif // four-color displays
             bbep.setAddrWindow(0, 0, bbep.width(), bbep.height());
             if (png->getBpp() == 1 || (png->getBpp() == 2 && png_count_colors(png, pPNG, iDataSize) == 2)) { // 1-bit image (single plane)
                 png->close(); // use a different PNGDraw callback for color matching
@@ -1786,6 +2008,9 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
     {
         Log_info("Drawing PNG");
         iRefreshMode = png_to_epd(image_buffer, data_size, false);
+#ifdef BOARD_ZECTRIX_NOTE4C
+        bAlloc = (bbep.getBuffer() != nullptr);
+#endif
     }
     else if (MOTOSHORT(image_buffer) == 0xffd8) {
         Log_info("Drawing JPEG");
@@ -1847,7 +2072,9 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
         }
 #ifdef BB_EPAPER
 #ifndef BOARD_SEEED_RETERMINAL_E1002
+#ifndef BOARD_ZECTRIX_NOTE4C
         bbep.writePlane(); // send image data to the EPD
+#endif
 #endif // !BOARD_SEEED_RETERMINAL_E1002
         iRefreshMode = REFRESH_PARTIAL;
 #endif // BB_EPAPER
@@ -2626,6 +2853,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     {
         Log_info("Display set to white");
         bbep.fillScreen(BBEP_WHITE);
+#if !defined(BOARD_ZECTRIX_NOTE4C)
 #ifdef BB_EPAPER
         if (!display_update_epaper(apiDisplayResult.response.maximum_compatibility ? REFRESH_FULL : REFRESH_FAST, true, true, PLANE_0)) {
             Log_error("display_show_msg: WiFi connect update failed");
@@ -2636,6 +2864,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         bbep.fullUpdate();
 #endif
         display_sleep(1000);
+#endif
     }
 
     auto width = display_width();
@@ -2763,7 +2992,13 @@ void display_sleep(void)
 {
     Log_info("Goto Sleep...");
 #ifdef BB_EPAPER
+#ifdef BOARD_ZECTRIX_NOTE4C
+    // The native Note4C refresh sequence already puts the SSD2683 into deep
+    // sleep and disables the EPD power rail.
+    digitalWrite(EPD_POWER_PIN, LOW);
+#else
     bbep.sleep(LIGHT_SLEEP);
+#endif
 #else
     bbep.einkPower(0);
     bbep.deInit();

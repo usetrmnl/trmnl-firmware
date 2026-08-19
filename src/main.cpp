@@ -4,6 +4,9 @@
 #include "esp_ota_ops.h"
 #include "power.h"
 #include "qa.h"
+#ifdef BOARD_ZECTRIX
+#include "zectrix.h"
+#endif
 
 #ifdef BOARD_TRMNL_X
 #include "display.h"
@@ -67,11 +70,16 @@ void setup() {
 }
 #else // TRMNL OG setup()
 void setup() {
+#ifdef BOARD_ZECTRIX
+  zectrix_power_init();
+#endif
 
+#ifndef NO_QA
   bool testPassed = checkIfAlreadyPassed();
   if (!testPassed) {
     startQA();
   }
+#endif
   esp_ota_mark_app_valid_cancel_rollback();
   bl_init();
 }
