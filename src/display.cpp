@@ -56,6 +56,7 @@ const TRMNL_DEVICE device_list[] =
   "xiao_epaper_mini", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 2,     1,    6,       BATT_ADC,  EPD_426,
   "xiao_epaper_display", 7, 9,  44,  38,   10,  4,    0xff, 0xff, 5,     1,    6,       BATT_ADC,  EPD_75,
   "xiao_epaper_3clr", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 5,     1,    6,       BATT_ADC,  EPD_75_3CLR,
+  "xiao_epaper_6clr", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 5,     1,    6,       BATT_ADC,  EPD_75_6CLR,
   "reterminal_e1001", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     1,    21,      BATT_ADC,  EPD_75,
   "reterminal_e1002", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     1,    21,      BATT_ADC,  EPD_75_6CLR,
   "crowpanel42",   0,    0,     0,   0,    0,   0,    0xff, 0xff, 2,     0xff, 0xff,    BATT_NONE, EPD_CROWPANEL, 
@@ -1650,7 +1651,7 @@ PNG *png = new PNG();
                 png->close();
                 delete(png); // free the decoder instance
                 bbep.writePlane(); // send the pixels to the display panel
-                return REFRESH_FULL;
+                return REFRESH_FAST;
             }
 #ifdef BOARD_TRMNL_4CLR
             Log_info("%s [%d]: decoding for 4-color EPD\r\n", __FILE__, __LINE__);
