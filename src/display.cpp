@@ -1348,7 +1348,7 @@ int png_draw(PNGDRAW *pDraw)
     uint8_t ucMask, ucPixel, src, *s, *d;
     int iPitch, iBpp;
 
-    if (y >= bbep.height()) return 0; // image is larger than the display, stop decoding it
+    if (y >= bbep.height() && bbep.height() != pDraw->iWidth) return 0; // image is larger than the display, stop decoding it
     if (pDraw->iPixelType == PNG_PIXEL_INDEXED || pDraw->iBpp > 4) { // need to convert through the palette and/or reduce the bpp
         s = bbep.tempBuffer(); // temp space we can use
         iBpp = (pDraw->iBpp > 4) ? 4 : pDraw->iBpp;
@@ -1693,7 +1693,7 @@ PNG *png = new PNG();
                 if (pDevice->epd_mosi_pin != 0 || pDevice->epd_sck_pin != 0) {
                     bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].TwoBit);
                     bbep.initIO(pDevice->epd_dc_pin, pDevice->epd_rst_pin, pDevice->epd_busy_pin, pDevice->epd_cs_pin,
-                        pDevice->epd_mosi_pin, pDevice->epd_sck_pin, 8000000);
+                    pDevice->epd_mosi_pin, pDevice->epd_sck_pin, 8000000);
                 } else {
                     bbep.begin(dpList[pDevice->panel_set][0].TwoBit);
                 }
