@@ -153,6 +153,70 @@ static bool display_update_epaper(int refreshMode, bool wait, bool writePlane = 
 }
 #endif
 
+static void WriteSPIByte(uint8_t data)
+{
+  for (int i=0; i<8; i++) {
+    digitalWrite(EPD_MOSI_PIN, (data & 0x80) ? 1:0);
+    digitalWrite(EPD_SCK_PIN, 1);
+    digitalWrite(EPD_SCK_PIN, 0);
+    data <<= 1;
+  }
+}
+
+static uint8_t ReadSPIByte(void)
+{
+uint8_t u8 = 0;
+  for (int i=0; i<8; i++) {
+    digitalWrite(EPD_SCK_PIN, 1);
+    digitalWrite(EPD_SCK_PIN, 0);
+    u8 <<= 1;
+    u8 |= digitalRead(EPD_MOSI_PIN);
+  }
+return u8;
+}
+/**
+ * @brief Function to read the EPD revision to know what temperature profile to use
+ * @param none
+ * @return 32-bit value read from the panel's revision (REV) command
+ */
+uint32_t get_panel_id(void)
+{
+uint32_t u32 = 0;
+uint8_t u8;
+
+    // Initialize the SPI bus in 'bit-bang' mode before running the normal init sequence
+    // This will allow us to use MOSI as a bidirectional line for reading data from the panel
+    pinMode(EPD_SCK_PIN, OUTPUT);
+    pinMode(EPD_CS_PIN, OUTPUT);
+    digitalWrite(EPD_CS_PIN, 1);
+    pinMode(EPD_RST_PIN, OUTPUT);
+    pinMode(EPD_DC_PIN, OUTPUT);
+    pinMode(EPD_BUSY_PIN, INPUT);
+
+    // Reset the panel
+    digitalWrite(EPD_RST_PIN, 0);
+    delay(20);
+    digitalWrite(EPD_RST_PIN, 1);
+    delay(20);
+    if (digitalRead(EPD_BUSY_PIN) == 0) { // it's a SSD16xx; not useful at the moment because our 7.5" B/W is a UC81xx type panel
+        return 0;
+    }
+    digitalWrite(EPD_DC_PIN, 0); // command mode
+    digitalWrite(EPD_CS_PIN, 0);
+    pinMode(EPD_MOSI_PIN, OUTPUT);
+    WriteSPIByte(0x70); // Revision (REV) command
+    digitalWrite(EPD_DC_PIN, 1); // data mode
+    pinMode(EPD_MOSI_PIN, INPUT);
+    for (int i=0; i<7; i++) {
+        u8 = ReadSPIByte();
+        if (i >= 3) { // first 3 bytes are 0xff
+            u32 <<= 8;
+            u32 |= u8;
+        }
+    }
+    digitalWrite(EPD_CS_PIN, 1);
+    return u32;
+} /* get_panel_id() */
 /**
  * @brief Function to init the display
  * @param none
@@ -168,6 +232,9 @@ void display_init(void)
     pinMode(47, OUTPUT); // enable EPD power
     digitalWrite(47, 1);
 #endif
+    uint32_t u32ID = get_panel_id();
+    Log_info("Panel ID = 0x%08x\n", u32ID);
+
     bbep.setPanelType(dpList[iTempProfile].OneBit); // must be set BEFORE calling initio
     Log_info("BB e-Paper init");
 #ifdef BOARD_SEEED_RETERMINAL_E1002
