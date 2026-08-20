@@ -15,7 +15,10 @@
 #include "messages.h"
 #include "config.h"
 #define MAX_BIT_DEPTH 8
-#ifndef BOARD_X_CLASS
+#ifdef BOARD_TRMNL_GEN2
+#include "gen2_display.h"
+#endif
+#if !defined(BOARD_X_CLASS)
 #define BB_EPAPER
 #include "bb_epaper.h"
 #include <SPIFFS.h>
@@ -58,11 +61,9 @@ BBEPAPER bbep(EP73_SPECTRA_800x480);
 };
 BBEPAPER bbep(EP75_800x480);
 #endif
-#ifdef BOARD_SEEED_RETERMINAL_E1002
 uint8_t u8SpectraPal[512]; // RGB333 mapped to closest Spectra6 color
-#endif // E1002
 
-#else // BOARD_X_CLASS
+#else // BOARD_X_CLASS (and not BOARD_TRMNL_GEN2)
 #include "esp_sleep.h"
 #include "driver/gpio.h"
 #include "driver/rtc_io.h"
@@ -163,7 +164,9 @@ void display_init(void)
     Log_info("dev module start");
     iTempProfile = preferences.getUInt(PREFERENCES_TEMP_PROFILE, TEMP_PROFILE_DEFAULT);
     Log_info("Saved temperature profile: %" PRIu32, iTempProfile);
-#ifdef BB_EPAPER
+#ifdef BOARD_TRMNL_GEN2
+    gen2_display_init();
+#elif defined BB_EPAPER
 #ifdef BOARD_SEEED_STICKY
     pinMode(47, OUTPUT); // enable EPD power
     digitalWrite(47, 1);
@@ -560,6 +563,7 @@ void display_sleep(uint32_t u32Millis)
  */
 void display_reset(void)
 {
+#ifndef BOARD_TRMNL_GEN2
     Log_info("e-Paper Clear start");
     bbep.fillScreen(BBEP_WHITE);
 #ifdef BB_EPAPER
@@ -574,6 +578,7 @@ void display_reset(void)
 #endif
     Log_info("e-Paper Clear end");
     // DEV_Delay_ms(500);
+#endif // BOARD_TRMNL_GEN2
 }
 
 /**
@@ -582,7 +587,11 @@ void display_reset(void)
  */
 uint16_t display_height()
 {
+#ifdef BOARD_TRMNL_GEN2
+    return 720;  // GEN2_IMG_SECTION_H
+#else
     return bbep.height();
+#endif
 }
 
 /**
@@ -591,7 +600,11 @@ uint16_t display_height()
  */
 uint16_t display_width()
 {
+#ifdef BOARD_TRMNL_GEN2
+    return 5120;  // GEN2_DISPLAY_VISIBLE_W
+#else
     return bbep.width();
+#endif
 }
 
 #ifdef BOARD_X_CLASS
@@ -651,6 +664,7 @@ void display_draw_touchbar_indicator(touchbar_side_t side, bool filled)
  * @param is_center_aligned If true, center the text; if false, left-align
  * @return none
  */
+#ifndef BOARD_TRMNL_GEN2
 void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message,
                              uint16_t max_width, uint16_t font_width,
                              UWORD color_fg, UWORD color_bg, const void *font,
@@ -797,6 +811,7 @@ void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message,
         bbep.print(lines[j]);
     }
 }
+#endif // BOARD_TRMNL_GEN2
 /**
  * @brief Reduce the bit depth of line of pixels using thresholding (aka simple color mapping)
  * @param Destination bit count (1 or 2)
@@ -963,7 +978,6 @@ unsigned char GetBWYRPixel(int r, int g, int b)
 } /* GetBWYRPixel() */
 #endif // BB_EPAPER
 
-#ifdef BOARD_SEEED_RETERMINAL_E1002
 //
 // bb_epaper colors to map to Spectra6 colors
 // The RGB values are not correct for the panel, but for simple mapping
@@ -1018,14 +1032,13 @@ uint16_t rgb333;
     c = u8SpectraPal[rgb333];
     return c;
 } /* GetSpectraPixel() */
-#endif // E1002
+
 /**
  * @brief Callback function for each line of PNG decoded
  * @param PNGDRAW structure containing the current line and relevant info
  * @return none
  */
 #ifdef BB_EPAPER
-#ifdef BOARD_SEEED_RETERMINAL_E1002
 //
 // Draw the PNG image into the local framebuffer memory using the drawPixel() method
 // to do color translation and to properly format the memory layout
@@ -1125,7 +1138,6 @@ int png_draw_6clr(PNGDRAW *pDraw)
         } // for x
     return 1; // continue decoding
 } /* png_draw_6clr() */
-#endif // E1002 (Spectra6 only)
 
 #ifdef BOARD_TRMNL_4CLR
 //
@@ -1346,6 +1358,7 @@ static void Expand2bppLineTo4bpp(const uint8_t *src, uint8_t *dest, int width)
 
 int png_draw(PNGDRAW *pDraw)
 {
+#ifndef BOARD_TRMNL_GEN2
     int x, y = pDraw->y;
     uint8_t uc = 0;
     uint8_t ucMask, ucPixel, src, *s, *d;
@@ -1431,6 +1444,9 @@ int png_draw(PNGDRAW *pDraw)
         }
     }
     return 1;
+#else
+    return 0;
+#endif // BOARD_TRMNL_GEN2
 } /* png_draw() */
 #endif
 //
@@ -1505,6 +1521,9 @@ int i, iColors;
  */
 int jpeg_draw(JPEGDRAW *pDraw)
 {
+#ifdef BOARD_TRMNL_GEN2
+    return 0;
+#else
 #ifdef BB_EPAPER
 int x, y;
 int iPlane = *(int *)pDraw->pUser;
@@ -1553,6 +1572,7 @@ uint8_t src=0, uc=0, ucMask, *s, *d, *pTemp = bbep.getCache();
   } // for y
 #endif
     return 1; // continue decoding
+#endif // BOARD_TRMNL_GEN2
 } /* jpeg_draw() */
 /**
  * @brief Function to decode and display a JPEG image from memory
@@ -1564,6 +1584,9 @@ uint8_t src=0, uc=0, ucMask, *s, *d, *pTemp = bbep.getCache();
  */
 int jpeg_to_epd(const uint8_t *pJPEG, int iDataSize)
 {
+#ifdef BOARD_TRMNL_GEN2
+    return 0;
+#else
 JPEGDEC *jpg = new JPEGDEC();
 int rc = -1; // invalid mode
 int iPlane = 0;
@@ -1609,6 +1632,7 @@ int iPlane = 0;
     jpg->close();
     delete(jpg);
     return rc;
+#endif // BOARD_TRMNL_GEN2
 } /* jpeg_to_epd() */
 /**
  * @brief Function to decode and display a PNG image from memory
@@ -1620,6 +1644,9 @@ int iPlane = 0;
  */
 int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious)
 {
+#ifdef BOARD_TRMNL_GEN2
+    return 0;
+#else
 int iPlane = PNG_1_BIT, rc = -1;
 PNG *png = new PNG();
 
@@ -1733,6 +1760,7 @@ PNG *png = new PNG();
     }
     delete(png); // free the decoder instance
     return rc;
+#endif // BOARD_TRMNL_GEN2
 } /* png_to_epd() */
 /**
  * @brief Function to show the image on the display
@@ -1743,6 +1771,11 @@ PNG *png = new PNG();
 void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool bSkipClear)
 
 {
+#ifdef BOARD_TRMNL_GEN2
+    // Gen2: 31.5" ACeP 6-color E-Ink via 8× E2803 ICs. Bypass bb_epaper entirely.
+    gen2_display_image(image_buffer, (uint32_t)data_size);
+    return;
+#else // !BOARD_TRMNL_GEN2
     bool isPNG = data_size >= 4 && MOTOLONG(image_buffer) == (int32_t)0x89504e47;
     auto width = display_width();
     auto height = display_height();
@@ -1929,6 +1962,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
 #endif
     iUpdateCount++;
     Log_info("display_show_image end");
+#endif // BOARD_TRMNL_GEN2
 }
 /**
  * @brief Function to read an image from the file system
@@ -1938,6 +1972,10 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
  */
 uint8_t * display_read_file(const char *filename, int *file_size)
 {
+#ifdef BOARD_TRMNL_GEN2
+    if (file_size) *file_size = 0;
+    return nullptr; // filesystem not used on gen2
+#else
 File f = FS.open(filename, "r");
 uint8_t *buffer;
 
@@ -1968,6 +2006,7 @@ uint8_t *buffer;
   f.read(buffer, *file_size);
   f.close();
   return buffer;
+#endif // BOARD_TRMNL_GEN2
 } /* display_read_file() */
 
 /**
@@ -1978,6 +2017,7 @@ uint8_t *buffer;
  */
 void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *message_text)
 {
+#ifndef BOARD_TRMNL_GEN2
     auto width = display_width();
     auto height = display_height();
     UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
@@ -2495,11 +2535,13 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
     bbep.fullUpdate(CLEAR_SLOW, true);
 #endif
     Log_info("display_show_msg end");
+#endif // BOARD_TRMNL_GEN2
 }
 
 
 void display_show_msg_qa(uint8_t *image_buffer, const float *voltage, const float *temperature, bool qa_result)
 {
+#ifndef BOARD_TRMNL_GEN2
     auto width = display_width();
     auto height = display_height();
     UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
@@ -2599,6 +2641,7 @@ void display_show_msg_qa(uint8_t *image_buffer, const float *voltage, const floa
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.print(string3);
     */
+#endif // BOARD_TRMNL_GEN2
 }
 
 /**
@@ -2613,6 +2656,7 @@ void display_show_msg_qa(uint8_t *image_buffer, const float *voltage, const floa
  */
 void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_id, bool id, const char *fw_version, String message)
 {
+#ifndef BOARD_TRMNL_GEN2
     Log_info("Free heap in display_show_msg - %" PRIu32, ESP.getMaxAllocHeap());
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef BB_EPAPER
@@ -2752,6 +2796,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     bbep.fullUpdate();
 #endif
     Log_info("display_show_msg2 end");
+#endif // BOARD_TRMNL_GEN2
 }
 
 /**
@@ -2761,6 +2806,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
  */
 void display_sleep(void)
 {
+#ifndef BOARD_TRMNL_GEN2
     Log_info("Goto Sleep...");
 #ifdef BB_EPAPER
     bbep.sleep(LIGHT_SLEEP);
@@ -2768,4 +2814,5 @@ void display_sleep(void)
     bbep.einkPower(0);
     bbep.deInit();
 #endif
+#endif // BOARD_TRMNL_GEN2
 }

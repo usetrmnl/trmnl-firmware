@@ -22,6 +22,10 @@
 /sdkconfigs/sdkconfig.trmnl_gen2
 /sdkconfigs/sdkconfig.local
 
+# IDF component manager lock file — regenerated per target; committing it breaks
+# cross-target builds (esp32c5 lock cannot be parsed when building esp32c3 envs).
+dependencies.lock
+
 # Handled by espressif
 managed_components/
 

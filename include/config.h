@@ -1,6 +1,14 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+// BOARD_FRAME is the N16R8 dev variant of the gen2 hardware.
+// Map it to BOARD_TRMNL_GEN2 so all gen2 driver code applies unchanged.
+#ifdef BOARD_FRAME
+#ifndef BOARD_TRMNL_GEN2
+#define BOARD_TRMNL_GEN2
+#endif
+#endif
+
 #define FW_MAJOR_VERSION 1
 #define FW_MINOR_VERSION 8
 #define FW_PATCH_VERSION 14
