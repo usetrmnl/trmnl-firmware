@@ -68,7 +68,7 @@
 #define EPD_BUSY_PIN 4
 #define SENSOR_SDA   21
 #define SENSOR_SCL   20
-#elif defined( BOARD_FRAME )
+#elif defined(BOARD_FRAME)
 // N16R8 dev board: SPI on dedicated pins, EPD BUSY via MOSFET-inverted GPIO.
 // CS/RST/DC and BQ25616 PG/STAT are managed by lib/trmnl_gen2 via TCA9555.
 #define EPD_SCK_PIN  9   // GEN2_SPI_CLK
