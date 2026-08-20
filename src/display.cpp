@@ -1319,6 +1319,12 @@ int png_draw(PNGDRAW *pDraw)
         }
     }
     bbep.writeData(pTemp, (iWidth+7)/8);
+    if (iWidth < bbep.width()) { // fill in missing pixels for images that are narrower than the panel width
+        int i = (bbep.width()+7)/8;
+        i -= ((iWidth+7)/8);
+        memset(pTemp, 0xff, i);
+        bbep.writeData(pTemp, i);
+    }
     return 1;
 } /* png_draw() */
 #else // TRMNL_X version
