@@ -973,6 +973,18 @@ void bl_init(void)
 
 // #endif
 
+#ifdef BOARD_TRMNL_X
+  // Read the gauge before the panel draws load current, and before the logo
+  // is drawn so its battery icon has a snapshot to read.
+  battery_count = detect_battery_count();
+  battery_charging = (power().chargingStatus() == ChargingStatus::CHARGING);
+  Log_info("BATTERY COUNT: %d", battery_count);
+  Log_info("BATTERY CHARGING: %s", battery_charging ? "YES" : "NO");
+
+  battery().gaugeInit();
+  vBatt = battery().readVoltage(); // Read the battery voltage BEFORE WiFi is turned on
+#endif // BOARD_TRMNL_X
+
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
   {
     Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
@@ -1001,16 +1013,6 @@ void bl_init(void)
     Log.info("%s [%d]: Display TRMNL logo end\r\n", __FILE__, __LINE__);
     preferences.putString(PREFERENCES_FILENAME_KEY, "");
   }
-#ifdef BOARD_TRMNL_X
-  battery_count = detect_battery_count();
-  battery_charging = (power().chargingStatus() == ChargingStatus::CHARGING);
-  Log_info("BATTERY COUNT: %d", battery_count);
-  Log_info("BATTERY CHARGING: %s", battery_charging ? "YES" : "NO");
-
-  battery().gaugeInit();
-  vBatt = battery().readVoltage(); // Read the battery voltage BEFORE WiFi is turned on
-#endif // BOARD_TRMNL_X
-
   Log_info("Firmware version %s", Messages::firmware_version().c_str());
   Log_info("Arduino version %d.%d.%d", ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH);
   Log_info("ESP-IDF version %d.%d.%d", ESP_IDF_VERSION_MAJOR, ESP_IDF_VERSION_MINOR, ESP_IDF_VERSION_PATCH);
