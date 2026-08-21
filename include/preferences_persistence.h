@@ -1,13 +1,16 @@
+#pragma once
 
-#include <persistence_interface.h>
 #include <Preferences.h>
+#include <persistence_interface.h>
+
+/// @brief Log the NVS partition's used/total entry counts.
+void log_nvs_usage();
 
 /**
  * NVMRAM-backed persistence on ESP32
  * https://docs.espressif.com/projects/arduino-esp32/en/latest/tutorials/preferences.html
  */
-class PreferencesPersistence : public Persistence
-{
+class PreferencesPersistence : public Persistence {
 public:
   PreferencesPersistence(Preferences &preferences);
 
@@ -34,5 +37,5 @@ public:
   bool remove(const char *key) override;
 
 private:
-  Preferences& _preferences;
+  Preferences &_preferences;
 };

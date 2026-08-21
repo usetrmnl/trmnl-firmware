@@ -2,17 +2,14 @@
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
+
+#include "hardware_types.h"
 #include "special_function.h"
+#include "trmnl_log.h"
 
-enum class ApiSetupOutcome
-{
-  Ok,
-  DeserializationError,
-  StatusError
-};
+enum class ApiSetupOutcome { Ok, DeserializationError, StatusError };
 
-struct ApiSetupResponse
-{
+struct ApiSetupResponse {
   ApiSetupOutcome outcome;
   uint16_t status;
   String api_key;
@@ -21,14 +18,19 @@ struct ApiSetupResponse
   String message;
 };
 
-enum class ApiDisplayOutcome
-{
+struct ApiSetupInputs {
+  String baseUrl;
+  String macAddress;
+  String firmwareVersion;
+  String model;
+};
+
+enum class ApiDisplayOutcome {
   Ok,
   DeserializationError,
 };
 
-struct ApiDisplayResponse
-{
+struct ApiDisplayResponse {
   ApiDisplayOutcome outcome;
   String error_detail;
   uint64_t status;
@@ -46,8 +48,7 @@ struct ApiDisplayResponse
   String touchbar_mode;
 };
 
-struct ApiDisplayInputs
-{
+struct ApiDisplayInputs {
   String baseUrl;
   String apiKey;
   String friendlyId;
@@ -55,9 +56,9 @@ struct ApiDisplayInputs
   uint32_t refreshRate;
   String macAddress;
   float batteryVoltage;
+  ChargingStatus chargingStatus;
 #ifdef BOARD_TRMNL_X
   int batteryCount;
-  int batteryCharging;
   int batteryCurrent;
   int currentBatteryCapacity;
   int maxBatteryCapacity;
@@ -66,21 +67,29 @@ struct ApiDisplayInputs
   int stateOfHealth;
 #endif
   String firmwareVersion;
+  String firmwareCommit;
   String model;
   int rssi;
+  String wifiBand;
   int displayWidth;
   int displayHeight;
   SPECIAL_FUNCTION specialFunction;
+  UsbStatus usbStatus;
+  bool imageCached;
+  int prevWakeTime;
 };
 
-typedef struct
-{
+struct ApiLogInputs {
+  String macAddress;
+  String apiKey;
+};
+
+typedef struct {
   char current_image[100];
   char current_error_message[100];
 } ScreenStatus;
 
-typedef struct DeviceStatusStamp
-{
+typedef struct DeviceStatusStamp {
   int8_t wifi_rssi_level;
   char wifi_status[30];
   uint32_t refresh_rate;
@@ -96,8 +105,7 @@ typedef struct DeviceStatusStamp
 
 } DeviceStatusStamp;
 
-struct LogWithDetails
-{
+struct LogWithDetails {
   DeviceStatusStamp deviceStatusStamp;
   time_t timestamp;
   int codeline;
@@ -108,4 +116,5 @@ struct LogWithDetails
   String filenameNew;
   bool logRetry;
   int retryAttempt;
+  LogLevel level;
 };

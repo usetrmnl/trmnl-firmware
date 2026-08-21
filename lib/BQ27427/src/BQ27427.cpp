@@ -705,8 +705,7 @@ bool BQ27427::executeControlWord(uint16_t function)
 	uint8_t subCommandMSB = (function >> 8);
 	uint8_t subCommandLSB = (function & 0x00FF);
 	uint8_t command[2] = {subCommandLSB, subCommandMSB};
-	uint8_t data[2] = {0, 0};
-	
+
 	if (i2cWriteBytes((uint8_t) 0, command, 2))
 		return true;
 	
@@ -787,22 +786,27 @@ bool BQ27427::writeBlockChecksum(uint8_t csum)
 uint8_t BQ27427::readExtendedData(uint8_t classID, uint8_t offset)
 {
 	uint8_t retData = 0;
-	if (!_userConfigControl) enterConfig(false);
-		
+//	if (!_userConfigControl) enterConfig(false);
+// Adds unnecessary delays since we're just reading data
+
 	if (!blockDataControl()) // // enable block data memory control
 		return false; // Return false if enable fails
 	if (!blockDataClass(classID)) // Write class ID using DataBlockClass()
 		return false;
-	
+	delayMicroseconds(200);
+
 	blockDataOffset(offset / 32); // Write 32-bit block offset (usually 0)
-	
-	computeBlockChecksum(); // Compute checksum going in
-	uint8_t oldCsum = blockDataChecksum();
+	delay(5); // allow block to load into RAM before reading it back
+
+// No need to compute a checksum because we're READING data, not writing data
+//	computeBlockChecksum(); // Compute checksum going in
+//	uint8_t oldCsum = blockDataChecksum();
 	/*for (int i=0; i<32; i++)
 		Serial.print(String(readBlockData(i)) + " ");*/
 	retData = readBlockData(offset % 32); // Read from offset (limit to 0-31)
-	
-	if (!_userConfigControl) exitConfig();
+
+// Adds unnecessary delays since we're just reading data
+//	if (!_userConfigControl) exitConfig();
 	
 	return retData;
 }
@@ -827,7 +831,7 @@ bool BQ27427::writeExtendedData(uint8_t classID, uint8_t offset, uint8_t * data,
 	
 	blockDataOffset(offset / 32); // Write 32-bit block offset (usually 0)
 	computeBlockChecksum(); // Compute checksum going in
-	uint8_t oldCsum = blockDataChecksum();
+	blockDataChecksum(); // read old checksum (value unused)
 
 	// Write data bytes:
 	for (int i = 0; i < len; i++)
@@ -991,10 +995,11 @@ bool BQ27427::applyGoldenFile(bool twoCell)
 		uint8_t cmd[] = {0x02, 0x00};
 		i2cWriteBytes(0x00, cmd, 2);
 		const uint8_t exp[] = {0x02, 0x02};
-		if (!goldenFileVerify(0x00, exp, 2))
+		if (!goldenFileVerify(0x00, exp, 2)) {
 			Serial.printf("BQ27427 golden file [%s]: WARNING — FW version != 2.02, continuing anyway\n", tag);
-		else
+		} else {
 			Serial.printf("BQ27427 golden file [%s]: FW version 2.02 confirmed\n", tag);
+		}
 	}
 
 	//------------------------------------------------------------------
@@ -1262,6 +1267,60 @@ bool BQ27427::configureOneCell()
 bool BQ27427::configureTwoCell()
 {
 	return applyGoldenFile(true);
+}
+
+// Connects to the chip and reloads the golden-file profile if a reset was
+// detected (ITPOR flag) or if the chip's stored design energy scale doesn't
+// match the currently detected cell count
+bool BQ27427::connectAndConfigure(int sda, int scl, bool oneCellPack)
+{
+	bool alive = begin(sda, scl);
+
+	if (alive) {
+		uint8_t expectedScale = oneCellPack ? 1 : 10;
+		bool needsConfig = (flags() & BQ27427_FLAG_ITPOR) || (designEnergyScale() != expectedScale);
+
+		if (needsConfig) {
+			if (oneCellPack) {
+				configureOneCell();
+			} else {
+				configureTwoCell();
+			}
+
+			// After SOFT_RESET the BQ27427 enters INITIALIZATION (ITPOR=1).
+			// The IT algorithm needs an OCV measurement (battery at rest) to
+			// transition to NORMAL mode and produce accurate capacity values.
+			// Poll for up to 5 s; under active load it may not clear until rest.
+			unsigned long t0 = millis();
+			while ((flags() & BQ27427_FLAG_ITPOR) && (millis() - t0 < 5000)) {
+				delay(100);
+			}
+		}
+	}
+
+	_initialized = alive && !(flags() & BQ27427_FLAG_ITPOR);
+	return _initialized;
+}
+
+// Reads a full snapshot of gas gauge registers and range-checks it.
+bool BQ27427::readSnapshot(BQ27427Snapshot &out)
+{
+	uint8_t energyScale = designEnergyScale();
+
+	out.flags = flags();
+	out.energyScale = energyScale;
+	out.soc = soc();
+	out.voltage = voltage();
+	out.current = current(AVG);
+	out.temperature = float(temperature(BATTERY) - 2732) / 10.0;
+	out.capacityFull = capacity(FULL) * energyScale;
+	out.capacityRemain = capacity(REMAIN) * energyScale;
+	out.health = soh();
+
+	// A failed I2C transaction returns 0xFFFF, which reads back as
+	// SOC=65535, voltage=65535 mV, etc. — well outside these sane ranges.
+	return _initialized && (out.soc >= 0 && out.soc <= 100) && (out.voltage <= 10000) &&
+		(out.health >= 0 && out.health <= 100) && (out.temperature >= -40.0 && out.temperature <= 100.0);
 }
 
 BQ27427 lipo; // Use lipo.[] to interact with the library in an Arduino sketch

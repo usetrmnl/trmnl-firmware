@@ -10,6 +10,7 @@
 #include "esp_loader_io.h"
 #include "esp32_port.h"
 #include "modem.h"
+#include <string_utils.h>
 
 #if defined (BOARD_TRMNL_X) || defined (BOARD_TRLML_X_EPDIY)
 #include <LittleFS.h>
@@ -40,6 +41,14 @@ Modem::Modem(uint32_t baudRate) : ModemSerial(0) {
     return;
   } else {
     Serial.println("[MODEM] set to station mode");
+  }
+
+  sendCommand("AT+CWAUTOCONN=0");
+  if (waitForResponse("OK", 5000).isEmpty()) {
+    Serial.println("[MODEM] AT+CWAUTOCONN failed.");
+    return;
+  } else {
+    Serial.println("[MODEM] Auto-connect disabled");
   }
 
   // Switch modem to 5 Mbps with RTS/CTS (volatile; reverts on power cycle)
@@ -437,10 +446,10 @@ std::vector<Modem::ModemNetwork> Modem::scanNetworks() {
 // ---------------------------------------------------------------------------
 // connectToNetwork() / disconnectFromNetwork()
 // ---------------------------------------------------------------------------
-bool Modem::connectToNetwork(const String& ssid, const String& password) {
-  // Escape backslash and double-quote in ssid/password
-  String s = ssid;      s.replace("\\", "\\\\"); s.replace("\"", "\\\"");
-  String p = password;  p.replace("\\", "\\\\"); p.replace("\"", "\\\"");
+bool Modem::connectToNetwork(const String& ssid, const String& password, const String& hostname) {
+  String s = escape_modem_param(ssid);
+  String p = escape_modem_param(password);
+  String h = escape_modem_param(hostname);
 
   while (ModemSerial.available()) ModemSerial.read();  // flush
 
@@ -448,6 +457,11 @@ bool Modem::connectToNetwork(const String& ssid, const String& password) {
   if (waitForResponse("OK", 3000).isEmpty()) {
     Serial.println("[MODEM] connectToNetwork: AT+CWMODE=1 failed");
     return false;
+  }
+
+  if (hostname.length() > 0) {
+    sendCommand(("AT+CWHOSTNAME=\"" + h + "\"").c_str());
+    waitForResponse("OK", 3000);
   }
 
   String cmd = "AT+CWJAP=\"" + s + "\",\"" + p + "\"";
@@ -509,8 +523,10 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, const String& saveToFil
     }
   }
 
+  String urlParam = escape_modem_param(url);
+
   // Use AT+HTTPURLCFG only when the URL itself is too long to fit inline.
-  bool useUrlCfg = (url.length() + 24 > 256);
+  bool useUrlCfg = (urlParam.length() + 24 > 256);
 
   if (useUrlCfg) {
     Serial.printf("[HTTP] URL %u bytes — using AT+HTTPURLCFG\n", url.length());
@@ -537,11 +553,11 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, const String& saveToFil
     Serial.flush();
 
     while (ModemSerial.available()) ModemSerial.read();
-    Serial.println("[HTTP] cmd: AT+HTTPCLIENT=2,0,\"\",,,2");
+    Serial.println("[HTTP] cmd: AT+HTTPCLIENT=2,1,\"\",,,2");
     Serial.flush();
-    sendCommand("AT+HTTPCLIENT=2,0,\"\",,,2");
+    sendCommand("AT+HTTPCLIENT=2,1,\"\",,,2");
   } else {
-    String httpCmd = "AT+HTTPCLIENT=2,0,\"" + url + "\",,,2";
+    String httpCmd = "AT+HTTPCLIENT=2,1,\"" + urlParam + "\",,,2";
     Serial.printf("[HTTP] cmd(%u): %s\n", httpCmd.length(), httpCmd.substring(0, 180).c_str());
     Serial.flush();
     sendCommand(httpCmd.c_str());
@@ -734,7 +750,7 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, const String& saveToFil
 // ---------------------------------------------------------------------------
 // httpGet() — chunk-callback overload: calls chunkCb(data, len) per chunk
 // ---------------------------------------------------------------------------
-Modem::ModemHttpResult Modem::httpGet(const String& url, std::function<bool(const uint8_t*, size_t)> chunkCb, size_t contentLength, const String& reqHeaders) {
+Modem::ModemHttpResult Modem::httpGet(const String& url, std::function<bool(const uint8_t*, size_t)> chunkCb, size_t contentLength, const String& reqHeaders, unsigned long timeoutMs) {
   while (ModemSerial.available()) ModemSerial.read();  // flush
 
   if (!reqHeaders.isEmpty()) {
@@ -760,7 +776,9 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, std::function<bool(cons
     }
   }
 
-  bool useUrlCfg = (url.length() + 24 > 256);
+  String urlParam = escape_modem_param(url);
+
+  bool useUrlCfg = (urlParam.length() + 24 > 256);
   if (useUrlCfg) {
     sendCommand(("AT+HTTPURLCFG=" + String(url.length())).c_str());
     if (waitForResponse(">", 5000).isEmpty()) return {false, 0, "", 0};
@@ -768,9 +786,9 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, std::function<bool(cons
     ModemSerial.flush();
     if (waitForResponse("SET OK", 5000).isEmpty()) return {false, 0, "", 0};
     while (ModemSerial.available()) ModemSerial.read();
-    sendCommand("AT+HTTPCLIENT=2,0,\"\",,,2");
+    sendCommand("AT+HTTPCLIENT=2,1,\"\",,,2");
   } else {
-    sendCommand(("AT+HTTPCLIENT=2,0,\"" + url + "\",,,2").c_str());
+    sendCommand(("AT+HTTPCLIENT=2,1,\"" + urlParam + "\",,,2").c_str());
   }
 
   enum class ParseState { SCAN, SIZE, DATA };
@@ -797,7 +815,7 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, std::function<bool(cons
 
   unsigned long downloadStart  = 0;
   unsigned long lastProgressMs = 0;
-  unsigned long deadline = millis() + 60000;
+  unsigned long deadline = millis() + timeoutMs;
 
   while (!done && !error && !cbAbort && millis() < deadline) {
     esp_task_wdt_reset();
@@ -980,5 +998,38 @@ String Modem::getMacAddress() {
   String mac = resp.substring(start, end);
   Serial.printf("[MODEM] MAC: %s\n", mac.c_str());
   return mac;
+}
+// ---------------------------------------------------------------------------
+// getSignalRssi(): AT+CWJAP? — RSSI (dBm) of the joined AP, 0 if not connected
+// ---------------------------------------------------------------------------
+int32_t Modem::getSignalRssi() {
+  while (ModemSerial.available()) ModemSerial.read();  // flush
+
+  sendCommand("AT+CWJAP?");
+  String resp = waitForResponse("OK", 3000);
+
+  // Response (when connected):
+  //   +CWJAP:"ssid","bssid",<channel>,<rssi>,<pci_en>,...\r\nOK
+  // When not connected: "No AP\r\nOK" (no +CWJAP: line).
+  int idx = resp.indexOf("+CWJAP:");
+  if (idx < 0) {
+    Serial.println("[MODEM] getSignalRssi: not connected / parse failed");
+    return 0;
+  }
+
+  // Skip the two quoted fields (ssid, bssid), then channel, to reach rssi.
+  int q2 = resp.indexOf('"', resp.indexOf('"', idx) + 1); // end of ssid
+  int q4 = resp.indexOf('"', resp.indexOf('"', q2 + 1) + 1); // end of bssid
+  int cChannel = resp.indexOf(',', q4 + 1);    // comma before channel
+  int cRssi    = resp.indexOf(',', cChannel + 1); // comma before rssi
+  int cEnd     = resp.indexOf(',', cRssi + 1);    // comma after rssi (or -1)
+  if (q2 < 0 || q4 < 0 || cChannel < 0 || cRssi < 0) {
+    Serial.println("[MODEM] getSignalRssi: field parse failed");
+    return 0;
+  }
+
+  int32_t rssi = resp.substring(cRssi + 1, cEnd >= 0 ? cEnd : resp.length()).toInt();
+  Serial.printf("[MODEM] RSSI: %d dBm\n", rssi);
+  return rssi;
 }
 #endif // BOARD_TRMNL_X

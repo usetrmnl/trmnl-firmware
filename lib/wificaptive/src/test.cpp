@@ -2,21 +2,19 @@
 #include <WebServer.h>
 #include <test.h>
 
-extern AsyncWebServer* _server;
-
+extern AsyncWebServer *_server;
 
 const int adcPin = 3; // ADC pin for voltage measurement
 const int samples = 1000;
 const int intervalMs = 7000; // 7s
-const int sample_interval = 1; //1 ms
+const int sample_interval = 1; // 1 ms
 const int temperature_threshold = 55; // 35 by Celsium
 
 float start_temp = 0;
 
-
 void setupTestEndpoint() {
-  _server->on("/run-test", HTTP_GET, [](AsyncWebServerRequest* request){
-    
+  _server->on("/run-test", HTTP_GET, [](AsyncWebServerRequest *request) {
+
   });
 }
 

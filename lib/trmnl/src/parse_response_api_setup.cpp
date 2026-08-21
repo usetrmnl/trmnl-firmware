@@ -1,24 +1,28 @@
 #include <ArduinoJson.h>
-#include "api_response_parsing.h"
 #include <trmnl_log.h>
 
-ApiSetupResponse parseResponse_apiSetup(String &payload)
-{
+#include "api_response_parsing.h"
+
+ApiSetupResponse parseResponse_apiSetup(String &payload) {
   JsonDocument doc;
   DeserializationError error = deserializeJson(doc, payload);
 
-  if (error)
-  {
+  if (error) {
     Log_error("JSON deserialization error.");
-    return {.outcome = ApiSetupOutcome::DeserializationError};
+    return {
+        .outcome = ApiSetupOutcome::DeserializationError,
+        .status = 0,
+        .api_key = "",
+        .friendly_id = "",
+        .image_url = "",
+        .message = ""};
   }
 
   ApiSetupResponse response;
   response.status = doc["status"].as<int>();
   response.message = doc["message"] | "";
 
-  if (response.status != 200)
-  {
+  if (response.status != 200) {
     Log_info("status FAIL.");
     response.outcome = ApiSetupOutcome::StatusError;
     return response;

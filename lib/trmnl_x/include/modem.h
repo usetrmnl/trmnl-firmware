@@ -35,7 +35,7 @@ public:
   };
   std::vector<ModemNetwork> scanNetworks();
 
-  bool connectToNetwork(const String& ssid, const String& password);
+  bool connectToNetwork(const String& ssid, const String& password, const String& hostname = "");
   bool disconnectFromNetwork();
 
   struct ModemHttpResult {
@@ -52,11 +52,14 @@ public:
   //               Set via AT+HTTPCHEAD before the request; cleared afterwards.
   ModemHttpResult httpGet(const String& url, const String& saveToFile = "", size_t contentLength = 0, const String& reqHeaders = "");
   // Chunk-callback overload: chunkCb is called for each received chunk; return false to abort
-  ModemHttpResult httpGet(const String& url, std::function<bool(const uint8_t*, size_t)> chunkCb, size_t contentLength = 0, const String& reqHeaders = "");
+  ModemHttpResult httpGet(const String& url, std::function<bool(const uint8_t*, size_t)> chunkCb, size_t contentLength = 0, const String& reqHeaders = "", unsigned long timeoutMs = 60000);
 
   // Configures modem SNTP and returns Unix timestamp (UTC), or 0 on failure.
   time_t getSntpTime();
 
   // Returns the MAC address of the ESP32-C5 station, or empty string on failure.
   String getMacAddress();
+
+  // Returns the RSSI (dBm) of the currently joined AP, (replaces WiFi.RSSI() on TRMNL_X)
+  int32_t getSignalRssi();
 };
