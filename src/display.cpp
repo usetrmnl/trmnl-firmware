@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <battery.h>
 #include <display.h>
 #include <power.h>
 #include <PNGdec.h>
@@ -111,8 +112,6 @@ const uint8_t u8_graytable_big[] = {
 /* 15 */ 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0
 };
 
-#include "BQ27427.h"
-extern BQ27427 lipo; // Use lipo.[] to interact with the library in an Arduino 
 #endif
 
 #include "Group5.h"
@@ -210,25 +209,6 @@ void BQ27427_reset()
 
     bbep.ioWrite(10, HIGH);
     Serial.println("BQ27427 reset performed");
-}
-
-// State of charge (%) from the BQ27427. With BYPASS_BQ27427_SOC the gauge's
-// SoC is ignored and estimated from the measured voltage instead.
-int getLipoSOC() {
-#ifdef BYPASS_BQ27427_SOC
-  // Mirrors the server's percent_charged_calculation: map 3.0 V onto 0 % at
-  // 0.012 V per percent, with plateaus near full charge (4.08 V follows a
-  // full charge) and a 1 % floor.
-  float voltage = lipo.voltage() / 1000.0f;
-  float pct = (voltage - 3.0f) / 0.012f;
-  if (pct >= 88.0f) return 100;
-  if (pct >= 85.0f) return 95;
-  if (pct >= 83.0f) return 90;
-  if (pct >= 10.0f) return (int)(pct + 0.5f);
-  return 1;
-#else
-  return lipo.soc();
-#endif // BYPASS_BQ27427_SOC
 }
 
 void config_tca95535_pins_for_lp()
@@ -1820,8 +1800,8 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
                 y = bbep.height() - 120;
                 bbep.loadG5Image(battery_hollow, 40, y, BBEP_WHITE, BBEP_BLACK);
                 Log_info("Displaying 'battery charge level' icon");
-                if (lipo.begin(PIN_INTERNAL_SDA, PIN_INTERNAL_SCL)) { // only report SoC if battery was detected and BQ27427 initialized successfully
-                    int batt_percent = getLipoSOC();
+                int batt_percent = battery().readSoc();
+                if (batt_percent >= 0) { // negative if no battery or the reading failed
                     if (batt_percent >= 97) batt_percent = 100; // can sometimes report 98% when full
                     // Draw a black rectangle to represent the battery charge level
                     bbep.fillRect(40+10, y+18, (97 * batt_percent)/100, 39, BBEP_BLACK);

@@ -86,6 +86,15 @@ void BQ27427Battery::gaugeInit() {
   } else if (snap.flags & BQ27427_FLAG_DSG) {
     Log_info("BATTERY IS DISCHARGING");
   }
+
+#ifdef BYPASS_BQ27427_SOC
+  // Replace the capacities after logging the raw values.
+  BypassCapacity capacity = bypassCapacity(battery_count, readSoc());
+  _capacityFull = capacity.full;
+  _capacityRemain = capacity.remain;
+  Log_info("BQ27427: gauging bypassed - SoC %d%% from %.2f V, capacity %d/%d mAh", readSoc(), _voltage, _capacityRemain,
+           _capacityFull);
+#endif // BYPASS_BQ27427_SOC
 }
 
 #endif // INCLUDE_BQ27427

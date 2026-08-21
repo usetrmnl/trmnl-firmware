@@ -1,5 +1,6 @@
 #pragma once
 
+#include <battery_soc.h>
 #include <stdint.h>
 
 //
@@ -7,6 +8,10 @@
 //
 #if defined(BOARD_TRMNL_X)
 #define INCLUDE_BQ27427
+#endif
+
+#if defined(BYPASS_BQ27427_SOC) && !defined(INCLUDE_BQ27427)
+#error "BYPASS_BQ27427_SOC only applies to boards with the BQ27427 gas gauge"
 #endif
 
 /// @brief Abstract battery voltage source.
@@ -62,8 +67,13 @@ public:
   ///        shared I2C bus for the duration.
   void gaugeInit();
 
+#ifdef BYPASS_BQ27427_SOC
+  int readSoc() const { return _voltage > 0 ? batteryVoltageToPercent(_voltage) : -1; }
+  int readHealth() const { return -1; }
+#else
   int readSoc() const { return _soc; }                     // %
   int readHealth() const { return _health; }                // %
+#endif                                                      // BYPASS_BQ27427_SOC
   int readCurrent() const { return _current; }               // mA
   float readTemperature() const { return _temperature; }     // C
   int readCapacityRemain() const { return _capacityRemain; } // mAh
