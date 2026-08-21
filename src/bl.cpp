@@ -36,6 +36,7 @@
 #include "logging_parcers.h"
 #include <SPIFFS.h>
 #include "http_client.h"
+#include <StreamString.h>
 #include <api-client/display.h>
 #include <api-client/request_headers.h>
 #include "driver/gpio.h"
@@ -1646,7 +1647,7 @@ static https_request_err_e downloadAndShow()
   }
 #endif // BOARD_TRMNL_X
 
-  withHttp(
+  result = withHttp(
       filename,
       [&](HTTPClient *httpsp, HttpError error) -> https_request_err_e
       {
@@ -1752,7 +1753,7 @@ static https_request_err_e downloadAndShow()
           long lStartTime = millis();
           if (content_size <= 0)
           {
-            Log.warning("%s [%d]: Content-Length not provided, using getString()\r\n", __FILE__, __LINE__);
+            Log.warning("%s [%d]: Content-Length not provided, using writeToStream()\r\n", __FILE__, __LINE__);
           }
 
           bool isPNG = https.header("Content-Type") == "image/png";
@@ -1764,9 +1765,18 @@ static https_request_err_e downloadAndShow()
           buffer = nullptr;
           bool buffer_malloc = false;
           if (content_size <= 0) {
-          // getString() handles lack of content size and chunked transfer encoding automatically
-            Log.info("%s [%d]: Downloading image with getString\r\n", __FILE__, __LINE__);
-            payload = https.getString();
+          // writeToStream() handles lack of content size and chunked transfer encoding
+          // automatically, and (unlike getString()) reports an error when the connection
+          // is closed before the whole body has arrived
+            Log.info("%s [%d]: Downloading image with writeToStream\r\n", __FILE__, __LINE__);
+            StreamString sstream;
+            int written = https.writeToStream(&sstream);
+            if (written < 0) {
+              Log_error_submit("Receiving failed; connection closed mid-download, error: %d (%s), RSSI %d",
+                               written, https.errorToString(written).c_str(), WiFi.RSSI());
+              return HTTPS_TIMED_OUT;
+            }
+            payload = std::move(static_cast<String &>(sstream));
             counter = payload.length();
             buffer = (uint8_t *)payload.c_str();
           } else {
@@ -1774,7 +1784,8 @@ static https_request_err_e downloadAndShow()
             counter = https.getSize();
             if (counter && counter <= MAX_IMAGE_SIZE) {
               WiFiClient *stream = https.getStreamPtr();
-              int iCount = 0;
+              uint32_t iCount = 0;
+              bool closed_early = false;
 
               buffer = (uint8_t *)malloc(counter);
               if (buffer) {
@@ -1783,15 +1794,25 @@ static https_request_err_e downloadAndShow()
                   if (stream->available()) {
                     buffer[iCount++] = stream->read();
                     lStartTime = millis(); // reset start time
+                  } else if (!stream->connected()) {
+                    // server closed the connection before sending the whole body;
+                    // no more data can arrive, so stop immediately instead of
+                    // waiting out the inactivity timeout
+                    closed_early = true;
+                    break;
                   } else { // 15 seconds with no activity => stop trying
                     vTaskDelay(1); // yield to allow time for the data to arrive
                   }
                 }
               } // if buffer
               stream->stop(); // Important! If you don't do this, WiFi will have a memory exception later
-              if (millis() > (lStartTime + IMAGE_STREAM_INACTIVITY_TIMEOUT_MS)) { // we timed out
-                  Log_error_submit("Receiving failed; download timed out. Image size = %" PRIu32, counter);
-                  return HTTPS_TIMED_OUT;
+              if (buffer_malloc && iCount < counter) { // premature close or inactivity timeout
+                Log_error_submit("Receiving failed; incomplete download (%s): %" PRIu32 "/%" PRIu32 " bytes, RSSI %d",
+                                 closed_early ? "connection closed early" : "timed out", iCount, counter,
+                                 WiFi.RSSI());
+                free(buffer);
+                buffer = nullptr;
+                return HTTPS_TIMED_OUT;
               }
             }
           } // if payload size is non-zero
