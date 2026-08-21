@@ -91,4 +91,4 @@ for env in "${ENVS[@]}"; do
 done
 
 echo
-echo "Release $TAG ready in .pio/release/"
+echo "Release v$VERSION ready in .pio/release/"
