@@ -151,6 +151,20 @@
 #define EPD_RST_PIN  12
 #define EPD_DC_PIN   11
 #define EPD_BUSY_PIN 13
+#elif defined(BOARD_M5STACK_PAPER)
+// M5Stack Paper ED047TC1 via its IT8951E SPI controller.
+#define EPD_MOSI_PIN    12
+#define EPD_MISO_PIN    13
+#define EPD_SCK_PIN     14
+#define EPD_CS_PIN      15
+#define EPD_RST_PIN     23 // EPD power-enable line also serves as controller reset
+#define EPD_BUSY_PIN    27
+#define EPD_MAIN_PWR_EN 2  // board main-power enable; must stay HIGH while running
+#define EPD_EXT_PWR_EN  5  // enables the external EPD supply
+#define EPD_EN_PIN      23 // FastEPD IT8951 power-control argument
+#define EPD_VCC_EN      23 // shared EPD power-enable/reset line
+#define SENSOR_SDA      21
+#define SENSOR_SCL      22
 #elif defined(BOARD_SEEED_RETERMINAL_E1003)
 #define EPD_SCK_PIN  7
 #define EPD_MOSI_PIN 9

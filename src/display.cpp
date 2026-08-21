@@ -67,29 +67,34 @@ uint8_t u8SpectraPal[512]; // RGB333 mapped to closest Spectra6 color
 #include "esp_sleep.h"
 #include "driver/gpio.h"
 #include "driver/rtc_io.h"
+#ifdef BOARD_M5STACK_PAPER
+#include <SPIFFS.h>
+#define FS SPIFFS
+#else
 #include "LittleFS.h"
 #define FS LittleFS
+#endif
 // Image size comparison for determining photos vs 'chart graphics'
 #define FASTEPD_LARGE_IMAGE_THRESHOLD (100 * 1024)
 #include "FastEPD.h"
 FASTEPD bbep;
 // 9-step table for fast grays
 const uint8_t u8_graytable[] = {
-/* 0 */  0, 0, 0, 0, 0, 0, 1, 1, 1, 
-/* 1 */  0, 0, 1, 1, 1, 2, 2, 1, 1, 
+/* 0 */  0, 0, 0, 0, 0, 0, 1, 1, 1,
+/* 1 */  0, 0, 1, 1, 1, 2, 2, 1, 1,
 /* 2 */  0, 0, 0, 0, 1, 2, 2, 1, 1,
-/* 3 */  1, 1, 2, 2, 1, 1, 1, 1, 2, 
-/* 4 */  0, 0, 0, 1, 2, 1, 1, 1, 2, 
-/* 5 */  1, 2, 2, 2, 2, 1, 1, 1, 2, 
-/* 6 */  0, 0, 1, 1, 2, 2, 1, 1, 2, 
-/* 7 */  0, 1, 1, 2, 1, 1, 2, 1, 2, 
-/* 8 */  0, 1, 1, 1, 2, 1, 2, 1, 2, 
-/* 9 */  0, 1, 1, 1, 1, 2, 2, 1, 2, 
-/* 10 */  1, 1, 1, 2, 1, 1, 1, 2, 2, 
-/* 11 */  0, 0, 1, 2, 1, 1, 1, 2, 2, 
-/* 12 */  0, 0, 0, 1, 2, 1, 1, 2, 2, 
-/* 13 */  0, 0, 0, 0, 1, 2, 1, 2, 2, 
-/* 14 */  0, 1, 1, 1, 2, 2, 2, 2, 2, 
+/* 3 */  1, 1, 2, 2, 1, 1, 1, 1, 2,
+/* 4 */  0, 0, 0, 1, 2, 1, 1, 1, 2,
+/* 5 */  1, 2, 2, 2, 2, 1, 1, 1, 2,
+/* 6 */  0, 0, 1, 1, 2, 2, 1, 1, 2,
+/* 7 */  0, 1, 1, 2, 1, 1, 2, 1, 2,
+/* 8 */  0, 1, 1, 1, 2, 1, 2, 1, 2,
+/* 9 */  0, 1, 1, 1, 1, 2, 2, 1, 2,
+/* 10 */  1, 1, 1, 2, 1, 1, 1, 2, 2,
+/* 11 */  0, 0, 1, 2, 1, 1, 1, 2, 2,
+/* 12 */  0, 0, 0, 1, 2, 1, 1, 2, 2,
+/* 13 */  0, 0, 0, 0, 1, 2, 1, 2, 2,
+/* 14 */  0, 1, 1, 1, 2, 2, 2, 2, 2,
 /* 15 */  0, 0, 0, 0, 0, 0, 0, 0, 2
 };
 // 38-step table for better photo rendering
@@ -113,7 +118,7 @@ const uint8_t u8_graytable_big[] = {
 };
 
 #include "BQ27427.h"
-extern BQ27427 lipo; // Use lipo.[] to interact with the library in an Arduino 
+extern BQ27427 lipo; // Use lipo.[] to interact with the library in an Arduino
 #endif
 
 #include "Group5.h"
@@ -190,9 +195,26 @@ void display_init(void)
 #elif defined(BOARD_TRMNL_X_LILYGO)
     bbep.initPanel(BB_PANEL_EPDIY_V7);
     bbep.setPanelSize(960, 540);
-#elif defined (BOARD_SEEED_RETERMINAL_E1003)
+#elif defined(BOARD_SEEED_RETERMINAL_E1003)
     bbep.initIT8951(EPD_MOSI_PIN, EPD_MISO_PIN, EPD_SCK_PIN, EPD_CS_PIN, EPD_BUSY_PIN, EPD_RST_PIN, EPD_EN_PIN, EPD_VCC_EN);
     bbep.setPanelSize(BBEP_DISPLAY_ED103TC2);
+#elif defined(BOARD_M5STACK_PAPER)
+    constexpr uint16_t m5PaperNativeWidth = 960;
+    constexpr uint16_t m5PaperNativeHeight = 540;
+
+    pinMode(EPD_MAIN_PWR_EN, OUTPUT);
+    pinMode(EPD_EXT_PWR_EN, OUTPUT);
+    pinMode(EPD_VCC_EN, OUTPUT);
+    digitalWrite(EPD_MAIN_PWR_EN, HIGH);
+    digitalWrite(EPD_EXT_PWR_EN, HIGH);
+    digitalWrite(EPD_VCC_EN, HIGH);
+    // allow for the EPD to stabilize before SPI access
+    delay(1000);
+
+    bbep.initIT8951(EPD_MOSI_PIN, EPD_MISO_PIN, EPD_SCK_PIN, EPD_CS_PIN,
+                                     EPD_BUSY_PIN, EPD_RST_PIN, EPD_EN_PIN, EPD_VCC_EN);
+    bbep.setPanelSize(m5PaperNativeWidth, m5PaperNativeHeight);
+    bbep.setMode(BB_MODE_4BPP);
 #endif // X
 #endif // bb_epaper
     Log_info("dev module end");
@@ -1886,7 +1908,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
       int rc = bbep.setCustomMatrix(u8_graytable_big, sizeof(u8_graytable_big));
       Log_info("using 38-pass gray table (data_size=%d)", data_size);
       Log_info("%s [%d]: setCustomMatrix returned %d\r\n", __FILE__, __LINE__, rc);
-    } else 
+    } else
 #endif
     {
         int rc = bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
