@@ -24,27 +24,6 @@ static bool connectAndRead(bool oneCellPack, BQ27427Snapshot &snap) {
   // SoC comes from the voltage and capacity from a fixed per-cell pack size.
   (void)oneCellPack;
 
-// State of charge (%) from the BQ27427. With BYPASS_BQ27427_SOC the gauge's
-// SoC is ignored and estimated from the measured voltage instead.
-
-  // Mirrors the server's percent_charged_calculation: map 3.0 V onto 0 % at
-  // 0.012 V per percent, with plateaus near full charge (4.08 V follows a
-  // full charge) and a 1 % floor.
-
-  int soc;
-  float voltage = lipo.voltage() / 1000.0f;
-  float pct = (voltage - 3.0f) / 0.012f;
-  if (pct >= 88.0f)
-    soc = 100;
-  else if (pct >= 85.0f)
-    soc = 95;
-  else if (pct >= 83.0f)
-    soc = 90;
-  else if (pct >= 10.0f)
-    soc = (int)(pct + 0.5f);
-  else
-    soc = 1;
-
   if (!lipo.begin(PIN_INTERNAL_SDA, PIN_INTERNAL_SCL)) return false;
   lipo._initialized = true;
   snap.flags = lipo.flags();
@@ -52,7 +31,23 @@ static bool connectAndRead(bool oneCellPack, BQ27427Snapshot &snap) {
   snap.voltage = lipo.voltage();                                     // mV
   snap.current = lipo.current(AVG);                                  // mA
   snap.temperature = float(lipo.temperature(BATTERY) - 2732) / 10.0; // C
-  snap.soc = soc;
+
+  // Estimate SoC from the voltage just read. Mirrors the server's
+  // percent_charged_calculation: map 3.0 V onto 0 % at 0.012 V per percent,
+  // with plateaus near full charge (4.08 V follows a full charge) and a
+  // 1 % floor.
+  float voltage = snap.voltage / 1000.0f;
+  float pct = (voltage - 3.0f) / 0.012f;
+  if (pct >= 88.0f)
+    snap.soc = 100;
+  else if (pct >= 85.0f)
+    snap.soc = 95;
+  else if (pct >= 83.0f)
+    snap.soc = 90;
+  else if (pct >= 10.0f)
+    snap.soc = (int)(pct + 0.5f);
+  else
+    snap.soc = 1;
   snap.capacityFull = battery_count * BQ27427_BYPASS_CELL_CAPACITY_MAH;
   snap.capacityRemain = snap.capacityFull * snap.soc / 100;
   snap.health = -1; // State-of-health unavailable without gauging
