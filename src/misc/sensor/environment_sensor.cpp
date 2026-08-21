@@ -40,12 +40,15 @@ void EnvironmentSensor::init() {
     return;
   }
 
-  // wait for the sensor(s) to generate a sample
-  Log_info("Light sleep for 5 seconds to allow sensor to generate a sample");
-  esp_sleep_enable_timer_wakeup(5000 * 1000L); // the SCD4x needs 5 seconds to get a sample
-  esp_light_sleep_start();                     // use light sleep to save power
-
   if (co2Found) {
+    // wait for the SCD4x to generate a sample
+    Log_info("Light sleep for 5 seconds to allow SCD4x to generate a sample");
+#ifdef DO_NOT_LIGHT_SLEEP
+    delay(5000);
+#else
+    esp_sleep_enable_timer_wakeup(5000 * 1000L); // the SCD4x needs 5 seconds to get a sample
+    esp_light_sleep_start();                     // use light sleep to save power
+#endif
     if (_scd41.getSample() == SCD41_SUCCESS) {
       _readings.sampledAt = (int)time(nullptr);
       _readings.co2 = _scd41.co2();
