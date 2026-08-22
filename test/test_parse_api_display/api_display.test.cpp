@@ -11,6 +11,7 @@ void assert_response_equal(ApiDisplayResponse expected, ApiDisplayResponse actua
   TEST_ASSERT_EQUAL(expected.reset_firmware, actual.reset_firmware);
   TEST_ASSERT_EQUAL(expected.special_function, actual.special_function);
   TEST_ASSERT_EQUAL_STRING(expected.action.c_str(), actual.action.c_str());
+  TEST_ASSERT_EQUAL_UINT32(expected.log_expires_at, actual.log_expires_at);
 }
 
 void test_parseResponse_apiDisplay_success(void) {
@@ -68,6 +69,19 @@ void test_parseResponse_apiDisplay_treats_unknown_sf_as_none(void) {
   TEST_ASSERT_EQUAL(parsed.special_function, SPECIAL_FUNCTION::SF_NONE);
 }
 
+void test_parseResponse_apiDisplay_reads_log_expires_at(void) {
+  String input = "{\"status\":200,\"log_expires_at\":1609459200}";
+
+  TEST_ASSERT_EQUAL_UINT32(1609459200, parseResponse_apiDisplay(input).log_expires_at);
+}
+
+void test_parseResponse_apiDisplay_defaults_log_expires_at_to_zero(void) {
+  // Absent means "leave the stored setting alone", which the caller distinguishes by zero.
+  String input = "{\"status\":200}";
+
+  TEST_ASSERT_EQUAL_UINT32(0, parseResponse_apiDisplay(input).log_expires_at);
+}
+
 void setUp(void) {
   // set stuff up here
 }
@@ -82,6 +96,8 @@ void process() {
   RUN_TEST(test_parseResponse_apiDisplay_deserializationError);
   RUN_TEST(test_parseResponse_apiDisplay_treats_unknown_sf_as_none);
   RUN_TEST(test_parseResponse_apiDisplay_missing_fields);
+  RUN_TEST(test_parseResponse_apiDisplay_reads_log_expires_at);
+  RUN_TEST(test_parseResponse_apiDisplay_defaults_log_expires_at_to_zero);
   UNITY_END();
 }
 
