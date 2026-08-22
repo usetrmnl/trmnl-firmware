@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include <stdint.h>
+
 /**
  * @brief Initializes the SPI interface for the Spectra6 display.
  * @return true if initialization was successful, false otherwise.

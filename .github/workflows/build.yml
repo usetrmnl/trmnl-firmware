@@ -83,6 +83,48 @@ jobs:
       - name: static analysis
         run: pio check --skip-packages --fail-on-defect high
 
+  # Compile-only gate for the BYOD device environments cut by
+  # scripts/prepare_release.sh. None of them are built anywhere else in CI,
+  # so compile breakage in these envs goes unnoticed (e.g. #513).
+  # TRMNL_X_E1003 is omitted: it needs the pioarduino platform and a much
+  # heavier build; the envs below share the default espressif32 platform.
+  build-byod:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio
+            ~/.buildcache
+          key: Linux-byod-pio-${{ hashFiles('platformio.ini') }}
+          restore-keys: |
+            Linux-byod-pio-
+            Linux-pio-
+
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: Linux-byod-ccache-${{ hashFiles('platformio.ini') }}
+          job-summary: "" # disabled
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Install PlatformIO Core
+        run: pip install --upgrade platformio
+
+      - name: Configure ccache for PlatformIO
+        run: |
+          echo "PLATFORMIO_BUILD_CACHE_DIR=$HOME/.buildcache" >> $GITHUB_ENV
+
+      - name: build (BYOD envs)
+        run: pio run -e seeed_xiao_esp32c3 -e xteink_x4 -e TRMNL_7inch5_OG_DIY_Kit -e seeed_reTerminal_E1001 -e seeed_reTerminal_E1002 -j 4
+
   publish-engineering-build:
     needs: build-test
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
