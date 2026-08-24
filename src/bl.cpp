@@ -76,7 +76,7 @@ const char *szHTTPErrors[] = {
 
 static float vBatt;
 
-#ifdef BOARD_TRMNL_GEN2
+#ifdef BOARD_TRMNL_GEN2_FUTURE
 #include "ulp_lp_core.h"
 #include "esp_err.h"
 extern const uint8_t bin_start[] asm("_binary_ulp_main_bin_start"); //refering to app name ulp_main defined in CMakelists.txt
@@ -764,7 +764,7 @@ void bl_init(void)
   hw_config_init();
   pins_init();
   buzzer().init();
-  sensor().init();
+  sensor().init(pDevice);
 #ifdef BOARD_TRMNL_X
   // Debug: Print all wakeup_stub_iqs_status structure fields
   Log_info("wakeup_stub_iqs_status.status: 0x%02X 0x%02X", wakeup_stub_iqs_status.status[0], wakeup_stub_iqs_status.status[1]);
@@ -2559,7 +2559,7 @@ static void resetDeviceCredentials(void)
   ESP.restart();
 }
 
-#ifdef BOARD_TRMNL_GEN2
+#ifdef BOARD_TRMNL_GEN2_FUTURE
 void start_ulp_program() {
     // Change: Load the ULP binary into RTC memory
     ESP_ERROR_CHECK(ulp_lp_core_load_binary(bin_start, (bin_end - bin_start)));
@@ -2573,7 +2573,7 @@ void start_ulp_program() {
     // Change: Start the ULP LP core program
     ESP_ERROR_CHECK(ulp_lp_core_run(&cfg));
 }
-#endif // BOARD_TRMNL_GEN2
+#endif // BOARD_TRMNL_GEN2_FUTURE
 
 /**
  * @brief Function to sleep preparing and go to sleep
@@ -2653,10 +2653,10 @@ void goToSleep(void)
   gpio_deep_sleep_hold_en(); // Needed to keep the battery power enabled during RTC sleep
 #endif
 #endif
-#ifdef BOARD_TRMNL_GEN2
+#ifdef BOARD_TRMNL_GEN2_FUTURE
 // Use the ULP of the ESP32-C5 to do interesting things on the ePaper while the main CPU is sleeping
 //  start_ulp_program();
-#endif // BOARD_TRMNL_GEN2
+#endif // BOARD_TRMNL_GEN2_FUTURE
   esp_deep_sleep_start();
 }
 

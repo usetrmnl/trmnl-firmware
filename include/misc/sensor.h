@@ -1,7 +1,6 @@
 #pragma once
 
 #include <config.h>
-
 #include <bb_scd41.h>
 #include <bb_temperature.h>
 
@@ -24,7 +23,7 @@ class BaseSensor {
 public:
   virtual ~BaseSensor() = default;
 
-  virtual void init() {}
+  virtual void init(TRMNL_DEVICE *pDevice) {}
   virtual SensorReadings readings() { return SensorReadings(); }
 
   /// @brief Builds the SENSORS HTTP header value from the last sample.
@@ -41,7 +40,7 @@ public:
 class EnvironmentSensor : public BaseSensor {
 public:
   EnvironmentSensor() {}
-  void init() override;
+  void init(TRMNL_DEVICE *pDevice) override;
   SensorReadings readings() override { return _readings; }
   bool buildSensorsHeader(char **szTemp) override;
 

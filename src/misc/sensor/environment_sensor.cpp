@@ -5,7 +5,6 @@
 #include <time.h>
 #include <trmnl_log.h>
 #include <config.h>
-extern TRMNL_DEVICE *pDevice;
 
 // bb_temperature device names, indexed by SensorReadings::sensorType
 static const char *szDevices[] = {"None",    "AHT20",  "BMP180",  "BME280", "BMP388", "SHT3X",
@@ -13,7 +12,7 @@ static const char *szDevices[] = {"None",    "AHT20",  "BMP180",  "BME280", "BMP
 static const char *szMakers[] = {"None", "ASAIR",   "Bosch",     "Bosch", "Bosch",    "Sensirion",
                                  "TI",   "STMicro", "MicroChip", "Bosch", "Sensirion", "Sensirion"};
 
-void EnvironmentSensor::init() {
+void EnvironmentSensor::init(TRMNL_DEVICE *pDevice) {
   bool co2Found = false;
   int sensorType = -1;
 
