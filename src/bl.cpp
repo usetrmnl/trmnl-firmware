@@ -380,60 +380,6 @@ bool check_corners_gesture()
   return slider_event == IQS323_GESTURE_HOLD && left && right;
 }
 
-static void update_playlist_order(const char *new_path, const char *prev_path) {
-  String order = preferences.getString(PREFERENCES_PLAYLIST_ORDER_KEY, "");
-  String newStr = String(new_path);
-  String prefix = newStr.substring(0, 14); // same-plugin identity (matches purge logic)
-  String prevStr = String(prev_path);
-
-  if (order.isEmpty()) {
-    preferences.putString(PREFERENCES_PLAYLIST_ORDER_KEY, newStr);
-    return;
-  }
-
-  // Scan list: update in-place if prefix matches (refresh), otherwise build a cleaned list
-  // dropping entries whose files no longer exist (except prev_path, which anchors insertion).
-  bool found = false;
-  String result = "";
-  int start = 0;
-  while (start <= (int)order.length()) {
-    int sep = order.indexOf('|', start);
-    String entry = (sep < 0) ? order.substring(start) : order.substring(start, sep);
-    if (!entry.isEmpty()) {
-      if (!found && entry.startsWith(prefix)) {
-        result += (result.isEmpty() ? "" : "|") + newStr;
-        found = true;
-      } else if (entry == prevStr || filesystem_file_exists(entry.c_str())) {
-        result += (result.isEmpty() ? "" : "|") + entry;
-      }
-      // else: file was purged from filesystem — drop from list
-    }
-    if (sep < 0) break;
-    start = sep + 1;
-  }
-  if (found) { preferences.putString(PREFERENCES_PLAYLIST_ORDER_KEY, result); return; }
-
-  // New plugin — insert right after prev_path's position in the cleaned list
-  String result2 = "";
-  bool inserted = false;
-  start = 0;
-  while (start <= (int)result.length()) {
-    int sep = result.indexOf('|', start);
-    String entry = (sep < 0) ? result.substring(start) : result.substring(start, sep);
-    if (!entry.isEmpty()) {
-      result2 += (result2.isEmpty() ? "" : "|") + entry;
-      if (!inserted && entry == prevStr) {
-        result2 += "|" + newStr;
-        inserted = true;
-      }
-    }
-    if (sep < 0) break;
-    start = sep + 1;
-  }
-  if (!inserted) result2 += (result2.isEmpty() ? "" : "|") + newStr;
-  preferences.putString(PREFERENCES_PLAYLIST_ORDER_KEY, result2);
-}
-
 static void show_cached_image_by_offset(int offset) {
   String order = preferences.getString(PREFERENCES_PLAYLIST_ORDER_KEY, "");
 
@@ -1518,7 +1464,7 @@ static https_request_err_e downloadAndShow()
         preferences.putString(PREFERENCES_LAST_PATH_KEY, _curPath);
       preferences.putString(PREFERENCES_CURRENT_PATH_KEY, String(szTemp));
       #ifdef BOARD_TRMNL_X
-      update_playlist_order(szTemp, _curPath.c_str());
+      update_playlist_order(preferences, szTemp, _curPath.c_str());
       #endif
       preferences.putString(PREFERENCES_BROWSE_PATH_KEY, String(szTemp));
       return result;
@@ -1566,7 +1512,7 @@ static https_request_err_e downloadAndShow()
     DisplayedImage::remember(szTemp); // current image becomes the previous image
 
     preferences.putString(PREFERENCES_CURRENT_PATH_KEY, String(szTemp));
-    update_playlist_order(szTemp, _prevPath.c_str());
+    update_playlist_order(preferences, szTemp, _prevPath.c_str());
     preferences.putString(PREFERENCES_BROWSE_PATH_KEY, String(szTemp));
 
 //    new_filename = apiDisplayResult.response.filename;
@@ -1804,7 +1750,7 @@ static https_request_err_e downloadAndShow()
               preferences.putString(PREFERENCES_LAST_PATH_KEY, _curPath);
             preferences.putString(PREFERENCES_CURRENT_PATH_KEY, String(szTemp));
             #ifdef BOARD_TRMNL_X
-            update_playlist_order(szTemp, _curPath.c_str());
+            update_playlist_order(preferences, szTemp, _curPath.c_str());
             #endif
             preferences.putString(PREFERENCES_BROWSE_PATH_KEY, String(szTemp));
           }
