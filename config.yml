@@ -26,6 +26,9 @@ branding:
   # Accent colour applied throughout the captive-portal web UI via
   # {{accent_color}} placeholders in the portal HTML.
   accent_color: "#F86527"
+  # Logo on the pairing / WiFi / status screens (non-X boards):
+  # small (86x86, stock) | medium (240x240) | big (640x640).
+  message_logo: "small"
 
 urls:
   # Back-end API base URL (no trailing slash).
