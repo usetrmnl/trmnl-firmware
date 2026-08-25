@@ -35,6 +35,7 @@
 #include <refresh_interval.h>
 #include <services/firmware_update.h>
 #include <api_response_parsing.h>
+#include <pairing.h>
 #include "logging_parcers.h"
 #include <SPIFFS.h>
 #include "http_client.h"
@@ -96,6 +97,10 @@ void config_gpio_for_lp();
 int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious);
 
 static unsigned long startup_time = 0;
+
+// Last pairing code painted on the FRIENDLY_ID screen, kept across deep sleep so
+// a NO_REGISTER (status 202) fast-poll doesn't repaint the same code every wake.
+static RTC_DATA_ATTR char s_last_shown_pairing_id[32] = {0};
 
 #ifndef BOARD_TRMNL_X
 // Create stub functions for the touchbar workaround
@@ -1372,12 +1377,25 @@ void bl_init(void)
 
   submitStoredLogs();
 
-  if (request_result == HTTPS_NO_REGISTER && need_to_refresh_display == 1)
+  if (request_result == HTTPS_NO_REGISTER)
   {
-    // show the image
+    // Unregistered device (HTTP 200 status 202 / no content): always land on the
+    // pairing-code screen so re-pairing after a server-side device deletion
+    // surfaces the code, regardless of the RTC need_to_refresh_display flag, but
+    // dedupe against the last painted code to avoid e-ink thrash on fast polls.
     String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
-    showMessageWithLogo(FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
-    need_to_refresh_display = 0;
+    if (shouldShowPairingCode(true, need_to_refresh_display == 1, friendly_id.c_str(), s_last_shown_pairing_id))
+    {
+      showMessageWithLogo(FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
+      need_to_refresh_display = 0;
+      snprintf(s_last_shown_pairing_id, sizeof(s_last_shown_pairing_id), "%s", friendly_id.c_str());
+    }
+  }
+  else if (request_result == HTTPS_SUCCESS)
+  {
+    // Content is on screen now; forget the last pairing code so a later 202
+    // (e.g. the server device record was removed) re-surfaces the code.
+    s_last_shown_pairing_id[0] = '\0';
   }
 
   // reset checking
