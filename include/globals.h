@@ -47,6 +47,7 @@ extern int iPrevWakeTime;               // RTC: total wake time of the last cycl
 extern bool bUsedCachedImage;           // RTC: last image displayed was read from cache (for statistics collection)
 extern uint8_t need_to_refresh_display; // RTC
 extern bool otg_state;                  // RTC: OTG state across deep sleep
+extern float vBatt;                     // battery voltage snapshot (prefer pre-WiFi reading)
 
 // --- UI / input ---
 extern bool touchbar_tap_mode; // false = "slide", true = "tap" (default)
