@@ -18,7 +18,12 @@ DeviceSetupResult DeviceSetup::perform() {
   _result = DeviceSetupResult();
   performApiSetup();
   if (_result.outcome == DeviceSetupOutcome::Success) {
-    downloadSetupImage();
+    if (_result.imageUrl.isEmpty()) {
+      _result.friendlyId = _persistence.readString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
+      _result.showSetupScreen = true;
+    } else {
+      downloadSetupImage();
+    }
   }
   return _result;
 }
