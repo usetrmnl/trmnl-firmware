@@ -1,5 +1,13 @@
+#include <Arduino.h>
 #include <ArduinoLog.h>
+#include <HTTPClient.h>
 #include <Preferences.h>
+#include <StreamString.h>
+#include <WiFi.h>
+#include <WifiCaptive.h>
+#include <api-client/display.h>
+#include <api-client/request_headers.h>
+#include <api_response_parsing.h>
 #include <battery.h>
 #include <bmp.h>
 #include <config.h>
@@ -8,6 +16,7 @@
 #include <display_session.h>
 #include <filesystem.h>
 #include <globals.h>
+#include <http_client.h>
 #include <logging_parcers.h>
 #include <png.h>
 #include <power.h>
@@ -15,9 +24,17 @@
 #include <types.h>
 #include <wifi_network.h>
 
+#include "displayed_image.h"
+
+#ifdef BOARD_TRMNL_X
+#include <modem.h>
+#endif
+
 // --- Helpers still owned by bl.cpp ---
 void writeSpecialFunction(SPECIAL_FUNCTION function);
 void showMessageWithLogo(MSG message_type);
+void load_prev_image(void);
+void submitStoredLogs(void);
 extern const char *szHTTPErrors[];
 
 ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences) {
@@ -531,5 +548,474 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse) {
       break;
     }
   }
+  return result;
+}
+
+/**
+ * @brief Function to ping server and download and show the image if all is OK
+ * @param url Server URL address
+ * @return https_request_err_e error code
+ */
+https_request_err_e downloadAndShow() {
+  image_err_e png_res = PNG_DECODE_ERR;
+  bmp_err_e bmp_res = BMP_NOT_BMP;
+  auto apiDisplayInputs = loadApiDisplayInputs(preferences);
+
+#ifdef BOARD_TRMNL_X
+  if (g_modem && WifiCaptivePortal.getLastCredentials().is5GHz) {
+    Log_info("Fetching /api/display via modem (5 GHz path)");
+    String reqHeaders = formatHeaders(buildDisplayHeaders(apiDisplayInputs));
+
+    auto httpRes = g_modem->httpGet(apiDisplayInputs.baseUrl + "/api/display", "", 0, reqHeaders);
+    if (!httpRes.ok) {
+      Log_error_submit("Modem /api/display request failed (%u bytes received)", httpRes.bytesReceived);
+      return HTTPS_REQUEST_FAILED;
+    }
+    auto apiResp = parseResponse_apiDisplay(httpRes.body);
+    if (apiResp.outcome == ApiDisplayOutcome::DeserializationError) {
+      Log_error_submit("Modem /api/display JSON parse error: %s", apiResp.error_detail.c_str());
+      return HTTPS_JSON_PARSING_ERR;
+    }
+    apiDisplayResult = {HTTPS_NO_ERR, apiResp, ""};
+  } else
+#endif // BOARD_TRMNL_X
+  {
+    for (int attempt = 1; attempt <= 5; ++attempt) {
+      apiDisplayResult = fetchApiDisplay(apiDisplayInputs);
+      if (apiDisplayResult.error != HTTPS_UNABLE_TO_CONNECT && apiDisplayResult.error != HTTPS_RESPONSE_CODE_INVALID)
+        break;
+      Log_error_serial("Connection attempt %d/5 failed: %s", attempt, apiDisplayResult.error_detail.c_str());
+      if (attempt < 5) delay(2000);
+    }
+  }
+
+  if (apiDisplayResult.error != HTTPS_NO_ERR) {
+    Log_error_submit("Error fetching API display: %d, detail: %s", apiDisplayResult.error,
+                     apiDisplayResult.error_detail.c_str());
+    return apiDisplayResult.error;
+  }
+
+  https_request_err_e result = handleApiDisplayResponse(apiDisplayResult.response);
+  if (apiDisplayResult.response.filename == "screen_wiper.png") {
+      // Guard against re-fetching forever if the wiper is the only playlist item
+    static bool wiped_this_wake = false;
+    if (wiped_this_wake) {
+      Log_info("Screen wiper returned again; not wiping twice in one wake");
+      return result; // leave the wiped (white) screen as-is
+    }
+    wiped_this_wake = true;
+    Log_info("Detected screen wiper filename: %s, clearing display...", apiDisplayResult.response.filename.c_str());
+    display_wipe();
+      // Wiping leaves the screen blank; fetch and show the next playlist item
+      // right away instead of waiting for the next scheduled refresh.
+    Log_info("Screen wipe complete, fetching next playlist item");
+    return downloadAndShow();
+  }
+
+  if (!status && result == HTTPS_SUCCESS) { // this means we already have this image stored in SPIFFS
+    char szTemp[36];
+#if BOARD_X_CLASS && !defined(BOARD_SEEED_RETERMINAL_E1003)
+    if (DisplayedImage::exists()) {
+      load_prev_image(); // decode the older image into the previous buffer of FastEPD
+    }
+#endif
+    filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
+    if (DisplayedImage::matches(szTemp)) {
+        // We just displayed the same image, don't refresh the display
+      Log.info("%s [%d]: The image hasn't changed since the last wakeup, don't refresh the display.\r\n", __FILE__,
+               __LINE__);
+      buffer = nullptr;
+      return result;
+    }
+    DisplayedImage::remember(szTemp);
+    Log.info("%s [%d]: Reading %s from SPIFFS\r\n", __FILE__, __LINE__, szTemp);
+    size_t content_size = filesystem_read_and_allocate(szTemp, &buffer);
+    if (!buffer || content_size == 0) {
+      filesystem_file_delete(szTemp);
+      Log_error_submit("Cached image is empty or unreadable: %s", szTemp);
+      return HTTPS_WRONG_IMAGE_SIZE;
+    }
+    Log.info("%s [%d]: Decoding image...\r\n", __FILE__, __LINE__);
+    display_show_image(buffer, content_size, true);
+    free(buffer);
+    buffer = nullptr;
+    DisplayedImage::remember(szTemp); // current image becomes the previous image
+      // Rotate NVS path keys: last ← current ← szTemp
+    String _curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
+    String _lastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
+    if (!_curPath.isEmpty() && (_curPath != String(szTemp) || _lastPath.isEmpty()))
+      preferences.putString(PREFERENCES_LAST_PATH_KEY, _curPath);
+    preferences.putString(PREFERENCES_CURRENT_PATH_KEY, String(szTemp));
+#ifdef BOARD_TRMNL_X
+    update_playlist_order(preferences, szTemp, _curPath.c_str());
+#endif
+    preferences.putString(PREFERENCES_BROWSE_PATH_KEY, String(szTemp));
+    return result;
+  }
+
+#ifdef BOARD_TRMNL_X
+// Special logic (TRMNL-X only) to download and disply the image if using a 5GHz AP
+  if (status && !reset_firmware && WifiCaptivePortal.getLastCredentials().is5GHz && g_modem) {
+    Log_info("Downloading image via modem (5 GHz path)");
+
+    char szTemp[36];
+    filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
+    Log_info("Modem: saving to %s", szTemp);
+    filesystem_purge_old_file(szTemp);
+
+    String _prevPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
+    String _prevLastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
+    if (!_prevPath.isEmpty() && (_prevPath != String(szTemp) || _prevLastPath.isEmpty()))
+      preferences.putString(PREFERENCES_LAST_PATH_KEY, _prevPath);
+
+    // Include ID and Access Token if the image is hosted on the same server as the API
+    String imgHeaders;
+    if (strncmp(filename, apiDisplayInputs.baseUrl.c_str(), apiDisplayInputs.baseUrl.length()) == 0)
+      imgHeaders = formatHeaders(buildImageHeaders(apiDisplayInputs));
+
+    auto httpRes = g_modem->httpGet(String(filename), szTemp, 0, imgHeaders);
+    if (!httpRes.ok) {
+      Log_error_submit("Modem httpGet failed: %u bytes received", httpRes.bytesReceived);
+      return HTTPS_REQUEST_FAILED;
+    }
+
+    int fileSize = 0;
+    uint8_t *buf = display_read_file(szTemp, &fileSize);
+    if (!buf || fileSize == 0) {
+      filesystem_file_delete(szTemp);
+      Log_error_submit("Modem: failed to read downloaded image from %s", szTemp);
+      return HTTPS_WRONG_IMAGE_SIZE;
+    }
+
+    display_show_image(buf, fileSize, true);
+    free(buf);
+    DisplayedImage::remember(szTemp); // current image becomes the previous image
+
+    preferences.putString(PREFERENCES_CURRENT_PATH_KEY, String(szTemp));
+    update_playlist_order(preferences, szTemp, _prevPath.c_str());
+    preferences.putString(PREFERENCES_BROWSE_PATH_KEY, String(szTemp));
+
+//    new_filename = apiDisplayResult.response.filename;
+//    saveCurrentFileName(new_filename);
+
+    if (result != HTTPS_PLUGIN_NOT_ATTACHED) result = HTTPS_SUCCESS;
+    return result;
+  }
+#endif // BOARD_TRMNL_X
+
+  result = withHttp(filename, [&](HTTPClient *httpsp, HttpError error) -> https_request_err_e {
+    if (error != HttpError::HTTPCLIENT_SUCCESS) {
+
+      return HTTPS_UNABLE_TO_CONNECT;
+    }
+
+    HTTPClient &https = *httpsp;
+
+    https.setTimeout(15000);
+    https.setConnectTimeout(15000);
+
+    https.addHeader("Accept-Encoding", "identity"); // Disable compression for raw image data
+
+        // Include ID and Access Token if the image is hosted on the same server as the API
+    if (strncmp(filename, apiDisplayInputs.baseUrl.c_str(), apiDisplayInputs.baseUrl.length()) == 0)
+      applyHeaders(https, buildImageHeaders(apiDisplayInputs));
+
+    if (status && !reset_firmware) {
+      status = false;
+
+          // The timeout will be zero if no value was returned, and in that case we just use the default timeout.
+          // Otherwise, we set the requested timeout.
+      uint32_t requestedTimeout = apiDisplayResult.response.image_url_timeout;
+      if (requestedTimeout > 0) {
+            // Convert from seconds to milliseconds.
+            // A uint32_t should be large enough not to worry about overflow for any reasonable timeout.
+        requestedTimeout *= MS_TO_S_FACTOR;
+        if (requestedTimeout > UINT16_MAX) {
+              // To avoid surprising behaviour if the server returned a timeout of more than 65 seconds
+              // we will send a log message back to the server and truncate the timeout to the maximum.
+          Log_info_submit("Requested image URL timeout too large (%" PRIu32 " ms). Using maximum of %d ms.",
+                          requestedTimeout, UINT16_MAX);
+          https.setTimeout(UINT16_MAX);
+        } else {
+          https.setTimeout(uint16_t(requestedTimeout));
+        }
+      }
+
+      const char *headers[] = {"Content-Type"};
+      https.collectHeaders(headers, 1);
+      Log_info("GET...");
+      Log_info("RSSI: %d", WiFi.RSSI());
+          // start connection and send HTTP header
+      int httpCode = https.GET();
+      int content_size = https.getSize();
+      if (httpCode == HTTP_CODE_PERMANENT_REDIRECT || httpCode == HTTP_CODE_TEMPORARY_REDIRECT) {
+        String location = https.getLocation();
+        https.end();
+        String redirectUrl;
+        if (location.startsWith("http://") || location.startsWith("https://")) {
+          redirectUrl = location;
+        } else {
+                // Extract origin from the original image URL for relative redirects
+          String origin = String(filename);
+          int schemeEnd = origin.indexOf("://");
+          if (schemeEnd != -1) {
+            int pathStart = origin.indexOf('/', schemeEnd + 3);
+            if (pathStart != -1) origin = origin.substring(0, pathStart);
+          }
+          redirectUrl = origin + location;
+        }
+        https.begin(redirectUrl);
+        Log_info("Redirected to: %s", redirectUrl.c_str());
+        https.setReuse(false);
+        https.setTimeout(15000);
+        https.setConnectTimeout(15000);
+        httpCode = https.GET();
+        content_size = https.getSize();
+      }
+//          uint8_t *buffer_old = nullptr; // Disable partial update for now
+//          int file_size_old = 0;
+
+          // httpCode will be negative on error
+      if (httpCode < 0) {
+        Log_error_submit("[HTTPS] GET... failed, error: %d (%s)", httpCode, https.errorToString(httpCode).c_str());
+
+        return HTTPS_REQUEST_FAILED;
+      }
+
+          // HTTP header has been send and Server response header has been handled
+      Log.info("%s [%d]: [HTTPS] GET... code: %d\r\n", __FILE__, __LINE__, httpCode);
+      Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
+          // file found at server
+      if (httpCode != HTTP_CODE_OK && httpCode != HTTP_CODE_MOVED_PERMANENTLY) {
+        Log_error_submit("[HTTPS] GET... failed, code: %d (%s)", httpCode, https.errorToString(httpCode).c_str());
+        return HTTPS_REQUEST_FAILED;
+      }
+
+      Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, https.getSize());
+
+      uint32_t counter = 0;
+      String payload;
+      long lStartTime = millis();
+      if (content_size <= 0) {
+        Log.warning("%s [%d]: Content-Length not provided, using writeToStream()\r\n", __FILE__, __LINE__);
+      }
+
+      bool isPNG = https.header("Content-Type") == "image/png";
+      bool isJPEG = https.header("Content-Type") == "image/jpeg";
+
+      Log.info("%s [%d]: Starting a download at: %d\r\n", __FILE__, __LINE__, systemClock().getTime());
+      heap_caps_check_integrity_all(true);
+
+      buffer = nullptr;
+      bool buffer_malloc = false;
+      if (content_size <= 0) {
+          // writeToStream() handles lack of content size and chunked transfer encoding
+          // automatically, and (unlike getString()) reports an error when the connection
+          // is closed before the whole body has arrived
+        Log.info("%s [%d]: Downloading image with writeToStream\r\n", __FILE__, __LINE__);
+        StreamString sstream;
+        int written = https.writeToStream(&sstream);
+        if (written < 0) {
+          Log_error_submit("Receiving failed; connection closed mid-download, error: %d (%s), RSSI %d", written,
+                           https.errorToString(written).c_str(), WiFi.RSSI());
+          return HTTPS_TIMED_OUT;
+        }
+        payload = std::move(static_cast<String &>(sstream));
+        counter = payload.length();
+        buffer = (uint8_t *)payload.c_str();
+      } else {
+        Log.info("%s [%d]: Downloading image with WifiClient (stream)\r\n", __FILE__, __LINE__);
+        counter = https.getSize();
+        if (counter && counter <= MAX_IMAGE_SIZE) {
+          WiFiClient *stream = https.getStreamPtr();
+          uint32_t iCount = 0;
+          bool closed_early = false;
+
+          buffer = (uint8_t *)malloc(counter);
+          if (buffer) {
+            buffer_malloc = true;
+            while (iCount < counter && millis() < (lStartTime + IMAGE_STREAM_INACTIVITY_TIMEOUT_MS)) {
+              if (stream->available()) {
+                buffer[iCount++] = stream->read();
+                lStartTime = millis(); // reset start time
+              } else if (!stream->connected()) {
+                    // server closed the connection before sending the whole body;
+                    // no more data can arrive, so stop immediately instead of
+                    // waiting out the inactivity timeout
+                closed_early = true;
+                break;
+              } else { // 15 seconds with no activity => stop trying
+                vTaskDelay(1); // yield to allow time for the data to arrive
+              }
+            }
+          } // if buffer
+          stream->stop(); // Important! If you don't do this, WiFi will have a memory exception later
+          if (buffer_malloc && iCount < counter) { // premature close or inactivity timeout
+            Log_error_submit("Receiving failed; incomplete download (%s): %" PRIu32 "/%" PRIu32 " bytes, RSSI %d",
+                             closed_early ? "connection closed early" : "timed out", iCount, counter, WiFi.RSSI());
+            free(buffer);
+            buffer = nullptr;
+            return HTTPS_TIMED_OUT;
+          }
+        }
+      } // if payload size is non-zero
+      Log.info("%s [%d]: %d bytes received in %d milliseconds\r\n", __FILE__, __LINE__, counter,
+               (int)(millis() - lStartTime));
+
+      if (counter == 0) {
+        Log_error_submit("Receiving failed. No data received");
+        return HTTPS_WRONG_IMAGE_SIZE;
+      }
+
+      if (counter > MAX_IMAGE_SIZE) {
+        Log_error_submit("Receiving failed; file size too big: %" PRIu32, counter);
+        return HTTPS_IMAGE_FILE_TOO_BIG;
+      }
+
+      if (buffer == NULL) {
+        Log_error_submit("Failed to allocate %" PRIu32 " bytes for image buffer", counter);
+        return HTTPS_OUT_OF_MEMORY;
+      }
+
+          // memcpy(buffer, payload.c_str(), counter);
+      content_size = counter;
+
+      if (counter >= 2 && buffer[0] == 'B' && buffer[1] == 'M') {
+        isPNG = false;
+        Log.info("BMP file detected");
+      }
+
+      submitStoredLogs();
+
+      WiFi.disconnect(true); // no need for WiFi, save power starting here
+      Log.info("%s [%d]: Received successfully; WiFi off.\r\n", __FILE__, __LINE__);
+
+      bool image_reverse = false;
+      if (isPNG || isJPEG) {
+        char szTemp[36];
+        filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
+        Log.info("%s [%d]: Writing %s to SPIFFS\r\n", __FILE__, __LINE__, szTemp);
+        filesystem_purge_old_file(szTemp); // try to delete the old version or older than 24h
+        writeImageToFile(szTemp, buffer, content_size);
+        Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
+        display_show_image(buffer, content_size, true);
+        DisplayedImage::remember(szTemp); // current image becomes the previous image
+        if (buffer_malloc) {
+          Log.info("%s [%d]: Freeing the image buffer we allocated\r\n", __FILE__, __LINE__);
+          free(buffer);
+        }
+        buffer = nullptr;
+        png_res = PNG_NO_ERR; // DEBUG
+        String _curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
+        String _lastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
+        if (!_curPath.isEmpty() && (_curPath != String(szTemp) || _lastPath.isEmpty()))
+          preferences.putString(PREFERENCES_LAST_PATH_KEY, _curPath);
+        preferences.putString(PREFERENCES_CURRENT_PATH_KEY, String(szTemp));
+#ifdef BOARD_TRMNL_X
+        update_playlist_order(preferences, szTemp, _curPath.c_str());
+#endif
+        preferences.putString(PREFERENCES_BROWSE_PATH_KEY, String(szTemp));
+      } else {
+        bmp_res = parseBMPHeader(buffer, image_reverse);
+        Log.info("%s [%d]: BMP Parsing result: %d\r\n", __FILE__, __LINE__, bmp_res);
+      }
+      Serial.println();
+      String error = "";
+         // uint8_t *imagePointer = buffer;
+//          uint8_t *imagePointer = (decodedPng == nullptr) ? buffer : decodedPng;
+        //  bool lastImageExists = filesystem_file_exists("/last.bmp") || filesystem_file_exists("/last.png");
+
+      switch (png_res) {
+      case PNG_NO_ERR: {
+
+           // Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
+           // display_show_image(imagePointer, image_reverse, isPNG);
+
+            // Using filename from API response
+        new_filename = apiDisplayResult.response.filename;
+
+            // Print the extracted string
+        Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
+
+        if (result != HTTPS_PLUGIN_NOT_ATTACHED) result = HTTPS_SUCCESS;
+      } break;
+      case PNG_WRONG_FORMAT: {
+        error = "Wrong image format. Did not pass signature check";
+      } break;
+      case PNG_BAD_SIZE: {
+        error = "IMAGE width, height or size are invalid";
+      } break;
+      case PNG_DECODE_ERR: {
+        error = "could not decode png image";
+      } break;
+      case PNG_MALLOC_FAILED: {
+        error = "could not allocate memory for png image decoder";
+      } break;
+      default:
+        break;
+      }
+
+      switch (bmp_res) {
+      case BMP_NO_ERR: {
+        if (!filesystem_file_exists("/current.png")) {
+          writeImageToFile("/current.bmp", buffer, content_size);
+        }
+        Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
+        display_show_image(buffer, content_size, true);
+        {
+          char szTemp[36];
+          filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
+          DisplayedImage::remember(szTemp);
+        }
+
+        if (buffer_malloc) {
+          Log.info("%s [%d]: Freeing the image buffer we allocated\r\n", __FILE__, __LINE__);
+          free(buffer);
+        }
+        buffer = nullptr;
+
+            // Using filename from API response
+        new_filename = apiDisplayResult.response.filename;
+
+            // Print the extracted string
+        Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
+
+        if (result != HTTPS_PLUGIN_NOT_ATTACHED) result = HTTPS_SUCCESS;
+      } break;
+      case BMP_NOT_BMP: {
+        error = "First two header bytes are invalid!";
+      } break;
+      case BMP_BAD_SIZE: {
+        error = "BMP width, height or size are invalid";
+      } break;
+      case BMP_COLOR_SCHEME_FAILED: {
+        error = "BMP color scheme is invalid";
+      } break;
+      case BMP_INVALID_OFFSET: {
+        error = "BMP header offset is invalid";
+      } break;
+      default:
+        break;
+      }
+
+      if (isPNG && png_res != PNG_NO_ERR) {
+        char szTemp[36];
+        filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
+        filesystem_file_delete(szTemp);
+        Log_error_submit("error parsing image file - %s", error.c_str());
+
+        return HTTPS_WRONG_IMAGE_FORMAT;
+      }
+    }
+
+    return result;
+  });
+
+  if (result == HTTPS_UNABLE_TO_CONNECT) {
+    Log_error_submit("unable to connect");
+  }
+
+  Log_info("Returned result - %s", szHTTPErrors[result]);
+
   return result;
 }
