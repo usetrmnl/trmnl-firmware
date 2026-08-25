@@ -40,6 +40,9 @@
 # Downstream white-label overrides, deep-merged over config.yml by the generator.
 /config.local.yml
 
+# Local white-label asset overlay referenced by config.local.yml images.*
+/assets/local/
+
 # Handled by espressif
 managed_components/
 
