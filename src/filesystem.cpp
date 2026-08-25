@@ -329,8 +329,7 @@ void update_playlist_order(Preferences &preferences, const char *new_path, const
       }
       // else: file was purged from filesystem — drop from list
     }
-    if (sep < 0)
-      break;
+    if (sep < 0) break;
     start = sep + 1;
   }
   if (found) {
@@ -352,12 +351,10 @@ void update_playlist_order(Preferences &preferences, const char *new_path, const
         inserted = true;
       }
     }
-    if (sep < 0)
-      break;
+    if (sep < 0) break;
     start = sep + 1;
   }
-  if (!inserted)
-    result2 += (result2.isEmpty() ? "" : "|") + newStr;
+  if (!inserted) result2 += (result2.isEmpty() ? "" : "|") + newStr;
   preferences.putString(PREFERENCES_PLAYLIST_ORDER_KEY, result2);
 }
 
