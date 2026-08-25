@@ -36,6 +36,7 @@
 /src/logo_medium.local.h
 /src/logo_big.local.h
 /src/loading.local.h
+/lib/wificaptive/src/wifi_ssid.local.h
 
 # Downstream white-label overrides, deep-merged over config.yml by the generator.
 /config.local.yml

@@ -23,15 +23,23 @@
 branding:
   # Product / device name inserted into user-facing text via {device_name}.
   device_name: "TRMNL"
-  # Accent colour for the captive-portal web UI. Only takes effect where the
-  # portal HTML uses a {{accent_color}} placeholder (stock HTML has none).
-  # accent_color: "#F86527"
+  # Accent colour applied throughout the captive-portal web UI via
+  # {{accent_color}} placeholders in the portal HTML.
+  accent_color: "#F86527"
 
 urls:
   # Back-end API base URL (no trailing slash).
   api_base_url: "https://trmnl.app"
   # Onboarding URL shown on the pairing screen.
   setup_url: "trmnl.com/start"
+
+# ---------------------------------------------------------------------------
+# WiFi setup access point
+# ---------------------------------------------------------------------------
+wifi:
+  # SSID prefix for the setup hotspot; the device MAC suffix is appended
+  # automatically (e.g. "TRMNL-A1B2C3").
+  ap_ssid_prefix: "TRMNL"
 
 # ---------------------------------------------------------------------------
 # QR codes rendered on the e-paper display. The bitmaps are regenerated from
@@ -85,6 +93,7 @@ strings:
   # portal_advanced_title: "{device_name} Advanced Configuration"
   # portal_reset_warning: "Are you sure? Soft resetting your {device_name} device will delete all WiFi credentials, clear your Device's ID, and reset your API key."
   # portal_server_note: "This button allows you to specify a custom API server (also known as BYOS) for your device. Most users don't want this, and will use the official server with their {device_name}. Are you sure you want to have a custom server specified?"
+  # portal_api_placeholder: "Enter your custom server without a trailing / (e.g. https://trmnl.app)"
 
   # -- WiFi connect (short status screen) --
   wifi_connect_short: "Connect to {device_name} WiFi"
