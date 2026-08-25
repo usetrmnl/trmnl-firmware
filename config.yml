@@ -45,6 +45,13 @@ wifi:
   ap_ssid_prefix: "TRMNL"
 
 # ---------------------------------------------------------------------------
+# Build options
+# ---------------------------------------------------------------------------
+build:
+  # Enable verbose serial logging by defining DEV_FIRMWARE at build time.
+  debug: false
+
+# ---------------------------------------------------------------------------
 # QR codes rendered on the e-paper display. The bitmaps are regenerated from
 # these URLs at build time via the `segno` package (installed automatically).
 # ---------------------------------------------------------------------------
