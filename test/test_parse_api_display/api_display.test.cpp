@@ -68,6 +68,24 @@ void test_parseResponse_apiDisplay_treats_unknown_sf_as_none(void) {
   TEST_ASSERT_EQUAL(parsed.special_function, SPECIAL_FUNCTION::SF_NONE);
 }
 
+void test_parseResponse_apiDisplay_status_202_has_no_image_url(void) {
+  // Registered-but-unclaimed / no-content: server replies 200 with body {"status":202}.
+  String input = "{\"status\":202}";
+  auto parsed = parseResponse_apiDisplay(input);
+  TEST_ASSERT_EQUAL(ApiDisplayOutcome::Ok, parsed.outcome);
+  TEST_ASSERT_EQUAL_UINT64(202, parsed.status);
+  TEST_ASSERT_EQUAL_STRING("", parsed.image_url.c_str());
+}
+
+void test_parseResponse_apiDisplay_status_0_empty_image_url(void) {
+  // status 0 with no image_url must not yield a non-empty URL to download.
+  String input = "{\"status\":0}";
+  auto parsed = parseResponse_apiDisplay(input);
+  TEST_ASSERT_EQUAL(ApiDisplayOutcome::Ok, parsed.outcome);
+  TEST_ASSERT_EQUAL_UINT64(0, parsed.status);
+  TEST_ASSERT_EQUAL_STRING("", parsed.image_url.c_str());
+}
+
 void setUp(void) {
   // set stuff up here
 }
@@ -82,6 +100,8 @@ void process() {
   RUN_TEST(test_parseResponse_apiDisplay_deserializationError);
   RUN_TEST(test_parseResponse_apiDisplay_treats_unknown_sf_as_none);
   RUN_TEST(test_parseResponse_apiDisplay_missing_fields);
+  RUN_TEST(test_parseResponse_apiDisplay_status_202_has_no_image_url);
+  RUN_TEST(test_parseResponse_apiDisplay_status_0_empty_image_url);
   UNITY_END();
 }
 
