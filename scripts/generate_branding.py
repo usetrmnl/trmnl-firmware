@@ -629,12 +629,21 @@ def main(project_dir=None):
     elif os.path.exists(ssid_h):
         os.remove(ssid_h)  # revert to stock prefix
 
+    return cfg
+
+
+def _truthy(v):
+    return str(v).strip().lower() in ("1", "true", "yes", "on")
+
 
 # PlatformIO pre-script hook ------------------------------------------------
 try:
     Import("env")  # noqa: F821
     _proj_dir = env.subst("$PROJECT_DIR") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # noqa: F821
-    main(_proj_dir)
+    _cfg = main(_proj_dir)
+    if _truthy(_cfg.get("build", {}).get("debug", False)):
+        env.Append(CPPDEFINES=["DEV_FIRMWARE"])  # noqa: F821
+        print("[branding] build.debug enabled -> DEV_FIRMWARE (verbose serial logging)")
 except NameError:
     pass
 
