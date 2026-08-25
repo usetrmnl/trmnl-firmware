@@ -334,7 +334,7 @@ def _string_variables(cfg):
 def generate_branding_h(cfg, out_path):
     variables = _string_variables(cfg)
     strings = cfg.get("strings", {})
-    logo_choice = str(cfg.get("branding", {}).get("message_logo", "small")).lower()
+    logo_choice = str(cfg.get("branding", {}).get("message_logo_size", "small")).lower()
     logo_symbol = {"small": "logo_small", "medium": "logo_medium", "big": "logo_big"}.get(logo_choice, "logo_small")
     lines = [
         "// ============================================================",
