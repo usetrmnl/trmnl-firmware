@@ -3003,7 +3003,9 @@ static uint8_t *storedLogoOrDefault(int iType)
     return const_cast<uint8_t *>(logo_medium);
 #else
   if (iType == 0) {
-    return const_cast<uint8_t *>(logo_small);
+    // Match the flash-branded path (which uses the medium logo); logo_small is
+    // tiny on the 800x480 pairing / message screens.
+    return const_cast<uint8_t *>(logo_medium);
   } else {
     // Force the loading screen to always use the slower update method because
     // we don't know (yet) if the panel can handle the faster update modes
