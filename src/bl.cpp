@@ -36,6 +36,7 @@
 #include "logging_parcers.h"
 #include <SPIFFS.h>
 #include "http_client.h"
+#include <StreamString.h>
 #include <api-client/display.h>
 #include <api-client/request_headers.h>
 #include "driver/gpio.h"
@@ -75,7 +76,6 @@ const char *szHTTPErrors[] = {
 };
 
 static float vBatt;
-
 static https_request_err_e downloadAndShow(); // download and show the image
 static https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse);
 static void resetDeviceCredentials(void);            // reset device credentials API key, Friendly ID, Wi-Fi SSID and password
@@ -929,6 +929,9 @@ void bl_init(void)
       Log_error("SF not saved");
     }
   }
+  // Read the battery voltage BEFORE the display or WiFi is turned on
+  vBatt = battery().readVoltage();
+
   // EPD init
   // EPD clear
   Log.info("%s [%d]: Display init\r\n", __FILE__, __LINE__);
@@ -972,6 +975,18 @@ void bl_init(void)
 //   pinMode(TCA9535_INT, INPUT);
 
 // #endif
+
+#ifdef BOARD_TRMNL_X
+  // Read the gauge before the panel draws load current, and before the logo
+  // is drawn so its battery icon has a snapshot to read.
+  battery_count = detect_battery_count();
+  battery_charging = (power().chargingStatus() == ChargingStatus::CHARGING);
+  Log_info("BATTERY COUNT: %d", battery_count);
+  Log_info("BATTERY CHARGING: %s", battery_charging ? "YES" : "NO");
+
+  battery().gaugeInit();
+  vBatt = battery().readVoltage(); // Read the battery voltage BEFORE WiFi is turned on
+#endif // BOARD_TRMNL_X
 
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
   {
@@ -1086,7 +1101,7 @@ void bl_init(void)
   WifiCredentials hardcodedCreds = {.ssid = "ssid-goes-here", .pswd = "password-goes-here"};
   Log_info("Hardcoded WiFi: connecting to SSID '%s'", hardcodedCreds.ssid.c_str());
   auto connectResult = WifiCaptivePortal.connect(hardcodedCreds);
-  Log_info("Hardcoded WiFi: connect result '%s'", wifiStatusStr(connectResult.status));
+  Log_info("Hardcoded WiFi: connect result '%s'", wifiStatusStr(connectResult));
 // goToSleep();
 #else
 
@@ -1537,6 +1552,21 @@ static https_request_err_e downloadAndShow()
   }
 
   https_request_err_e result = handleApiDisplayResponse(apiDisplayResult.response);
+  if (apiDisplayResult.response.filename == "screen_wiper.png") {
+      // Guard against re-fetching forever if the wiper is the only playlist item
+      static bool wiped_this_wake = false;
+      if (wiped_this_wake) {
+          Log_info("Screen wiper returned again; not wiping twice in one wake");
+          return result; // leave the wiped (white) screen as-is
+      }
+      wiped_this_wake = true;
+      Log_info("Detected screen wiper filename: %s, clearing display...", apiDisplayResult.response.filename.c_str());
+      display_wipe();
+      // Wiping leaves the screen blank; fetch and show the next playlist item
+      // right away instead of waiting for the next scheduled refresh.
+      Log_info("Screen wipe complete, fetching next playlist item");
+      return downloadAndShow();
+  }
 
   if (!status && result == HTTPS_SUCCESS) { // this means we already have this image stored in SPIFFS
       char szTemp[36];
@@ -1632,7 +1662,7 @@ static https_request_err_e downloadAndShow()
   }
 #endif // BOARD_TRMNL_X
 
-  withHttp(
+  result = withHttp(
       filename,
       [&](HTTPClient *httpsp, HttpError error) -> https_request_err_e
       {
@@ -1738,7 +1768,7 @@ static https_request_err_e downloadAndShow()
           long lStartTime = millis();
           if (content_size <= 0)
           {
-            Log.warning("%s [%d]: Content-Length not provided, using getString()\r\n", __FILE__, __LINE__);
+            Log.warning("%s [%d]: Content-Length not provided, using writeToStream()\r\n", __FILE__, __LINE__);
           }
 
           bool isPNG = https.header("Content-Type") == "image/png";
@@ -1750,9 +1780,18 @@ static https_request_err_e downloadAndShow()
           buffer = nullptr;
           bool buffer_malloc = false;
           if (content_size <= 0) {
-          // getString() handles lack of content size and chunked transfer encoding automatically
-            Log.info("%s [%d]: Downloading image with getString\r\n", __FILE__, __LINE__);
-            payload = https.getString();
+          // writeToStream() handles lack of content size and chunked transfer encoding
+          // automatically, and (unlike getString()) reports an error when the connection
+          // is closed before the whole body has arrived
+            Log.info("%s [%d]: Downloading image with writeToStream\r\n", __FILE__, __LINE__);
+            StreamString sstream;
+            int written = https.writeToStream(&sstream);
+            if (written < 0) {
+              Log_error_submit("Receiving failed; connection closed mid-download, error: %d (%s), RSSI %d",
+                               written, https.errorToString(written).c_str(), WiFi.RSSI());
+              return HTTPS_TIMED_OUT;
+            }
+            payload = std::move(static_cast<String &>(sstream));
             counter = payload.length();
             buffer = (uint8_t *)payload.c_str();
           } else {
@@ -1760,7 +1799,8 @@ static https_request_err_e downloadAndShow()
             counter = https.getSize();
             if (counter && counter <= MAX_IMAGE_SIZE) {
               WiFiClient *stream = https.getStreamPtr();
-              int iCount = 0;
+              uint32_t iCount = 0;
+              bool closed_early = false;
 
               buffer = (uint8_t *)malloc(counter);
               if (buffer) {
@@ -1769,15 +1809,25 @@ static https_request_err_e downloadAndShow()
                   if (stream->available()) {
                     buffer[iCount++] = stream->read();
                     lStartTime = millis(); // reset start time
+                  } else if (!stream->connected()) {
+                    // server closed the connection before sending the whole body;
+                    // no more data can arrive, so stop immediately instead of
+                    // waiting out the inactivity timeout
+                    closed_early = true;
+                    break;
                   } else { // 15 seconds with no activity => stop trying
                     vTaskDelay(1); // yield to allow time for the data to arrive
                   }
                 }
               } // if buffer
               stream->stop(); // Important! If you don't do this, WiFi will have a memory exception later
-              if (millis() > (lStartTime + IMAGE_STREAM_INACTIVITY_TIMEOUT_MS)) { // we timed out
-                  Log_error_submit("Receiving failed; download timed out. Image size = %" PRIu32, counter);
-                  return HTTPS_TIMED_OUT;
+              if (buffer_malloc && iCount < counter) { // premature close or inactivity timeout
+                Log_error_submit("Receiving failed; incomplete download (%s): %" PRIu32 "/%" PRIu32 " bytes, RSSI %d",
+                                 closed_early ? "connection closed early" : "timed out", iCount, counter,
+                                 WiFi.RSSI());
+                free(buffer);
+                buffer = nullptr;
+                return HTTPS_TIMED_OUT;
               }
             }
           } // if payload size is non-zero

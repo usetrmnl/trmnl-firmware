@@ -10,6 +10,7 @@
 #include "battery_hollow.h"
 #include "messages.h"
 #include "config.h"
+#include "battery.h"
 #define MAX_BIT_DEPTH 8
 TRMNL_DEVICE *pDevice = NULL;
 #ifdef PARALLEL_EPD
@@ -534,6 +535,33 @@ void display_set_light_sleep(uint8_t enabled)
     bbep.setLightSleep(enabled);
 #endif
 }
+
+// Clear any ghosting on the X display by wiping it black/white many times
+void display_wipe(void)
+{
+#ifdef BB_EPAPER
+
+#ifdef BOARD_TRMNL_4CLR
+    int refreshCount = 2;
+#else
+    int refreshCount = 60;
+#endif
+
+    bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit);
+    bbep.fillScreen(BBEP_WHITE);
+    for (int i=0; i<refreshCount; i++) {
+        bbep.refresh(REFRESH_FULL); // 2 to 3 minutes of Black/White clearing of the display
+    }
+    bbep.sleep(LIGHT_SLEEP);
+#else
+    bbep.setMode(BB_MODE_1BPP);
+    bbep.fillScreen(BBEP_WHITE);
+    for (int i=0; i<100; i++) { // 200 black/white cycles should remove any ghosting
+        bbep.fullUpdate(CLEAR_SLOW, true);
+    }
+    bbep.einkPower(0); // power off the display
+#endif
+} /* display_wipe() */
 
 /**
  * @brief Function to sleep the ESP32 while saving power
@@ -1349,7 +1377,7 @@ int png_draw(PNGDRAW *pDraw)
     uint8_t ucMask, ucPixel, src, *s, *d;
     int iPitch, iBpp;
 
-    if (y >= bbep.height() && bbep.height() != pDraw->iWidth) return 0; // image is larger than the display, stop decoding it
+    if (y >= bbep.height() && pDraw->iWidth != bbep.height()) return 0; // image is larger than the display (and not rotated), stop decoding it
     if (pDraw->iPixelType == PNG_PIXEL_INDEXED || pDraw->iBpp > 4) { // need to convert through the palette and/or reduce the bpp
         s = bbep.tempBuffer(); // temp space we can use
         iBpp = (pDraw->iBpp > 4) ? 4 : pDraw->iBpp;
@@ -1826,8 +1854,8 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
                 y = bbep.height() - 120;
                 bbep.loadG5Image(battery_hollow, 40, y, BBEP_WHITE, BBEP_BLACK);
                 Log_info("Displaying 'battery charge level' icon");
-                if (lipo.begin(PIN_INTERNAL_SDA, PIN_INTERNAL_SCL)) { // only report SoC if battery was detected and BQ27427 initialized successfully
-                    int batt_percent = lipo.soc();
+                int batt_percent = battery().readSoc(); // -1 if no battery or the gauge reading failed
+                if (batt_percent >= 0) {
                     if (batt_percent >= 97) batt_percent = 100; // can sometimes report 98% when full
                     // Draw a black rectangle to represent the battery charge level
                     bbep.fillRect(40+10, y+18, (97 * batt_percent)/100, 39, BBEP_BLACK);
