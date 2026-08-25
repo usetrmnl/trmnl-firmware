@@ -45,6 +45,7 @@
 #include <preferences_persistence.h>
 #include "logo_small.h"
 #include "logo_medium.h"
+#include "logo_big.h"
 #include "loading.h"
 #include <wifi-helpers.h>
 #include <sys/time.h>
@@ -2957,6 +2958,9 @@ static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiRes
 
 // 0 = larger glyph for message screens
 // 1 = loading screen (mostly blank, small glyph in lower right corner)
+#ifndef BRAND_MESSAGE_LOGO
+#define BRAND_MESSAGE_LOGO logo_small // stock default; override via branding.message_logo
+#endif
 static uint8_t *storedLogoOrDefault(int iType)
 {
 //
@@ -2993,7 +2997,7 @@ static uint8_t *storedLogoOrDefault(int iType)
     return const_cast<uint8_t *>(logo_medium);
 #else
   if (iType == 0) {
-    return const_cast<uint8_t *>(logo_small);
+    return const_cast<uint8_t *>(BRAND_MESSAGE_LOGO);
   } else {
     // Force the loading screen to always use the slower update method because
     // we don't know (yet) if the panel can handle the faster update modes
