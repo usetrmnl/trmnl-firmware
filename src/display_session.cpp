@@ -1,18 +1,16 @@
-#include <display_session.h>
-
 #include <ArduinoLog.h>
 #include <battery.h>
 #include <config.h>
 #include <device_id.h>
 #include <display.h>
+#include <display_session.h>
 #include <globals.h>
 #include <logging_parcers.h>
 #include <power.h>
 #include <trmnl_log.h>
 #include <wifi_network.h>
 
-ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
-{
+ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences) {
   ApiDisplayInputs inputs;
 
   inputs.baseUrl = preferences.getString(PREFERENCES_API_URL, API_BASE_URL);
@@ -20,32 +18,23 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   Log.info("%s [%d]: baseUrl from preferences: %s\r\n", __FILE__, __LINE__, inputs.baseUrl.c_str());
 
   char wakeupReasonString[32] = {0};
-  if (parseWakeupReasonToStr(wakeupReasonString, sizeof(wakeupReasonString), (esp_sleep_source_t)wakeup_reason))
-  {
+  if (parseWakeupReasonToStr(wakeupReasonString, sizeof(wakeupReasonString), (esp_sleep_source_t)wakeup_reason)) {
     inputs.updateSource = String(wakeupReasonString);
-  }
-  else
-  {
+  } else {
     inputs.updateSource = "unknown";
   }
 
-  if (preferences.isKey(PREFERENCES_API_KEY))
-  {
+  if (preferences.isKey(PREFERENCES_API_KEY)) {
     inputs.apiKey = preferences.getString(PREFERENCES_API_KEY, PREFERENCES_API_KEY_DEFAULT);
     Log.info("%s [%d]: %s key exists. Value - %s\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY, inputs.apiKey.c_str());
-  }
-  else
-  {
+  } else {
     Log.info("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY);
   }
 
-  if (preferences.isKey(PREFERENCES_FRIENDLY_ID))
-  {
+  if (preferences.isKey(PREFERENCES_FRIENDLY_ID)) {
     inputs.friendlyId = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
     Log.info("%s [%d]: %s key exists. Value - %s\r\n", __FILE__, __LINE__, PREFERENCES_FRIENDLY_ID, inputs.friendlyId);
-  }
-  else
-  {
+  } else {
     Log.info("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_FRIENDLY_ID);
   }
 
