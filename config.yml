@@ -23,6 +23,9 @@
 branding:
   # Product / device name inserted into user-facing text via {device_name}.
   device_name: "TRMNL"
+  # Accent colour for the captive-portal web UI. Only takes effect where the
+  # portal HTML uses a {{accent_color}} placeholder (stock HTML has none).
+  # accent_color: "#F86527"
 
 urls:
   # Back-end API base URL (no trailing slash).
@@ -39,6 +42,20 @@ qr:
   connect_url: "https://trmnl.com/start"
   # Shown on the WiFi-failure / help screens (src/wifi_failed_qr.h).
   help_url: "https://help.usetrmnl.com"
+
+# ---------------------------------------------------------------------------
+# Custom logos (optional). Point these at 1-bit PNGs of the exact pixel size
+# shown to replace the stock e-paper logos. Leave unset to keep the committed
+# defaults. Generated headers are git-ignored sidecars, so overriding never
+# edits a tracked file. Put real overrides in config.local.yml, e.g. pointing
+# at git-ignored assets under assets/local/.
+# ---------------------------------------------------------------------------
+# images:
+#   logo_small:  "assets/local/logo_small.png"    # 86x86
+#   logo_medium: "assets/local/logo_medium.png"   # 240x240
+#   logo_big:    "assets/local/logo_big.png"      # 640x640
+#   loading:     "assets/local/loading.png"       # 800x480
+#   portal_logo: "assets/local/logo.svg"          # captive-portal web logo
 
 # ---------------------------------------------------------------------------
 # User-facing text strings (defaults match the stock firmware verbatim).
@@ -61,6 +78,13 @@ strings:
   wifi_reset_confirm: "Are you sure you want to reset WiFi settings?"
   power_off_confirm: "Turn off device?"
   confirm_instructions: "Hold middle of touch bar to confirm, tap to cancel."
+
+  # -- Web portal (captive-portal pages). Optional: set these to rebrand the
+  #    setup site. Left unset here so the generated page matches stock verbatim.
+  # portal_title: "{device_name} Wi-Fi Configuration"
+  # portal_advanced_title: "{device_name} Advanced Configuration"
+  # portal_reset_warning: "Are you sure? Soft resetting your {device_name} device will delete all WiFi credentials, clear your Device's ID, and reset your API key."
+  # portal_server_note: "This button allows you to specify a custom API server (also known as BYOS) for your device. Most users don't want this, and will use the official server with their {device_name}. Are you sure you want to have a custom server specified?"
 
   # -- WiFi connect (short status screen) --
   wifi_connect_short: "Connect to {device_name} WiFi"

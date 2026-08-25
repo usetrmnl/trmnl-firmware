@@ -22,3 +22,14 @@
 
 # strings:
 #   welcome: "Welcome to {device_name}."
+#   # Captive-portal web page text:
+#   portal_title: "{device_name} Wi-Fi Configuration"
+#   portal_advanced_title: "{device_name} Advanced Configuration"
+
+# Custom logos: point at 1-bit PNGs of the exact size (git-ignored overlay).
+# images:
+#   logo_small:  "assets/local/logo_small.png"    # 86x86
+#   logo_medium: "assets/local/logo_medium.png"   # 240x240
+#   logo_big:    "assets/local/logo_big.png"      # 640x640
+#   loading:     "assets/local/loading.png"       # 800x480
+#   portal_logo: "assets/local/logo.svg"

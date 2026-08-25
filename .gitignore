@@ -28,6 +28,14 @@
 /include/branding.h
 /src/wifi_connect_qr.h
 /src/wifi_failed_qr.h
+/lib/wificaptive/src/WifiCaptivePage.h
+
+# Custom logo overrides: sidecars emitted when config.yml points images.* at a
+# PNG; the committed stock logo headers include them via __has_include.
+/src/logo_small.local.h
+/src/logo_medium.local.h
+/src/logo_big.local.h
+/src/loading.local.h
 
 # Downstream white-label overrides, deep-merged over config.yml by the generator.
 /config.local.yml

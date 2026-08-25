@@ -102,12 +102,18 @@ jobs:
 
       - name: Local override applies without touching tracked files
         run: |
-          printf 'branding:\n  device_name: "Timeframe"\n' > config.local.yml
+          python scripts/generate_branding.py
+          cp lib/wificaptive/src/WifiCaptivePage.h /tmp/portal_stock.h
+          printf 'branding:\n  device_name: "Timeframe"\nstrings:\n  portal_title: "Timeframe Wi-Fi Configuration"\n' > config.local.yml
           python scripts/generate_branding.py
           grep -q '"Timeframe"' include/branding.h
+          # Overriding portal_title must change the (deterministic) portal page.
+          if cmp -s /tmp/portal_stock.h lib/wificaptive/src/WifiCaptivePage.h; then
+            echo "portal page did not change on override" >&2; exit 1
+          fi
           rm config.local.yml
-          # branding.h and the QR headers are git-ignored build artifacts, so
-          # overriding config must not modify any tracked file.
+          # branding.h, QR headers and WifiCaptivePage.h are git-ignored build
+          # artifacts, so overriding config must not modify any tracked file.
           git diff --exit-code
 
   publish-engineering-build:
