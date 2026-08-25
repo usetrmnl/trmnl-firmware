@@ -1,6 +1,11 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+// Generated branding (git-ignored); falls back to stock values when absent.
+#if defined(__has_include) && __has_include("branding.h")
+#include "branding.h"
+#endif
+
 #define FW_MAJOR_VERSION 1
 #define FW_MINOR_VERSION 8
 #define FW_PATCH_VERSION 14
@@ -192,14 +197,17 @@
 
 // #define FAKE_BATTERY_VOLTAGE // Uncomment to report 4.2V instead of reading ADC
 
-#define BUTTON_HOLD_TIME                   5000
-#define BUTTON_MEDIUM_HOLD_TIME            1000
-#define BUTTON_SOFT_RESET_TIME             15000
-#define BUTTON_SHIP_MODE_TIME              30000
-#define BUTTON_DOUBLE_CLICK_WINDOW         800
+#define BUTTON_HOLD_TIME           5000
+#define BUTTON_MEDIUM_HOLD_TIME    1000
+#define BUTTON_SOFT_RESET_TIME     15000
+#define BUTTON_SHIP_MODE_TIME      30000
+#define BUTTON_DOUBLE_CLICK_WINDOW 800
 
-#define SERVER_MAX_RETRIES                 3
-#define API_BASE_URL                       "https://trmnl.app"
+#define SERVER_MAX_RETRIES         3
+#ifndef BRAND_API_BASE_URL
+#define BRAND_API_BASE_URL "https://trmnl.app"
+#endif
+#define API_BASE_URL                       BRAND_API_BASE_URL
 
 // Abort an image download when the stream goes this long with no data.
 #define IMAGE_STREAM_INACTIVITY_TIMEOUT_MS 15000
