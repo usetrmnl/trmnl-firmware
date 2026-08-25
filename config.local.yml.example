@@ -1,0 +1,35 @@
+# =============================================================================
+# config.local.yml - downstream white-label overrides (EXAMPLE)
+# =============================================================================
+# Copy this file to `config.local.yml` (which is git-ignored) and set only the
+# keys you want to override. It is deep-merged over config.yml at build time by
+# scripts/generate_branding.py, so you never edit a tracked file and pulling
+# upstream never produces merge conflicts.
+#
+# Only include the keys you change; everything else falls back to config.yml.
+# =============================================================================
+
+# branding:
+#   device_name: "Timeframe"
+
+# urls:
+#   api_base_url: "https://api.example.com"
+#   setup_url: "example.com/start"
+
+# qr:
+#   connect_url: "https://example.com/start"
+#   help_url: "https://help.example.com"
+
+# strings:
+#   welcome: "Welcome to {device_name}."
+#   # Captive-portal web page text:
+#   portal_title: "{device_name} Wi-Fi Configuration"
+#   portal_advanced_title: "{device_name} Advanced Configuration"
+
+# Custom logos: point at 1-bit PNGs of the exact size (git-ignored overlay).
+# images:
+#   logo_small:  "assets/local/logo_small.png"    # 86x86
+#   logo_medium: "assets/local/logo_medium.png"   # 240x240
+#   logo_big:    "assets/local/logo_big.png"      # 640x640
+#   loading:     "assets/local/loading.png"       # 800x480
+#   portal_logo: "assets/local/logo.svg"

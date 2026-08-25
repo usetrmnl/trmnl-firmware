@@ -10,6 +10,7 @@ lib/IQS323/**
 lib/trmnl_x/**
 
 # pre-generated constants
+include/branding.h
 include/Inter_18.h
 include/Roboto_Black_24.h
 include/nicoclean_8.h

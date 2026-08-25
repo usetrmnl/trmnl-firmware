@@ -50,6 +50,9 @@ jobs:
       - name: Install PlatformIO Core
         run: pip install --upgrade platformio
 
+      - name: Generate branding headers
+        run: python scripts/generate_branding.py
+
       - name: Configure ccache for PlatformIO (Unix)
         if: runner.os != 'Windows'
         run: |
@@ -82,6 +85,36 @@ jobs:
 
       - name: static analysis
         run: pio check --skip-packages --fail-on-defect high
+
+  branding-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Stock config produces stock branding
+        run: |
+          python scripts/generate_branding.py
+          grep -q '"TRMNL"' include/branding.h
+
+      - name: Local override applies without touching tracked files
+        run: |
+          python scripts/generate_branding.py
+          cp lib/wificaptive/src/WifiCaptivePage.h /tmp/portal_stock.h
+          printf 'branding:\n  device_name: "Timeframe"\nstrings:\n  portal_title: "Timeframe Wi-Fi Configuration"\n' > config.local.yml
+          python scripts/generate_branding.py
+          grep -q '"Timeframe"' include/branding.h
+          # Overriding portal_title must change the (deterministic) portal page.
+          if cmp -s /tmp/portal_stock.h lib/wificaptive/src/WifiCaptivePage.h; then
+            echo "portal page did not change on override" >&2; exit 1
+          fi
+          rm config.local.yml
+          # branding.h, QR headers and WifiCaptivePage.h are git-ignored build
+          # artifacts, so overriding config must not modify any tracked file.
+          git diff --exit-code
 
   publish-engineering-build:
     needs: build-test
