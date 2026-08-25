@@ -14,7 +14,14 @@
 #include "WifiCaptivePage.h"
 #include "wifi-types.h"
 
-#define WIFI_SSID                "TRMNL"
+#if defined(__has_include) && __has_include("wifi_ssid.local.h")
+#include "wifi_ssid.local.h" // white-label AP prefix override (git-ignored)
+#endif
+#ifndef BRAND_WIFI_AP_PREFIX
+#define BRAND_WIFI_AP_PREFIX "TRMNL"
+#endif
+
+#define WIFI_SSID                BRAND_WIFI_AP_PREFIX
 #define WIFI_PASSWORD            NULL
 
 // Define the DNS interval in milliseconds between processing DNS requests
