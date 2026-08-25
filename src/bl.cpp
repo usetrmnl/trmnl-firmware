@@ -1730,6 +1730,23 @@ static https_request_err_e downloadAndShow()
   }
 #endif // BOARD_TRMNL_X
 
+  // Nothing new to fetch: `status` is only set when the response carried a new
+  // image_url, and `filename` is left empty otherwise. This happens for an
+  // HTTP 200 body of status 202 (device registered but no content/plugin/
+  // playlist assigned) and for a status 0 response with no image_url. Falling
+  // through here would call withHttp("") on the empty URL; https.begin("")
+  // fails to parse it and returns false, which the download path misreports as
+  // HTTPS_UNABLE_TO_CONNECT ("unable to connect to internet") - a misleading
+  // network error for what is really a "no content yet" state. Skip the
+  // download and return the already-handled result (e.g. HTTPS_NO_REGISTER for
+  // a 202) so the device keeps its current screen and fast-polls until content
+  // is assigned.
+  if (!status || strlen(filename) == 0)
+  {
+    Log_info("No image URL to download (status=%d, url_len=%u); skipping image fetch", status, (unsigned)strlen(filename));
+    return result;
+  }
+
   result = withHttp(
       filename,
       [&](HTTPClient *httpsp, HttpError error) -> https_request_err_e
