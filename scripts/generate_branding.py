@@ -4,14 +4,22 @@ generate_branding.py - Read config.yml and emit:
   1. include/branding.h                     (string / URL #define macros)
   2. src/wifi_connect_qr.h, wifi_failed_qr.h (QR bitmaps for the configured URLs)
 
+These outputs are build artifacts (git-ignored) regenerated on every build.
+
 Defaults reproduce the stock TRMNL strings/URLs, so an unmodified config.yml
 produces byte-identical output.
+
+Downstream white-labels put their overrides in config.local.yml (git-ignored),
+which is deep-merged over config.yml. Customizing therefore never edits a
+tracked file, so syncing upstream does not create merge conflicts.
 
 Runs standalone or as a PlatformIO pre-build script. The QR step depends on the
 `segno` package (see scripts/requirements.txt); it is installed on demand so the
 QR bitmaps always regenerate from config.yml.
 """
 
+import gzip
+import io
 import os
 import re
 import struct
@@ -49,6 +57,14 @@ def _parse_yaml(path):
                 parent[key] = value
     return result
 
+def _deep_merge(base, override):
+    """Recursively merge *override* into *base* (both dicts); returns *base*."""
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(base.get(key), dict):
+            _deep_merge(base[key], value)
+        else:
+            base[key] = value
+    return base
 
 def _expand(template, variables):
     """Replace {key} placeholders in *template* with values from *variables*."""
@@ -353,6 +369,169 @@ def generate_branding_h(cfg, out_path):
 
 
 # ---------------------------------------------------------------------------
+# Custom logo generation (dependency: pillow, auto-installed on demand)
+# ---------------------------------------------------------------------------
+
+def _ensure_pillow():
+    """Import PIL.Image, installing pillow on demand. Returns Image or None."""
+    try:
+        from PIL import Image
+        return Image
+    except ImportError:
+        pass
+    import subprocess
+    import sys
+    print("[branding] installing 'pillow' to convert custom images...")
+    for extra in ([], ["--break-system-packages"]):
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "--quiet", "pillow"] + extra)
+            break
+        except subprocess.CalledProcessError:
+            continue
+    try:
+        from PIL import Image
+        return Image
+    except ImportError:
+        return None
+
+
+def generate_image_header(png_path, var_name, expected_w, expected_h, out_path):
+    """Convert a 1-bit PNG of exact size into a G5 BB_BITMAP C header."""
+    Image = _ensure_pillow()
+    if Image is None:
+        print(f"[branding] WARNING: pillow unavailable, cannot convert {png_path}")
+        return False
+    img = Image.open(png_path).convert("1")  # force 1-bit
+    if img.size != (expected_w, expected_h):
+        raise ValueError(
+            f"{png_path}: expected {expected_w}x{expected_h} but got {img.size[0]}x{img.size[1]}"
+        )
+    row_byte_width = (expected_w + 7) // 8
+    rows = []
+    for y in range(expected_h):
+        row = bytearray(row_byte_width)
+        for x in range(expected_w):
+            if img.getpixel((x, y)):  # white pixel -> set bit (white=1)
+                row[x >> 3] |= 0x80 >> (x & 7)
+        tail = expected_w & 7
+        if tail:
+            row[-1] |= 0xFF >> tail
+        rows.append(bytes(row))
+    _write_g5_header(rows, expected_w, expected_h, var_name, out_path, os.path.basename(png_path))
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Captive-portal page (WifiCaptivePage.h) generation
+# ---------------------------------------------------------------------------
+
+def _brand_html(html_text, cfg):
+    """Apply configured portal-text overrides to stock captive-portal HTML.
+
+    Only keys present in config replace a stock literal, so an unmodified config
+    reproduces the stock page content verbatim.
+    """
+    strings = cfg.get("strings", {})
+    variables = {
+        "device_name": cfg.get("branding", {}).get("device_name", "TRMNL"),
+        "api_base_url": cfg.get("urls", {}).get("api_base_url", "https://trmnl.app"),
+    }
+
+    title = strings.get("portal_title")
+    if title:
+        html_text = html_text.replace(
+            "<title>TRMNL Wi-Fi Configuration</title>",
+            f"<title>{_expand(title, variables)}</title>",
+        )
+    adv_title = strings.get("portal_advanced_title")
+    if adv_title:
+        html_text = html_text.replace(
+            "<title>TRMNL Advanced Configuration</title>",
+            f"<title>{_expand(adv_title, variables)}</title>",
+        )
+    reset_warning = strings.get("portal_reset_warning")
+    if reset_warning:
+        html_text = re.sub(
+            r"Are you sure\? Soft resetting your TRMNL device will delete all WiFi credentials,\s*"
+            r"clear your Device's ID, and reset your API key\.",
+            lambda _m: _expand(reset_warning, variables),
+            html_text,
+        )
+    server_note = strings.get("portal_server_note")
+    if server_note:
+        html_text = re.sub(
+            r"This button allows you to specify a custom API server.*?"
+            r"Are you sure you want to have a custom server specified\?",
+            lambda _m: _expand(server_note, variables),
+            html_text,
+            flags=re.DOTALL,
+        )
+    accent = cfg.get("branding", {}).get("accent_color")
+    if accent:
+        html_text = html_text.replace("{{accent_color}}", accent)
+    return html_text
+
+
+def _gzip_bytes(data):
+    buf = io.BytesIO()
+    with gzip.GzipFile(fileobj=buf, mode="wb", mtime=0) as gz:  # mtime=0 for reproducibility
+        gz.write(data)
+    return buf.getvalue()
+
+
+def _has_portal_overrides(cfg):
+    strings = cfg.get("strings", {})
+    portal_keys = ("portal_title", "portal_advanced_title", "portal_reset_warning", "portal_server_note")
+    return bool(cfg.get("branding", {}).get("accent_color")) or any(strings.get(k) for k in portal_keys)
+
+
+def generate_captive_portal(cfg, portal_dir, out_path, svg_override=None):
+    """Brand the portal HTML/SVG, gzip it, and write the WifiCaptivePage.h header.
+
+    With no portal overrides configured, the raw source bytes are gzipped
+    unchanged so the page content is byte-identical to stock.
+    """
+    if not os.path.isdir(portal_dir):
+        print(f"[branding] WARNING: {portal_dir} not found, skipping portal page")
+        return
+    apply_branding = _has_portal_overrides(cfg)
+    entries = []
+    for fname in sorted(os.listdir(portal_dir)):
+        if not fname.endswith((".html", ".svg")):
+            continue
+        if fname == "logo.svg" and svg_override is not None:
+            data = svg_override.encode("utf-8")
+        else:
+            with open(os.path.join(portal_dir, fname), "rb") as f:
+                data = f.read()
+        if fname.endswith(".html") and apply_branding:
+            data = _brand_html(data.decode("utf-8"), cfg).encode("utf-8")
+        compressed = _gzip_bytes(data)
+        array_name = fname.replace(".", "_").upper()
+        hex_vals = ", ".join(hex(b) for b in compressed)
+        entries.append(
+            f"const uint8_t {array_name}[] PROGMEM = {{ {hex_vals} }};\n"
+            f"const int {array_name}_LEN = sizeof({array_name});\n"
+        )
+    content = (
+        "#ifndef WifiCaptivePage_h\n"
+        "#define WifiCaptivePage_h\n\n"
+        "#include <pgmspace.h>\n\n"
+        + "\n".join(entries)
+        + "\n#endif\n"
+    )
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    if os.path.exists(out_path):
+        with open(out_path, "r", encoding="utf-8") as f:
+            if f.read() == content:
+                print(f"[branding] {out_path} is up-to-date")
+                return
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write(content)
+    print(f"[branding] wrote {out_path}")
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
@@ -367,11 +546,20 @@ def main(project_dir=None):
     else:
         cfg = _parse_yaml(config_path)
 
+    # Optional downstream overrides, deep-merged over config.yml. Keeping
+    # customization in this git-ignored file means tracked files never change,
+    # so pulling upstream never conflicts.
+    local_path = os.path.join(project_dir, "config.local.yml")
+    if os.path.isfile(local_path):
+        print(f"[branding] applying overrides from {local_path}")
+        _deep_merge(cfg, _parse_yaml(local_path))
+
     generate_branding_h(cfg, os.path.join(project_dir, "include", "branding.h"))
+
+    src_dir = os.path.join(project_dir, "src")
 
     # --- QR codes (regenerated from config.yml URLs) ---
     qr = cfg.get("qr", {})
-    src_dir = os.path.join(project_dir, "src")
     specs = [
         (qr.get("connect_url", "https://trmnl.com/start"), "wifi_connect_qr", "wifi_connect_qr.h"),
         (qr.get("help_url", "https://help.usetrmnl.com"), "wifi_failed_qr", "wifi_failed_qr.h"),
@@ -379,6 +567,41 @@ def main(project_dir=None):
     segno = _ensure_segno()
     for url, var_name, out_name in specs:
         generate_qr_header(url, var_name, os.path.join(src_dir, out_name), segno)
+
+    # --- Captive-portal page (git-ignored build artifact) ---
+    images = cfg.get("images", {})
+    portal_dir = os.path.join(project_dir, "lib", "wificaptive", "portal")
+    captive_h = os.path.join(project_dir, "lib", "wificaptive", "src", "WifiCaptivePage.h")
+    svg_override = None
+    portal_logo = images.get("portal_logo", "")
+    if portal_logo:
+        abs_svg = os.path.join(project_dir, portal_logo)
+        if os.path.isfile(abs_svg):
+            with open(abs_svg, "r", encoding="utf-8") as f:
+                svg_override = f.read()
+        else:
+            print(f"[branding] WARNING: {portal_logo} not found, using stock portal logo")
+    generate_captive_portal(cfg, portal_dir, captive_h, svg_override)
+
+    # --- Optional custom logos -> git-ignored *.local.h sidecars ---
+    # Stock headers stay the tracked default; a configured image emits a sidecar
+    # that the committed header picks up via __has_include, so customizing logos
+    # never modifies a tracked file.
+    image_specs = [
+        ("logo_small",  "logo_small",  86,  86,  "logo_small.local.h"),
+        ("logo_medium", "logo_medium", 240, 240, "logo_medium.local.h"),
+        ("logo_big",    "logo_big",    640, 640, "logo_big.local.h"),
+        ("loading",     "loading",     800, 480, "loading.local.h"),
+    ]
+    for cfg_key, var_name, w, h, out_name in image_specs:
+        path = images.get(cfg_key, "")
+        if not path:
+            continue
+        abs_png = os.path.join(project_dir, path)
+        if not os.path.isfile(abs_png):
+            print(f"[branding] WARNING: {path} not found, skipping {cfg_key}")
+            continue
+        generate_image_header(abs_png, var_name, w, h, os.path.join(src_dir, out_name))
 
 
 # PlatformIO pre-script hook ------------------------------------------------
