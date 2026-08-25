@@ -28,7 +28,7 @@ branding:
   accent_color: "#F86527"
   # Logo on the pairing / WiFi / status screens (non-X boards):
   # small (86x86, stock) | medium (240x240) | big (640x640).
-  message_logo: "small"
+  message_logo_size: "small"
 
 urls:
   # Back-end API base URL (no trailing slash).
