@@ -22,6 +22,16 @@
 /sdkconfigs/sdkconfig.trmnl_gen2
 /sdkconfigs/sdkconfig.local
 
+# Localization / branding build artifacts, regenerated from config.yml at build
+# time by scripts/generate_branding.py. Untracked so downstream customization
+# never diffs a committed file.
+/include/branding.h
+/src/wifi_connect_qr.h
+/src/wifi_failed_qr.h
+
+# Downstream white-label overrides, deep-merged over config.yml by the generator.
+/config.local.yml
+
 # Handled by espressif
 managed_components/
 

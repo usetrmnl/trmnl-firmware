@@ -4,8 +4,14 @@ generate_branding.py - Read config.yml and emit:
   1. include/branding.h                     (string / URL #define macros)
   2. src/wifi_connect_qr.h, wifi_failed_qr.h (QR bitmaps for the configured URLs)
 
+These outputs are build artifacts (git-ignored) regenerated on every build.
+
 Defaults reproduce the stock TRMNL strings/URLs, so an unmodified config.yml
 produces byte-identical output.
+
+Downstream white-labels put their overrides in config.local.yml (git-ignored),
+which is deep-merged over config.yml. Customizing therefore never edits a
+tracked file, so syncing upstream does not create merge conflicts.
 
 Runs standalone or as a PlatformIO pre-build script. The QR step depends on the
 `segno` package (see scripts/requirements.txt); it is installed on demand so the
@@ -49,6 +55,14 @@ def _parse_yaml(path):
                 parent[key] = value
     return result
 
+def _deep_merge(base, override):
+    """Recursively merge *override* into *base* (both dicts); returns *base*."""
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(base.get(key), dict):
+            _deep_merge(base[key], value)
+        else:
+            base[key] = value
+    return base
 
 def _expand(template, variables):
     """Replace {key} placeholders in *template* with values from *variables*."""
@@ -366,6 +380,14 @@ def main(project_dir=None):
         cfg = {}
     else:
         cfg = _parse_yaml(config_path)
+
+    # Optional downstream overrides, deep-merged over config.yml. Keeping
+    # customization in this git-ignored file means tracked files never change,
+    # so pulling upstream never conflicts.
+    local_path = os.path.join(project_dir, "config.local.yml")
+    if os.path.isfile(local_path):
+        print(f"[branding] applying overrides from {local_path}")
+        _deep_merge(cfg, _parse_yaml(local_path))
 
     generate_branding_h(cfg, os.path.join(project_dir, "include", "branding.h"))
 
