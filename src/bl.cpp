@@ -78,7 +78,7 @@ const char *szHTTPErrors[] = {
 static float vBatt;
 static https_request_err_e downloadAndShow(); // download and show the image
 static https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse);
-static void resetDeviceCredentials(void);            // reset device credentials API key, Friendly ID, Wi-Fi SSID and password
+void resetDeviceCredentials(void);            // reset device credentials API key, Friendly ID, Wi-Fi SSID and password
 void goToSleep(void);                         // sleep preparing
 static void goToSleepButtonOnly(void);               // sleep until button press, no timer
 static void submitStoredLogs(void);
@@ -115,6 +115,7 @@ void wait_for_serial() {
 }
 #ifdef BOARD_TRMNL_X
 #include <qa.h> // For device turn off feature
+#include <touchbar_session.h>
 // ############################ WAKEUP STUB #############################
 #include "rtc_wake_stub_trmnl_x.h"
 // ############################ WAKEUP STUB #############################
@@ -134,37 +135,24 @@ static touchbar_side_t pending_indicator_side = TOUCHBAR_LEFT;
 static bool pending_indicator_filled = false;
 static bool has_pending_indicator = false;
 
-// WiFi reset confirmation constants
-#define WIFI_RESET_CONFIRMATION_TIMEOUT_MS 15000
-#define WIFI_RESET_POLL_INTERVAL_MS 100
-
-// Static flag to prevent re-entry during WiFi reset confirmation
-static bool in_wifi_reset_confirmation = false;
-// Static flag to prevent re-entry during power-off confirmation
-static bool in_power_off_confirmation = false;
-// Cooldown timestamp after cancel to prevent immediate re-trigger
-static uint32_t s_power_off_cooldown_until = 0;
 // Tracks first detection of both corners held so wakeup_time can be reset once
 static bool s_corners_detected = false;
 
-// Read gesture data directly without triggering other handlers
-void read_gesture_data_only()
+void showLastImageAndSleep()
 {
-  // Read slider coordinates
-  uint16_t buffer = iqs323.sliderCoordinate();
-  if (buffer != slider_position) {
-    slider_position = buffer;
-  }
-
-  // Read gesture event
-  bool gesture_event = iqs323.getSliderEvent();
-  if (gesture_event) {
-    iqs323_gesture_events gesture_buffer = iqs323.getGestureType();
-    if (gesture_buffer != IQS323_GESTURE_NONE) {
-      slider_event = gesture_buffer;
+  int file_size = 0;
+  String curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
+  if (!curPath.isEmpty()) {
+    uint8_t *buf = display_read_file(curPath.c_str(), &file_size);
+    if (buf && file_size > 0) {
+      display_show_image(buf, file_size, true);
+      free(buf);
+      DisplayedImage::remember(curPath.c_str());
     }
   }
+  goToSleep();
 }
+
 // Returns true if channel i has been held for HOLD_THRESHOLD_MS since wakeup stub.
 // Releases the I2C lock during the wait so the iqs323 task can update the memory map.
 static bool tap_mode_is_hold(uint8_t channel_index, time_t hold_threshold_ms = 600)
@@ -203,162 +191,6 @@ static bool tap_mode_is_hold(uint8_t channel_index, time_t hold_threshold_ms = 6
     iqs323.IQSMemoryMap.SYSTEM_STATUS[1] = saved_status[1];
   }
   return iqs323.channel_touchState((iqs323_channel_e)channel_index);
-}
-
-// Check if user wants to confirm WiFi reset (middle button hold)
-bool check_wifi_reset_confirm()
-{
-  if (slider_event == IQS323_GESTURE_HOLD && iqs323.channel_touchState(IQS323_CH1)) {
-    Log_info("WiFi reset confirmed by user - holding middle button");
-    return true;
-  }
-  return false;
-}
-
-// Check if user wants to cancel WiFi reset (any tap)
-bool check_wifi_reset_cancel()
-{
-  if (slider_event == IQS323_GESTURE_TAP) {
-    Log_info("WiFi reset cancelled by user - tap detected");
-    return true;
-  }
-  return false;
-}
-
-static void confirm_wifi_reset()
-{
-  resetDeviceCredentials();
-}
-
-static void confirm_power_off()
-{
-  clearShipmentStatus();
-  ESP.restart();
-}
-
-static bool handle_confirmation_flow(bool &in_flag, MSG message, void (*on_confirm)(void))
-{
-  in_flag = true;
-  showMessageWithLogo(message);
-
-  // Wait for the triggering hold to be fully released before accepting new input.
-  // Without this, lifting fingers from the initial hold could register as a cancel tap.
-  {
-    const uint32_t RELEASE_TIMEOUT_MS = 2000;
-    unsigned long release_start = millis();
-    do {
-      delay(200);
-      iqs323.updateInfoFlags(STOP);
-    } while ((iqs323.channel_touchState(IQS323_CH0) ||
-              iqs323.channel_touchState(IQS323_CH1) ||
-              iqs323.channel_touchState(IQS323_CH2)) &&
-             millis() - release_start < RELEASE_TIMEOUT_MS);
-    slider_event = IQS323_GESTURE_NONE;
-  }
-
-  if (touchbar_tap_mode) {
-    const uint32_t HOLD_MS = 600;
-    const uint32_t POLL_MS = 20;
-    unsigned long start_time = millis();
-
-    while (millis() - start_time < WIFI_RESET_CONFIRMATION_TIMEOUT_MS) {
-      delay(POLL_MS);
-      if (iqs323.getRDYStatus()) {
-        iqs323.updateInfoFlags(STOP);
-      }
-
-      if (iqs323.channel_touchState(IQS323_CH0) || iqs323.channel_touchState(IQS323_CH2)) {
-        bool left_cancel = iqs323.channel_touchState(IQS323_CH0);
-        Log_info("Confirmation cancelled - outer button in tap mode, status: left=%d right=%d", iqs323.channel_touchState(IQS323_CH0), iqs323.channel_touchState(IQS323_CH2));
-        display_draw_touchbar_indicator(left_cancel ? TOUCHBAR_LEFT : TOUCHBAR_RIGHT, false);
-        in_flag = false;
-        return false;
-      }
-
-      if (iqs323.channel_touchState(IQS323_CH1)) {
-        unsigned long touch_start = millis();
-        while (millis() - touch_start < HOLD_MS) {
-          delay(POLL_MS);
-          if (iqs323.getRDYStatus()) {
-            iqs323.updateInfoFlags(STOP);
-          }
-          if (!iqs323.channel_touchState(IQS323_CH1)) {
-            Log_info("Confirmation cancelled - tap on middle button in tap mode");
-            display_draw_touchbar_indicator(TOUCHBAR_MIDDLE, false);
-            in_flag = false;
-            return false;
-          }
-        }
-        display_draw_touchbar_indicator(TOUCHBAR_MIDDLE, true);
-        Log_info("Confirmed - holding middle button in tap mode");
-        in_flag = false;
-        on_confirm();
-        return true;
-      }
-    }
-
-    Log_info("Confirmation timeout - cancelling");
-    in_flag = false;
-    return false;
-  }
-
-  unsigned long start_time = millis();
-
-  while (millis() - start_time < WIFI_RESET_CONFIRMATION_TIMEOUT_MS) {
-    delay(WIFI_RESET_POLL_INTERVAL_MS);
-    read_gesture_data_only();
-
-    if (check_wifi_reset_confirm()) {
-      in_flag = false;
-      on_confirm();
-      return true;
-    }
-
-    if (check_wifi_reset_cancel()) {
-      in_flag = false;
-      return false;
-    }
-
-    if (slider_position == 65535) {
-      slider_event = IQS323_GESTURE_NONE;
-    }
-  }
-
-  Log_info("Confirmation timeout - cancelling");
-  in_flag = false;
-  return false;
-}
-
-static void showLastImageAndSleep()
-{
-  int file_size = 0;
-  String curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
-  if (!curPath.isEmpty()) {
-    uint8_t *buf = display_read_file(curPath.c_str(), &file_size);
-    if (buf && file_size > 0) {
-      display_show_image(buf, file_size, true);
-      free(buf);
-      DisplayedImage::remember(curPath.c_str());
-    }
-  }
-  goToSleep();
-}
-
-void handle_wifi_reset_confirmation()
-{
-  Log_info("Entering WiFi reset confirmation mode");
-  bool confirmed = handle_confirmation_flow(in_wifi_reset_confirmation, WIFI_RESET_CONFIRM, confirm_wifi_reset);
-  
-  if (!confirmed) {
-    Log_info("WiFi reset cancelled - redrawing last image and sleeping");
-    showLastImageAndSleep();
-  }
-}
-
-void handle_power_off_confirmation()
-{
-  Log_info("Entering power-off confirmation mode");
-  handle_confirmation_flow(in_power_off_confirmation, POWER_OFF_CONFIRM, confirm_power_off);
 }
 
 // Check if both left and right corners are being held
@@ -2574,7 +2406,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
  * @param url Server URL address
  * @return none
  */
-static void resetDeviceCredentials(void)
+void resetDeviceCredentials(void)
 {
   Log.info("%s [%d]: The device will be reset now...\r\n", __FILE__, __LINE__);
   Log.info("%s [%d]: WiFi resetting...\r\n", __FILE__, __LINE__);
