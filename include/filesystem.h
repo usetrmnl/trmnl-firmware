@@ -121,3 +121,10 @@ bool filesystem_file_rename(const char *old_name, const char *new_name);
 uint32_t filesystem_extract_timestamp(const char *filename);
 
 void list_files();
+
+/**
+ * @brief Function to delete the largest root files until the free space is above the reserve
+ * @param none
+ * @return result - true if the function deleted a file; false - if it deleted nothing
+ */
+bool filesystem_purge_if_full(void);
