@@ -20,6 +20,7 @@
 
 // --- Helpers still owned by bl.cpp ---
 void submitStoredLogs(void);
+void showMessageWithLogo(MSG message_type);
 
 /**
  * @brief Function to sleep preparing and go to sleep
@@ -177,3 +178,33 @@ void config_gpio_for_lp() {
   pinMode(GPIO_NUM_2, INPUT); // RTS
 #endif // BOARD_TRMNL_X
 } /* config_gpio_for_lp() */
+
+void wifiErrorDeepSleep(void) {
+  if (!preferences.isKey(PREFERENCES_CONNECT_WIFI_RETRY_COUNT)) {
+    preferences.putInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT, 1);
+  }
+
+  uint8_t retry_count = preferences.getInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT);
+
+  Log_info("WIFI connection failed! Retry count: %d \n", retry_count);
+
+  switch (retry_count) {
+  case 1:
+  case 2:
+  case 3:
+    refreshInterval.applyWifiRetry(retry_count);
+    break;
+
+  default:
+    preferences.putInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT, 1);
+    showMessageWithLogo(WIFI_RETRY_LIMIT);
+    display_sleep();
+    goToSleepButtonOnly();
+    return;
+  }
+  retry_count++;
+  preferences.putInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT, retry_count);
+
+  display_sleep();
+  goToSleep();
+}
