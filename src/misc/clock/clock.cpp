@@ -71,7 +71,7 @@ bool Clock::sync(Preferences &prefs, const String &ntpServer) {
 
   if (getLocalTime(&timeinfo)) {
     sync_status = true;
-    Log.info("%s [%d]: Time sync succeed in %d ms\r\n", __FILE__, __LINE__, (int)(millis() - start_ms));
+    Log.info("%s [%d]: Time sync succeeded in %d ms\r\n", __FILE__, __LINE__, (int)(millis() - start_ms));
     prefs.putUInt("last_sync", getTime()); // save epoch time of last sync
   } else {
     Log.info("%s [%d]: Time sync failed...\r\n", __FILE__, __LINE__);
