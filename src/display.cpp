@@ -102,9 +102,9 @@ extern BQ27427 lipo; // Use lipo.[] to interact with the library in an Arduino
 #include <inttypes.h>
 #include <trmnl_log.h>
 #include "png_flip.h"
-#include "nicoclean_8.h"
-#include "Inter_18.h"
-#include "Roboto_Black_24.h"
+#include "fonts/nicoclean_8.h"
+#include "fonts/Inter_18.h"
+#include "fonts/Roboto_Black_24.h"
 #include <globals.h>
 static uint8_t *pDither;
 
