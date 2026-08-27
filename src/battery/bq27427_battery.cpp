@@ -10,7 +10,13 @@
 
 #include "BQ27427.h"
 #include "driver/gpio.h"
+#ifdef BOARD_TRMNL_X
 #include "iqs323_task.h"
+#else
+static void iqs323_task_i2c_lock(void) {} // stub functions
+static void iqs323_task_i2c_unlock(void) {} // stub functions
+static int battery_count = BATTERY_ONE; // Debug
+#endif
 
 void BQ27427Battery::gaugeInit() {
   if (battery_count == BATTERY_NONE) {
