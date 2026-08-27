@@ -3,6 +3,7 @@
 #include <ESPmDNS.h>
 #include <bl.h>
 #include <wifi_network.h>
+#include <wifi_session.h>
 #include <power.h>
 #include <battery.h>
 #include <device_id.h>
@@ -83,7 +84,7 @@ static void goToSleepButtonOnly(void);               // sleep until button press
 static void submitStoredLogs(void);
 static void writeSpecialFunction(SPECIAL_FUNCTION function);
 static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiResponse);
-static void wifiErrorDeepSleep();
+void wifiErrorDeepSleep(void);
 static uint8_t *storedLogoOrDefault(int iType);
 static DeviceStatusStamp getDeviceStatusStamp();
 void config_gpio_for_lp();
@@ -170,20 +171,8 @@ void bl_init(void)
 #endif
   Log_info("BL init success");
 
-  WifiCaptivePortal.setHostname(getWifiClientHostname());
+  wifiSessionInit();
 
-#ifdef BOARD_TRMNL_X
-  bool bModemNeeded = false;
-  Log.info("%s [%d]: Checking if we need to use the ESP32-C5 modem...\r\n", __FILE__, __LINE__);
-  if (WifiCaptivePortal.isSaved()) {
-    // WiFi saved, connection
-    WifiCredentials lastCreds = WifiCaptivePortal.getLastCredentials();
-    bModemNeeded = lastCreds.is5GHz;
-  } else {
-    bModemNeeded = true; // captive portal needs modem for 5 GHz
-  }
-  Log.info("%s [%d]: modem needed = %d\n\r", __FILE__, __LINE__, bModemNeeded);
-#endif // X
   pins_init();
   buzzer().init();
   sensor().init();
@@ -542,132 +531,8 @@ void bl_init(void)
   // showMessageWithLogo(MSG_FORMAT_ERROR);
   // display_show_msg(storedLogoOrDefault(1), WIFI_CONNECT, "ABCDEF", true, Messages::firmware_version().c_str(), "Hello World!");
   // wifiErrorDeepSleep();
-#ifdef BOARD_TRMNL_X
-  if (bModemNeeded) {
-    modem_reset_target(); // Must be done BEFORE the instantiation of the class since it expects the modem to be ready
-    static Modem modemInstance(115200);
-    if (modemInstance.isInitialized()) {
-      g_modem = &modemInstance;
-    } else {
-      Log_info("Modem init failed — falling back to 2.4 GHz mode");
-      g_modem = nullptr;
-    }
-  } else {
-    g_modem = nullptr;
-  }
-    
-  // Only scan when no credentials are saved (i.e. captive portal will be shown). 
-  if (g_modem && !WifiCaptivePortal.isSaved())
-  {
-    // The modem is a separate radio and can see the device's own captive-portal
-    // SoftAP over the air; exclude it so it never shows up as a connectable network.
-    String ownApSsid = WifiCaptivePortal.getAPSSID();
 
-    Log_info("No saved credentials — scanning networks via modem...");
-    auto modemNets = g_modem->scanNetworks();
-    Log_info("Modem found %d network(s)", modemNets.size());
-    std::vector<ExternalNetwork> nets;
-    for (auto& n : modemNets) {
-      if (n.ssid == ownApSsid) continue;
-      nets.push_back({n.ssid, n.rssi, n.open, n.is5GHz});
-    }
-    WifiCaptivePortal.setNetworks(nets);
-
-    // Register callback so captive portal can connect 5 GHz networks via modem
-    WifiCaptivePortal.setModemConnectCallback([](const String& ssid, const String& pass) {
-      return g_modem->connectToNetwork(ssid, pass, getWifiClientHostname());
-    });
-
-    // Register callback so the captive portal's Refresh button can trigger a fresh modem scan
-    WifiCaptivePortal.setModemScanCallback([ownApSsid]() {
-      auto modemNets = g_modem->scanNetworks();
-      Log_info("Modem re-scan found %d network(s)", modemNets.size());
-      std::vector<ExternalNetwork> nets;
-      for (auto& n : modemNets) {
-        if (n.ssid == ownApSsid) continue;
-        nets.push_back({n.ssid, n.rssi, n.open, n.is5GHz});
-      }
-      return nets;
-    });
-
-    String modemMac = g_modem->getMacAddress();
-    if (!modemMac.isEmpty()) {
-      WifiCaptivePortal.setModemMac(modemMac);
-    }
-  }
-#endif // BOARD_TRMNL_X
-
-  WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
-
-  MSG current_msg = NONE;
-
-// uncdcomment this to hardcode WiFi credentials (useful for testing wifi errors, etc.)
-// #define HARDCODED_WIFI
-#ifdef HARDCODED_WIFI
-  WifiCredentials hardcodedCreds = {.ssid = "ssid-goes-here", .pswd = "password-goes-here"};
-  Log_info("Hardcoded WiFi: connecting to SSID '%s'", hardcodedCreds.ssid.c_str());
-  auto connectResult = WifiCaptivePortal.connect(hardcodedCreds);
-  Log_info("Hardcoded WiFi: connect result '%s'", wifiStatusStr(connectResult.status));
-// goToSleep();
-#else
-
-  if (WifiCaptivePortal.isSaved())
-  {
-    // WiFi saved, connection
-    Log.info("%s [%d]: WiFi saved\r\n", __FILE__, __LINE__);
-    int connection_res = connectWithSavedCredentials() ? 1 : 0;
-
-    Log.info("%s [%d]: Connection result: %d, WiFI Status: %d\r\n", __FILE__, __LINE__, connection_res, WiFi.status());
-
-    // Check if connected
-    if (connection_res)
-    {
-      String ip = String(WiFi.localIP());
-      Log.info("%s [%d]:wifi_connection [DEBUG]: Connected: %s\r\n", __FILE__, __LINE__, ip.c_str());
-      preferences.putInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT, 1);
-    }
-    else
-    {
-      if (current_msg != WIFI_FAILED)
-      {
-        showMessageWithLogo(WIFI_FAILED);
-        current_msg = WIFI_FAILED;
-      }
-
-      Log_fatal_submit("Connection failed! WL Status: %d", WiFi.status());
-
-      wifiErrorDeepSleep();
-    }
-  }
-  else
-  {
-    // WiFi credentials are not saved - start captive portal
-    Log.info("%s [%d]: WiFi NOT saved\r\n", __FILE__, __LINE__);
-
-    Log_info("FW version %s", Messages::firmware_version().c_str());
-
-    showMessageWithLogo(WIFI_CONNECT, "", false, Messages::firmware_version().c_str(), WifiCaptivePortal.getAPSSID());
-#ifdef BOARD_TRMNL_X
-    touchbar_init_captive_portal_power_off_hook();
-#endif
-    WifiCaptivePortal.setResetSettingsCallback(resetDeviceCredentials);
-    res = WifiCaptivePortal.startPortal();
-    if (!res)
-    {
-      WiFi.disconnect(true);
-
-      showMessageWithLogo(WIFI_FAILED);
-
-      Log_error("Failed to connect or hit timeout");
-
-      // Go to deep sleep
-      wifiErrorDeepSleep();
-    }
-    Log.info("%s [%d]: WiFi connected\r\n", __FILE__, __LINE__);
-    preferences.putInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT, 1);
-  }
-
-#endif
+  wifiSessionConnect();
 
   // clock synchronization
   if (systemClock().setTimeFromNTP())
@@ -742,7 +607,9 @@ void bl_init(void)
     preferences.putInt(PREFERENCES_CONNECT_API_RETRY_COUNT, 1);
   }
 
-  if (request_result != HTTPS_SUCCESS && request_result != HTTPS_NO_ERR && request_result != HTTPS_NO_REGISTER && request_result != HTTPS_RESET && request_result != HTTPS_PLUGIN_NOT_ATTACHED && current_msg != WIFI_FAILED)
+  // wifiSessionConnect deep-sleeps on Wi-Fi failure, so WIFI_FAILED is never pending here
+  if (request_result != HTTPS_SUCCESS && request_result != HTTPS_NO_ERR && request_result != HTTPS_NO_REGISTER &&
+      request_result != HTTPS_RESET && request_result != HTTPS_PLUGIN_NOT_ATTACHED)
   {
     uint8_t retries = preferences.getInt(PREFERENCES_CONNECT_API_RETRY_COUNT);
     iqs323_task_i2c_lock();
@@ -2393,7 +2260,7 @@ static uint8_t *storedLogoOrDefault(int iType)
 // Chop up long names to fit within the SPIFFS 31 character limit
 
 
-static void wifiErrorDeepSleep()
+void wifiErrorDeepSleep(void)
 {
   if (!preferences.isKey(PREFERENCES_CONNECT_WIFI_RETRY_COUNT))
   {
