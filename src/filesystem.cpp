@@ -1,8 +1,8 @@
 #include <Arduino.h>
+#include <config.h>
 #include <filesystem.h>
 #include <inttypes.h>
 #include <trmnl_log.h>
-#include <config.h>
 
 #if defined(BOARD_X_CLASS)
 #include <LittleFS.h>
@@ -289,8 +289,8 @@ bool filesystem_purge_if_full(void) {
   size_t n = 0;
   size_t deleted = 0;
 
-  Log_info("FS free low (%u/%u, need %u); purging largest cached files",
-           (unsigned)freeBytes, (unsigned)total, (unsigned)minFree);
+  Log_info("FS free low (%u/%u, need %u); purging largest cached files", (unsigned)freeBytes, (unsigned)total,
+           (unsigned)minFree);
 
   File rootDir = FS.open("/");
   while (File file = rootDir.openNextFile()) {
@@ -312,8 +312,7 @@ bool filesystem_purge_if_full(void) {
   while (n > 0 && freeBytes <= minFree) {
     size_t best = 0;
     for (size_t j = 1; j < n; j++) {
-      if (files[j].size > files[best].size)
-        best = j;
+      if (files[j].size > files[best].size) best = j;
     }
     Log_info("Deleting %s (%u bytes)", files[best].name, (unsigned)files[best].size);
     if (FS.remove(files[best].name)) {
