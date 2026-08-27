@@ -82,7 +82,6 @@ static https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiRespo
 void submitStoredLogs(void);
 static void writeSpecialFunction(SPECIAL_FUNCTION function);
 static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiResponse);
-static void wifiErrorDeepSleep();
 static uint8_t *storedLogoOrDefault(int iType);
 static DeviceStatusStamp getDeviceStatusStamp();
 int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious);
@@ -2232,41 +2231,6 @@ static uint8_t *storedLogoOrDefault(int iType)
 #endif
 }
 
-// Chop up long names to fit within the SPIFFS 31 character limit
-
-
-static void wifiErrorDeepSleep()
-{
-  if (!preferences.isKey(PREFERENCES_CONNECT_WIFI_RETRY_COUNT))
-  {
-    preferences.putInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT, 1);
-  }
-
-  uint8_t retry_count = preferences.getInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT);
-
-  Log_info("WIFI connection failed! Retry count: %d \n", retry_count);
-
-  switch (retry_count)
-  {
-  case 1:
-  case 2:
-  case 3:
-    refreshInterval.applyWifiRetry(retry_count);
-    break;
-
-  default:
-    preferences.putInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT, 1);
-    showMessageWithLogo(WIFI_RETRY_LIMIT);
-    display_sleep();
-    goToSleepButtonOnly();
-    return;
-  }
-  retry_count++;
-  preferences.putInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT, retry_count);
-
-  display_sleep();
-  goToSleep();
-}
 
 DeviceStatusStamp getDeviceStatusStamp()
 {
