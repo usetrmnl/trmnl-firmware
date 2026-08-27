@@ -1649,6 +1649,11 @@ static https_request_err_e downloadAndShow()
   }
 #endif // BOARD_TRMNL_X
 
+  // A 202 carries no image_url, so filename is still empty here. HTTPClient::begin() rejects
+  // that and the fetch below would report it as an API failure over the friendly ID screen.
+  if (filename[0] == '\0')
+    return result;
+
   result = withHttp(
       filename,
       [&](HTTPClient *httpsp, HttpError error) -> https_request_err_e
