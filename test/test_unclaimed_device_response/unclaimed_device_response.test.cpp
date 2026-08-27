@@ -5,11 +5,10 @@
 // account yet. Captured from production; the 202 arm of handleApiDisplayResponse() never
 // reads image_url, so the global filename buffer is still empty when downloadAndShow()
 // reaches the image fetch.
-static const char *UNCLAIMED_DEVICE_BODY =
-    "{\"status\":202,\"image_url\":null,\"filename\":null,\"refresh_rate\":908,"
-    "\"reset_firmware\":false,\"update_firmware\":false,\"firmware_url\":\"\","
-    "\"special_function\":\"identify\",\"maximum_compatibility\":false,"
-    "\"temperature_profile\":\"default\"}";
+static const char *UNCLAIMED_DEVICE_BODY = "{\"status\":202,\"image_url\":null,\"filename\":null,\"refresh_rate\":908,"
+                                           "\"reset_firmware\":false,\"update_firmware\":false,\"firmware_url\":\"\","
+                                           "\"special_function\":\"identify\",\"maximum_compatibility\":false,"
+                                           "\"temperature_profile\":\"default\"}";
 
 // The URL check HTTPClient::begin(WiFiClient&, String) runs before it will connect
 // (framework-arduinoespressif32/libraries/HTTPClient/src/HTTPClient.cpp).
