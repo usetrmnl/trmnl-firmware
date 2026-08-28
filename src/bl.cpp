@@ -56,6 +56,10 @@
 #include "messages.h"
 #include "displayed_image.h"
 #include <globals.h>
+#ifndef BOARD_TRMNL_X
+#include <bb_epaper.h>
+#endif // !BOARD_TRMNL_X
+
 const char *szHTTPErrors[] = {
     "HTTPS_NO_ERR",
     "HTTPS_RESET",
@@ -91,6 +95,7 @@ static uint8_t *storedLogoOrDefault(int iType);
 static DeviceStatusStamp getDeviceStatusStamp();
 void config_gpio_for_lp();
 int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious);
+void ShowClock(BB_RECT *pRect, bool bFirst, int iPanelType);
 
 static unsigned long startup_time = 0;
 
@@ -2637,12 +2642,27 @@ void goToSleep(void)
 
   filesystem_deinit();
   uint32_t time_to_sleep = refreshInterval.seconds();
+// *** Experimental Clock START ***
+  BB_RECT clockRect;
+  clockRect.x = clockRect.y = 0; // show in upper left corner
+  clockRect.w = 400; clockRect.h = 240; // DEBUG
+  uint32_t u32WakeMinutes = time_to_sleep / 60; // how many minutes we can show the clock
+  uint32_t u32LastWakeDelta =  (systemClock().getTime() - preferences.getUInt(PREFERENCES_LAST_SLEEP_TIME, 0))/60;
+  if (u32LastWakeDelta >= u32WakeMinutes) {
+    // normal plugin wake cycle, draw the clock on a new image and set the last sleep time
+    ShowClock(&clockRect, true, EP75_800x480);
+    preferences.putUInt(PREFERENCES_LAST_SLEEP_TIME, systemClock().getTime());
+  } else {
+    ShowClock(&clockRect, false, EP75_800x480);
+  }
+// *** Experimental Clock END ***
+
   iPrevWakeTime = millis() - startup_time; // save for statistics
   Log.info("%s [%d]: total awake time - %d ms\r\n", __FILE__, __LINE__, iPrevWakeTime); 
   Log.info("%s [%d]: time to sleep - %d\r\n", __FILE__, __LINE__, time_to_sleep);
-  preferences.putUInt(PREFERENCES_LAST_SLEEP_TIME, systemClock().getTime());
   preferences.end();
-  esp_sleep_enable_timer_wakeup((uint64_t)time_to_sleep * SLEEP_uS_TO_S_FACTOR);
+  esp_sleep_enable_timer_wakeup(58 * 1000 * 1000); // sleep for 58 seconds since 2 are needed for the clock
+//  esp_sleep_enable_timer_wakeup((uint64_t)time_to_sleep * SLEEP_uS_TO_S_FACTOR);
   // Configure GPIO pin for wakeup
 #if CONFIG_IDF_TARGET_ESP32
   #define BUTTON_PIN_BITMASK(GPIO) (1ULL << GPIO)  // 2 ^ GPIO_NUMBER in hex
