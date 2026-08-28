@@ -34,6 +34,7 @@ String WifiCaptive::getAPSSID() {
 bool WifiCaptive::startPortal() {
   _dnsServer = new DNSServer();
   _server = new AsyncWebServer(80);
+  _connectionState = WifiConnectionState::Idle;
 
     // Set the WiFi mode to access point and station
   WiFi.mode(WIFI_MODE_AP);
@@ -83,7 +84,9 @@ bool WifiCaptive::startPortal() {
           _band = band;
           _api_server = api_server;
           _enterprise_credentials = credentials;
+          _connectionState = WifiConnectionState::Connecting;
         },
+      .getConnectionState = [this]() { return _connectionState.load(); },
       .getAnnotatedNetworks =
         [this](bool runScan) {
           if (!_networks.empty()) {
@@ -181,19 +184,24 @@ bool WifiCaptive::startPortal() {
       }
 
       bool res = false;
+      WifiConnectionState failureState = WifiConnectionState::Failed;
       if (credentials.is5GHz && _modemConnectCallback) {
         res = _modemConnectCallback(credentials.ssid, credentials.pswd);
         if (res) connected_via_modem = true;
       } else {
-        res = connect(credentials) == WL_CONNECTED;
+        auto result = initiateConnectionAndWaitForOutcome(credentials);
+        res = result.status == WL_CONNECTED;
+        if (!res) failureState = classifyConnectionFailure(result);
       }
 
       if (res) {
+        _connectionState = WifiConnectionState::Connected;
         saveWifiCredentials(credentials);
         saveApiServer(_api_server);
         succesfullyConnected = true;
         break;
       } else {
+        _connectionState = failureState;
         _ssid = "";
         _password = "";
         _band = "";
@@ -201,7 +209,6 @@ bool WifiCaptive::startPortal() {
 
         WiFi.disconnect();
         WiFi.enableSTA(false);
-        break;
       }
     }
   }
@@ -258,6 +265,20 @@ bool WifiCaptive::startPortal() {
 #endif
   }
   return succesfullyConnected;
+}
+
+WifiConnectionState WifiCaptive::classifyConnectionFailure(const WifiConnectionResult &result) {
+  switch (result.eventData.disconnectReason) {
+  case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:
+  case WIFI_REASON_802_1X_AUTH_FAILED:
+  case WIFI_REASON_AUTH_FAIL:
+  case WIFI_REASON_HANDSHAKE_TIMEOUT:
+    return WifiConnectionState::AuthenticationFailed;
+  case WIFI_REASON_NO_AP_FOUND:
+    return WifiConnectionState::NetworkNotFound;
+  default:
+    return WifiConnectionState::Failed;
+  }
 }
 
 void WifiCaptive::resetSettings() {
