@@ -37,6 +37,7 @@ const TRMNL_DEVICE device_list[] =
   "m5_papers3",   BB_PANEL_M5PAPERS3,   BB_PANEL_NONE,         0xff,  0xff,  0xff,  3,    0xff,   BATT_ADC,
   "sensoria_c5",  BB_PANEL_SENSORIA_C5, BB_PANEL_NONE,         7,     6,     0,     0xff, 0xff,   BATT_ADC,
   "lilygo_t5pro", BB_PANEL_EPDIY_V7,    BBEP_DISPLAY_ED047TC1, 39,    40,    0,     0xff, 0xff,   BATT_BQ27220,
+  "m5paper",      BB_PANEL_M5PAPER,     BB_PANEL_NONE,         21,    22,    38,    0xff, 0xff,   BATT_NONE,
   NULL, 0, 0, 0, 0, 0, 0, 0, 0,
 }; // Parallel Eink device list
 
@@ -94,8 +95,13 @@ uint8_t u8SpectraPal[512]; // RGB333 mapped to closest Spectra6 color
 #include "esp_sleep.h"
 #include "driver/gpio.h"
 #include "driver/rtc_io.h"
+#ifdef USE_SPIFFS
+#include <SPIFFS.h>
+#define FS SPIFFS
+#else
 #include "LittleFS.h"
 #define FS LittleFS
+#endif
 
 const uint8_t u8_graytable[] = {
 /* 0 */  0, 0, 0, 0, 0, 0, 1, 1, 1, 
