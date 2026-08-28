@@ -64,6 +64,7 @@ private:
   String _api_server = "";
   WifiCredentials _enterprise_credentials;
   std::atomic<WifiConnectionState> _connectionState{WifiConnectionState::Idle};
+  std::atomic<uint32_t> _connectionRequestedAt{0};
 
   std::function<void()> _resetcallback;
   std::function<void()> _tickCallback = nullptr;

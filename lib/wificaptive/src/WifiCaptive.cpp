@@ -84,6 +84,7 @@ bool WifiCaptive::startPortal() {
           _band = band;
           _api_server = api_server;
           _enterprise_credentials = credentials;
+          _connectionRequestedAt = millis();
           _connectionState = WifiConnectionState::Connecting;
         },
       .getConnectionState = [this]() { return _connectionState.load(); },
@@ -155,7 +156,11 @@ bool WifiCaptive::startPortal() {
 
     if (_tickCallback) _tickCallback();
 
-    if (_ssid == "") {
+    if (_connectionState.load() != WifiConnectionState::Connecting) {
+      delay(DNS_INTERVAL);
+    } else if ((uint32_t)(millis() - _connectionRequestedAt.load()) < 1000) {
+      // Give the /connect response time to reach the browser before the STA
+      // radio changes channel and may briefly disconnect captive-portal clients.
       delay(DNS_INTERVAL);
     } else {
             // use enterprise credentials if available, otherwise use basic credentials
