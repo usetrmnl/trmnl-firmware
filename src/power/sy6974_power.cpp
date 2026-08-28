@@ -1,6 +1,5 @@
 #include <Arduino.h>
 #include <Wire.h>
-
 #include <config.h>
 #include <power.h>
 
@@ -25,7 +24,7 @@ bool SY6974Power::readStatus(uint8_t &status) {
   CHARGER_I2C_BUS.beginTransmission(CHARGER_I2C_ADDR);
   CHARGER_I2C_BUS.write(SY6974_REG_STATUS);
   if (CHARGER_I2C_BUS.endTransmission(false) != 0) return false;
-  if (CHARGER_I2C_BUS.requestFrom((int) CHARGER_I2C_ADDR, 1) != 1) return false;
+  if (CHARGER_I2C_BUS.requestFrom((int)CHARGER_I2C_ADDR, 1) != 1) return false;
 
   status = CHARGER_I2C_BUS.read();
   return true;
