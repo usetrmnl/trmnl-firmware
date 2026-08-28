@@ -143,6 +143,10 @@
 #define VBAT_SWITCH_LEVEL HIGH // load switch enable pin active level
 #define PIN_BUZZER        45          // passive buzzer (MLT-8530) via NPN transistor
 #define BUZZER_FREQ       2700       // resonant frequency of MLT-8530 in Hz
+#define CHARGER_SY6974               // SY6974B I2C charger PMIC
+#define CHARGER_I2C_BUS   Wire1      // SY6974B sits on I2C1
+#define CHARGER_I2C_SDA   39
+#define CHARGER_I2C_SCL   40
 #elif defined(BOARD_SEEED_RETERMINAL_E1002)
 #define DEVICE_MODEL      "reterminal_e1002"
 #define PIN_INTERRUPT     3 // the green button
@@ -156,6 +160,10 @@
 #define PIN_VBAT_SWITCH   40
 #define VBAT_SWITCH_LEVEL HIGH
 #define DEVICE_MODEL      "reterminal_e1003"
+#define CHARGER_SY6974               // SY6974B I2C charger PMIC
+#define CHARGER_I2C_BUS   Wire       // SY6974B sits on I2C0 (shared with RTC / sensor)
+#define CHARGER_I2C_SDA   19
+#define CHARGER_I2C_SCL   20
 #endif
 
 // DHCP hostname prefix (hyphens instead of spaces).
