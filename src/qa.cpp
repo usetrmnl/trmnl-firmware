@@ -6,10 +6,10 @@
 
 #include "WifiCaptive.h"
 #include "button.h"
-#include "pins.h"
 #include "config.h"
 #include "logo_medium.h"
 #include "logo_small.h"
+#include "pins.h"
 extern TRMNL_DEVICE *pDevice;
 
 extern "C" {

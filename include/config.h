@@ -46,7 +46,7 @@
 #define WIFI_CONNECTION_RSSI                 (-100)
 
 #define DISPLAY_BMP_IMAGE_SIZE 48062 // in bytes - 62 bytes - header; 48000 bytes - bitmap (480*800 1bpp) / 8
-#define DEFAULT_IMAGE_SIZE 48000
+#define DEFAULT_IMAGE_SIZE     48000
 #if defined(BOARD_HAS_PSRAM)
 #define MAX_IMAGE_SIZE 750000 // Use PSRAM on the ESP32-S3/C5 (all X-class boards have PSRAM)
 #else
@@ -134,46 +134,39 @@
 
 // Battery measurement types
 // BATT_NONE = use fake voltage
-enum {
-  BATT_NONE = 0,
-  BATT_ADC,
-  BATT_BQ27220,
-  BATT_BQ27427
-};
+enum { BATT_NONE = 0, BATT_ADC, BATT_BQ27220, BATT_BQ27427 };
 
 #ifdef PARALLEL_EPD
 // TRMNL Device structure (slightly different for parallel eink panels)
-typedef struct tag_trmnl_device
-{
-   const char *device_name;
-   int iBoardType;
-   int iPanelSize; // set to 0 if the board type already includes the panel type (e.g. M5 PaperS3)
-   uint8_t sensor_sda;
-   uint8_t sensor_scl;
-   uint8_t interrupt_pin;
-   uint8_t batt_pin;
-   uint8_t batt_en_pin;
-   uint8_t batt_type; // ADC, BQxxx
+typedef struct tag_trmnl_device {
+  const char *device_name;
+  int iBoardType;
+  int iPanelSize; // set to 0 if the board type already includes the panel type (e.g. M5 PaperS3)
+  uint8_t sensor_sda;
+  uint8_t sensor_scl;
+  uint8_t interrupt_pin;
+  uint8_t batt_pin;
+  uint8_t batt_en_pin;
+  uint8_t batt_type; // ADC, BQxxx
 } TRMNL_DEVICE;
-#else 
+#else
 // TRMNL Device structure - defines the GPIO connections for the display, button and battery
 // Only needed on "OG" class devices with SPI ePaper displays
-typedef struct tag_trmnl_device
-{
-   const char *device_name;
-   uint8_t epd_sck_pin;
-   uint8_t epd_mosi_pin;
-   uint8_t epd_cs_pin;
-   uint8_t epd_rst_pin;
-   uint8_t epd_dc_pin;
-   uint8_t epd_busy_pin;
-   uint8_t sensor_sda;
-   uint8_t sensor_scl;
-   uint8_t interrupt_pin;
-   uint8_t batt_pin;
-   uint8_t batt_en_pin;
-   uint8_t batt_type; // ADC, BQ27xx
-   uint8_t panel_set;
+typedef struct tag_trmnl_device {
+  const char *device_name;
+  uint8_t epd_sck_pin;
+  uint8_t epd_mosi_pin;
+  uint8_t epd_cs_pin;
+  uint8_t epd_rst_pin;
+  uint8_t epd_dc_pin;
+  uint8_t epd_busy_pin;
+  uint8_t sensor_sda;
+  uint8_t sensor_scl;
+  uint8_t interrupt_pin;
+  uint8_t batt_pin;
+  uint8_t batt_en_pin;
+  uint8_t batt_type; // ADC, BQ27xx
+  uint8_t panel_set;
 } TRMNL_DEVICE;
 #endif // PARALLEL_EPD
 
@@ -195,34 +188,34 @@ enum {
 
 /**
  * data
-**/
+ **/
 #define UBYTE   uint8_t
 #define UWORD   uint16_t
 #define UDOUBLE uint32_t
 
-#if defined (BOARD_SEEED_RETERMINAL_E1003)
-   #define EPD_SCK_PIN  7
-   #define EPD_MOSI_PIN 9
-   #define EPD_MISO_PIN 8
-   #define EPD_CS_PIN   10
-   #define EPD_RST_PIN  12
-   #define EPD_EN_PIN   11
-   #define EPD_BUSY_PIN 13
-   #define EPD_VCC_EN   21
+#if defined(BOARD_SEEED_RETERMINAL_E1003)
+#define EPD_SCK_PIN  7
+#define EPD_MOSI_PIN 9
+#define EPD_MISO_PIN 8
+#define EPD_CS_PIN   10
+#define EPD_RST_PIN  12
+#define EPD_EN_PIN   11
+#define EPD_BUSY_PIN 13
+#define EPD_VCC_EN   21
 #endif
 
-#define GPIO_PIN_SET   1
+#define GPIO_PIN_SET                    1
 
 /**
  * GPIO read and write
-**/
-#define DEV_Digital_Write(_pin, _value) digitalWrite(_pin, _value == 0? LOW:HIGH)
-#define DEV_Digital_Read(_pin) digitalRead(_pin)
+ **/
+#define DEV_Digital_Write(_pin, _value) digitalWrite(_pin, _value == 0 ? LOW : HIGH)
+#define DEV_Digital_Read(_pin)          digitalRead(_pin)
 
 /**
  * delay x ms
-**/
-#define DEV_Delay_ms(__xms) delay(__xms)
+ **/
+#define DEV_Delay_ms(__xms)             delay(__xms)
 
 /*------------------------------------------------------------------------------------------------------*/
 UBYTE DEV_Module_Init(void);

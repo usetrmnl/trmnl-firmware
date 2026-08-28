@@ -1,5 +1,5 @@
-#include <config.h>
 #include <battery.h>
+#include <config.h>
 
 #ifdef INCLUDE_BQ27427
 

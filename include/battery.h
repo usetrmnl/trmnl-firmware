@@ -33,7 +33,7 @@ class BQ27427Battery : public BaseBattery {
 public:
   /// @brief Battery voltage from the last gaugeInit() snapshot.
   /// @return voltage in Volts, or a negative value if the last reading failed
-  float readVoltage(TRMNL_DEVICE *pDevice) override { return 0.0f;}
+  float readVoltage(TRMNL_DEVICE *pDevice) override { return 0.0f; }
   float readVoltage() override { return _voltage; } // V
 
   /// @brief Connects to the BQ27427 gas gauge, (re)configures it if needed,

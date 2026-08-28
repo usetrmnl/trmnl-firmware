@@ -1,15 +1,14 @@
-#include <misc/sensor.h>
-
 #include <Arduino.h>
+#include <config.h>
 #include <esp_sleep.h>
+#include <misc/sensor.h>
 #include <time.h>
 #include <trmnl_log.h>
-#include <config.h>
 
 // bb_temperature device names, indexed by SensorReadings::sensorType
 static const char *szDevices[] = {"None",    "AHT20",  "BMP180",  "BME280", "BMP388", "SHT3X",
-                                  "HDC1080", "HTS221", "MCP9808", "BME68x", "SHTC3", "SHT40"};
-static const char *szMakers[] = {"None", "ASAIR",   "Bosch",     "Bosch", "Bosch",    "Sensirion",
+                                  "HDC1080", "HTS221", "MCP9808", "BME68x", "SHTC3",  "SHT40"};
+static const char *szMakers[] = {"None", "ASAIR",   "Bosch",     "Bosch", "Bosch",     "Sensirion",
                                  "TI",   "STMicro", "MicroChip", "Bosch", "Sensirion", "Sensirion"};
 
 void EnvironmentSensor::init(TRMNL_DEVICE *pDevice) {

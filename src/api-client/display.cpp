@@ -10,11 +10,14 @@
 #include <misc/sensor.h>
 #include <trmnl_log.h>
 extern RTC_DATA_ATTR int iPrevWakeTime; // total wake time of the last cycle (for statistics collection)
-extern RTC_DATA_ATTR bool bUsedCachedImage; // if the last image displayed was read from cache (for statistics collection)
+extern RTC_DATA_ATTR bool
+  bUsedCachedImage; // if the last image displayed was read from cache (for statistics collection)
 #ifdef SENSOR_SDA
 extern int lastCO2, lastSCDTemp, lastTemp, lastSCDHumid, lastHumid, lastPressure, lastType, lastTime;
-const char *szDevices[] = {"None", "AHT20", "BMP180", "BME280", "BMP388", "SHT3X", "HDC1080", "HTS221", "MCP9808","BME68x","SHTC3"};
-const char *szMakers[] = {"None", "ASAIR", "Bosch", "Bosch", "Bosch", "Sensirion", "TI", "STMicro","MicroChip","Bosch","Sensirion"};
+const char *szDevices[] = {"None",    "AHT20",  "BMP180",  "BME280", "BMP388", "SHT3X",
+                           "HDC1080", "HTS221", "MCP9808", "BME68x", "SHTC3"};
+const char *szMakers[] = {"None", "ASAIR",   "Bosch",     "Bosch", "Bosch",    "Sensirion",
+                          "TI",   "STMicro", "MicroChip", "Bosch", "Sensirion"};
 #endif // SENSOR_SDA
 
 void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs) {

@@ -1,8 +1,8 @@
 #pragma once
 
-#include <config.h>
 #include <bb_scd41.h>
 #include <bb_temperature.h>
+#include <config.h>
 
 /// @brief Environmental sample captured during this wake cycle. Temperatures
 ///        are in tenths of a degree Celsius.
