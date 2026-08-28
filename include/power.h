@@ -39,6 +39,17 @@ private:
   uint8_t _statPin;
 };
 
+/// @brief Reads USB presence and charge state from the SY6974B status register.
+class SY6974Power : public BasePower {
+public:
+  UsbStatus usbStatus() override;
+  ChargingStatus chargingStatus() override;
+
+private:
+  bool readStatus(uint8_t &status);
+  bool busStarted = false;
+};
+
 #ifdef INCLUDE_TCA9535_POWER
 class FASTEPD;
 
