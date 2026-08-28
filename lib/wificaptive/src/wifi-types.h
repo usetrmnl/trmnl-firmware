@@ -43,3 +43,12 @@ struct WifiConnectionResult {
   wl_status_t status;
   WifiEventData eventData;
 };
+
+enum class WifiConnectionState : uint8_t {
+  Idle,
+  Connecting,
+  Connected,
+  AuthenticationFailed,
+  NetworkNotFound,
+  Failed,
+};

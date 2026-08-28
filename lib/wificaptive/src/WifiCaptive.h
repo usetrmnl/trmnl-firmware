@@ -6,6 +6,7 @@
 #include <AsyncTCP.h> //https://github.com/me-no-dev/AsyncTCP using the latest dev version from @me-no-dev
 #include <DNSServer.h>
 #include <ESPAsyncWebServer.h> //https://github.com/me-no-dev/ESPAsyncWebServer using the latest dev version from @me-no-dev
+#include <atomic>
 #include <esp_wifi.h>
 #include <functional>
 #include <vector>
@@ -69,6 +70,7 @@ private:
   String _band = "";
   String _api_server = "";
   WifiCredentials _enterprise_credentials;
+  std::atomic<WifiConnectionState> _connectionState{WifiConnectionState::Idle};
 
   std::function<void()> _resetcallback;
   std::function<void()> _tickCallback = nullptr;
@@ -98,6 +100,7 @@ private:
   std::vector<WifiCredentials> matchNetworks(std::vector<WifiNetwork> &scanResults, WifiCredentials wifiCredentials[]);
   std::vector<WifiNetwork> getScannedUniqueNetworks(bool runScan);
   std::vector<WifiNetwork> combineNetworks(std::vector<WifiNetwork> &scanResults, WifiCredentials wifiCredentials[]);
+  WifiConnectionState classifyConnectionFailure(const WifiConnectionResult &result);
 
 public:
   wl_status_t connect(const WifiCredentials credentials);
