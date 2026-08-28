@@ -2,6 +2,8 @@
 
 #include <stdint.h>
 
+#include "config.h"
+
 //
 // derive device-specific battery flags
 //
