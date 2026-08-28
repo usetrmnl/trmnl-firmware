@@ -12,6 +12,53 @@
 #include "driver/gpio.h"
 #include "iqs323_task.h"
 
+/// @brief Per-cell pack capacity (mAh) assumed when BYPASS_BQ27427_SOC is enabled.
+#define BQ27427_BYPASS_CELL_CAPACITY_MAH 6000
+
+/// Connect to the BQ27427 and fill in a validated snapshot of its readings.
+static bool connectAndRead(bool oneCellPack, BQ27427Snapshot &snap) {
+#ifdef BYPASS_BQ27427_SOC
+  // Charge gauging is bypassed: the IT algorithm's SoC/capacity values are
+  // never used, so skip the golden-file configuration and ITPOR wait. The
+  // chip only supplies direct measurements (voltage, current, temperature);
+  // SoC comes from the voltage and capacity from a fixed per-cell pack size.
+  (void)oneCellPack;
+
+  if (!lipo.begin(PIN_INTERNAL_SDA, PIN_INTERNAL_SCL)) return false;
+  lipo._initialized = true;
+  snap.flags = lipo.flags();
+  snap.energyScale = 1;
+  snap.voltage = lipo.voltage();                                     // mV
+  snap.current = lipo.current(AVG);                                  // mA
+  snap.temperature = float(lipo.temperature(BATTERY) - 2732) / 10.0; // C
+
+  // Estimate SoC from the voltage just read. Mirrors the server's
+  // percent_charged_calculation: map 3.0 V onto 0 % at 0.012 V per percent,
+  // with plateaus near full charge (4.08 V follows a full charge) and a
+  // 1 % floor.
+  float voltage = snap.voltage / 1000.0f;
+  float pct = (voltage - 3.0f) / 0.012f;
+  if (pct >= 88.0f)
+    snap.soc = 100;
+  else if (pct >= 85.0f)
+    snap.soc = 95;
+  else if (pct >= 83.0f)
+    snap.soc = 90;
+  else if (pct >= 10.0f)
+    snap.soc = (int)(pct + 0.5f);
+  else
+    snap.soc = 1;
+  snap.capacityFull = battery_count * BQ27427_BYPASS_CELL_CAPACITY_MAH;
+  snap.capacityRemain = snap.capacityFull * snap.soc / 100;
+  snap.health = -1; // State-of-health unavailable without gauging
+  // A failed I2C transaction reads back as 0xFFFF (65535 mV), well outside a
+  // plausible pack voltage.
+  return snap.voltage <= 10000 && snap.temperature >= -40.0 && snap.temperature <= 100.0;
+#else
+  return lipo.connectAndConfigure(PIN_INTERNAL_SDA, PIN_INTERNAL_SCL, oneCellPack) && lipo.readSnapshot(snap);
+#endif // BYPASS_BQ27427_SOC
+}
+
 void BQ27427Battery::gaugeInit() {
   if (battery_count == BATTERY_NONE) {
     Log_info("No battery detected - skipping BQ27427 initialization");
@@ -23,19 +70,17 @@ void BQ27427Battery::gaugeInit() {
   iqs323_task_i2c_lock();
 
   BQ27427Snapshot snap;
-  bool ready = lipo.connectAndConfigure(PIN_INTERNAL_SDA, PIN_INTERNAL_SCL, oneCellPack);
-  bool readingsValid = ready && lipo.readSnapshot(snap);
+  bool readingsValid = connectAndRead(oneCellPack, snap);
 
   if (!readingsValid) {
-    Log_warn("BQ27427: init failed or invalid readings (ready=%d) - resetting and retrying", ready);
+    Log_warn("BQ27427: init failed or invalid readings - resetting and retrying");
 
     BQ27427_reset();
     iqs323_task_i2c_unlock();
     delay(300); // BQ27427 needs 250 ms to power up
     iqs323_task_i2c_lock();
 
-    ready = lipo.connectAndConfigure(PIN_INTERNAL_SDA, PIN_INTERNAL_SCL, oneCellPack);
-    readingsValid = ready && lipo.readSnapshot(snap);
+    readingsValid = connectAndRead(oneCellPack, snap);
 
     if (!readingsValid) {
       Log_error("BQ27427: still not initialized or invalid readings after retry.");

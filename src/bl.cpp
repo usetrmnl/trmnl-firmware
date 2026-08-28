@@ -1016,16 +1016,6 @@ void bl_init(void)
     Log.info("%s [%d]: Display TRMNL logo end\r\n", __FILE__, __LINE__);
     preferences.putString(PREFERENCES_FILENAME_KEY, "");
   }
-#ifdef BOARD_TRMNL_X
-  battery_count = detect_battery_count();
-  battery_charging = (power().chargingStatus() == ChargingStatus::CHARGING);
-  Log_info("BATTERY COUNT: %d", battery_count);
-  Log_info("BATTERY CHARGING: %s", battery_charging ? "YES" : "NO");
-
-  battery().gaugeInit();
-#endif
-  vBatt = battery().readVoltage(pDevice); // Read the battery voltage BEFORE WiFi is turned on
-
   Log_info("Firmware version %s", Messages::firmware_version().c_str());
   Log_info("Arduino version %d.%d.%d", ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH);
   Log_info("ESP-IDF version %d.%d.%d", ESP_IDF_VERSION_MAJOR, ESP_IDF_VERSION_MINOR, ESP_IDF_VERSION_PATCH);
@@ -1661,6 +1651,11 @@ static https_request_err_e downloadAndShow()
     return result;
   }
 #endif // BOARD_TRMNL_X
+
+  // A 202 carries no image_url, so filename is still empty here. HTTPClient::begin() rejects
+  // that and the fetch below would report it as an API failure over the friendly ID screen.
+  if (filename[0] == '\0')
+    return result;
 
   result = withHttp(
       filename,
