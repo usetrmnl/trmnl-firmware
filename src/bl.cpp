@@ -930,7 +930,7 @@ void bl_init(void)
     }
   }
   // Read the battery voltage BEFORE the display or WiFi is turned on
-  vBatt = battery().readVoltage();
+  vBatt = battery().readVoltage(pDevice);
 
   // EPD init
   // EPD clear
