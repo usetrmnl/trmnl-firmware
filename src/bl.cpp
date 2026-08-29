@@ -69,6 +69,7 @@ const char *szHTTPErrors[] = {
     "HTTPS_JSON_PARSING_ERR",
     "HTTPS_WRONG_IMAGE_SIZE",
     "HTTPS_WRONG_IMAGE_FORMAT",
+    "HTTPS_IMAGE_DOWNLOAD_FAILED",
     "HTTPS_IMAGE_FILE_TOO_BIG",
     "HTTPS_PLUGIN_NOT_ATTACHED",
     "HTTPS_BAD_CLIENT",
@@ -1354,6 +1355,10 @@ void bl_init(void)
     }
   }
   break;
+  case HTTPS_IMAGE_DOWNLOAD_FAILED: {
+    showMessageWithLogo(IMAGE_DOWNLOAD_FAILED);
+    break;
+  }
   case HTTPS_WRONG_IMAGE_FORMAT:
   {
     showMessageWithLogo(MSG_FORMAT_ERROR);
@@ -1619,8 +1624,8 @@ static https_request_err_e downloadAndShow()
     auto httpRes = g_modem->httpGet(String(filename), szTemp, 0, imgHeaders);
     if (!httpRes.ok)
     {
-      Log_error_submit("Modem httpGet failed: %u bytes received", httpRes.bytesReceived);
-      return HTTPS_REQUEST_FAILED;
+      Log_error_submit("[HTTPS] Modem Image GET... failed: %u bytes received", httpRes.bytesReceived);
+      return HTTPS_IMAGE_DOWNLOAD_FAILED;
     }
 
     int fileSize = 0;
@@ -1727,15 +1732,10 @@ static https_request_err_e downloadAndShow()
               httpCode = https.GET();
               content_size = https.getSize();
             }
-//          uint8_t *buffer_old = nullptr; // Disable partial update for now
-//          int file_size_old = 0;
-
           // httpCode will be negative on error
-          if (httpCode < 0)
-          {
-            Log_error_submit("[HTTPS] GET... failed, error: %d (%s)", httpCode, https.errorToString(httpCode).c_str());
-
-            return HTTPS_REQUEST_FAILED;
+          if (httpCode < 0) {
+            Log_error_submit("[HTTPS] Image GET... failed, error: %d (%s)", httpCode, https.errorToString(httpCode).c_str());
+            return HTTPS_IMAGE_DOWNLOAD_FAILED;
           }
 
           // HTTP header has been send and Server response header has been handled

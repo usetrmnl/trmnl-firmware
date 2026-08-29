@@ -2150,6 +2150,17 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         bbep.print(string1);
     }
     break;
+    case IMAGE_DOWNLOAD_FAILED: {
+        const char string1[] = "Failed to download the image returned by the API.";
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, 340);
+        bbep.println(string1);
+        const char string2[] = "Device will retry..";
+        bbep.getStringBox(string2, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+        bbep.println(string2);
+    }
+    break;
     case API_REQUEST_FAILED:
     {
         const char string1[] = "WiFi connected, request to API failed.";
