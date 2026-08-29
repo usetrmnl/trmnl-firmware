@@ -4,7 +4,7 @@
 
 #if defined(FAKE_BATTERY_VOLTAGE)
 static FakeBattery batteryInstance;
-#elif defined(BOARD_TRMNL_X)
+#elif defined(BOARD_TRMNL_X) || defined(BOARD_FRAME)
 static BQ27427Battery batteryInstance;
 #elif defined(PIN_VBAT_SWITCH)
 static SeeedBattery batteryInstance(PIN_BATTERY, PIN_VBAT_SWITCH, VBAT_SWITCH_LEVEL);

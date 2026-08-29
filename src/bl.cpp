@@ -55,6 +55,10 @@
 #include <services/device_setup.h>
 #include "messages.h"
 #include "displayed_image.h"
+#ifdef BOARD_TRMNL_GEN2
+#include "gen2_battery.h" // Gen2BatteryStatus, gen2_batteryRead()
+#endif
+
 #include <globals.h>
 const char *szHTTPErrors[] = {
     "HTTPS_NO_ERR",

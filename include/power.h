@@ -8,7 +8,7 @@
 //
 #if defined(BOARD_TRMNL_X)
 #define INCLUDE_TCA9535_POWER
-#elif defined(BOARD_TRMNL_GEN2)
+#elif defined(BOARD_TRMNL_GEN2) && !defined(BOARD_FRAME)
 #define INCLUDE_GPIO_POWER
 #endif
 

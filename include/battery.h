@@ -5,7 +5,7 @@
 //
 // derive device-specific battery flags
 //
-#if defined(BOARD_TRMNL_X)
+#if defined(BOARD_TRMNL_X) || defined(BOARD_FRAME)
 #define INCLUDE_BQ27427
 #endif
 

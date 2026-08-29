@@ -1,5 +1,6 @@
 Import("env")
 import subprocess
+import sys
 import urllib.request
 from pathlib import Path
 
@@ -14,8 +15,11 @@ def post_build(source, target, env):
         print(f"Downloading littlefs.bin from {LITTLEFS_URL} ...")
         urllib.request.urlretrieve(LITTLEFS_URL, littlefs)
 
+    esptool_dir = env.PioPlatform().get_package_dir("tool-esptoolpy")
+    esptool = Path(esptool_dir) / "esptool.py"
+
     subprocess.run([
-        "pio", "pkg", "exec", "-p", "tool-esptoolpy", "esptool.py", "--",
+        sys.executable, str(esptool),
         "--chip", "ESP32S3",
         "merge_bin",
         "-o", str(output),
