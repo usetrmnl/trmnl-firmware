@@ -56,6 +56,25 @@
 #include "messages.h"
 #include "displayed_image.h"
 #include <globals.h>
+#ifdef MULTI_BUTTON_WAKEUP
+#include "driver/rtc_io.h"
+#include <button_wakeup.h>
+static uint64_t ext1_wake_bits = 0; // which ext1 pin(s) woke us
+
+// Wake on any of the device's buttons. The extra buttons rely on internal
+// pull-ups, which must be held through deep sleep via the RTC domain.
+static void multi_button_arm_wakeup(void)
+{
+  for (gpio_num_t p : {(gpio_num_t)PIN_INTERRUPT, (gpio_num_t)PIN_BUTTON_A, (gpio_num_t)PIN_BUTTON_B})
+  {
+    rtc_gpio_init(p);
+    rtc_gpio_set_direction(p, RTC_GPIO_MODE_INPUT_ONLY);
+    rtc_gpio_pullup_en(p);
+    rtc_gpio_pulldown_dis(p);
+  }
+  esp_sleep_enable_ext1_wakeup(BUTTON_WAKEUP_MASK, ESP_EXT1_WAKEUP_ANY_LOW);
+}
+#endif
 const char *szHTTPErrors[] = {
     "HTTPS_NO_ERR",
     "HTTPS_RESET",
@@ -781,6 +800,17 @@ void bl_init(void)
                       wakeup_reason == ESP_SLEEP_WAKEUP_EXT1);
   Log.info("%s [%d]: Wake reason: %d\r\n", __FILE__, __LINE__, (int)wakeup_reason);
 
+  bool skip_button_read = false;
+#ifdef MULTI_BUTTON_WAKEUP
+  if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT1)
+  {
+    ext1_wake_bits = esp_sleep_get_ext1_wakeup_status();
+    Log_info("ext1 wake bits=0x%llx", (unsigned long long)ext1_wake_bits);
+    // An extra-button wake is a plain press: the classification below reads
+    // only PIN_INTERRUPT and would idle through its double-click window.
+    skip_button_read = ext1_wake_bits != 0 && (ext1_wake_bits & (1ULL << PIN_INTERRUPT)) == 0;
+  }
+#endif
   Log_info("preferences start");
   bool res = preferences.begin("data", false);
   if (res)
@@ -795,7 +825,7 @@ void bl_init(void)
   Log_info("preferences end");
   #ifndef BOARD_TRMNL_X
   bool double_click = false;
-  if (gpio_wakeup)
+  if (gpio_wakeup && !skip_button_read)
   {
     Log_info("GPIO wakeup detected (%d)", wakeup_reason);
     auto button = read_button_presses();
@@ -1422,6 +1452,17 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   {
     inputs.updateSource = "unknown";
   }
+#ifdef MULTI_BUTTON_WAKEUP
+  // Name the button that woke us in Update-Source. PIN_INTERRUPT reports
+  // "button"; the other two report "button_a" and "button_b".
+  if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT1 && ext1_wake_bits != 0)
+  {
+    const char *button_source =
+        updateSourceForWakeBits(ext1_wake_bits, PIN_INTERRUPT, PIN_BUTTON_A, PIN_BUTTON_B);
+    if (button_source != nullptr)
+      inputs.updateSource = button_source;
+  }
+#endif
 
   if (preferences.isKey(PREFERENCES_API_KEY))
   {
@@ -2651,7 +2692,11 @@ void goToSleep(void)
   pinMode(PIN_INTERRUPT, INPUT); // needed to not immediately wake up
   esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
 #elif defined(CONFIG_IDF_TARGET_ESP32S3)
+#ifdef MULTI_BUTTON_WAKEUP
+  multi_button_arm_wakeup();
+#else
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
+#endif
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
 #endif
@@ -2686,7 +2731,11 @@ static void goToSleepButtonOnly(void)
 #elif defined( CONFIG_IDF_TARGET_ESP32C3 ) || defined ( CONFIG_IDF_TARGET_ESP32C5 )
   esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
 #elif CONFIG_IDF_TARGET_ESP32S3
+#ifdef MULTI_BUTTON_WAKEUP
+  multi_button_arm_wakeup();
+#else
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
+#endif
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
 #endif

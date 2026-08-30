@@ -137,12 +137,16 @@
 #define PIN_VBAT_SWITCH   6 // load switch enable pin for battery voltage measurement
 #define VBAT_SWITCH_LEVEL HIGH // load switch enable pin active level
 #elif defined(BOARD_SEEED_RETERMINAL_E1001)
-#define DEVICE_MODEL      "reterminal_e1001"
-#define PIN_INTERRUPT     3 // the green button
-#define PIN_VBAT_SWITCH   21 // load switch enable pin for battery voltage measurement
-#define VBAT_SWITCH_LEVEL HIGH // load switch enable pin active level
-#define PIN_BUZZER        45          // passive buzzer (MLT-8530) via NPN transistor
-#define BUZZER_FREQ       2700       // resonant frequency of MLT-8530 in Hz
+#define DEVICE_MODEL        "reterminal_e1001"
+#define PIN_INTERRUPT       3 // the green button
+#define MULTI_BUTTON_WAKEUP // all three buttons wake; Update-Source names which
+#define PIN_BUTTON_A        4 // reported as button_a, no external pull-up
+#define PIN_BUTTON_B        5 // reported as button_b, no external pull-up
+#define BUTTON_WAKEUP_MASK  ((1ULL << PIN_INTERRUPT) | (1ULL << PIN_BUTTON_A) | (1ULL << PIN_BUTTON_B))
+#define PIN_VBAT_SWITCH     21 // load switch enable pin for battery voltage measurement
+#define VBAT_SWITCH_LEVEL   HIGH // load switch enable pin active level
+#define PIN_BUZZER          45          // passive buzzer (MLT-8530) via NPN transistor
+#define BUZZER_FREQ         2700       // resonant frequency of MLT-8530 in Hz
 #elif defined(BOARD_SEEED_RETERMINAL_E1002)
 #define DEVICE_MODEL      "reterminal_e1002"
 #define PIN_INTERRUPT     3 // the green button
