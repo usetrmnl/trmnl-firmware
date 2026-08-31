@@ -1187,13 +1187,10 @@ void bl_init(void)
 #endif
 
   // clock synchronization
-  if (systemClock().setTimeFromNTP())
-  {
+  if (systemClock().setTimeFromNTP()) {
     time_since_sleep = preferences.getUInt(PREFERENCES_LAST_SLEEP_TIME, 0);
-    time_since_sleep = time_since_sleep ? systemClock().getTime() - time_since_sleep : 0; // may be can be used even if no sync
-  }
-  else
-  {
+    time_since_sleep = time_since_sleep ? systemClock().getTime() - time_since_sleep : 0; // maybe can be used even if no sync
+  } else {
     time_since_sleep = 0;
     Log.info("%s [%d]: Time wasn't synced.\r\n", __FILE__, __LINE__);
   }
