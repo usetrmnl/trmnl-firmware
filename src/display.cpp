@@ -530,7 +530,7 @@ void display_wipe(void)
     for (int i=0; i<refreshCount; i++) {
         bbep.refresh(REFRESH_FULL); // 2 to 3 minutes of Black/White clearing of the display
     }
-    bbep.sleep(LIGHT_SLEEP);
+    bbep.sleep((bbep.capabilities() & BBEP_4COLOR) ? DEEP_SLEEP : LIGHT_SLEEP);
 #else
     bbep.setMode(BB_MODE_1BPP);
     bbep.fillScreen(BBEP_WHITE);
@@ -2764,7 +2764,7 @@ void display_sleep(void)
 {
     Log_info("Goto Sleep...");
 #ifdef BB_EPAPER
-    bbep.sleep(LIGHT_SLEEP);
+    bbep.sleep((bbep.capabilities() & BBEP_4COLOR) ? DEEP_SLEEP : LIGHT_SLEEP);
 #else
     bbep.einkPower(0);
     bbep.deInit();
