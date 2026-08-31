@@ -56,24 +56,6 @@
 #include "messages.h"
 #include "displayed_image.h"
 #include <globals.h>
-const char *szHTTPErrors[] = {
-    "HTTPS_NO_ERR",
-    "HTTPS_RESET",
-    "HTTPS_NO_REGISTER",
-    "HTTPS_SUCCESS",
-    "HTTPS_CLIENT_FAILED",
-    "HTTPS_REQUEST_FAILED",
-    "HTTPS_UNABLE_TO_CONNECT",
-    "HTTPS_CONNECTION_FAILED",
-    "HTTPS_RESPONSE_CODE_INVALID",
-    "HTTPS_JSON_PARSING_ERR",
-    "HTTPS_WRONG_IMAGE_SIZE",
-    "HTTPS_WRONG_IMAGE_FORMAT",
-    "HTTPS_IMAGE_FILE_TOO_BIG",
-    "HTTPS_PLUGIN_NOT_ATTACHED",
-    "HTTPS_BAD_CLIENT",
-    "HTTPS_OUT_OF_MEMORY"
-};
 
 static float vBatt;
 static https_request_err_e downloadAndShow(); // download and show the image
@@ -1242,7 +1224,7 @@ void bl_init(void)
 
   // OTA checking, image checking and drawing
   https_request_err_e request_result = downloadAndShow();
-  Log.info("%s [%d]: request result - %s\r\n", __FILE__, __LINE__, szHTTPErrors[request_result]);
+  Log.info("%s [%d]: request result - %s\r\n", __FILE__, __LINE__, https_request_err_str(request_result));
 
   if (request_result == HTTPS_IMAGE_FILE_TOO_BIG)
   {
@@ -2012,7 +1994,7 @@ static https_request_err_e downloadAndShow()
     Log_error_submit("unable to connect");
   }
 
-  Log_info("Returned result - %s", szHTTPErrors[result]);
+  Log_info("Returned result - %s", https_request_err_str(result));
 
   return result;
 }
@@ -2133,7 +2115,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
         result = HTTPS_RESET;
       if (sleep_5_seconds)
         result = HTTPS_PLUGIN_NOT_ATTACHED;
-      Log.info("%s [%d]: result - %s\r\n", __FILE__, __LINE__, szHTTPErrors[result]);
+      Log.info("%s [%d]: result - %s\r\n", __FILE__, __LINE__, https_request_err_str(result));
     }
     break;
     case 202:
