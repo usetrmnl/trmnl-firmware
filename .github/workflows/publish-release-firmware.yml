@@ -1,0 +1,145 @@
+name: publish-release-firmware
+
+# Publishes a tagged release: builds all TRMNL environments via
+# scripts/prepare_release.sh, uploads the OTA and full-flash bins to S3, and
+# records draft Firmware/FlashFirmware releases in the TRMNL web app for an
+# admin to promote/publish.
+#
+# Idempotent: already-uploaded S3 objects are skipped (unless overwrite is
+# set) and the admin API upserts, so a failed run can safely be re-run.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish (e.g. v1.8.15)"
+        required: true
+        type: string
+      force:
+        description: "Bypass prepare_release.sh's HEAD commit message check"
+        type: boolean
+        default: false
+      overwrite:
+        description: "Re-upload files that already exist in S3"
+        type: boolean
+        default: false
+
+concurrency:
+  group: publish-release-firmware
+  cancel-in-progress: false
+
+env:
+  S3_BUCKET: trmnl-fw
+  S3_BASE_URL: https://trmnl-fw.s3.us-east-2.amazonaws.com
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Verify tag matches firmware version
+        run: |
+          MAJOR=$(awk '/#define FW_MAJOR_VERSION/ {print $3}' include/config.h)
+          MINOR=$(awk '/#define FW_MINOR_VERSION/ {print $3}' include/config.h)
+          PATCH=$(awk '/#define FW_PATCH_VERSION/ {print $3}' include/config.h)
+          VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          if [[ "${{ inputs.tag }}" != "v${VERSION}" ]]; then
+            echo "::error::Tag '${{ inputs.tag }}' does not match firmware version v${VERSION} in include/config.h"
+            exit 1
+          fi
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio/.cache
+          key: ${{ runner.os }}-pio
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+
+      - name: Install PlatformIO Core
+        run: pip install --upgrade platformio esptool
+
+      - name: Build release firmware
+        env:
+          INCLUDE_GIT_HASH_IN_VERSION_NUMBER: "false"
+        run: ./scripts/prepare_release.sh ${{ inputs.force && '--force' || '' }} trmnl
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-2
+
+      - name: Upload to S3 and record draft releases in TRMNL
+        env:
+          TRMNL_ADMIN_API_TOKEN: ${{ secrets.TRMNL_ADMIN_API_TOKEN }}
+          OVERWRITE: ${{ inputs.overwrite }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+
+          # PlatformIO env -> S3 slug (must cover TRMNL_ENVS in prepare_release.sh)
+          declare -A SLUGS=( [trmnl]=trmnl_og [trmnl_4clr]=trmnl_bwry [TRMNL_X]=trmnl_x )
+          FILE="FW${VERSION}.bin"
+
+          upload() { # <local file> <s3 key>
+            if [[ "$OVERWRITE" != "true" ]] && aws s3api head-object --bucket "$S3_BUCKET" --key "$2" >/dev/null 2>&1; then
+              echo "Skipping (already in S3): $2"
+            else
+              aws s3 cp "$1" "s3://${S3_BUCKET}/$2"
+            fi
+          }
+
+          echo "## 🚀 Release ${TAG}" >> "$GITHUB_STEP_SUMMARY"
+
+          for pio_env in trmnl trmnl_4clr TRMNL_X; do
+            slug=${SLUGS[$pio_env]}
+            ota_src=".pio/release/${pio_env}/ota/${FILE}"
+            flash_src=".pio/release/${pio_env}/flash/${FILE}"
+            ota_key="${slug}/${FILE}"
+            flash_key="${slug}/flash/${FILE}"
+
+            upload "$ota_src" "$ota_key"
+            upload "$flash_src" "$flash_key"
+
+            jq -n \
+              --arg version "$VERSION" \
+              --arg tag "$TAG" \
+              --arg ota_url "${S3_BASE_URL}/${ota_key}" \
+              --argjson ota_size "$(stat -c%s "$ota_src")" \
+              --arg flash_url "${S3_BASE_URL}/${flash_key}" \
+              --argjson flash_size "$(stat -c%s "$flash_src")" \
+              '{
+                version: $version,
+                tag: $tag,
+                ota: { url: $ota_url, size: $ota_size },
+                flash: { url: $flash_url, size: $flash_size }
+              }' > payload.json
+
+            echo "Recording draft release for ${slug}:"
+            curl --fail-with-body -sS -X POST \
+              -H "Access-Token: ${TRMNL_ADMIN_API_TOKEN}" \
+              -H "Content-Type: application/json" \
+              --data @payload.json \
+              https://trmnl.com/admin_api/firmware_releases
+            echo
+
+            {
+              echo "### ${slug}"
+              echo "- OTA: \`${S3_BASE_URL}/${ota_key}\` ($(stat -c%s "$ota_src") bytes)"
+              echo "- Flash: \`${S3_BASE_URL}/${flash_key}\` ($(stat -c%s "$flash_src") bytes)"
+            } >> "$GITHUB_STEP_SUMMARY"
+          done
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Draft Firmware and FlashFirmware records created — promote/publish them in the admin." >> "$GITHUB_STEP_SUMMARY"

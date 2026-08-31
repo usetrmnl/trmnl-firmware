@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 #ifndef _NO_DEV_CONFIG_
-#include "DEV_Config.h"
+#include "config.h"
 #endif
 
 enum MSG {
@@ -74,12 +74,6 @@ typedef enum {
 } battery_count_t;
 
 battery_count_t detect_battery_count();
-
-/// @brief State of charge from the BQ27427 (or estimated from its voltage
-///        reading when BYPASS_BQ27427_SOC is defined). lipo.begin() must have
-///        succeeded first.
-/// @return state of charge, 0-100 %
-int getLipoSOC();
 
 extern "C" {
   void modem_enter_bootloader();
