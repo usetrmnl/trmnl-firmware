@@ -12,11 +12,6 @@
 #include <special_function.h>
 #include <stored_logs.h>
 
-#ifdef SENSOR_SDA
-#include <bb_scd41.h>
-#include <bb_temperature.h>
-#endif
-
 #ifdef BOARD_TRMNL_X
 #include "IQS323.h"
 class Modem;
@@ -62,15 +57,6 @@ extern bool otg_message;
 extern int iUpdateCount;   // RTC: partial updates since the last full refresh
 extern bool bCanDoPartial; // RTC
 extern uint32_t iTempProfile;
-
-#ifdef SENSOR_SDA
-// --- Environmental sensors ---
-extern SCD41 scd41;
-extern BBTemp bbt;
-extern bool bCO2;
-extern int iSensorType;
-extern int lastCO2, lastSCDTemp, lastTemp, lastSCDHumid, lastHumid, lastPressure, lastType, lastTime;
-#endif // SENSOR_SDA
 
 #ifdef BOARD_TRMNL_X
 // --- TRMNL X hardware ---

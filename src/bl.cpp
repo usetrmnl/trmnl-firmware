@@ -4,6 +4,7 @@
 #include <bl.h>
 #include <wifi_network.h>
 #include <power.h>
+#include <config.h>
 #include <battery.h>
 #include <device_id.h>
 #include <trmnl_log.h>
@@ -11,7 +12,6 @@
 #include <ArduinoLog.h>
 #include <WifiCaptive.h>
 #include <pins.h>
-#include <config.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <display.h>
@@ -36,6 +36,7 @@
 #include "logging_parcers.h"
 #include <SPIFFS.h>
 #include "http_client.h"
+#include <StreamString.h>
 #include <api-client/display.h>
 #include <api-client/request_headers.h>
 #include "driver/gpio.h"
@@ -50,6 +51,7 @@
 #include <sys/time.h>
 #include <misc/buzzer.h>
 #include <misc/clock.h>
+#include <misc/sensor.h>
 #include <services/device_setup.h>
 #include "messages.h"
 #include "displayed_image.h"
@@ -74,7 +76,6 @@ const char *szHTTPErrors[] = {
 };
 
 static float vBatt;
-
 static https_request_err_e downloadAndShow(); // download and show the image
 static https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse);
 static void resetDeviceCredentials(void);            // reset device credentials API key, Friendly ID, Wi-Fi SSID and password
@@ -98,6 +99,8 @@ static unsigned long startup_time = 0;
 void iqs323_task_i2c_lock(void) {}
 void iqs323_task_i2c_unlock(void) {}
 #endif // !BOARD_TRMNL_X
+void hw_config_init(void);
+extern TRMNL_DEVICE *pDevice;
 
 void wait_for_serial() {
 #ifdef WAIT_FOR_SERIAL
@@ -744,75 +747,8 @@ static void handle_orientation_change_confirmation(struct bma5_dev *dev, uint8_t
 #include "modem.h"
 // ############################ esp32c5 modem #########################
 
-// ############################ Gas gauge #############################
-#include "BQ27427.h"
-// ############################ Gas gauge #############################
 #endif
 
-/**
- * @brief Function to initialize and read from I2C sensors (if present)
- * @param none
- * @return none
- */
-void sensor_init(void)
-{
-#ifdef SENSOR_SDA
-  // check if there is a SCD41 or supported temperature sensor attached
-  if (scd41.init(SENSOR_SDA, SENSOR_SCL) == SCD41_SUCCESS) {
-    bCO2 = true;
-    Log.info("%s [%d]: SCD41 sensor found!\r\n", __FILE__, __LINE__);
-//    scd41.start(SCD41_MODE_PERIODIC);
-    scd41.wakeup();
-    // The SCD41 needs to be re-initialized after big Vcc variations from the last wakeup
-    // put it in a 'confused' state. If we don't re-initialize it, it won't generate more samples
-    scd41.sendCMD(SCD41_CMD_REINIT);
-    vTaskDelay(3); // allow time to reinitialize
-    scd41.triggerSample(); // trigger a 'one-shot' sample that takes about 5 seconds to complete
-  }
-  if (bbt.init(SENSOR_SDA, SENSOR_SCL) == BBT_SUCCESS) {
-    iSensorType = bbt.type();
-    Log.info("%s [%d]: supported sensor found! (%d)\r\n", __FILE__, __LINE__, iSensorType);
-    bbt.start(); // start the sensor
-  }
-  if (!bCO2 && iSensorType < 0) {
-    Log.info("%s [%d]: No sensor found on I2C bus %d/%d\r\n", __FILE__, __LINE__, SENSOR_SDA, SENSOR_SCL);
-  }
-  // wait for the sensor(s) to generate a sample
-  if (bCO2 || iSensorType >= 0) {
-    Log.info("%s [%d]: Light sleep for 5 seconds to allow sensor to generate a sample\r\n", __FILE__, __LINE__);
-    esp_sleep_enable_timer_wakeup(5000 * 1000L); // the SCD4x needs 5 seconds to get a sample
-    esp_light_sleep_start(); // use light sleep to save power
-  }
-  if (bCO2) {
-    if (scd41.getSample() == SCD41_SUCCESS) {
-        time((time_t *)&lastTime); // get the UTC epoch time that the same was captured
-        lastCO2 = scd41.co2();
-        lastSCDTemp = scd41.temperature();
-        lastSCDHumid = scd41.humidity();
-        Log.info("%s [%d]: Got SCD41 sample: CO2 = %dppm\r\n", __FILE__, __LINE__, lastCO2);
-    } else {
-        Log.info("%s [%d]: SCD41 sample failed\r\n", __FILE__, __LINE__);
-        lastCO2 = 0;
-    }
-    scd41.shutdown(); // conserve power since we completed getting a sample ready for the next TRMNL wakeup
-  }
-  if (iSensorType >= 0) {
-      BBT_SAMPLE bbts;
-      if (bbt.getSample(&bbts) == BBT_SUCCESS) {
-        time((time_t *)&lastTime); // get the UTC epoch time that the same was captured
-        lastTemp = bbts.temperature;
-        lastHumid = bbts.humidity;
-        lastPressure = bbts.pressure;
-        lastType = iSensorType;
-        Log.info("%s [%d]: Got bb_temperature sample: Temp = %d.%dC\r\n", __FILE__, __LINE__, lastTemp/10, lastTemp % 10);
-      } else {
-        lastType = -1;
-        Log.info("%s [%d]: bb_temperature sample failed\r\n", __FILE__, __LINE__);
-      }
-      bbt.stop(); // turn off the sensor to conserve power
-  }
-#endif // SENSOR_SDA
-} /* sensor_init() */
 /**
  * @brief Function to init business logic module
  * @param none
@@ -854,9 +790,10 @@ void bl_init(void)
   }
   Log.info("%s [%d]: modem needed = %d\n\r", __FILE__, __LINE__, bModemNeeded);
 #endif // X
+  hw_config_init();
   pins_init();
   buzzer().init();
-  sensor_init();
+  sensor().init(pDevice);
 #ifdef BOARD_TRMNL_X
   // Debug: Print all wakeup_stub_iqs_status structure fields
   Log_info("wakeup_stub_iqs_status.status: 0x%02X 0x%02X", wakeup_stub_iqs_status.status[0], wakeup_stub_iqs_status.status[1]);
@@ -1032,6 +969,9 @@ void bl_init(void)
       Log_error("SF not saved");
     }
   }
+  // Read the battery voltage BEFORE the display or WiFi is turned on
+  vBatt = battery().readVoltage();
+
   // EPD init
   // EPD clear
   Log.info("%s [%d]: Display init\r\n", __FILE__, __LINE__);
@@ -1068,6 +1008,18 @@ void bl_init(void)
 
 #endif
 
+#ifdef BOARD_TRMNL_X
+  // Read the gauge before the panel draws load current, and before the logo
+  // is drawn so its battery icon has a snapshot to read.
+  battery_count = detect_battery_count();
+  battery_charging = (power().chargingStatus() == ChargingStatus::CHARGING);
+  Log_info("BATTERY COUNT: %d", battery_count);
+  Log_info("BATTERY CHARGING: %s", battery_charging ? "YES" : "NO");
+
+  battery().gaugeInit();
+  vBatt = battery().readVoltage(); // Read the battery voltage BEFORE WiFi is turned on
+#endif // BOARD_TRMNL_X
+
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
   {
     Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
@@ -1096,114 +1048,6 @@ void bl_init(void)
     Log.info("%s [%d]: Display TRMNL logo end\r\n", __FILE__, __LINE__);
     preferences.putString(PREFERENCES_FILENAME_KEY, "");
   }
-#ifdef BOARD_TRMNL_X
-  battery_count = detect_battery_count();
-  battery_charging = (power().chargingStatus() == ChargingStatus::CHARGING);
-  Log_info("BATTERY COUNT: %d", battery_count);
-  Log_info("BATTERY CHARGING: %s", battery_charging ? "YES" : "NO");
-
-  if (battery_count != BATTERY_NONE) {
-    bool bBQ27Alive = false;
-    if (!lipo.begin(PIN_INTERNAL_SDA, PIN_INTERNAL_SCL)) {
-      BQ27427_reset(); // try resetting the chip
-      delay(300); // BQ27427 needs 250 ms to power up
-      if (!lipo.begin(PIN_INTERNAL_SDA, PIN_INTERNAL_SCL)) { // try again
-      // If communication fails, print an error message and loop forever.
-        Log_error("Error: Unable to communicate with BQ27427.");
-        gpio_dump_io_configuration(stdout, (1ULL << PIN_INTERNAL_SDA));
-        gpio_dump_io_configuration(stdout, (1ULL << PIN_INTERNAL_SCL));
-      } else {
-        bBQ27Alive = true;
-      }
-    } else {
-      bBQ27Alive = true;
-    }
-    if (bBQ27Alive) {
-    Log_info("Connected to BQ27427!");
-    if (lipo.flags() & BQ27427_FLAG_ITPOR) { // it got reset, reload the 'golden file' data
-      if (battery_count == BATTERY_ONE) {
-        Log_info("One battery detected");
-        lipo.configureOneCell();
-      } else if (battery_count == BATTERY_TWO) {
-        Log_info("Two batteries detected");
-        lipo.configureTwoCell();
-      }
-
-      // After SOFT_RESET the BQ27427 enters INITIALIZATION (ITPOR=1).
-      // The IT algorithm needs an OCV measurement (battery at rest) to
-      // transition to NORMAL mode and produce accurate capacity values.
-      // Poll for up to 5 s; under active load it may not clear until rest.
-      {
-        unsigned long t0 = millis();
-        while ((lipo.flags() & BQ27427_FLAG_ITPOR) && (millis() - t0 < 5000)) {
-          delay(100);
-        }
-        if (lipo.flags() & BQ27427_FLAG_ITPOR) {
-          Log_info("BQ27427: ITPOR still set — device in INITIALIZATION, capacity values may be stale");
-        } else {
-          Log_info("BQ27427: ITPOR cleared — device in NORMAL mode");
-          lipo._initialized = true;
-        }
-      }
-    } else {
-        Log_info("BQ27427: ITPOR cleared — device in NORMAL mode");
-        lipo._initialized = true;
-    }
-    uint8_t energyScale = lipo.designEnergyScale();
-    unsigned int soc = lipo.soc();                               // State-of-charge (%) — use this for battery level display
-    unsigned int volts = lipo.voltage();                         // Battery voltage (mV)
-    int current = lipo.current(AVG);                            // Average current (mA)
-    float temperature = float((lipo.temperature(BATTERY)) - 2732) / 10.0;         // Temperature (C)
-    unsigned int fullCapacity = lipo.capacity(FULL) * energyScale; // Full capacity (mAh) — valid only in NORMAL mode
-    unsigned int capacity = lipo.capacity(REMAIN) * energyScale;   // Remaining capacity (mAh) — valid only in NORMAL mode
-    int health = lipo.soh();                                     // State-of-health (%)
-
-    // Assemble a string to print
-    String toPrint = "[" + String(millis() / 1000) + "] ";
-    toPrint += String(soc) + "% | ";
-    toPrint += String(temperature, 1) + " C | ";
-    toPrint += String(volts) + " mV | ";
-    toPrint += String(current) + " mA | ";
-    toPrint += String(capacity) + " / ";
-    toPrint += String(fullCapacity) + " mAh | ";
-    toPrint += String(health) + "%";
-    //fast charging allowed
-    if (lipo.chgFlag())
-        toPrint += " CHG";
-
-    //full charge detected
-    if (lipo.fcFlag())
-        toPrint += " FC";
-
-    //battery is discharging
-    if (lipo.dsgFlag())
-        toPrint += " DSG";
-
-    // ITPOR flag: device still in INITIALIZATION, capacity values may be stale
-    if (lipo.itporFlag())
-        toPrint += " INIT";
-
-    // Print the string
-    Serial.println(toPrint);
-
-    if (lipo.fcFlag()) {
-      Log_info("BATTERY IS FULL");
-      // full, charger connected but not drawing current
-    } else if (lipo.chgFlag()) {
-      Log_info("BATTERY IS CHARGING");
-      // actively charging
-    } else if (lipo.dsgFlag()) {
-      Log_info("BATTERY IS DISCHARGING");
-      // discharging
-    }
-  }
-  }
-  else {
-    Log_info("No battery detected - skipping BQ27427 initialization");
-  }
-#endif // BOARD_TRMNL_X
-  vBatt = battery().readVoltage(); // Read the battery voltage BEFORE WiFi is turned on
-
   Log_info("Firmware version %s", Messages::firmware_version().c_str());
   Log_info("Arduino version %d.%d.%d", ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH);
   Log_info("ESP-IDF version %d.%d.%d", ESP_IDF_VERSION_MAJOR, ESP_IDF_VERSION_MINOR, ESP_IDF_VERSION_PATCH);
@@ -1279,7 +1123,7 @@ void bl_init(void)
   WifiCredentials hardcodedCreds = {.ssid = "ssid-goes-here", .pswd = "password-goes-here"};
   Log_info("Hardcoded WiFi: connecting to SSID '%s'", hardcodedCreds.ssid.c_str());
   auto connectResult = WifiCaptivePortal.connect(hardcodedCreds);
-  Log_info("Hardcoded WiFi: connect result '%s'", wifiStatusStr(connectResult.status));
+  Log_info("Hardcoded WiFi: connect result '%s'", wifiStatusStr(connectResult));
 // goToSleep();
 #else
 
@@ -1655,23 +1499,14 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
 
 #ifdef BOARD_TRMNL_X
   inputs.orientation = bma530_orientation_to_string(device_orientation);
+  // These getters already return -1 if the last gaugeInit() didn't produce a valid reading.
   inputs.batteryCount = battery_count;
-  if (lipo._initialized) { // only report SoC if battery was detected and BQ27427 initialized successfully
-    inputs.stateOfCharge = lipo.soc();
-    inputs.stateOfHealth = lipo.soh();
-    inputs.batteryCurrent = lipo.current(AVG);
-    inputs.batteryTemperature = float((lipo.temperature(BATTERY)) - 2732) / 10.0; // convert from K to C
-    inputs.currentBatteryCapacity = lipo.capacity(REMAIN) * lipo.designEnergyScale();
-    inputs.maxBatteryCapacity = lipo.capacity(FULL) * lipo.designEnergyScale();
-  }
-  else {
-    inputs.stateOfCharge = -1;
-    inputs.stateOfHealth = -1;
-    inputs.batteryCurrent = -1;
-    inputs.batteryTemperature = -1;
-    inputs.currentBatteryCapacity = -1;
-    inputs.maxBatteryCapacity = -1;
-  }
+  inputs.stateOfCharge = battery().readSoc();
+  inputs.stateOfHealth = battery().readHealth();
+  inputs.batteryCurrent = battery().readCurrent();
+  inputs.batteryTemperature = battery().readTemperature();
+  inputs.currentBatteryCapacity = battery().readCapacityRemain();
+  inputs.maxBatteryCapacity = battery().readCapacityFull();
 #endif // BOARD_TRMNL_X
 
   return inputs;
@@ -1740,10 +1575,25 @@ static https_request_err_e downloadAndShow()
   }
 
   https_request_err_e result = handleApiDisplayResponse(apiDisplayResult.response);
+  if (apiDisplayResult.response.filename == "screen_wiper.png") {
+      // Guard against re-fetching forever if the wiper is the only playlist item
+      static bool wiped_this_wake = false;
+      if (wiped_this_wake) {
+          Log_info("Screen wiper returned again; not wiping twice in one wake");
+          return result; // leave the wiped (white) screen as-is
+      }
+      wiped_this_wake = true;
+      Log_info("Detected screen wiper filename: %s, clearing display...", apiDisplayResult.response.filename.c_str());
+      display_wipe();
+      // Wiping leaves the screen blank; fetch and show the next playlist item
+      // right away instead of waiting for the next scheduled refresh.
+      Log_info("Screen wipe complete, fetching next playlist item");
+      return downloadAndShow();
+  }
 
   if (!status && result == HTTPS_SUCCESS) { // this means we already have this image stored in SPIFFS
       char szTemp[36];
-#if BOARD_X_CLASS && !defined(BOARD_SEEED_RETERMINAL_E1003)
+#if PARALLEL_EPD && !defined(BOARD_SEEED_RETERMINAL_E1003)
       if (DisplayedImage::exists()) {
         load_prev_image(); // decode the older image into the previous buffer of FastEPD
       }
@@ -1835,7 +1685,12 @@ static https_request_err_e downloadAndShow()
   }
 #endif // BOARD_TRMNL_X
 
-  withHttp(
+  // A 202 carries no image_url, so filename is still empty here. HTTPClient::begin() rejects
+  // that and the fetch below would report it as an API failure over the friendly ID screen.
+  if (filename[0] == '\0')
+    return result;
+
+  result = withHttp(
       filename,
       [&](HTTPClient *httpsp, HttpError error) -> https_request_err_e
       {
@@ -1941,7 +1796,7 @@ static https_request_err_e downloadAndShow()
           long lStartTime = millis();
           if (content_size <= 0)
           {
-            Log.warning("%s [%d]: Content-Length not provided, using getString()\r\n", __FILE__, __LINE__);
+            Log.warning("%s [%d]: Content-Length not provided, using writeToStream()\r\n", __FILE__, __LINE__);
           }
 
           bool isPNG = https.header("Content-Type") == "image/png";
@@ -1953,9 +1808,18 @@ static https_request_err_e downloadAndShow()
           buffer = nullptr;
           bool buffer_malloc = false;
           if (content_size <= 0) {
-          // getString() handles lack of content size and chunked transfer encoding automatically
-            Log.info("%s [%d]: Downloading image with getString\r\n", __FILE__, __LINE__);
-            payload = https.getString();
+          // writeToStream() handles lack of content size and chunked transfer encoding
+          // automatically, and (unlike getString()) reports an error when the connection
+          // is closed before the whole body has arrived
+            Log.info("%s [%d]: Downloading image with writeToStream\r\n", __FILE__, __LINE__);
+            StreamString sstream;
+            int written = https.writeToStream(&sstream);
+            if (written < 0) {
+              Log_error_submit("Receiving failed; connection closed mid-download, error: %d (%s), RSSI %d",
+                               written, https.errorToString(written).c_str(), WiFi.RSSI());
+              return HTTPS_TIMED_OUT;
+            }
+            payload = std::move(static_cast<String &>(sstream));
             counter = payload.length();
             buffer = (uint8_t *)payload.c_str();
           } else {
@@ -1963,7 +1827,8 @@ static https_request_err_e downloadAndShow()
             counter = https.getSize();
             if (counter && counter <= MAX_IMAGE_SIZE) {
               WiFiClient *stream = https.getStreamPtr();
-              int iCount = 0;
+              uint32_t iCount = 0;
+              bool closed_early = false;
 
               buffer = (uint8_t *)malloc(counter);
               if (buffer) {
@@ -1972,15 +1837,25 @@ static https_request_err_e downloadAndShow()
                   if (stream->available()) {
                     buffer[iCount++] = stream->read();
                     lStartTime = millis(); // reset start time
+                  } else if (!stream->connected()) {
+                    // server closed the connection before sending the whole body;
+                    // no more data can arrive, so stop immediately instead of
+                    // waiting out the inactivity timeout
+                    closed_early = true;
+                    break;
                   } else { // 15 seconds with no activity => stop trying
                     vTaskDelay(1); // yield to allow time for the data to arrive
                   }
                 }
               } // if buffer
               stream->stop(); // Important! If you don't do this, WiFi will have a memory exception later
-              if (millis() > (lStartTime + IMAGE_STREAM_INACTIVITY_TIMEOUT_MS)) { // we timed out
-                  Log_error_submit("Receiving failed; download timed out. Image size = %" PRIu32, counter);
-                  return HTTPS_TIMED_OUT;
+              if (buffer_malloc && iCount < counter) { // premature close or inactivity timeout
+                Log_error_submit("Receiving failed; incomplete download (%s): %" PRIu32 "/%" PRIu32 " bytes, RSSI %d",
+                                 closed_early ? "connection closed early" : "timed out", iCount, counter,
+                                 WiFi.RSSI());
+                free(buffer);
+                buffer = nullptr;
+                return HTTPS_TIMED_OUT;
               }
             }
           } // if payload size is non-zero
@@ -2766,7 +2641,7 @@ void goToSleep(void)
   submitStoredLogs();
 
 // DEBUG - workaround to prevent crash in the WiFi stack of unknown origin
-#ifndef BOARD_X_CLASS
+#ifndef PARALLEL_EPD
   if (WiFi.status() == WL_CONNECTED) {
     WiFi.disconnect();
   }
@@ -2807,12 +2682,16 @@ void goToSleep(void)
   // Configure GPIO pin for wakeup
 #if CONFIG_IDF_TARGET_ESP32
   #define BUTTON_PIN_BITMASK(GPIO) (1ULL << GPIO)  // 2 ^ GPIO_NUMBER in hex
-  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK(PIN_INTERRUPT), ESP_EXT1_WAKEUP_ALL_LOW);
+  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK(pDevice->interrupt_pin), ESP_EXT1_WAKEUP_ALL_LOW);
 #elif defined(CONFIG_IDF_TARGET_ESP32C3) || defined (CONFIG_IDF_TARGET_ESP32C5)
-  pinMode(PIN_INTERRUPT, INPUT); // needed to not immediately wake up
-  esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
+  pinMode(pDevice->interrupt_pin, INPUT); // needed to not immediately wake up
+  esp_deep_sleep_enable_gpio_wakeup(1 << pDevice->interrupt_pin, ESP_GPIO_WAKEUP_GPIO_LOW);
 #elif defined(CONFIG_IDF_TARGET_ESP32S3)
+#ifdef BOARD_TRMNL_X
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
+#else
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)pDevice->interrupt_pin, 0);
+#endif
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
 #endif
@@ -2843,11 +2722,15 @@ static void goToSleepButtonOnly(void)
   preferences.end();
 #if CONFIG_IDF_TARGET_ESP32
   #define BUTTON_PIN_BITMASK_BTN(GPIO) (1ULL << GPIO)
-  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK_BTN(PIN_INTERRUPT), ESP_EXT1_WAKEUP_ALL_LOW);
+  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK_BTN(pDevice->interrupt_pin), ESP_EXT1_WAKEUP_ALL_LOW);
 #elif defined( CONFIG_IDF_TARGET_ESP32C3 ) || defined ( CONFIG_IDF_TARGET_ESP32C5 )
-  esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
+  esp_deep_sleep_enable_gpio_wakeup(1 << pDevice->interrupt_pin, ESP_GPIO_WAKEUP_GPIO_LOW);
 #elif CONFIG_IDF_TARGET_ESP32S3
+#ifdef BOARD_TRMNL_X
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
+#else
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)pDevice->interrupt_pin, 0);
+#endif
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
 #endif
@@ -3085,7 +2968,7 @@ static uint8_t *storedLogoOrDefault(int iType)
       }
    }
   }
-#ifdef BOARD_X_CLASS
+#ifdef PARALLEL_EPD
     return const_cast<uint8_t *>(logo_medium);
 #else
   if (iType == 0) {

@@ -39,16 +39,6 @@ RTC_DATA_ATTR int iUpdateCount = 0;
 RTC_DATA_ATTR bool bCanDoPartial = false;
 uint32_t iTempProfile;
 
-#ifdef SENSOR_SDA
-// --- Environmental sensors ---
-SCD41 scd41;
-BBTemp bbt;
-bool bCO2 = false;
-int iSensorType = -1;
-int lastCO2 = 0, lastSCDTemp = 0, lastTemp = 0, lastSCDHumid = 0, lastHumid = 0, lastPressure = 0, lastType = -1,
-    lastTime = 0;
-#endif // SENSOR_SDA
-
 #ifdef BOARD_TRMNL_X
 // --- TRMNL X hardware ---
 // Set once during bl_init, used by download helpers and getWiFiStatus()
