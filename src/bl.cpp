@@ -733,7 +733,8 @@ void bl_init(void)
   uint32_t init_time = micros();
 #endif
   startup_time = init_time/1000L; // convert to milliseconds
-#ifdef DEV_FIRMWARE
+#if defined(DEV_FIRMWARE) || defined(UART_CONSOLE)
+  // UART_CONSOLE boards (Seeed E-series) have no logs at all unless the console is initialized here
   Serial.begin(115200);
   wait_for_serial();
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
