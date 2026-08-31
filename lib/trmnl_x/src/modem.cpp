@@ -11,6 +11,7 @@
 #include "esp32_port.h"
 #include "modem.h"
 #include <string_utils.h>
+#include <modem_scan_parse.h>
 
 #if defined (BOARD_TRMNL_X) || defined (BOARD_TRLML_X_EPDIY)
 #include <LittleFS.h>
@@ -392,52 +393,8 @@ std::vector<Modem::ModemNetwork> Modem::scanNetworks() {
   }
 
   std::vector<ModemNetwork> results;
-
-  int pos = 0;
-  while ((pos = acc.indexOf("+CWLAP:", pos)) >= 0) {
-    int paren = acc.indexOf('(', pos);
-    int close = acc.indexOf(')', paren);
-    if (paren < 0 || close < 0) { pos++; continue; }
-
-    String entry = acc.substring(paren + 1, close);
-
-    // field 0: ecn
-    int c1 = entry.indexOf(',');
-    int ecn = entry.substring(0, c1).toInt();
-
-    // field 1: quoted SSID
-    int q1 = entry.indexOf('"', c1);
-    int q2 = entry.indexOf('"', q1 + 1);
-    String ssid = entry.substring(q1 + 1, q2);
-
-    // field 2: rssi
-    int c2 = entry.indexOf(',', q2 + 1);
-    int c3 = entry.indexOf(',', c2 + 1);
-    int32_t rssi = entry.substring(c2 + 1, c3).toInt();
-
-    // skip quoted MAC, find channel
-    int q3 = entry.indexOf('"', c3);
-    int q4 = entry.indexOf('"', q3 + 1);
-    int c4 = entry.indexOf(',', q4 + 1);
-    int c5 = entry.indexOf(',', c4 + 1);
-    int channel = entry.substring(c4 + 1, c5 >= 0 ? c5 : entry.length()).toInt();
-
-    if (ssid.isEmpty() || ssid == "TRMNL") { pos = close; continue; }
-
-    // Dedup: keep highest RSSI per SSID
-    bool found = false;
-    bool is5GHz = channel >= 36;
-    for (auto& net : results) {
-      if (net.ssid == ssid && net.is5GHz == is5GHz) { // only compare RSSI of the same band
-        if (rssi > net.rssi) net.rssi = rssi;
-        found = true;
-        break;
-      }
-    }
-    if (!found) {
-      results.push_back({ssid, rssi, ecn == 0, is5GHz});
-    }
-    pos = close;
+  for (const auto &n : parseCwlapResponse(acc)) {
+    results.push_back({n.ssid, n.rssi, n.open, n.is5GHz, n.enterprise});
   }
 
   return results;

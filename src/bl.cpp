@@ -1053,7 +1053,7 @@ void bl_init(void)
     std::vector<ExternalNetwork> nets;
     for (auto& n : modemNets) {
       if (n.ssid == ownApSsid) continue;
-      nets.push_back({n.ssid, n.rssi, n.open, n.is5GHz});
+      nets.push_back({n.ssid, n.rssi, n.open, n.is5GHz, n.enterprise});
     }
     WifiCaptivePortal.setNetworks(nets);
 
@@ -1069,7 +1069,7 @@ void bl_init(void)
       std::vector<ExternalNetwork> nets;
       for (auto& n : modemNets) {
         if (n.ssid == ownApSsid) continue;
-        nets.push_back({n.ssid, n.rssi, n.open, n.is5GHz});
+        nets.push_back({n.ssid, n.rssi, n.open, n.is5GHz, n.enterprise});
       }
       return nets;
     });

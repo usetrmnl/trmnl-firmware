@@ -30,8 +30,9 @@ public:
   struct ModemNetwork {
     String  ssid;
     int32_t rssi;
-    bool    open;    // true if no encryption (ecn == 0)
-    bool    is5GHz;  // true if channel >= 36
+    bool    open;        // true if no encryption (ecn == 0)
+    bool    is5GHz;      // true if channel >= 36
+    bool    enterprise;  // true if WPA2-Enterprise (ecn == 5)
   };
   std::vector<ModemNetwork> scanNetworks();
 
