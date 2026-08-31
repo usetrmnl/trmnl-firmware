@@ -4,6 +4,7 @@
 #include <bl.h>
 #include <wifi_network.h>
 #include <power.h>
+#include <config.h>
 #include <battery.h>
 #include <device_id.h>
 #include <trmnl_log.h>
@@ -11,7 +12,6 @@
 #include <ArduinoLog.h>
 #include <WifiCaptive.h>
 #include <pins.h>
-#include <config.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <display.h>
@@ -99,6 +99,8 @@ static unsigned long startup_time = 0;
 void iqs323_task_i2c_lock(void) {}
 void iqs323_task_i2c_unlock(void) {}
 #endif // !BOARD_TRMNL_X
+void hw_config_init(void);
+extern TRMNL_DEVICE *pDevice;
 
 void wait_for_serial() {
 #ifdef WAIT_FOR_SERIAL
@@ -752,9 +754,10 @@ void bl_init(void)
   }
   Log.info("%s [%d]: modem needed = %d\n\r", __FILE__, __LINE__, bModemNeeded);
 #endif // X
+  hw_config_init();
   pins_init();
   buzzer().init();
-  sensor().init();
+  sensor().init(pDevice);
 #ifdef BOARD_TRMNL_X
   // Debug: Print all wakeup_stub_iqs_status structure fields
   Log_info("wakeup_stub_iqs_status.status: 0x%02X 0x%02X", wakeup_stub_iqs_status.status[0], wakeup_stub_iqs_status.status[1]);
@@ -1557,7 +1560,7 @@ static https_request_err_e downloadAndShow()
 
   if (!status && result == HTTPS_SUCCESS) { // this means we already have this image stored in SPIFFS
       char szTemp[36];
-#if BOARD_X_CLASS && !defined(BOARD_SEEED_RETERMINAL_E1003)
+#if PARALLEL_EPD && !defined(BOARD_SEEED_RETERMINAL_E1003)
       if (DisplayedImage::exists()) {
         load_prev_image(); // decode the older image into the previous buffer of FastEPD
       }
@@ -2605,7 +2608,7 @@ void goToSleep(void)
   submitStoredLogs();
 
 // DEBUG - workaround to prevent crash in the WiFi stack of unknown origin
-#ifndef BOARD_X_CLASS
+#ifndef PARALLEL_EPD
   if (WiFi.status() == WL_CONNECTED) {
     WiFi.disconnect();
   }
@@ -2646,12 +2649,16 @@ void goToSleep(void)
   // Configure GPIO pin for wakeup
 #if CONFIG_IDF_TARGET_ESP32
   #define BUTTON_PIN_BITMASK(GPIO) (1ULL << GPIO)  // 2 ^ GPIO_NUMBER in hex
-  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK(PIN_INTERRUPT), ESP_EXT1_WAKEUP_ALL_LOW);
+  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK(pDevice->interrupt_pin), ESP_EXT1_WAKEUP_ALL_LOW);
 #elif defined(CONFIG_IDF_TARGET_ESP32C3) || defined (CONFIG_IDF_TARGET_ESP32C5)
-  pinMode(PIN_INTERRUPT, INPUT); // needed to not immediately wake up
-  esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
+  pinMode(pDevice->interrupt_pin, INPUT); // needed to not immediately wake up
+  esp_deep_sleep_enable_gpio_wakeup(1 << pDevice->interrupt_pin, ESP_GPIO_WAKEUP_GPIO_LOW);
 #elif defined(CONFIG_IDF_TARGET_ESP32S3)
+#ifdef BOARD_TRMNL_X
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
+#else
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)pDevice->interrupt_pin, 0);
+#endif
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
 #endif
@@ -2682,11 +2689,15 @@ static void goToSleepButtonOnly(void)
   preferences.end();
 #if CONFIG_IDF_TARGET_ESP32
   #define BUTTON_PIN_BITMASK_BTN(GPIO) (1ULL << GPIO)
-  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK_BTN(PIN_INTERRUPT), ESP_EXT1_WAKEUP_ALL_LOW);
+  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK_BTN(pDevice->interrupt_pin), ESP_EXT1_WAKEUP_ALL_LOW);
 #elif defined( CONFIG_IDF_TARGET_ESP32C3 ) || defined ( CONFIG_IDF_TARGET_ESP32C5 )
-  esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
+  esp_deep_sleep_enable_gpio_wakeup(1 << pDevice->interrupt_pin, ESP_GPIO_WAKEUP_GPIO_LOW);
 #elif CONFIG_IDF_TARGET_ESP32S3
+#ifdef BOARD_TRMNL_X
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
+#else
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)pDevice->interrupt_pin, 0);
+#endif
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
 #endif
@@ -2924,7 +2935,7 @@ static uint8_t *storedLogoOrDefault(int iType)
       }
    }
   }
-#ifdef BOARD_X_CLASS
+#ifdef PARALLEL_EPD
     return const_cast<uint8_t *>(logo_medium);
 #else
   if (iType == 0) {
