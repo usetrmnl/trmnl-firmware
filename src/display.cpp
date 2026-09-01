@@ -1305,10 +1305,14 @@ int png_draw(PNGDRAW *pDraw)
                 }
             } // for x
         } else { // normal 0/1 split plane
-            ucMask = (iPlane == PNG_2_BIT_0) ? 0x40 : 0x80; // lower or upper source bit
+            const uint8_t ucTranslate[4] = {0, 2, 1, 3}; // translate grays to odd order of native 4-gray mode on 7.5" panel
+            const uint8_t ucNoTranslate[4] = {0, 1, 2, 3}; // for other 2-bit panels
+            uint8_t ucPT = bbep.getPanelType();
+            const uint8_t *pTranslate = (ucPT == EP75_800x480_4GRAY || ucPT == EP75_800x480_4GRAY_GEN2) ? ucTranslate : ucNoTranslate;
+            ucMask = (iPlane == PNG_2_BIT_0) ? 0x1 : 0x2; // lower or upper source bit
             for (x=0; x<iWidth; x++) {
                 uc <<= 1;
-                if (src & ucMask) {
+                if (pTranslate[src>>6] & ucMask) {
                     uc |= 1; // high bit of source pair
                 }
                 src <<= 2;
