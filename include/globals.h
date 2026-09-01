@@ -54,7 +54,7 @@ extern bool otg_message;
 
 // --- Display refresh bookkeeping ---
 extern int iUpdateCount;   // RTC: partial updates since the last full refresh
-extern bool bCanDoPartial; // RTC
+extern RTC_DATA_ATTR bool bCanDoPartial; // RTC
 extern uint32_t iTempProfile;
 
 #ifdef BOARD_TRMNL_X
