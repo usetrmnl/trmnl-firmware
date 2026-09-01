@@ -46,7 +46,7 @@ const TRMNL_DEVICE device_list[] =
 // name            sck   mosi   cs   rst   dc   busy  sda   scl   intr   batt  batt_en, batt_type, panel
   "og",            7,    8,     6,   10,   5,   4,    21,   20,   2,     3,    0xff,    BATT_ADC,  EPD_75,
   "og_4clr",       7,    8,     6,   10,   5,   4,    21,   20,   2,     3,    0xff,    BATT_ADC,  EPD_75_4CLR,
-  "og_gen2",       6,    1,     4,   2,    5,   0,    11,   12,   3,     0xff, 0xff,    BATT_BQ27427,  EPD_75, // fake battery == 0xff
+  "og_gen2",       6,    1,     4,   2,    5,   0,    23,   10,   3,     0xff, 0xff,    BATT_BQ27427,  EPD_75, // fake battery == 0xff
   "og_gen2_4clr",  6,    1,     4,   2,    5,   0,    11,   12,   3,     0xff, 0xff,    BATT_BQ27427,  EPD_75_4CLR, // fake battery == 0xff
   "xteink_x4",     8,    10,    21,  5,    4,   6,    0xff, 0xff, 3,     0xff, 0xff,    BATT_ADC,  EPD_426,
   "waveshare",     13,   14,    15,  26,   27,  25,   0xff, 0xff, 33,    0xff, 0xff,    BATT_ADC,  EPD_75,
