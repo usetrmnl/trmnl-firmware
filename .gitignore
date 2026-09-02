@@ -28,3 +28,7 @@ managed_components/
 # Integration test environment (contains secrets)
 test/integration/test_config.h
 dependencies.lock
+
+include/fonts/dseg_*
+scratchpad/
+__pycache__/

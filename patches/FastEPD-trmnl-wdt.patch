@@ -1,0 +1,25 @@
+--- a/src/FastEPD.inl
++++ b/src/FastEPD.inl
+@@ -21,6 +21,7 @@
+ #include <esp_lcd_panel_ops.h>
+ #endif
+ #include <esp_log.h>
++#include "esp_task_wdt.h" // TRMNL: long fullUpdate/clear feed task WDT
+ #if PSRAM != enabled && !defined(CONFIG_ESP32_SPIRAM_SUPPORT) && !defined(CONFIG_ESP32S3_SPIRAM_SUPPORT) && !defined(CONFIG_ESP32C5_SPIRAM_SUPPORT)
+ #error "Please enable PSRAM support"
+@@ -1904,6 +1905,7 @@ void bbepClear(FASTEPDSTATE *pState, uint8_t val, uint8_t count, BB_RECT *pRect)
+                 memcpy(pState->dma_buf, u8Cache, pState->native_width / 4);
+             }
+             bbepWriteRow(pState, pState->dma_buf, pState->native_width / 4, (i!=0));
++            if ((i & 15) == 0) esp_task_wdt_reset(); // TRMNL: feed task WDT during long clears
+         }
+         delayMicroseconds(230);
+     }
+@@ -2326,6 +2328,7 @@ int bbepFullUpdate(FASTEPDSTATE *pState, int iClearMode, bool bKeepOn, BB_RECT *
+             bbepRowControl(pState, ROW_START);
+             iDMAOff = 0;
+             for (i = 0; i < pState->native_height; i++) {
++                if ((i & 15) == 0) esp_task_wdt_reset(); // TRMNL: before heavy 4bpp row work
+                 d = &pState->dma_buf[iDMAOff];
+                 dy = (pState->iFlags & BB_PANEL_FLAG_MIRROR_Y) ? pState->native_height - 1 - i : i;
+                 if (dy >= iStartRow && dy <= iEndRow) { // within the clip rectangle

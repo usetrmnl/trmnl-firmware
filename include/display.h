@@ -192,6 +192,9 @@ void display_set_light_sleep(uint8_t enabled);
  */
 void display_sleep(void);
 
+/** @brief Light sleep the ESP32 for u32Millis while saving power */
+void display_sleep(uint32_t u32Millis);
+
 /**
  * @brief Function to wipe the display
  * @param none

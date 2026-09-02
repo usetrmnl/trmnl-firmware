@@ -2,6 +2,7 @@
 #include <WiFi.h>
 #include <ESPmDNS.h>
 #include <bl.h>
+#include <services/client_draw_session.h>
 #include <wifi_network.h>
 #include <power.h>
 #include <config.h>
@@ -436,7 +437,7 @@ static void update_playlist_order(const char *new_path, const char *prev_path) {
   preferences.putString(PREFERENCES_PLAYLIST_ORDER_KEY, result2);
 }
 
-static void show_cached_image_by_offset(int offset) {
+void show_cached_image_by_offset(int offset, bool sleep_after) {
   String order = preferences.getString(PREFERENCES_PLAYLIST_ORDER_KEY, "");
 
   if (order.isEmpty()) {
@@ -449,7 +450,9 @@ static void show_cached_image_by_offset(int offset) {
     if (buffer && file_size > 0) {
       display_show_image(buffer, file_size, true);
       DisplayedImage::remember(path.c_str());
-      goToSleep();
+      free(buffer);
+      buffer = nullptr;
+      if (sleep_after) goToSleep();
     }
     return;
   }
@@ -494,7 +497,9 @@ static void show_cached_image_by_offset(int offset) {
   preferences.putString(PREFERENCES_BROWSE_PATH_KEY, String(images[new_idx]));
   display_show_image(buffer, file_size, true);
   DisplayedImage::remember(images[new_idx]);
-  goToSleep();
+  free(buffer);
+  buffer = nullptr;
+  if (sleep_after) goToSleep();
 }
 
 void check_channel_states(void)
@@ -1392,6 +1397,8 @@ void bl_init(void)
   default:
     break;
   }
+
+  run_client_draw_clock_session(startup_time);
 
   // display go to sleep
   Log_info("%s [%d]: BL done, going to sleep...", __FILE__, __LINE__);
@@ -2642,6 +2649,7 @@ void goToSleep(void)
   uint32_t time_to_sleep = refreshInterval.seconds();
   iPrevWakeTime = millis() - startup_time; // save for statistics
   Log.info("%s [%d]: total awake time - %d ms\r\n", __FILE__, __LINE__, iPrevWakeTime); 
+  time_to_sleep = end_client_draw_clock_session(time_to_sleep);
   Log.info("%s [%d]: time to sleep - %d\r\n", __FILE__, __LINE__, time_to_sleep);
   preferences.putUInt(PREFERENCES_LAST_SLEEP_TIME, systemClock().getTime());
   preferences.end();

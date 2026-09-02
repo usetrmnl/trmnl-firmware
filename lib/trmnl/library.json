@@ -2,5 +2,12 @@
   "name": "trmnl",
   "build": {
     "flags": ["-Wformat"]
-  }
+  },
+  "dependencies": [
+    {
+      "owner": "bblanchon",
+      "name": "ArduinoJson",
+      "version": "7.4.2"
+    }
+  ]
 }
