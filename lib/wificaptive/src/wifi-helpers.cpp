@@ -19,12 +19,14 @@ const char *wifiStatusStr(wl_status_t wifi_status) {
       {"connect_failed", WL_CONNECT_FAILED},
       {"connection_lost", WL_CONNECTION_LOST},
       {"disconnected", WL_DISCONNECTED},
+      {"stopped", WL_STOPPED},
   };
 
   for (const WifiStatusNode &entry : wifiStatusMap) {
     if (wifi_status == entry.value) return entry.name;
   }
-  return nullptr;
+  // Callers strncpy this into a fixed-size log field, so it must never be null.
+  return "unknown";
 }
 
 void applyWifiHostname(const String &hostname) {
