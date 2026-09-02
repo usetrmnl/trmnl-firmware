@@ -19,6 +19,7 @@ const char *wifiStatusStr(wl_status_t wifi_status) {
       {"connect_failed", WL_CONNECT_FAILED},
       {"connection_lost", WL_CONNECTION_LOST},
       {"disconnected", WL_DISCONNECTED},
+      {"stopped", WL_STOPPED},
   };
 
   for (const WifiStatusNode &entry : wifiStatusMap) {
