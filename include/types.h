@@ -29,4 +29,36 @@ enum https_request_err_e {
   HTTPS_TIMED_OUT
 };
 
+struct https_request_err_name {
+  https_request_err_e code;
+  const char *name;
+};
+
+static const https_request_err_name https_request_err_names[] = {
+    {HTTPS_NO_ERR, "HTTPS_NO_ERR"},
+    {HTTPS_RESET, "HTTPS_RESET"},
+    {HTTPS_NO_REGISTER, "HTTPS_NO_REGISTER"},
+    {HTTPS_SUCCESS, "HTTPS_SUCCESS"},
+    {HTTPS_CLIENT_FAILED, "HTTPS_CLIENT_FAILED"},
+    {HTTPS_REQUEST_FAILED, "HTTPS_REQUEST_FAILED"},
+    {HTTPS_UNABLE_TO_CONNECT, "HTTPS_UNABLE_TO_CONNECT"},
+    {HTTPS_CONNECTION_FAILED, "HTTPS_CONNECTION_FAILED"},
+    {HTTPS_RESPONSE_CODE_INVALID, "HTTPS_RESPONSE_CODE_INVALID"},
+    {HTTPS_JSON_PARSING_ERR, "HTTPS_JSON_PARSING_ERR"},
+    {HTTPS_WRONG_IMAGE_SIZE, "HTTPS_WRONG_IMAGE_SIZE"},
+    {HTTPS_WRONG_IMAGE_FORMAT, "HTTPS_WRONG_IMAGE_FORMAT"},
+    {HTTPS_IMAGE_FILE_TOO_BIG, "HTTPS_IMAGE_FILE_TOO_BIG"},
+    {HTTPS_PLUGIN_NOT_ATTACHED, "HTTPS_PLUGIN_NOT_ATTACHED"},
+    {HTTPS_BAD_CLIENT, "HTTPS_BAD_CLIENT"},
+    {HTTPS_OUT_OF_MEMORY, "HTTPS_OUT_OF_MEMORY"},
+    {HTTPS_TIMED_OUT, "HTTPS_TIMED_OUT"},
+};
+
+inline const char *https_request_err_str(https_request_err_e err) {
+  for (const https_request_err_name &entry : https_request_err_names) {
+    if (entry.code == err) return entry.name;
+  }
+  return "UNKNOWN";
+}
+
 #endif
