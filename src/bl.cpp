@@ -127,6 +127,7 @@ void wait_for_serial() {
 
 // ############################ SLIDER ##################################
 #include "IQS323.h"
+#include "snake.h"
 
 void process_iqs323_data(void);
 
@@ -346,6 +347,18 @@ static void showLastImageAndSleep()
   goToSleep();
 }
 
+// Easter egg: keep holding the middle of the touchbar and Snake launches.
+// One wake handles one touch event, so entry has to resolve within this gesture.
+static bool launch_snake_on_long_middle_hold(uint32_t already_held_ms)
+{
+  if (!snake_entry_hold_confirmed(already_held_ms))
+    return false;
+
+  snake_run();
+  showLastImageAndSleep();
+  return true;
+}
+
 void handle_wifi_reset_confirmation()
 {
   Log_info("Entering WiFi reset confirmation mode");
@@ -525,6 +538,9 @@ void check_channel_states(void)
           break;
         case 1:
           if (hold) {
+            if (launch_snake_on_long_middle_hold(2000)) { // tap_mode_is_hold already spent this
+              return;
+            }
             display_draw_touchbar_indicator(TOUCHBAR_MIDDLE, true);
             Log_info("Middle button hold");
             pending_indicator_side = TOUCHBAR_MIDDLE;
@@ -571,6 +587,9 @@ void check_channel_states(void)
       } else {
         // Slide mode
         if ((slider_event == IQS323_GESTURE_TAP || slider_event == IQS323_GESTURE_HOLD)) {
+          if (i == 1 && slider_event == IQS323_GESTURE_HOLD && launch_snake_on_long_middle_hold(0)) {
+            return;
+          }
           printf("CH: %d: Touch\n", i);
           switch (i) {
           case 0:
@@ -2606,6 +2625,13 @@ void goToSleep(void)
 {
   Log.info("%s [%d]: go to sleep\r\n", __FILE__, __LINE__);
   submitStoredLogs();
+#ifdef BOARD_TRMNL_X
+  // Snake stashes result in NVS (the game runs before WiFi is up)
+  if (WiFi.isConnected()) {
+    snake_submit_pending_score(preferences.getString(PREFERENCES_API_KEY, PREFERENCES_API_KEY_DEFAULT).c_str(),
+                               preferences.getString(PREFERENCES_API_URL, API_BASE_URL).c_str());
+  }
+#endif
 
 // DEBUG - workaround to prevent crash in the WiFi stack of unknown origin
 #ifndef PARALLEL_EPD
