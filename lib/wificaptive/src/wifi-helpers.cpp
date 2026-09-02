@@ -24,8 +24,7 @@ const char *wifiStatusStr(wl_status_t wifi_status) {
   for (const WifiStatusNode &entry : wifiStatusMap) {
     if (wifi_status == entry.value) return entry.name;
   }
-  // Callers pass this straight to strncpy() and %s. Never return NULL.
-  return "unknown";
+  return nullptr;
 }
 
 void applyWifiHostname(const String &hostname) {

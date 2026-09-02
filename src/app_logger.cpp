@@ -50,8 +50,6 @@ void log_impl(LogLevel level, LogMode mode, const char *file, int line, const ch
 // so shortcut it here
   if (mode == LOG_SERIAL_ONLY) {
     Serial.println(serial_buffer);
-    free(serial_buffer);
-    free(user_message);
     return;
   }
 

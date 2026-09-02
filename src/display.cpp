@@ -570,7 +570,7 @@ void display_sleep(uint32_t u32Millis)
             esp_task_wdt_delete(self);
         }
 #endif
-        esp_sleep_enable_timer_wakeup((uint64_t)u32Millis * 1000ULL);
+        esp_sleep_enable_timer_wakeup(u32Millis * 1000L);
         esp_light_sleep_start();
 #ifdef PARALLEL_EPD
         esp_sleep_pd_config(ESP_PD_DOMAIN_CPU, ESP_PD_OPTION_AUTO);
@@ -1383,9 +1383,7 @@ int png_draw(PNGDRAW *pDraw)
     if (pDraw->iPixelType == PNG_PIXEL_INDEXED || pDraw->iBpp > 4) { // need to convert through the palette and/or reduce the bpp
         s = bbep.tempBuffer(); // temp space we can use
         iBpp = (pDraw->iBpp > 4) ? 4 : pDraw->iBpp;
-        if (iBpp == 2 && bbep.getMode() != BB_MODE_2BPP) {
-            iBpp = 4; // expand indexed 2-bit to 4bpp when not in native 2-bpp mode
-        }
+        if (iBpp == 2) iBpp = 4; // 2-bit indexed images -> 4bpp for calibrated gray refresh
         ReduceBpp(iBpp, pDraw->iPixelType, pDraw->pPalette, pDraw->pPixels, s, pDraw->iWidth, pDraw->iBpp);
     } else { // for grayscale images of 1/2/4-bpp we can directly use the pixels as-is
         iBpp = pDraw->iBpp;
@@ -1396,9 +1394,6 @@ int png_draw(PNGDRAW *pDraw)
         switch (iBpp) { // if this matches the new image we can do a non-flickering update
             case 1:
                 bbep.setPreviousMode(BB_MODE_1BPP);
-                break;
-            case 2:
-                bbep.setPreviousMode(BB_MODE_2BPP);
                 break;
             default:
                 bbep.setPreviousMode(BB_MODE_4BPP);
@@ -1424,20 +1419,6 @@ int png_draw(PNGDRAW *pDraw)
                 if (uc & 0x80) ucPixel |= ucMask;
                 d[0] = ucPixel;
                 uc <<= 1;
-                d -= iPitch;
-            }
-        }
-    } else if (iBpp == 2 && bbep.getMode() == BB_MODE_2BPP) {
-        iPitch = (bbep.width() + 3) / 4;
-        if (bbep.width() == pDraw->iWidth) {
-            d += y * iPitch;
-            memcpy(d, s, (pDraw->iWidth + 3) / 4);
-        } else { // rotated — same nibble layout as 4-bpp path
-            d += (bbep.height() - 1) * iPitch;
-            d += (y / 4);
-            for (x=0; x<pDraw->iWidth; x+=4) {
-                uc = *s++;
-                *d = uc;
                 d -= iPitch;
             }
         }
@@ -1767,7 +1748,8 @@ PNG *png = new PNG();
                     bbep.setMode(BB_MODE_1BPP);
                 break;
                 case 2:
-                    bbep.setMode(BB_MODE_2BPP);
+                    // 2-bit PNGs are expanded to 4bpp in png_draw() so refresh uses u8_graytable
+                    bbep.setMode(BB_MODE_4BPP);
                 break;
                 default:
                     bbep.setMode(BB_MODE_4BPP);
@@ -1964,8 +1946,16 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
     int rc = bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
     Log_info("%s [%d]: setCustomMatrix returned %d\r\n", __FILE__, __LINE__, rc);
 
-    int iClearMode = bSkipClear ? CLEAR_NONE
-                               : ((iUpdateCount & 7) == 0 || (iTempProfile > 0)) ? CLEAR_SLOW : CLEAR_FAST;
+ //   if (bbep.getPreviousMode() != BB_MODE_NONE && (bbep.getMode() == BB_MODE_1BPP || bbep.getMode() == BB_MODE_2BPP)) {
+ //       Log_info("%s [%d]: Using partial update since we have a copy of the previous image\n", __FILE__, __LINE__);
+ //       bbep.setPasses(6,6);
+ //       bbep.partialUpdate(false); // we have a previous image to diff against; use a non-flickering update
+ //   } else {
+        // bWait=false means loading screen: skip clearing passes so it appears
+        // faster. Ghosting from the previous image is acceptable since the
+        // real content refresh (bWait=true) immediately follows.
+        int iClearMode = bSkipClear ? CLEAR_NONE
+                                   : ((iUpdateCount & 7) == 0 || (iTempProfile > 0)) ? CLEAR_SLOW : CLEAR_FAST;
 #ifdef BOARD_TRMNL_X
         // Client-draw clock: avoid CLEAR_SLOW (very long) so we reach the loop sooner.
         if (clientDrawClock && iClearMode == CLEAR_SLOW) {
@@ -1973,7 +1963,6 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
         }
 #endif
         Log_info("fullUpdate clear mode = %d\n", iClearMode);
-        // bKeepOn=false: client_draw_clock refresh powers the panel back up.
         bbep.fullUpdate(iClearMode, false);
  //   }
  }
