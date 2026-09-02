@@ -200,6 +200,12 @@ static const void *clock_pick_dseg_font(const ClientDrawClock &spec, const char 
   }
 
   const int last = DSEG_FONT_COUNT - 1;
+  int w = 0;
+  int h = 0;
+  int min_y = 0;
+  clock_measure_custom_font(dseg_fonts[last], text, &w, &h, &min_y);
+  Log_error("client_draw_clock: '%s' does not fit %dx%d; smallest font is %dx%d at %dpt", text, spec.w,
+            spec.h, w, h, dseg_font_pt[last]);
   *font_pt = dseg_font_pt[last];
   return dseg_fonts[last];
 }

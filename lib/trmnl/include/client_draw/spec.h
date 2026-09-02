@@ -15,14 +15,10 @@ typedef struct {
   int32_t tz; // UTC offset seconds (Ruby Time#utc_offset)
 } ClientDrawClock;
 
-/// @brief Report whether a PNG chunk at @p off fits inside a @p size byte buffer.
-/// @param off offset of the chunk header
-/// @param len payload length taken from the chunk header (attacker controlled)
-/// @param size total buffer size
-/// @return true when the 12 bytes of chunk overhead plus @p len bytes fit
-/// Takes uint32_t so the arithmetic is 32-bit on every host. This matches the
-/// device, where "off + 12 + len" wraps on a hostile length and lets an
-/// oversized chunk pass a bounds check written that way.
+/// Report whether a PNG chunk at @p off, plus its 12 bytes of overhead, fits in
+/// @p size. @p len comes from the chunk header, so it is attacker controlled.
+/// The parameters are uint32_t to keep the 32-bit wrap of the device, where
+/// "off + 12 + len" overflows and lets an oversized chunk pass the check.
 bool client_draw_png_chunk_fits(uint32_t off, uint32_t len, uint32_t size);
 
 void client_draw_clock_wall_time(const ClientDrawClock *spec, time_t utc_now, struct tm *out);

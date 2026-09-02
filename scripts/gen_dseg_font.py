@@ -29,7 +29,7 @@ MANIFEST_H = INCLUDE / "dseg_fonts.h"
 FIRST_CHAR = 48  # '0'
 LAST_CHAR = 58   # ':'
 
-DEFAULT_SIZES = "120,140,160,200,240,280,320,380,460,560,680"
+DEFAULT_SIZES = "60,64,69,74,79,84,90,96,103,110,118,126,135,145,155,166,177,190,203,217,232,248,266"
 
 CREDIT = (
     "// Generated from DSEG7 Modern Bold Italic by keshikan (http://www.keshikan.net).\n"
