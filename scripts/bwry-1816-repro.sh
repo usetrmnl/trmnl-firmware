@@ -41,17 +41,32 @@ find_port() {
   die "no serial port found. Plug in USB and press the device button to wake it, or set BWRY_PORT=/dev/..."
 }
 
-esptool_cmd() {
-  if command -v esptool >/dev/null 2>&1; then echo "esptool";
-  elif command -v esptool.py >/dev/null 2>&1; then echo "esptool.py";
-  else die "esptool not found. Install with: pip install esptool"; fi
+# Resolved once at startup into ESPTOOL. Must not be resolved inside a command
+# substitution: die() would then exit only the subshell and we would build a
+# command line starting with "--port".
+ESPTOOL=()
+resolve_esptool() {
+  command -v esptool    >/dev/null 2>&1 && { ESPTOOL=(esptool);    return; }
+  command -v esptool.py >/dev/null 2>&1 && { ESPTOOL=(esptool.py); return; }
+  local py
+  for py in python3 python; do
+    if command -v "$py" >/dev/null 2>&1 && "$py" -c 'import esptool' >/dev/null 2>&1; then
+      ESPTOOL=("$py" -m esptool); return
+    fi
+  done
+  # PlatformIO ships its own copy, which firmware developers will already have.
+  local pio_py pio_et
+  pio_py="$HOME/.platformio/penv/bin/python"
+  pio_et=$(ls -d "$HOME"/.platformio/packages/tool-esptoolpy*/esptool.py 2>/dev/null | head -1)
+  if [ -x "$pio_py" ] && [ -n "$pio_et" ]; then ESPTOOL=("$pio_py" "$pio_et"); return; fi
+  die "esptool not found. Install with: pip install esptool"
 }
 
 # esptool 4.x needs underscore subcommands; 5.x accepts them with a deprecation
 # warning. Underscores therefore work on both.
 et() {
   local port; port=$(find_port)
-  $(esptool_cmd) --port "$port" --chip "$CHIP" --before default_reset --after no_reset "$@"
+  "${ESPTOOL[@]}" --port "$port" --chip "$CHIP" --before default_reset --after no_reset "$@"
 }
 
 sha256_of() {
@@ -124,13 +139,14 @@ flash_image() { # flash_image <spec> <label>
 }
 
 case "${1:-help}" in
-  bad)       flash_image "$IMG_BAD"  "KNOWN-BAD 1.8.16 release" ;;
-  candidate) flash_image "$IMG_CAND" "CANDIDATE 1.8.16 (CI dev build of 22dd41d)" ;;
-  v1815)     flash_image "$IMG_1815" "KNOWN-GOOD 1.8.15 release" ;;
-  wipe)      wipe_nvs; manual_steps ;;
+  bad)       resolve_esptool; flash_image "$IMG_BAD"  "KNOWN-BAD 1.8.16 release" ;;
+  candidate) resolve_esptool; flash_image "$IMG_CAND" "CANDIDATE 1.8.16 (CI dev build of 22dd41d)" ;;
+  v1815)     resolve_esptool; flash_image "$IMG_1815" "KNOWN-GOOD 1.8.15 release" ;;
+  wipe)      resolve_esptool; wipe_nvs; manual_steps ;;
   info)
+    resolve_esptool
     echo "port:    $(find_port)"
-    echo "esptool: $($(esptool_cmd) version 2>/dev/null | head -1)"
+    echo "esptool: $("${ESPTOOL[@]}" version 2>/dev/null | grep -Eo 'v?[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)"
     et flash_id 2>&1 | grep -Ei 'chip is|features|MAC|flash size' || true
     ;;
   help|*)
