@@ -1482,11 +1482,14 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
 void load_prev_image(void)
 {
   uint8_t *buffer;
-  size_t content_size = 0;
-  if (content_size > 0) {
+  int file_size = 0;
+
+  buffer = display_read_file(DisplayedImage::get(), &file_size);
+  if (file_size > 0) {
     // Decode it into the previous buffer
     Log.info("%s [%d]: Decoding previous image (%s) into the EPD 'old' buffer\r\n", __FILE__, __LINE__, DisplayedImage::get());
-    png_to_epd(buffer, content_size, true);
+    png_to_epd(buffer, file_size, true);
+    free(buffer);
   }
 } /* load_prev_image() */
 
@@ -1562,7 +1565,10 @@ static https_request_err_e downloadAndShow()
       char szTemp[36];
 #if PARALLEL_EPD && !defined(BOARD_SEEED_RETERMINAL_E1003)
       if (DisplayedImage::exists()) {
+        Log_info("%s [%d]: Previous image exists; loading it to do a partial update\n", __FILE__, __LINE__);
         load_prev_image(); // decode the older image into the previous buffer of FastEPD
+      } else {
+        Log_info("%s [%d]: Previous image does not exist\n", __FILE__, __LINE__);
       }
 #endif
       filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
