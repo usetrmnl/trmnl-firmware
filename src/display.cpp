@@ -10,6 +10,9 @@
 #include "battery_hollow.h"
 #include "messages.h"
 #include "config.h"
+#ifdef BOARD_TRMNL_X
+#include "accelerometer.h"
+#endif
 #include "battery.h"
 #define MAX_BIT_DEPTH 8
 TRMNL_DEVICE *pDevice = NULL;
@@ -291,6 +294,77 @@ uint8_t tca9535_interrupt_clear()
 {
     return bbep.ioRead(3);
 }
+
+/**
+ * Maps a BMA530-computed device orientation to the bb_ep rotation angle that
+ * keeps drawn content upright, per the TRMNL X mounting confirmed empirically
+ * with display_test_orientation_rotations(): 0=LANDSCAPE_RIGHT,
+ * 90=PORTRAIT_UP_RIGHT, 180=LANDSCAPE_LEFT, 270=PORTRAIT_UP_DOWN.
+ */
+void display_set_orientation(uint8_t orientation)
+{
+    int angle;
+    switch (orientation) {
+        case PORTRAIT_UP_RIGHT: angle = 90;  break;
+        case LANDSCAPE_LEFT:    angle = 180; break;
+        case PORTRAIT_UP_DOWN:  angle = 270; break;
+        case LANDSCAPE_RIGHT:
+        default:                angle = 0;   break;
+    }
+    bbep.setRotation(angle);
+}
+
+/**
+ * Draw one frame of the "Changing device orientation..." confirmation screen.
+ */
+void display_show_orientation_confirm(uint8_t *logo_buffer, int dots_filled)
+{
+    bbep.setMode(BB_MODE_1BPP);
+    bbep.fillScreen(BBEP_WHITE);
+
+    int logo_bottom = bbep.height() / 2 - 40;
+    if (logo_buffer && *(uint16_t *)logo_buffer == BB_BITMAP_MARKER) {
+        BB_BITMAP *pBBB = (BB_BITMAP *)logo_buffer;
+        int x = (bbep.width() - pBBB->width) / 2;
+        int y = (bbep.height() - pBBB->height) / 2 - 40;
+        logo_bottom = y + pBBB->height;
+        bbep.loadG5Image(logo_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
+    }
+
+    const char msg[] = "Changing device orientation...";
+    BB_RECT rect;
+    bbep.setFont(Inter_18);
+    bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
+    bbep.getStringBox(msg, &rect);
+    int text_y = logo_bottom + 40;
+    bbep.setCursor((bbep.width() - rect.w) / 2, text_y);
+    bbep.println(msg);
+
+    if (dots_filled < 0) dots_filled = 0;
+    if (dots_filled > ORIENTATION_CONFIRM_DOT_COUNT) dots_filled = ORIENTATION_CONFIRM_DOT_COUNT;
+
+    const int DOT_RADIUS = 6;
+    const int DOT_SPACING = 24;
+    int dots_y = text_y + rect.h + 30;
+    int dots_total_width = (ORIENTATION_CONFIRM_DOT_COUNT - 1) * DOT_SPACING;
+    int dots_start_x = bbep.width() / 2 - dots_total_width / 2;
+
+    for (int i = 0; i < ORIENTATION_CONFIRM_DOT_COUNT; i++) {
+        int cx = dots_start_x + i * DOT_SPACING;
+        if (i < dots_filled) {
+            bbep.fillCircle(cx, dots_y, DOT_RADIUS, BBEP_BLACK);
+        } else {
+            bbep.drawCircle(cx, dots_y, DOT_RADIUS, BBEP_BLACK);
+        }
+    }
+
+    if (dots_filled == 0) {
+        bbep.fullUpdate();
+    } else {
+        bbep.partialUpdate(false);
+    }
+}
+
 
 void otg_turn_on()
 {

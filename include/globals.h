@@ -47,6 +47,7 @@ extern int iPrevWakeTime;               // RTC: total wake time of the last cycl
 extern bool bUsedCachedImage;           // RTC: last image displayed was read from cache (for statistics collection)
 extern uint8_t need_to_refresh_display; // RTC
 extern bool otg_state;                  // RTC: OTG state across deep sleep
+extern uint8_t device_orientation;      // RTC: last computed BMA530 orientation (PORTRAIT_UP_RIGHT/LANDSCAPE_LEFT/PORTRAIT_UP_DOWN/LANDSCAPE_RIGHT)
 
 // --- UI / input ---
 extern bool touchbar_tap_mode; // false = "slide", true = "tap" (default)

@@ -27,6 +27,7 @@ RTC_DATA_ATTR int iPrevWakeTime = 0;
 RTC_DATA_ATTR bool bUsedCachedImage = false;
 RTC_DATA_ATTR uint8_t need_to_refresh_display = 1;
 RTC_DATA_ATTR bool otg_state = false;
+RTC_DATA_ATTR uint8_t device_orientation = 3; // LANDSCAPE_RIGHT
 
 // --- UI / input ---
 bool touchbar_tap_mode = true; // false = "slide", true = "tap" (default)
