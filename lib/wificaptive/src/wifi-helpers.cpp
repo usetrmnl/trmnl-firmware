@@ -19,7 +19,9 @@ const char *wifiStatusStr(wl_status_t wifi_status) {
       {"connect_failed", WL_CONNECT_FAILED},
       {"connection_lost", WL_CONNECTION_LOST},
       {"disconnected", WL_DISCONNECTED},
+#if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
       {"stopped", WL_STOPPED},
+#endif
   };
 
   for (const WifiStatusNode &entry : wifiStatusMap) {
