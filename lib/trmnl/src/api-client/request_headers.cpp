@@ -24,6 +24,10 @@ HttpHeaderList buildDisplayHeaders(const ApiDisplayInputs &inputs) {
   headers.push_back({"Battery-Temp", String(inputs.batteryTemperature)});
   headers.push_back(
     {"Battery-Capacity", String(inputs.currentBatteryCapacity) + "/" + String(inputs.maxBatteryCapacity)});
+  headers.push_back({"Gauge-SOC", String(inputs.gaugeSoc)});
+  headers.push_back({"Gauge-Health", String(inputs.gaugeHealth)});
+  headers.push_back(
+    {"Gauge-Capacity", String(inputs.gaugeCapacityRemain) + "/" + String(inputs.gaugeCapacityFull)});
 #endif // BOARD_TRMNL_X
   headers.push_back({"FW-Version", inputs.firmwareVersion});
   if (inputs.firmwareCommit.length() > 0) headers.push_back({"FW-Commit", inputs.firmwareCommit});
