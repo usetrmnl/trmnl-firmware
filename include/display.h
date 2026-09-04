@@ -40,6 +40,7 @@ enum MSG {
   FILL_WHITE,
   WIFI_RETRY_LIMIT,
   CAPTIVE_WIFI_TIMEOUT,
+  IMAGE_DOWNLOAD_FAILED
 };
 
 typedef struct dp_tag {
