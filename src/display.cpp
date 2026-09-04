@@ -92,6 +92,9 @@ uint8_t u8SpectraPal[512]; // RGB333 mapped to closest Spectra6 color
 
 #ifdef PARALLEL_EPD
 #include "esp_sleep.h"
+#ifndef DO_NOT_LIGHT_SLEEP
+#include "esp_task_wdt.h"
+#endif
 #include "driver/gpio.h"
 #include "driver/rtc_io.h"
 #include "LittleFS.h"
@@ -132,6 +135,7 @@ extern BQ27427 lipo; // Use lipo.[] to interact with the library in an Arduino
 #include "fonts/Inter_18.h"
 #include "fonts/Roboto_Black_24.h"
 #include <globals.h>
+#include <client_draw/clock.h>
 static uint8_t *pDither;
 
 #ifdef BB_EPAPER
@@ -556,8 +560,25 @@ void display_sleep(uint32_t u32Millis)
     if (!light_sleep_enabled) {
         delay(u32Millis);
     } else {
+#ifdef PARALLEL_EPD
+        // CPU must stay on: PSRAM/FastEPD state survives the nap. Unsubscribe TWDT — idle
+        // task is frozen during multi-second light sleep and would trip the 5 s watchdog.
+        esp_sleep_pd_config(ESP_PD_DOMAIN_CPU, ESP_PD_OPTION_ON);
+        TaskHandle_t self = xTaskGetCurrentTaskHandle();
+        const bool wdt_subscribed = (esp_task_wdt_status(self) == ESP_OK);
+        if (wdt_subscribed) {
+            esp_task_wdt_delete(self);
+        }
+#endif
         esp_sleep_enable_timer_wakeup(u32Millis * 1000L);
         esp_light_sleep_start();
+#ifdef PARALLEL_EPD
+        esp_sleep_pd_config(ESP_PD_DOMAIN_CPU, ESP_PD_OPTION_AUTO);
+        if (wdt_subscribed) {
+            esp_task_wdt_add(self);
+        }
+        esp_task_wdt_reset();
+#endif
     }
 #endif
 }
@@ -643,7 +664,10 @@ void display_draw_touchbar_indicator(touchbar_side_t side, bool filled)
         bbep.drawRect(rx - border - 1, ry - border - 1, rect_w + 2 + (2*border), rect_h + 2 + (2*border), fill_color);
         bbep.fillRect(rx - border, ry - border, rect_w + (2*border), rect_h + (2*border), border_color);
         bbep.fillRect(rx, ry, rect_w, rect_h, fill_color);
-        bbep.partialUpdate(false);
+        int rc = bbep.partialUpdate(false);
+        if (rc != BBEP_SUCCESS) {
+            Log_error_serial("Touchbar indicator update failed rc=%d mode=%d prev=%d", rc, bbep.getMode(), bbep.getPreviousMode());
+        }
 } /* display_draw_touchbar_indicator() */
 #endif
 
@@ -1757,6 +1781,9 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
 //    uint32_t *d32;
     bool bAlloc = false;
     static int i426Workaround = 0;
+#ifdef BOARD_TRMNL_X
+    bool clientDrawClock = false;
+#endif
 #ifdef BB_EPAPER
     int iRefreshMode = REFRESH_FULL; // assume full (slow) refresh
 #else
@@ -1910,6 +1937,12 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
     }
 #else
  {
+#ifdef BOARD_TRMNL_X
+    if (bWait && isPNG) {
+        clientDrawClock = client_draw_clock_prepare(image_buffer, data_size);
+    }
+#endif
+
     int rc = bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
     Log_info("%s [%d]: setCustomMatrix returned %d\r\n", __FILE__, __LINE__, rc);
 
@@ -1923,6 +1956,12 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
         // real content refresh (bWait=true) immediately follows.
         int iClearMode = bSkipClear ? CLEAR_NONE
                                    : ((iUpdateCount & 7) == 0 || (iTempProfile > 0)) ? CLEAR_SLOW : CLEAR_FAST;
+#ifdef BOARD_TRMNL_X
+        // Client-draw clock: avoid CLEAR_SLOW (very long) so we reach the loop sooner.
+        if (clientDrawClock && iClearMode == CLEAR_SLOW) {
+            iClearMode = CLEAR_FAST;
+        }
+#endif
         Log_info("fullUpdate clear mode = %d\n", iClearMode);
         bbep.fullUpdate(iClearMode, false);
  //   }
@@ -1930,6 +1969,11 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
 #endif
     iUpdateCount++;
     Log_info("display_show_image end");
+#ifdef BOARD_TRMNL_X
+    if (clientDrawClock) {
+        client_draw_clock_show();
+    }
+#endif
 }
 /**
  * @brief Function to read an image from the file system
