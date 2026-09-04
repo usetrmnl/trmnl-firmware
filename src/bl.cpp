@@ -1608,6 +1608,7 @@ static https_request_err_e downloadAndShow()
     filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
     Log_info("Modem: saving to %s", szTemp);
     filesystem_purge_old_file(szTemp);
+    filesystem_purge_if_full();
 
     String _prevPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
     String _prevLastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
