@@ -644,6 +644,7 @@ void display_draw_touchbar_indicator(touchbar_side_t side, bool filled)
         bbep.fillRect(rx - border, ry - border, rect_w + (2*border), rect_h + (2*border), border_color);
         bbep.fillRect(rx, ry, rect_w, rect_h, fill_color);
         bbep.partialUpdate(false);
+        bbep.setPreviousMode(BB_MODE_NONE); // we can't do partial updates since we don't have the contents
 } /* display_draw_touchbar_indicator() */
 #endif
 
