@@ -176,6 +176,7 @@ enum {
   EPD_75 = 0,
   EPD_426,
   EPD_397,
+  EPD_368,
   EPD_75_3CLR,
   EPD_75_4CLR,
   EPD_75_6CLR,
