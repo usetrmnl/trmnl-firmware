@@ -28,10 +28,6 @@ RTC_DATA_ATTR bool bUsedCachedImage = false;
 RTC_DATA_ATTR uint8_t need_to_refresh_display = 1;
 RTC_DATA_ATTR bool otg_state = false;
 
-// --- UI / input ---
-bool touchbar_tap_mode = true; // false = "slide", true = "tap" (default)
-bool otg_message = false;
-
 // --- Display refresh bookkeeping ---
 // Counts the number of partial updates to know when to do a full update
 RTC_DATA_ATTR int iUpdateCount = 0;
@@ -44,7 +40,4 @@ uint32_t iTempProfile;
 Modem *g_modem = nullptr;
 battery_count_t battery_count = BATTERY_NONE;
 bool battery_charging = false;
-IQS323 iqs323;
-uint16_t slider_position = 65535;
-iqs323_gesture_events slider_event = IQS323_GESTURE_NONE;
 #endif // BOARD_TRMNL_X
