@@ -176,7 +176,6 @@ enum {
   EPD_75 = 0,
   EPD_426,
   EPD_397,
-  EPD_368,
   EPD_75_3CLR,
   EPD_75_4CLR,
   EPD_75_6CLR,
@@ -185,6 +184,7 @@ enum {
   EPD_PAPER_MONO,
   EPD_PAPER_COLOR,
   EPD_133_COLOR,
+  EPD_368,
 };
 
 /**
