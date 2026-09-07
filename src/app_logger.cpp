@@ -68,6 +68,8 @@ void log_impl(LogLevel level, LogMode mode, const char *file, int line, const ch
     if (serial_logging_enabled) {
       Serial.println(serial_buffer);
     }
+    free(serial_buffer);
+    free(user_message);
     return;
   }
 

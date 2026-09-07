@@ -67,7 +67,7 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
     request->send(response);
   });
   server.on("/run-test", HTTP_GET, [](AsyncWebServerRequest *request) {
-    Serial.println("Running sensor test from web...");
+    Log_info_serial("Running sensor test from web...");
     String json = testTemperature();
     request->send(200, "application/json", json);
   });
@@ -146,7 +146,7 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
     }
 
     WiFi.scanDelete();
-    Serial.println(json);
+    Log_info_serial("%s", json.c_str());
 
     if (WiFi.scanComplete() == -2) {
 #ifdef CONFIG_IDF_TARGET_ESP32C5

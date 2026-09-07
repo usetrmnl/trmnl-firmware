@@ -22,4 +22,9 @@ void log_impl(LogLevel level, LogMode mode, const char *file, int line, const ch
   va_end(args);
 }
 
+// Stubs so lib/trmnl code that queries the verbose-logging flag (e.g. the
+// Log-Level request header in request_headers.cpp) links in the native test build.
+void set_verbose_logging(bool) {}
+bool get_verbose_logging() { return false; }
+
 #endif

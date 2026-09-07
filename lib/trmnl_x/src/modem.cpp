@@ -11,6 +11,7 @@
 #include "esp32_port.h"
 #include "modem.h"
 #include <string_utils.h>
+#include <trmnl_log.h>
 
 #if defined (BOARD_TRMNL_X) || defined (BOARD_TRLML_X_EPDIY)
 #include <LittleFS.h>
@@ -24,37 +25,37 @@ Modem::Modem(uint32_t baudRate) : ModemSerial(0) {
   ModemSerial.begin(baudRate, SERIAL_8N1, AT_UART_RX, AT_UART_TX);
   ModemSerial.setPins(AT_UART_RX, AT_UART_TX, AT_UART_RTS, AT_UART_CTS);
   this->baudRate = baudRate;
-  Serial.printf("[MODEM] Modem initialization...\n", baudRate);
+  Log_info_serial("[MODEM] Modem initialization...", baudRate);
   delay(100);
 
   // Verify modem is alive at the initial baud rate
   while (ModemSerial.available()) ModemSerial.read();
   sendCommand("AT");
   if (waitForResponse("OK", 5000).isEmpty()) {
-    Serial.println("[MODEM] no response to AT — skipping baud upgrade");
+    Log_info_serial("[MODEM] no response to AT — skipping baud upgrade");
     return;
   }
 
   sendCommand("AT+CWMODE=1");
   if (waitForResponse("OK", 5000).isEmpty()) {
-    Serial.println("[MODEM] AT+CWMODE failed.");
+    Log_info_serial("[MODEM] AT+CWMODE failed.");
     return;
   } else {
-    Serial.println("[MODEM] set to station mode");
+    Log_info_serial("[MODEM] set to station mode");
   }
 
   sendCommand("AT+CWAUTOCONN=0");
   if (waitForResponse("OK", 5000).isEmpty()) {
-    Serial.println("[MODEM] AT+CWAUTOCONN failed.");
+    Log_info_serial("[MODEM] AT+CWAUTOCONN failed.");
     return;
   } else {
-    Serial.println("[MODEM] Auto-connect disabled");
+    Log_info_serial("[MODEM] Auto-connect disabled");
   }
 
   // Switch modem to 5 Mbps with RTS/CTS (volatile; reverts on power cycle)
   sendCommand("AT+UART_CUR=5000000,8,1,0,3");
   if (waitForResponse("OK", 5000).isEmpty()) {
-    Serial.println("[MODEM] AT+UART_CUR failed — keeping initial baud rate");
+    Log_info_serial("[MODEM] AT+UART_CUR failed — keeping initial baud rate");
     return;
   }
 
@@ -71,9 +72,9 @@ Modem::Modem(uint32_t baudRate) : ModemSerial(0) {
   // Confirm communication at new baud rate
   sendCommand("AT");
   if (waitForResponse("OK", 5000).isEmpty()) {
-    Serial.println("[MODEM] no response at 5 Mbps — falling back to 2.4 GHz mode");
+    Log_info_serial("[MODEM] no response at 5 Mbps — falling back to 2.4 GHz mode");
   } else {
-    Serial.println("[MODEM] running at 5 Mbps with RTS/CTS");
+    Log_info_serial("[MODEM] running at 5 Mbps with RTS/CTS");
     _initialized = true;
   }
 }
@@ -81,7 +82,7 @@ Modem::Modem(uint32_t baudRate) : ModemSerial(0) {
 
 Modem::~Modem() {
   ModemSerial.end();
-  Serial.println("[MODEM] ModemSerial ended");
+  Log_info_serial("[MODEM] ModemSerial ended");
 }
 
 bool Modem::sendCommand(const char* command) {
@@ -354,7 +355,7 @@ void Modem::setSerialBaud(uint32_t baud) {
   delay(50);
   ModemSerial.begin(baud, SERIAL_8N1, AT_UART_RX, AT_UART_TX);
   baudRate = baud;
-  Serial.printf("[MODEM] Serial baud set to %u\n", baud);
+  Log_info_serial("[MODEM] Serial baud set to %u", baud);
 }
 
 // ---------------------------------------------------------------------------
@@ -455,7 +456,7 @@ bool Modem::connectToNetwork(const String& ssid, const String& password, const S
 
   sendCommand("AT+CWMODE=1");
   if (waitForResponse("OK", 3000).isEmpty()) {
-    Serial.println("[MODEM] connectToNetwork: AT+CWMODE=1 failed");
+    Log_info_serial("[MODEM] connectToNetwork: AT+CWMODE=1 failed");
     return false;
   }
 
@@ -470,10 +471,10 @@ bool Modem::connectToNetwork(const String& ssid, const String& password, const S
   // Success contains "WIFI GOT IP"; failure contains "FAIL" or "ERROR"
   String resp = waitForResponse("WIFI GOT IP", 20000);
   if (resp.isEmpty()) {
-    Serial.println("[MODEM] connectToNetwork: failed to obtain IP");
+    Log_info_serial("[MODEM] connectToNetwork: failed to obtain IP");
     return false;
   }
-  Serial.println("[MODEM] connectToNetwork: WIFI GOT IP");
+  Log_info_serial("[MODEM] connectToNetwork: WIFI GOT IP");
   return true;
 }
 
@@ -494,7 +495,7 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, const String& saveToFil
     // Clear any previously set headers
     sendCommand("AT+HTTPCHEAD=0");
     if (waitForResponse("OK", 3000).isEmpty()) {
-      Serial.println("[HTTP] HTTPCHEAD=0 failed");
+      Log_info_serial("[HTTP] HTTPCHEAD=0 failed");
       return {false, 0, "", 0};
     }
 
@@ -505,16 +506,16 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, const String& saveToFil
       String hdr = (nl < 0) ? reqHeaders.substring(pos) : reqHeaders.substring(pos, nl);
       hdr.trim();
       if (!hdr.isEmpty()) {
-        Serial.printf("[HTTP] HTTPCHEAD(%u): %s\n", hdr.length(), hdr.c_str());
+        Log_info_serial("[HTTP] HTTPCHEAD(%u): %s", hdr.length(), hdr.c_str());
         sendCommand(("AT+HTTPCHEAD=" + String(hdr.length())).c_str());
         if (waitForResponse(">", 3000).isEmpty()) {
-          Serial.println("[HTTP] HTTPCHEAD: no '>' prompt");
+          Log_info_serial("[HTTP] HTTPCHEAD: no '>' prompt");
           return {false, 0, "", 0};
         }
         ModemSerial.write((const uint8_t*)hdr.c_str(), hdr.length());
         ModemSerial.flush();
         if (waitForResponse("OK", 3000).isEmpty()) {
-          Serial.printf("[HTTP] HTTPCHEAD: no 'OK' for: %s\n", hdr.c_str());
+          Log_info_serial("[HTTP] HTTPCHEAD: no 'OK' for: %s", hdr.c_str());
           return {false, 0, "", 0};
         }
       }
@@ -529,16 +530,16 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, const String& saveToFil
   bool useUrlCfg = (urlParam.length() + 24 > 256);
 
   if (useUrlCfg) {
-    Serial.printf("[HTTP] URL %u bytes — using AT+HTTPURLCFG\n", url.length());
+    Log_info_serial("[HTTP] URL %u bytes — using AT+HTTPURLCFG", url.length());
     Serial.flush();
 
     sendCommand(("AT+HTTPURLCFG=" + String(url.length())).c_str());
     String promptResp = waitForResponse(">", 5000);
     if (promptResp.isEmpty()) {
-      Serial.println("[HTTP] URLCFG: no '>' prompt (timeout)");
+      Log_info_serial("[HTTP] URLCFG: no '>' prompt (timeout)");
       return {false, 0, "", 0};
     }
-    Serial.printf("[HTTP] URLCFG prompt OK (%u bytes from modem)\n", promptResp.length());
+    Log_info_serial("[HTTP] URLCFG prompt OK (%u bytes from modem)", promptResp.length());
     Serial.flush();
 
     ModemSerial.write((const uint8_t*)url.c_str(), url.length());
@@ -546,19 +547,19 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, const String& saveToFil
 
     String setOkResp = waitForResponse("SET OK", 5000);
     if (setOkResp.isEmpty()) {
-      Serial.println("[HTTP] URLCFG: no 'SET OK' (timeout)");
+      Log_info_serial("[HTTP] URLCFG: no 'SET OK' (timeout)");
       return {false, 0, "", 0};
     }
-    Serial.printf("[HTTP] URLCFG SET OK (%u bytes from modem)\n", setOkResp.length());
+    Log_info_serial("[HTTP] URLCFG SET OK (%u bytes from modem)", setOkResp.length());
     Serial.flush();
 
     while (ModemSerial.available()) ModemSerial.read();
-    Serial.println("[HTTP] cmd: AT+HTTPCLIENT=2,1,\"\",,,2");
+    Log_info_serial("[HTTP] cmd: AT+HTTPCLIENT=2,1,\"\",,,2");
     Serial.flush();
     sendCommand("AT+HTTPCLIENT=2,1,\"\",,,2");
   } else {
     String httpCmd = "AT+HTTPCLIENT=2,1,\"" + urlParam + "\",,,2";
-    Serial.printf("[HTTP] cmd(%u): %s\n", httpCmd.length(), httpCmd.substring(0, 180).c_str());
+    Log_info_serial("[HTTP] cmd(%u): %s", httpCmd.length(), httpCmd.substring(0, 180).c_str());
     Serial.flush();
     sendCommand(httpCmd.c_str());
   }
@@ -618,10 +619,10 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, const String& saveToFil
         float kbps    = elapsed > 0.0f ? (totalBytes / 1024.0f) / elapsed : 0.0f;
         if (contentLength > 0) {
           int pct = (int)(totalBytes * 100 / contentLength);
-          Serial.printf("[HTTP] %u/%u bytes (%d%%) @ %.1f KB/s\n",
-                        totalBytes, contentLength, pct, kbps);
+          Log_info_serial("[HTTP] %u/%u bytes (%d%%) @ %.1f KB/s",
+                          totalBytes, contentLength, pct, kbps);
         } else {
-          Serial.printf("[HTTP] %u bytes @ %.1f KB/s\n", totalBytes, kbps);
+          Log_info_serial("[HTTP] %u bytes @ %.1f KB/s", totalBytes, kbps);
         }
         lastProgressMs = now;
       }
@@ -720,20 +721,22 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, const String& saveToFil
   }
 
   // Debug: print raw modem response and exit reason
-  Serial.printf("[HTTP] raw(%u, %s): ", rawDbgLen,
-    done ? "DONE" : (error ? "ERR" : "TOUT"));
-  for (int _i = 0; _i < rawDbgLen; _i++) {
-    char _c = rawDbg[_i];
-    if (_c >= 32 && _c < 127) Serial.print(_c);
-    else Serial.printf("<%02X>", (uint8_t)_c);
+  {
+    String _raw;
+    for (int _i = 0; _i < rawDbgLen; _i++) {
+      char _c = rawDbg[_i];
+      if (_c >= 32 && _c < 127) { _raw += _c; }
+      else { char _h[6]; snprintf(_h, sizeof(_h), "<%02X>", (uint8_t)_c); _raw += _h; }
+    }
+    Log_info_serial("[HTTP] raw(%d, %s): %s", rawDbgLen,
+                    done ? "DONE" : (error ? "ERR" : "TOUT"), _raw.c_str());
   }
-  Serial.println();
   Serial.flush();
 
   if (downloadStart > 0) {
     float elapsed = (millis() - downloadStart) / 1000.0f;
     float kbps    = elapsed > 0.0f ? (totalBytes / 1024.0f) / elapsed : 0.0f;
-    Serial.printf("[HTTP] Done: %u bytes in %.1f s (%.1f KB/s)\n", totalBytes, elapsed, kbps);
+    Log_info_serial("[HTTP] Done: %u bytes in %.1f s (%.1f KB/s)", totalBytes, elapsed, kbps);
   }
 
   // Clear request headers (global on modem) so they don't bleed into later requests
@@ -756,7 +759,7 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, std::function<bool(cons
   if (!reqHeaders.isEmpty()) {
     sendCommand("AT+HTTPCHEAD=0");
     if (waitForResponse("OK", 3000).isEmpty()) {
-      Serial.println("[HTTP] HTTPCHEAD=0 failed");
+      Log_info_serial("[HTTP] HTTPCHEAD=0 failed");
       return {false, 0, "", 0};
     }
     int pos = 0;
@@ -827,9 +830,9 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, std::function<bool(cons
         float kbps    = elapsed > 0.0f ? (totalBytes / 1024.0f) / elapsed : 0.0f;
         if (contentLength > 0) {
           int pct = (int)(totalBytes * 100 / contentLength);
-          Serial.printf("[HTTP] %u/%u bytes (%d%%) @ %.1f KB/s\n", totalBytes, contentLength, pct, kbps);
+          Log_info_serial("[HTTP] %u/%u bytes (%d%%) @ %.1f KB/s", totalBytes, contentLength, pct, kbps);
         } else {
-          Serial.printf("[HTTP] %u bytes @ %.1f KB/s\n", totalBytes, kbps);
+          Log_info_serial("[HTTP] %u bytes @ %.1f KB/s", totalBytes, kbps);
         }
         lastProgressMs = now;
       }
@@ -915,7 +918,7 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, std::function<bool(cons
   if (downloadStart > 0) {
     float elapsed = (millis() - downloadStart) / 1000.0f;
     float kbps    = elapsed > 0.0f ? (totalBytes / 1024.0f) / elapsed : 0.0f;
-    Serial.printf("[HTTP] Done: %u bytes in %.1f s (%.1f KB/s)\n", totalBytes, elapsed, kbps);
+    Log_info_serial("[HTTP] Done: %u bytes in %.1f s (%.1f KB/s)", totalBytes, elapsed, kbps);
   }
 
   if (!reqHeaders.isEmpty()) {
@@ -937,14 +940,14 @@ time_t Modem::getSntpTime() {
   // Enable SNTP with UTC timezone and two well-known servers
   sendCommand("AT+CIPSNTPCFG=1,0,\"time.google.com\",\"time.cloudflare.com\"");
   if (waitForResponse("OK", 3000).isEmpty()) {
-    Serial.println("[MODEM] CIPSNTPCFG failed");
+    Log_info_serial("[MODEM] CIPSNTPCFG failed");
     return 0;
   }
 
   // Wait for modem to confirm NTP sync via +TIME_UPDATED URC (up to 30 s)
   String upd = waitForResponse("+TIME_UPDATED", 30000);
   if (upd.isEmpty()) {
-    Serial.println("[MODEM] SNTP +TIME_UPDATED timeout");
+    Log_info_serial("[MODEM] SNTP +TIME_UPDATED timeout");
     return 0;
   }
 
@@ -955,7 +958,7 @@ time_t Modem::getSntpTime() {
 
   // Response: +CIPSNTPTIME:Tue Oct 19 17:47:56 2021\r\nOK
   int idx = resp.indexOf("+CIPSNTPTIME:");
-  if (idx < 0) { Serial.println("[MODEM] CIPSNTPTIME parse fail"); return 0; }
+  if (idx < 0) { Log_info_serial("[MODEM] CIPSNTPTIME parse fail"); return 0; }
 
   String ascStr = resp.substring(idx + 13);
   ascStr.trim();
@@ -966,12 +969,12 @@ time_t Modem::getSntpTime() {
 
   struct tm t = {};
   if (!strptime(ascStr.c_str(), "%a %b %d %H:%M:%S %Y", &t)) {
-    Serial.println("[MODEM] strptime failed");
+    Log_info_serial("[MODEM] strptime failed");
     return 0;
   }
   t.tm_isdst = -1;
   time_t ts = mktime(&t);
-  Serial.printf("[MODEM] SNTP UTC time: %lu\n", (unsigned long)ts);
+  Log_info_serial("[MODEM] SNTP UTC time: %lu", (unsigned long)ts);
   return ts;
 }
 // ---------------------------------------------------------------------------
@@ -986,17 +989,17 @@ String Modem::getMacAddress() {
   // Response: +CIPSTAMAC:"xx:xx:xx:xx:xx:xx"\r\nOK
   int idx = resp.indexOf("+CIPSTAMAC:\"");
   if (idx < 0) {
-    Serial.println("[MODEM] getMacAddress: parse failed");
+    Log_info_serial("[MODEM] getMacAddress: parse failed");
     return "";
   }
   int start = idx + 12;
   int end   = resp.indexOf('"', start);
   if (end < 0) {
-    Serial.println("[MODEM] getMacAddress: closing quote not found");
+    Log_info_serial("[MODEM] getMacAddress: closing quote not found");
     return "";
   }
   String mac = resp.substring(start, end);
-  Serial.printf("[MODEM] MAC: %s\n", mac.c_str());
+  Log_info_serial("[MODEM] MAC: %s", mac.c_str());
   return mac;
 }
 // ---------------------------------------------------------------------------
@@ -1013,7 +1016,7 @@ int32_t Modem::getSignalRssi() {
   // When not connected: "No AP\r\nOK" (no +CWJAP: line).
   int idx = resp.indexOf("+CWJAP:");
   if (idx < 0) {
-    Serial.println("[MODEM] getSignalRssi: not connected / parse failed");
+    Log_info_serial("[MODEM] getSignalRssi: not connected / parse failed");
     return 0;
   }
 
@@ -1024,12 +1027,12 @@ int32_t Modem::getSignalRssi() {
   int cRssi    = resp.indexOf(',', cChannel + 1); // comma before rssi
   int cEnd     = resp.indexOf(',', cRssi + 1);    // comma after rssi (or -1)
   if (q2 < 0 || q4 < 0 || cChannel < 0 || cRssi < 0) {
-    Serial.println("[MODEM] getSignalRssi: field parse failed");
+    Log_info_serial("[MODEM] getSignalRssi: field parse failed");
     return 0;
   }
 
   int32_t rssi = resp.substring(cRssi + 1, cEnd >= 0 ? cEnd : resp.length()).toInt();
-  Serial.printf("[MODEM] RSSI: %d dBm\n", rssi);
+  Log_info_serial("[MODEM] RSSI: %d dBm", rssi);
   return rssi;
 }
 #endif // BOARD_TRMNL_X
