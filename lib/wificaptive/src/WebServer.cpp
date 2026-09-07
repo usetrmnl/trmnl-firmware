@@ -76,11 +76,31 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
     Preferences prefs;
     prefs.begin("data", true);
     String apiUrl = prefs.getString("api_url", "");
+    bool verboseLogging = prefs.getBool("verbose_log", get_verbose_logging());
     prefs.end();
     apiUrl.replace("\\", "\\\\");
     apiUrl.replace("\"", "\\\"");
-    request->send(200, "application/json", "{\"api_url\":\"" + apiUrl + "\"}");
+    request->send(200, "application/json",
+                  "{\"api_url\":\"" + apiUrl + "\",\"verbose_logging\":" +
+                    (verboseLogging ? "true" : "false") + "}");
   });
+
+  AsyncCallbackJsonWebHandler *verboseLoggingHandler = new AsyncCallbackJsonWebHandler(
+    "/verbose-logging", [](AsyncWebServerRequest *request, JsonVariant &json) {
+      JsonObject data = json.as<JsonObject>();
+      bool enabled = data["enabled"].is<bool>() && data["enabled"].as<bool>();
+
+      Preferences prefs;
+      prefs.begin("data", false);
+      prefs.putBool("verbose_log", enabled);
+      prefs.end();
+      set_verbose_logging(enabled); // takes effect immediately
+
+      Log_info("WebServer: Verbose logging set to %s", enabled ? "enabled" : "disabled");
+      request->send(200, "application/json",
+                    String("{\"verbose_logging\":") + (enabled ? "true" : "false") + "}");
+    });
+  server.addHandler(verboseLoggingHandler);
 
   auto scanGET = server.on("/scan", HTTP_GET, [callbacks, modemMac](AsyncWebServerRequest *request) {
     String json = "{\"networks\":[";

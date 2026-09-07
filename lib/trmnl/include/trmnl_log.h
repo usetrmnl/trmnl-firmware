@@ -9,6 +9,10 @@ enum LogMode { LOG_SERIAL_ONLY, LOG_STORE_ONLY, LOG_SUBMIT_OR_STORE };
 
 void log_impl(LogLevel level, LogMode mode, const char *file, int line, const char *format, ...) PRINTF_LIKE(5, 6);
 
+/// Enables/disables live serial output of logs at runtime
+void set_verbose_logging(bool enabled);
+bool get_verbose_logging();
+
 #define _LOG_IMPL(level, mode, format, ...) log_impl(level, mode, __FILE__, __LINE__, format, ##__VA_ARGS__)
 
 /**

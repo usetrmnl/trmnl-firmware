@@ -46,6 +46,7 @@ struct ApiDisplayResponse {
   SPECIAL_FUNCTION special_function;
   String action;
   String touchbar_mode;
+  String verbose_logging;
 };
 
 struct ApiDisplayInputs {
