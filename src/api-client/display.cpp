@@ -64,8 +64,9 @@ ApiDisplayResult fetchApiDisplay(ApiDisplayInputs &apiDisplayInputs) {
 
       delay(5);
 
-      Log_info("Start location: %s", https->getLocation().c_str());
+      Log_info("Start location: %s", (apiDisplayInputs.baseUrl + "/api/display").c_str());
       int httpCode = https->GET();
+      Log_info("GET... code: %d", httpCode);
       if (httpCode == HTTP_CODE_PERMANENT_REDIRECT || httpCode == HTTP_CODE_TEMPORARY_REDIRECT) {
         String location = https->getLocation();
         https->end();
@@ -90,9 +91,6 @@ ApiDisplayResult fetchApiDisplay(ApiDisplayInputs &apiDisplayInputs) {
             .error_detail =
               "HTTP Client failed with error: " + https->errorToString(httpCode) + "(" + String(httpCode) + ")"};
       }
-
-        // HTTP header has been send and Server response header has been handled
-      Log_info("GET... code: %d", httpCode);
 
       String payload = https->getString();
       size_t size = https->getSize();
