@@ -483,11 +483,69 @@
         .then(response => response.json())
         .then(response => {
           displayWifiInfo(response);
-          hideLoader();
+          pollConnectionStatus(isEnterprise);
         })
         .catch(_ => {
           hideLoader();
+          resetConnectButton();
+          displayAlert('Unable to submit Wi-Fi credentials. Please try again.', 'warning');
         });
+    }
+
+    function pollConnectionStatus(isEnterprise) {
+      fetch('/connection-status')
+        .then(response => response.json())
+        .then(response => {
+          if (response.status === 'connecting' || response.status === 'idle') {
+            setTimeout(() => pollConnectionStatus(isEnterprise), 500);
+            return;
+          }
+
+          displayConnectionResult(response.status, isEnterprise);
+        })
+        .catch(_ => {
+          setTimeout(() => pollConnectionStatus(isEnterprise), 500);
+        });
+    }
+
+    function displayConnectionResult(status, isEnterprise) {
+      hideLoader();
+
+      if (status === 'connected') {
+        displayAlert('Wi-Fi connected.', 'primary');
+        return;
+      }
+
+      resetConnectButton();
+      if (status === 'authentication_failed') {
+        var message = isEnterprise
+          ? 'Wi-Fi authentication failed. Check your credentials and try again.'
+          : 'Incorrect Wi-Fi password. Please try again.';
+        displayAlert(message, 'warning');
+        document.getElementById('password').focus();
+      } else if (status === 'network_not_found') {
+        displayAlert('Wi-Fi network not found. Check the network name and try again.', 'warning');
+      } else {
+        displayAlert('Unable to connect to Wi-Fi. Please try again.', 'warning');
+      }
+    }
+
+    function restoreConnectionStatus() {
+      fetch('/connection-status')
+        .then(response => response.json())
+        .then(response => {
+          if (response.status !== 'idle' && response.status !== 'connecting') {
+            var isEnterprise = document.getElementById('isEnterpriseHidden').value === 'true';
+            displayConnectionResult(response.status, isEnterprise);
+          }
+        })
+        .catch(_ => {});
+    }
+
+    function resetConnectButton() {
+      var btn = document.getElementById('btnConnect');
+      btn.disabled = false;
+      btn.textContent = 'Connect';
     }
 
     function confirmSoftReset() {
@@ -635,7 +693,7 @@
       var macInfo = response.mac_5ghz ? `2.4GHz MAC: ${mac}\n5GHz MAC: ${response.mac_5ghz.toUpperCase()}` : `MAC: ${mac}`;
 
       if (response.ssid.length > 0) {
-        displayAlert(`Connecting to: ${response.ssid}`, "alert-warning");
+        displayAlert(`Connecting to: ${response.ssid}`, "warning");
       }
       displayInfo(macInfo);
     }
@@ -699,6 +757,7 @@
 
     setTimeout(getInfo, 500);
     setTimeout(loadServerFromDevice, 100);
+    setTimeout(restoreConnectionStatus, 100);
   </script>
 </head>
 

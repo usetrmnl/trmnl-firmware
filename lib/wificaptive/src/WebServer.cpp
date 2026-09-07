@@ -7,6 +7,26 @@
 
 #include "WifiCaptive.h"
 
+namespace {
+  const char *connectionStateName(WifiConnectionState state) {
+    switch (state) {
+    case WifiConnectionState::Idle:
+      return "idle";
+    case WifiConnectionState::Connecting:
+      return "connecting";
+    case WifiConnectionState::Connected:
+      return "connected";
+    case WifiConnectionState::AuthenticationFailed:
+      return "authentication_failed";
+    case WifiConnectionState::NetworkNotFound:
+      return "network_not_found";
+    case WifiConnectionState::Failed:
+      return "failed";
+    }
+    return "failed";
+  }
+} // namespace
+
 void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperationCallbacks callbacks,
                     const String &modemMac) {
     //======================== Webserver ========================
@@ -80,6 +100,13 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
     apiUrl.replace("\\", "\\\\");
     apiUrl.replace("\"", "\\\"");
     request->send(200, "application/json", "{\"api_url\":\"" + apiUrl + "\"}");
+  });
+
+  server.on("/connection-status", HTTP_GET, [callbacks](AsyncWebServerRequest *request) {
+    String response = "{\"status\":\"";
+    response += connectionStateName(callbacks.getConnectionState());
+    response += "\"}";
+    request->send(200, "application/json", response);
   });
 
   auto scanGET = server.on("/scan", HTTP_GET, [callbacks, modemMac](AsyncWebServerRequest *request) {
