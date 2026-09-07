@@ -45,18 +45,7 @@ uint32_t RefreshInterval::applyApiRetry(uint8_t attempt) {
 }
 
 uint32_t RefreshInterval::applyWifiRetry(uint8_t attempt) {
-  uint32_t sleep;
-  switch (attempt) {
-  case 1:
-    sleep = 60;
-    break;
-  case 2:
-    sleep = 180;
-    break;
-  default:
-    sleep = 300;
-    break;
-  }
+  uint32_t sleep = wifiRetrySeconds(attempt);
   writeIfChanged(sleep);
   return sleep;
 }
@@ -71,6 +60,13 @@ uint32_t RefreshInterval::fastPollSeconds(uint32_t streak) {
   if (streak <= 60) return 60;  // 1 min
   if (streak <= 70) return 900; // 15 min
   return 3600;                  // 1 hour
+}
+
+uint32_t RefreshInterval::wifiRetrySeconds(uint8_t attempt) {
+  if (attempt <= 2) return 60;    // 1 min
+  if (attempt <= 5) return 120;   // 2 min
+  if (attempt <= 10) return 180;  // 3 min
+  return 300;                     // 5 min
 }
 
 bool RefreshInterval::writeIfChanged(uint32_t value) {
