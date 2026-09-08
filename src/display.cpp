@@ -525,7 +525,11 @@ void display_wipe(void)
     int refreshCount = 60;
 #endif
 
-    bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit);
+    if (pDevice->epd_mosi_pin == pDevice->epd_sck_pin) { // predefined device
+        bbep.begin(dpList[pDevice->panel_set][0].OneBit);
+    } else {
+        bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit);
+    }
     bbep.fillScreen(BBEP_WHITE);
     for (int i=0; i<refreshCount; i++) {
         bbep.refresh(REFRESH_FULL); // 2 to 3 minutes of Black/White clearing of the display
@@ -1671,7 +1675,11 @@ PNG *png = new PNG();
             bbep.setAddrWindow(0, 0, bbep.width(), bbep.height());
             if (png->getBpp() == 1 || (png->getBpp() == 2 && png_count_colors(png, pPNG, iDataSize) == 2)) { // 1-bit image (single plane)
                 png->close(); // use a different PNGDraw callback for color matching
-                bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit);
+                if (pDevice->epd_mosi_pin == pDevice->epd_sck_pin) { // predefined device
+                    bbep.begin(dpList[pDevice->panel_set][0].OneBit);
+                } else {
+                    bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit);
+                }
                 rc = REFRESH_PARTIAL; // the new image is 1bpp - try a partial update
                 bbep.startWrite(PLANE_0); // start writing image data to plane 0
                 png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
@@ -1988,7 +1996,9 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef BB_EPAPER
     bbep.allocBuffer(false);
+    const int iFontHeight = 12;
 #else
+    const int iFontHeight = 24;
     bbep.setMode(BB_MODE_1BPP); // message screens are 1-bit
 #endif
     if (image_buffer && *(uint16_t *)image_buffer == BB_BITMAP_MARKER)
@@ -2119,7 +2129,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
     {
         const char string1[] = "Connect to TRMNL WiFi";
         bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - rect.w)/2, 430);
+        bbep.setCursor((bbep.width() - rect.w)/2, height-(iFontHeight*2));
         bbep.println(string1);
         const char string2[] = "on your phone or computer";
         bbep.getStringBox(string2, &rect);
@@ -2132,7 +2142,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         String string0 = "TRMNL firmware ";
         string0 += Messages::firmware_version();
 #ifdef __BB_EPAPER__
-        bbep.setCursor(40, 48); // place in upper left corner
+        bbep.setCursor(40, iFontHeight*2); // place in upper left corner
 #else
         bbep.setCursor(80, 104); // place in upper left corner
 #endif
@@ -2618,8 +2628,10 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef BB_EPAPER
     bbep.allocBuffer(false);
+    const int iFontHeight = 12;
     Log_info("Free heap after bbep.allocBuffer() - %" PRIu32, ESP.getMaxAllocHeap());
 #else
+    const int iFontHeight = 24;
     bbep.setMode(BB_MODE_1BPP); // message screens are 1-bit
 #endif
 
@@ -2703,17 +2715,20 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 
         String string1 = "TRMNL firmware ";
         string1 += fw_version;
-        bbep.setCursor(40, 48); // place in upper left corner
+        bbep.setCursor(40, iFontHeight*2); // place in upper left corner
         bbep.println(string1);
-        String string2 = "Connect your phone or computer to ";
-        string2 += (message.length() > 0) ? "\"" + message + "\"" : String("the TRMNL");
-        string2 += " Wi-Fi";
+        String string2 = "Connect your phone or computer to:";
         bbep.getStringBox(string2, &rect);
 #ifdef __BB_EPAPER__
-        bbep.setCursor((bbep.width() - rect.w) / 2, 386);
+        bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - (iFontHeight*4));
 #else
         bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 100 - rect.h);
 #endif
+        bbep.println(string2);
+        string2 = (message.length() > 0) ? "\"" + message + "\"" : String("the TRMNL");
+        string2 += " Wi-Fi";
+        bbep.getStringBox(string2, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.println(string2);
         const char string3[] = "or scan the QR code for help";
         bbep.getStringBox(string3, &rect);
