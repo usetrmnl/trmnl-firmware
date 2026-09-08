@@ -11,6 +11,22 @@
 /// Logs at or above this severity will be sent to the server
 static LogLevel store_submit_threshold = LogLevel::LOG_ERROR;
 
+static bool serial_logging_enabled = false;
+static bool serial_started = false;
+
+void set_verbose_logging(bool enabled) {
+  serial_logging_enabled = enabled;
+  if (enabled && !serial_started) {
+    Serial.begin(115200);
+    Log.begin(LOG_LEVEL_VERBOSE, &Serial);
+    serial_started = true;
+  } else if (serial_started) {
+    Log.setLevel(enabled ? LOG_LEVEL_VERBOSE : LOG_LEVEL_SILENT);
+  }
+}
+
+bool get_verbose_logging() { return serial_logging_enabled; }
+
 static void handle_store_submit(LogLevel level, const char *clean_message, const char *file, int line,
                                 LogMode mode = LOG_STORE_ONLY) {
   if (level >= store_submit_threshold) {
@@ -49,26 +65,32 @@ void log_impl(LogLevel level, LogMode mode, const char *file, int line, const ch
 // This mode is not handled correctly by underlying implementation,
 // so shortcut it here
   if (mode == LOG_SERIAL_ONLY) {
-    Serial.println(serial_buffer);
+    if (serial_logging_enabled) {
+      Serial.println(serial_buffer);
+    }
+    free(serial_buffer);
+    free(user_message);
     return;
   }
 
-  switch (level) {
-  case LOG_VERBOSE:
-    Log.verboseln(serial_buffer);
-    break;
-  case LOG_INFO:
-    Log.infoln(serial_buffer);
-    break;
-  case LOG_WARN:
-    Log.warningln(serial_buffer);
-    break;
-  case LOG_ERROR:
-    Log.errorln(serial_buffer);
-    break;
-  case LOG_FATAL:
-    Log.fatalln(serial_buffer);
-    break;
+  if (serial_logging_enabled) {
+    switch (level) {
+    case LOG_VERBOSE:
+      Log.verboseln(serial_buffer);
+      break;
+    case LOG_INFO:
+      Log.infoln(serial_buffer);
+      break;
+    case LOG_WARN:
+      Log.warningln(serial_buffer);
+      break;
+    case LOG_ERROR:
+      Log.errorln(serial_buffer);
+      break;
+    case LOG_FATAL:
+      Log.fatalln(serial_buffer);
+      break;
+    }
   }
   free(serial_buffer);
 

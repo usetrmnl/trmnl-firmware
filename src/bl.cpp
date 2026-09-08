@@ -692,10 +692,28 @@ void bl_init(void)
   uint32_t init_time = micros();
 #endif
   startup_time = init_time/1000L; // convert to milliseconds
+
+  bool res = preferences.begin("data", false);
+  if (res)
+  {
+    Log_info("preferences init success (%d free entries)", preferences.freeEntries());
+  }
+  else
+  {
+    Log_fatal("preferences init failed");
+    ESP.restart();
+  }
+
+  bool verbose_logging = preferences.getBool(PREFERENCES_VERBOSE_LOG_KEY,
 #ifdef DEV_FIRMWARE
-  Serial.begin(115200);
-  wait_for_serial();
-  Log.begin(LOG_LEVEL_VERBOSE, &Serial);
+    true
+#else
+    false
+#endif
+  );
+  set_verbose_logging(verbose_logging);
+#ifdef WAIT_FOR_SERIAL
+  if (verbose_logging) wait_for_serial();
 #endif
   Log_info("BL init success");
 
@@ -742,19 +760,6 @@ void bl_init(void)
                       wakeup_reason == ESP_SLEEP_WAKEUP_EXT0 ||
                       wakeup_reason == ESP_SLEEP_WAKEUP_EXT1);
   Log.info("%s [%d]: Wake reason: %d\r\n", __FILE__, __LINE__, (int)wakeup_reason);
-
-  Log_info("preferences start");
-  bool res = preferences.begin("data", false);
-  if (res)
-  {
-    Log_info("preferences init success (%d free entries)", preferences.freeEntries());
-  }
-  else
-  {
-    Log_fatal("preferences init failed");
-    ESP.restart();
-  }
-  Log_info("preferences end");
   #ifndef BOARD_TRMNL_X
   bool double_click = false;
   if (gpio_wakeup)
@@ -1948,6 +1953,14 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
     preferences.putBool(PREFERENCES_TOUCHBAR_MODE_KEY, touchbar_tap_mode);
   }
 #endif // BOARD_TRMNL_X
+
+  if (apiResponse.verbose_logging.length() > 0) {
+    bool enabled = (apiResponse.verbose_logging == "debug");
+    if (enabled != get_verbose_logging()) {
+      set_verbose_logging(enabled);
+      preferences.putBool(PREFERENCES_VERBOSE_LOG_KEY, enabled);
+    }
+  }
 
   if (special_function == SF_NONE)
   {

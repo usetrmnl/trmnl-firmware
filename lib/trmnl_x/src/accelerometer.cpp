@@ -5,6 +5,7 @@
 #include "Wire.h"
 
 #include "accelerometer.h"
+#include <trmnl_log.h>
 
 // ############################ ACCELEROMETER #############################
 
@@ -92,12 +93,12 @@ int8_t bma530_init_device(struct bma5_dev *dev) {
     // Initialize the sensor
     rslt = bma530_init(dev);
     if (rslt != BMA5_OK) {
-        Serial.printf("BMA530 initialization failed: %d\n", rslt);
+        Log_info_serial("BMA530 initialization failed: %d", rslt);
         return rslt;
     }
 
-    Serial.println("BMA530 initialized successfully");
-    Serial.printf("Chip ID: 0x%02X\n", dev->chip_id);
+    Log_info_serial("BMA530 initialized successfully");
+    Log_info_serial("Chip ID: 0x%02X", dev->chip_id);
 
     return BMA5_OK;
 }
@@ -113,7 +114,7 @@ int8_t bma530_configure_low_power_mode(struct bma5_dev *dev) {
     // Get current accelerometer configuration
     rslt = bma5_get_acc_conf(&acc_cfg, dev);
     if (rslt != BMA5_OK) {
-        Serial.printf("Failed to get acc config: %d\n", rslt);
+        Log_info_serial("Failed to get acc config: %d", rslt);
         return rslt;
     }
 
@@ -128,7 +129,7 @@ int8_t bma530_configure_low_power_mode(struct bma5_dev *dev) {
     // Apply configuration
     rslt = bma5_set_acc_conf(&acc_cfg, dev);
     if (rslt != BMA5_OK) {
-        Serial.printf("Failed to set acc config: %d\n", rslt);
+        Log_info_serial("Failed to set acc config: %d", rslt);
         return rslt;
     }
 
@@ -136,15 +137,15 @@ int8_t bma530_configure_low_power_mode(struct bma5_dev *dev) {
     sensor_ctrl = BMA5_SENSOR_CTRL_ENABLE;
     rslt = bma5_set_acc_conf_0(sensor_ctrl, dev);
     if (rslt != BMA5_OK) {
-        Serial.printf("Failed to enable accelerometer: %d\n", rslt);
+        Log_info_serial("Failed to enable accelerometer: %d", rslt);
         return rslt;
     }
 
-    Serial.println("Low power mode configured:");
-    Serial.println("  Power Mode: Low Power Mode (Duty Cycling)");
-    Serial.println("  ODR: 25 Hz");
-    Serial.println("  Range: 4G");
-    Serial.println("  Noise Mode: Lower Power");
+    Log_info_serial("Low power mode configured:");
+    Log_info_serial("  Power Mode: Low Power Mode (Duty Cycling)");
+    Log_info_serial("  ODR: 25 Hz");
+    Log_info_serial("  Range: 4G");
+    Log_info_serial("  Noise Mode: Lower Power");
 
     return BMA5_OK;
 }
@@ -161,7 +162,7 @@ int8_t bma530_configure_orientation(struct bma5_dev *dev) {
     // Get current orientation configuration
     rslt = bma530_get_orient_config(&conf, dev);
     if (rslt != BMA5_OK) {
-        Serial.printf("Failed to get orientation config: %d\n", rslt);
+        Log_info_serial("Failed to get orientation config: %d", rslt);
         return rslt;
     }
 
@@ -177,14 +178,14 @@ int8_t bma530_configure_orientation(struct bma5_dev *dev) {
     // Apply orientation configuration
     rslt = bma530_set_orient_config(&conf, dev);
     if (rslt != BMA5_OK) {
-        Serial.printf("Failed to set orientation config: %d\n", rslt);
+        Log_info_serial("Failed to set orientation config: %d", rslt);
         return rslt;
     }
 
     // Enable orientation feature in feature engine
     rslt = bma530_get_feat_eng_gpr_0(&gpr_0, dev);
     if (rslt != BMA5_OK) {
-        Serial.printf("Failed to get feature engine GPR: %d\n", rslt);
+        Log_info_serial("Failed to get feature engine GPR: %d", rslt);
         return rslt;
     }
 
@@ -202,24 +203,24 @@ int8_t bma530_configure_orientation(struct bma5_dev *dev) {
 
     rslt = bma530_set_feat_eng_gpr_0(&gpr_0, dev);
     if (rslt != BMA5_OK) {
-        Serial.printf("Failed to enable orientation feature: %d\n", rslt);
+        Log_info_serial("Failed to enable orientation feature: %d", rslt);
         return rslt;
     }
 
     // Set feature engine control to host
     rslt = bma5_set_regs(BMA5_REG_FEAT_ENG_GPR_CTRL, &gpr_ctrl_host, 1, dev);
     if (rslt != BMA5_OK) {
-        Serial.printf("Failed to set feature engine control: %d\n", rslt);
+        Log_info_serial("Failed to set feature engine control: %d", rslt);
         return rslt;
     }
 
-    Serial.println("Orientation detection configured:");
-    Serial.println("  Face up/down detection: Enabled");
-    Serial.println("  Mode: Symmetric");
-    Serial.printf("  Theta: 0x%02X\n", conf.theta);
-    Serial.printf("  Hold time: 0x%02X\n", conf.hold_time);
-    Serial.printf("  Slope threshold: 0x%02X\n", conf.slope_thres);
-    Serial.printf("  Hysteresis: 0x%02X\n", conf.hysteresis);
+    Log_info_serial("Orientation detection configured:");
+    Log_info_serial("  Face up/down detection: Enabled");
+    Log_info_serial("  Mode: Symmetric");
+    Log_info_serial("  Theta: 0x%02X", conf.theta);
+    Log_info_serial("  Hold time: 0x%02X", conf.hold_time);
+    Log_info_serial("  Slope threshold: 0x%02X", conf.slope_thres);
+    Log_info_serial("  Hysteresis: 0x%02X", conf.hysteresis);
 
     return BMA5_OK;
 }
@@ -235,7 +236,7 @@ int8_t bma530_configure_int1(struct bma5_dev *dev) {
     // Get current interrupt mapping
     rslt = bma530_get_int_map(&int_map, dev);
     if (rslt != BMA5_OK) {
-        Serial.printf("Failed to get interrupt mapping: %d\n", rslt);
+        Log_info_serial("Failed to get interrupt mapping: %d", rslt);
         return rslt;
     }
 
@@ -258,7 +259,7 @@ int8_t bma530_configure_int1(struct bma5_dev *dev) {
 
     rslt = bma530_set_int_map(&int_map, dev);
     if (rslt != BMA5_OK) {
-        Serial.printf("Failed to set interrupt mapping: %d\n", rslt);
+        Log_info_serial("Failed to set interrupt mapping: %d", rslt);
         return rslt;
     }
 
@@ -267,7 +268,7 @@ int8_t bma530_configure_int1(struct bma5_dev *dev) {
 
     rslt = bma5_get_int_conf(&int_config, 1, dev);
     if (rslt != BMA5_OK) {
-        Serial.printf("Failed to get INT1 config: %d\n", rslt);
+        Log_info_serial("Failed to get INT1 config: %d", rslt);
         return rslt;
     }
 
@@ -278,15 +279,15 @@ int8_t bma530_configure_int1(struct bma5_dev *dev) {
 
     rslt = bma5_set_int_conf(&int_config, 1, dev);
     if (rslt != BMA5_OK) {
-        Serial.printf("Failed to set INT1 config: %d\n", rslt);
+        Log_info_serial("Failed to set INT1 config: %d", rslt);
         return rslt;
     }
 
-    Serial.println("INT1 configured:");
-    Serial.println("  Orientation interrupt mapped to INT1");
-    Serial.println("  Mode: Latched");
-    Serial.println("  Output: Open-Drain");
-    Serial.println("  Level: Active Low (pulls to GND with external pull-up)");
+    Log_info_serial("INT1 configured:");
+    Log_info_serial("  Orientation interrupt mapped to INT1");
+    Log_info_serial("  Mode: Latched");
+    Log_info_serial("  Output: Open-Drain");
+    Log_info_serial("  Level: Active Low (pulls to GND with external pull-up)");
 
     return BMA5_OK;
 }
@@ -305,18 +306,18 @@ void bma530_process_orientation(struct bma5_dev *dev) {
     // Read interrupt status
     rslt = bma530_get_int_status(&int_status, 1, dev);
     if (rslt != BMA5_OK) {
-        Serial.printf("Failed to read interrupt status: %d\n", rslt);
+        Log_info_serial("Failed to read interrupt status: %d", rslt);
         return;
     }
 
     // Check if orientation interrupt occurred
     if (int_status.int_status.orient_int_status & BMA5_ENABLE) {
-        Serial.println("\n*** Orientation change detected! ***");
+        Log_info_serial("*** Orientation change detected! ***");
 
         // Read orientation output values
         rslt = bma530_get_feat_eng_feature_out(&feat_out, dev);
         if (rslt != BMA5_OK) {
-            Serial.printf("Failed to read orientation data: %d\n", rslt);
+            Log_info_serial("Failed to read orientation data: %d", rslt);
             return;
         }
 
@@ -324,43 +325,26 @@ void bma530_process_orientation(struct bma5_dev *dev) {
         uint8_t face_up_down = feat_out.orientation_face_up_down;
 
         // Print orientation state
-        Serial.print("Orientation: ");
+        const char *pl;
         switch (portrait_landscape) {
-            case PORTRAIT_UP_RIGHT:
-                Serial.print("Portrait Upright");
-                break;
-            case LANDSCAPE_LEFT:
-                Serial.print("Landscape Left");
-                break;
-            case PORTRAIT_UP_DOWN:
-                Serial.print("Portrait Upside Down");
-                break;
-            case LANDSCAPE_RIGHT:
-                Serial.print("Landscape Right");
-                break;
-            default:
-                Serial.print("Unknown");
+            case PORTRAIT_UP_RIGHT: pl = "Portrait Upright"; break;
+            case LANDSCAPE_LEFT:    pl = "Landscape Left"; break;
+            case PORTRAIT_UP_DOWN:  pl = "Portrait Upside Down"; break;
+            case LANDSCAPE_RIGHT:   pl = "Landscape Right"; break;
+            default:                pl = "Unknown";
         }
-
-        Serial.print(" | ");
-
+        const char *fud;
         switch (face_up_down) {
-            case FACE_UP:
-                Serial.print("Face Up");
-                break;
-            case FACE_DOWN:
-                Serial.print("Face Down");
-                break;
-            default:
-                Serial.print("Unknown");
+            case FACE_UP:   fud = "Face Up"; break;
+            case FACE_DOWN: fud = "Face Down"; break;
+            default:        fud = "Unknown";
         }
-
-        Serial.println();
+        Log_info_serial("Orientation: %s | %s", pl, fud);
 
         // Clear interrupt status
         rslt = bma530_set_int_status(&int_status, 1, dev);
         if (rslt != BMA5_OK) {
-            Serial.printf("Failed to clear interrupt status: %d\n", rslt);
+            Log_info_serial("Failed to clear interrupt status: %d", rslt);
         }
     }
 }

@@ -295,12 +295,28 @@
     async function loadServerFromDevice() {
       try {
         const response = await fetch('/device-settings');
-        const server = (await response.json()).api_url;
-        if (server) {
-          document.getElementById('server').value = server;
+        const settings = await response.json();
+        if (settings.api_url) {
+          document.getElementById('server').value = settings.api_url;
           document.getElementById('custom_server_form_group').style.display = 'flex';
         }
+        document.getElementById('verboseLogging').checked = !!settings.verbose_logging;
       } catch (_) { }
+    }
+
+    async function saveVerboseLogging() {
+      const enabled = document.getElementById('verboseLogging').checked;
+      try {
+        const response = await fetch('/verbose-logging', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled })
+        });
+        if (!response.ok) throw new Error('request failed');
+        displayAlert(enabled ? 'Verbose logging enabled.' : 'Verbose logging disabled.', 'primary');
+      } catch (_) {
+        displayAlert('Could not save verbose logging setting. Please try again.', 'warning');
+      }
     }
 
     function closeCustomServerModal() {
@@ -574,6 +590,18 @@
         <button class="button button-primary" onclick="clearHostname()">Reset to default</button>
       </span>
     </div>
+    <!-- Verbose Logging -->
+    <div style="width: 100%; margin-top: 20px; border-top: 1px solid #ccc; padding-top: 15px;">
+      <h3 style="margin-bottom: 10px;">Verbose Logging</h3>
+      <div class="form-group">
+        <label style="display: flex; align-items: center; gap: 10px;">
+          <input type="checkbox" id="verboseLogging" style="width: auto;">
+          Send logs to serial
+        </label>
+      </div>
+      <button class="button button-success" onclick="saveVerboseLogging()">Save</button>
+    </div>
+
     <div class="form-group">
       <div class="alert alert-primary" id="test-output" role="alert" style="display: none;"></div>
     </div>
