@@ -66,7 +66,7 @@ jobs:
           python-version: "3.x"
 
       - name: Install PlatformIO Core
-        run: pip install --upgrade platformio esptool
+        run: pip install --upgrade platformio==6.1.19 esptool
 
       - name: Build release firmware
         env:
