@@ -644,6 +644,7 @@ void display_draw_touchbar_indicator(touchbar_side_t side, bool filled)
         bbep.fillRect(rx - border, ry - border, rect_w + (2*border), rect_h + (2*border), border_color);
         bbep.fillRect(rx, ry, rect_w, rect_h, fill_color);
         bbep.partialUpdate(false);
+        bbep.setPreviousMode(BB_MODE_NONE); // we can't do partial updates since we don't have the contents
 } /* display_draw_touchbar_indicator() */
 #endif
 
@@ -1732,6 +1733,7 @@ PNG *png = new PNG();
                 break;
             }
             Log_info("%s [%d]: FastEPD graphics mode set to: %d\n", __FILE__, __LINE__, bbep.getMode());
+            Log_info("%s [%d]: Decoding %s PNG image\n", __FILE__, __LINE__, (bPrevious) ? "previous" : "current");
             png->decode((void *)bPrevious, 0);
             png->close();
 #endif
@@ -1913,19 +1915,24 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
     int rc = bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
     Log_info("%s [%d]: setCustomMatrix returned %d\r\n", __FILE__, __LINE__, rc);
 
- //   if (bbep.getPreviousMode() != BB_MODE_NONE && (bbep.getMode() == BB_MODE_1BPP || bbep.getMode() == BB_MODE_2BPP)) {
- //       Log_info("%s [%d]: Using partial update since we have a copy of the previous image\n", __FILE__, __LINE__);
- //       bbep.setPasses(6,6);
- //       bbep.partialUpdate(false); // we have a previous image to diff against; use a non-flickering update
- //   } else {
+    if (bbep.getPreviousMode() != BB_MODE_NONE && (bbep.getMode() == BB_MODE_1BPP || bbep.getMode() == BB_MODE_2BPP)) {
+        Log_info("%s [%d]: Using partial update since we have a copy of the previous image\n", __FILE__, __LINE__);
+        bbep.setPasses(6,6);
+        bbep.partialUpdate(false); // we have a previous image to diff against; use a non-flickering update
+    } else {
         // bWait=false means loading screen: skip clearing passes so it appears
         // faster. Ghosting from the previous image is acceptable since the
         // real content refresh (bWait=true) immediately follows.
+        Log_info("%s [%d]: Doing a full update since we don't have a copy of the previous image\n", __FILE__, __LINE__);
         int iClearMode = bSkipClear ? CLEAR_NONE
                                    : ((iUpdateCount & 7) == 0 || (iTempProfile > 0)) ? CLEAR_SLOW : CLEAR_FAST;
         Log_info("fullUpdate clear mode = %d\n", iClearMode);
         bbep.fullUpdate(iClearMode, false);
- //   }
+        if (bSkipClear) {
+            Log_info("%s [%d]: We can't do a partial update after this faded loading screen\n", __FILE__, __LINE__);
+            bbep.setPreviousMode(BB_MODE_NONE);
+        }
+    }
  }
 #endif
     iUpdateCount++;
