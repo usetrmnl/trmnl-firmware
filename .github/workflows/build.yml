@@ -48,7 +48,7 @@ jobs:
           xcode-version: latest-stable
 
       - name: Install PlatformIO Core
-        run: pip install --upgrade platformio
+        run: pip install --upgrade platformio==6.1.19
 
       - name: Configure ccache for PlatformIO (Unix)
         if: runner.os != 'Windows'

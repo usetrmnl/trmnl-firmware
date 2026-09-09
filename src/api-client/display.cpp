@@ -1,4 +1,3 @@
-#include <DEV_Config.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <api-client/display.h>
@@ -10,6 +9,16 @@
 #include <inttypes.h>
 #include <misc/sensor.h>
 #include <trmnl_log.h>
+extern RTC_DATA_ATTR int iPrevWakeTime; // total wake time of the last cycle (for statistics collection)
+extern RTC_DATA_ATTR bool
+  bUsedCachedImage; // if the last image displayed was read from cache (for statistics collection)
+#ifdef SENSOR_SDA
+extern int lastCO2, lastSCDTemp, lastTemp, lastSCDHumid, lastHumid, lastPressure, lastType, lastTime;
+const char *szDevices[] = {"None",    "AHT20",  "BMP180",  "BME280", "BMP388", "SHT3X",
+                           "HDC1080", "HTS221", "MCP9808", "BME68x", "SHTC3"};
+const char *szMakers[] = {"None", "ASAIR",   "Bosch",     "Bosch", "Bosch",    "Sensirion",
+                          "TI",   "STMicro", "MicroChip", "Bosch", "Sensirion"};
+#endif // SENSOR_SDA
 
 void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs) {
   HttpHeaderList headers = buildDisplayHeaders(inputs);
@@ -55,8 +64,9 @@ ApiDisplayResult fetchApiDisplay(ApiDisplayInputs &apiDisplayInputs) {
 
       delay(5);
 
-      Log_info("Start location: %s", https->getLocation().c_str());
+      Log_info("Start location: %s", (apiDisplayInputs.baseUrl + "/api/display").c_str());
       int httpCode = https->GET();
+      Log_info("GET... code: %d", httpCode);
       if (httpCode == HTTP_CODE_PERMANENT_REDIRECT || httpCode == HTTP_CODE_TEMPORARY_REDIRECT) {
         String location = https->getLocation();
         https->end();
@@ -81,9 +91,6 @@ ApiDisplayResult fetchApiDisplay(ApiDisplayInputs &apiDisplayInputs) {
             .error_detail =
               "HTTP Client failed with error: " + https->errorToString(httpCode) + "(" + String(httpCode) + ")"};
       }
-
-        // HTTP header has been send and Server response header has been handled
-      Log_info("GET... code: %d", httpCode);
 
       String payload = https->getString();
       size_t size = https->getSize();

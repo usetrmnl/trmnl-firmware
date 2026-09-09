@@ -7,6 +7,7 @@
 #include <lwip/sockets.h>
 #include <mbedtls/error.h>
 #include <mbedtls/ssl.h>
+#include <trmnl_log.h>
 
 #include "Arduino.h"
 
@@ -28,7 +29,7 @@ static const char *rwcs_pers = "esp32-tls";
 static int rwcs_err(int ret, int line) {
   char buf[100];
   mbedtls_strerror(ret, buf, sizeof(buf));
-  log_e("rwcs_start[%d]: (%d) %s", line, ret, buf);
+  Log_error("rwcs_start[%d]: (%d) %s", line, ret, buf);
   return ret;
 }
 #define RWCS_ERR(e) rwcs_err(e, __LINE__)
@@ -44,7 +45,7 @@ static int rwcs_start(sslclient_context *ssl_client, const IPAddress &ip, uint32
 
   ssl_client->socket = lwip_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if (ssl_client->socket < 0) {
-    log_e("ERROR opening socket");
+    Log_error("rwcs_start: socket() failed, errno: %d", errno);
     return ssl_client->socket;
   }
 
@@ -69,7 +70,7 @@ static int rwcs_start(sslclient_context *ssl_client, const IPAddress &ip, uint32
 
   int res = lwip_connect(ssl_client->socket, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
   if (res < 0 && errno != EINPROGRESS) {
-    log_e("connect on fd %d, errno: %d", ssl_client->socket, errno);
+    Log_error("rwcs_start: connect() on fd %d failed, errno: %d", ssl_client->socket, errno);
     lwip_close(ssl_client->socket);
     ssl_client->socket = -1;
     return -1;
@@ -80,7 +81,8 @@ static int rwcs_start(sslclient_context *ssl_client, const IPAddress &ip, uint32
   int sockerr = 0;
   socklen_t len = sizeof(sockerr);
   if (res <= 0 || getsockopt(ssl_client->socket, SOL_SOCKET, SO_ERROR, &sockerr, &len) < 0 || sockerr != 0) {
-    log_e("connect failed on fd %d (select %d, sockerr %d)", ssl_client->socket, res, sockerr);
+    Log_error("rwcs_start: connect() on fd %d timed out or failed (select %d, sockerr %d)", ssl_client->socket,
+              res, sockerr);
     lwip_close(ssl_client->socket);
     ssl_client->socket = -1;
     return -1;
@@ -128,7 +130,10 @@ static int rwcs_start(sslclient_context *ssl_client, const IPAddress &ip, uint32
   unsigned long handshake_start = millis();
   while ((ret = mbedtls_ssl_handshake(&ssl_client->ssl_ctx)) != 0) {
     if (ret != MBEDTLS_ERR_SSL_WANT_READ && ret != MBEDTLS_ERR_SSL_WANT_WRITE) return RWCS_ERR(ret);
-    if ((millis() - handshake_start) > ssl_client->handshake_timeout) return -1;
+    if ((millis() - handshake_start) > ssl_client->handshake_timeout) {
+      Log_error("rwcs_start: handshake timed out after %lu ms (resume %d)", millis() - handshake_start, try_resume);
+      return -1;
+    }
     vTaskDelay(2);
   }
 
@@ -150,7 +155,10 @@ int ResumableWiFiClientSecure::connect(IPAddress ip, uint16_t port) { return con
 
 int ResumableWiFiClientSecure::connect(const char *host, uint16_t port) {
   IPAddress address;
-  if (!WiFi.hostByName(host, address)) return 0;
+  if (!WiFi.hostByName(host, address)) {
+    Log_error("DNS lookup for %s failed", host);
+    return 0;
+  }
   return connectResumable(address, port, host);
 }
 
