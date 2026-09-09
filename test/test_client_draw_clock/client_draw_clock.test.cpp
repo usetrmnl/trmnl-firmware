@@ -43,7 +43,7 @@ static int make_png_with_comment(uint8_t *out, int out_max, const char *comment)
 void test_parse_digital_spec(void) {
   ClientDrawClock spec;
   TEST_ASSERT_TRUE(client_draw_clock_parse_json(
-      "[{\"v\":1,\"name\":\"clock\",\"rect\":[176,16,448,448],\"type\":\"digital\",\"tz\":0}]", &spec));
+    "[{\"v\":1,\"name\":\"clock\",\"rect\":[176,16,448,448],\"type\":\"digital\",\"tz\":0}]", &spec));
   TEST_ASSERT_EQUAL(CLIENT_DRAW_CLOCK_DIGITAL, spec.style);
   TEST_ASSERT_EQUAL(176, spec.x);
   TEST_ASSERT_EQUAL(16, spec.y);
@@ -55,8 +55,8 @@ void test_parse_digital_spec(void) {
 void test_parse_spec_allows_spaces(void) {
   ClientDrawClock spec;
   TEST_ASSERT_TRUE(client_draw_clock_parse_json(
-      "[ { \"v\" : 1, \"name\" : \"clock\", \"rect\" : [176, 16, 448, 448], \"type\" : \"digital\", \"tz\" : 0 } ]",
-      &spec));
+    "[ { \"v\" : 1, \"name\" : \"clock\", \"rect\" : [176, 16, 448, 448], \"type\" : \"digital\", \"tz\" : 0 } ]",
+    &spec));
   TEST_ASSERT_EQUAL(CLIENT_DRAW_CLOCK_DIGITAL, spec.style);
   TEST_ASSERT_EQUAL(176, spec.x);
   TEST_ASSERT_EQUAL(448, spec.h);
@@ -65,7 +65,7 @@ void test_parse_spec_allows_spaces(void) {
 void test_parse_analog_spec(void) {
   ClientDrawClock spec;
   TEST_ASSERT_TRUE(client_draw_clock_parse_json(
-      "[{\"v\":1,\"name\":\"clock\",\"rect\":[0,0,400,240],\"type\":\"analog\",\"tz\":11800}]", &spec));
+    "[{\"v\":1,\"name\":\"clock\",\"rect\":[0,0,400,240],\"type\":\"analog\",\"tz\":11800}]", &spec));
   TEST_ASSERT_EQUAL(CLIENT_DRAW_CLOCK_ANALOG, spec.style);
   TEST_ASSERT_EQUAL(0, spec.x);
   TEST_ASSERT_EQUAL(0, spec.y);
@@ -76,10 +76,10 @@ void test_parse_analog_spec(void) {
 
 void test_parse_spec_ignores_non_clock_entries(void) {
   ClientDrawClock spec;
-  TEST_ASSERT_TRUE(client_draw_clock_parse_json(
-      "[{\"v\":1,\"name\":\"title\",\"rect\":[0,0,1,1],\"type\":\"digital\",\"tz\":0},"
-      "{\"v\":1,\"name\":\"clock\",\"rect\":[1,2,3,4],\"type\":\"digital\",\"tz\":19800}]",
-      &spec));
+  TEST_ASSERT_TRUE(
+    client_draw_clock_parse_json("[{\"v\":1,\"name\":\"title\",\"rect\":[0,0,1,1],\"type\":\"digital\",\"tz\":0},"
+                                 "{\"v\":1,\"name\":\"clock\",\"rect\":[1,2,3,4],\"type\":\"digital\",\"tz\":19800}]",
+                                 &spec));
   TEST_ASSERT_EQUAL(CLIENT_DRAW_CLOCK_DIGITAL, spec.style);
   TEST_ASSERT_EQUAL(1, spec.x);
   TEST_ASSERT_EQUAL(2, spec.y);
@@ -97,13 +97,13 @@ void test_parse_spec_rejects_unknown_style(void) {
   ClientDrawClock spec;
   memset(&spec, 0xff, sizeof(spec));
   TEST_ASSERT_FALSE(client_draw_clock_parse_json(
-      "[{\"v\":1,\"name\":\"clock\",\"rect\":[0,0,10,10],\"type\":\"binary\",\"tz\":0}]", &spec));
+    "[{\"v\":1,\"name\":\"clock\",\"rect\":[0,0,10,10],\"type\":\"binary\",\"tz\":0}]", &spec));
 }
 
 void test_parse_spec_rejects_missing_tz(void) {
   ClientDrawClock spec;
-  TEST_ASSERT_FALSE(client_draw_clock_parse_json(
-      "[{\"v\":1,\"name\":\"clock\",\"rect\":[0,0,10,10],\"type\":\"digital\"}]", &spec));
+  TEST_ASSERT_FALSE(
+    client_draw_clock_parse_json("[{\"v\":1,\"name\":\"clock\",\"rect\":[0,0,10,10],\"type\":\"digital\"}]", &spec));
 }
 
 void test_clock_wall_time_applies_tz(void) {
@@ -118,14 +118,13 @@ void test_clock_wall_time_applies_tz(void) {
 void test_parse_spec_rejects_zero_size(void) {
   ClientDrawClock spec;
   TEST_ASSERT_FALSE(client_draw_clock_parse_json(
-      "[{\"v\":1,\"name\":\"clock\",\"rect\":[0,0,0,10],\"type\":\"digital\",\"tz\":0}]", &spec));
+    "[{\"v\":1,\"name\":\"clock\",\"rect\":[0,0,0,10],\"type\":\"digital\",\"tz\":0}]", &spec));
 }
 
 void test_parse_png_comment_chunk(void) {
   uint8_t png[256];
   int len = make_png_with_comment(
-      png, (int)sizeof(png),
-      "[{\"v\":1,\"name\":\"clock\",\"rect\":[176,16,448,448],\"type\":\"digital\",\"tz\":0}]");
+    png, (int)sizeof(png), "[{\"v\":1,\"name\":\"clock\",\"rect\":[176,16,448,448],\"type\":\"digital\",\"tz\":0}]");
   ClientDrawClock spec;
   TEST_ASSERT_TRUE(client_draw_clock_parse_png(png, (size_t)len, &spec));
   TEST_ASSERT_EQUAL(CLIENT_DRAW_CLOCK_DIGITAL, spec.style);

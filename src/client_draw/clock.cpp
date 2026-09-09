@@ -4,13 +4,13 @@
 
 #include <Arduino.h>
 #include <FastEPD.h>
+#include <client_draw/clock.h>
 #include <config.h>
 #include <display.h>
 #include <esp_sleep.h>
 #include <esp_task_wdt.h>
 #include <globals.h>
 #include <math.h>
-#include <client_draw/clock.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
@@ -170,7 +170,8 @@ static void clock_font_draw_string(const ClientDrawClock &spec, const void *pFon
   const int x = spec.x + (spec.w - w) / 2;
   const int y = spec.y + (spec.h - h) / 2 - min_y;
   if (font_pt > 0) {
-    Log_info("client_draw_clock font: '%s' %dpt tile %dx%d at %d,%d box %dx%d", text, font_pt, spec.w, spec.h, x, y, w, h);
+    Log_info("client_draw_clock font: '%s' %dpt tile %dx%d at %d,%d box %dx%d", text, font_pt, spec.w, spec.h, x, y, w,
+             h);
   } else {
     Log_info("client_draw_clock font: '%s' tile %dx%d at %d,%d box %dx%d", text, spec.w, spec.h, x, y, w, h);
   }
@@ -204,8 +205,8 @@ static const void *clock_pick_dseg_font(const ClientDrawClock &spec, const char 
   int h = 0;
   int min_y = 0;
   clock_measure_custom_font(dseg_fonts[last], text, &w, &h, &min_y);
-  Log_error("client_draw_clock: '%s' does not fit %dx%d; smallest font is %dx%d at %dpt", text, spec.w,
-            spec.h, w, h, dseg_font_pt[last]);
+  Log_error("client_draw_clock: '%s' does not fit %dx%d; smallest font is %dx%d at %dpt", text, spec.w, spec.h, w, h,
+            dseg_font_pt[last]);
   *font_pt = dseg_font_pt[last];
   return dseg_fonts[last];
 }
@@ -270,10 +271,10 @@ static void log_clock_time(const char *label, const ClientDrawClock &spec) {
   gmtime_r(&utc, &utc_tm);
   client_draw_clock_wall_time(&spec, utc, &wall_tm);
   localtime_r(&utc, &local_tm);
-  Log_info(
-    "client_draw_clock %s: epoch %ld | utc %02d:%02d:%02d | wall(utc+tz=%ld) %02d:%02d:%02d | device_local %02d:%02d:%02d",
-    label, (long)utc, utc_tm.tm_hour, utc_tm.tm_min, utc_tm.tm_sec, (long)spec.tz, wall_tm.tm_hour, wall_tm.tm_min,
-    wall_tm.tm_sec, local_tm.tm_hour, local_tm.tm_min, local_tm.tm_sec);
+  Log_info("client_draw_clock %s: epoch %ld | utc %02d:%02d:%02d | wall(utc+tz=%ld) %02d:%02d:%02d | device_local "
+           "%02d:%02d:%02d",
+           label, (long)utc, utc_tm.tm_hour, utc_tm.tm_min, utc_tm.tm_sec, (long)spec.tz, wall_tm.tm_hour,
+           wall_tm.tm_min, wall_tm.tm_sec, local_tm.tm_hour, local_tm.tm_min, local_tm.tm_sec);
 }
 
 static void draw_clock_now(const ClientDrawClock &spec) {
@@ -371,8 +372,8 @@ static int refresh_clock_region(bool first_show) {
   }
 
   BB_RECT rect = clock_refresh_rect_4bpp();
-  Log_info("client_draw_clock 4bpp refresh rect %d,%d %dx%d clear=%d tick=%d", rect.x, rect.y, rect.w, rect.h, CLEAR_FAST,
-           s_refresh_tick);
+  Log_info("client_draw_clock 4bpp refresh rect %d,%d %dx%d clear=%d tick=%d", rect.x, rect.y, rect.w, rect.h,
+           CLEAR_FAST, s_refresh_tick);
   esp_task_wdt_reset();
   const int rc = bbep.fullUpdate(CLEAR_FAST, false, &rect);
   esp_task_wdt_reset();
@@ -465,7 +466,8 @@ bool client_draw_clock_prepare(const uint8_t *png, int size) {
   log_clock_time("prepare", s_spec);
 
   if (!clamp_spec(&s_spec)) {
-    Log_info("client_draw_clock skipped: rect too small after clamp (%d,%d %dx%d)", s_spec.x, s_spec.y, s_spec.w, s_spec.h);
+    Log_info("client_draw_clock skipped: rect too small after clamp (%d,%d %dx%d)", s_spec.x, s_spec.y, s_spec.w,
+             s_spec.h);
     return false;
   }
 
