@@ -35,6 +35,7 @@ const TRMNL_DEVICE device_list[] =
 // name           board_name            panel_type.            sda    scl    intr   batt  batt_en batt_type
   "x",            BB_PANEL_TRMNL_X,     BB_PANEL_NONE,         0xff,  0xff,  0xff,  0xff, 0xff,   BATT_ADC,
   "m5_papers3",   BB_PANEL_M5PAPERS3,   BB_PANEL_NONE,         0xff,  0xff,  0xff,  3,    0xff,   BATT_ADC,
+  "sensoria_s3",  BB_PANEL_V7_RAW,      BBEP_DISPLAY_ED052TC4, 39,    40,    0,     0xff, 0xff,   BATT_BQ27426,
   "sensoria_c5",  BB_PANEL_SENSORIA_C5, BB_PANEL_NONE,         7,     6,     0,     0xff, 0xff,   BATT_ADC,
   "lilygo_t5pro", BB_PANEL_EPDIY_V7,    BBEP_DISPLAY_ED047TC1, 39,    40,    0,     0xff, 0xff,   BATT_BQ27220,
   NULL, 0, 0, 0, 0, 0, 0, 0, 0,
