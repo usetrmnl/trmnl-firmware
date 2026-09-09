@@ -29,6 +29,6 @@ managed_components/
 test/integration/test_config.h
 dependencies.lock
 
-include/fonts/dseg_*
+include/fonts/dseg_*.h
 scratchpad/
 __pycache__/
