@@ -32,10 +32,11 @@ BBEPAPER bbep;
 #ifdef PARALLEL_EPD
 const TRMNL_DEVICE device_list[] = 
 {
-// name           board_name            panel_type.            sda    scl    intr   batt  batt_en batt_type
-  "x",            BB_PANEL_TRMNL_X,     BB_PANEL_NONE,         0xff,  0xff,  0xff,  0xff, 0xff,   BATT_ADC,
-  "m5_papers3",   BB_PANEL_M5PAPERS3,   BB_PANEL_NONE,         0xff,  0xff,  0xff,  3,    0xff,   BATT_ADC,
-  "sensoria_c5",  BB_PANEL_SENSORIA_C5, BB_PANEL_NONE,         7,     6,     0,     0xff, 0xff,   BATT_ADC,
+// name           board_name            panel_size             sda    scl    intr   batt  batt_en batt_type
+  "x",            BB_PANEL_TRMNL_X,     -1,                    0xff,  0xff,  0xff,  0xff, 0xff,   BATT_ADC,
+  "m5_papers3",   BB_PANEL_M5PAPERS3,   -1,                    0xff,  0xff,  0xff,  3,    0xff,   BATT_ADC,
+  "sensoria_c5",  BB_PANEL_SENSORIA_C5, -1,                    7,     6,     0,     0xff, 0xff,   BATT_ADC,
+  "epdiy_kindle", BB_PANEL_V7_RAW,      BBEP_DISPLAY_EC060TC1, 0xff,  0xff,  0,     0xff, 0xff,   BATT_NONE,
   "lilygo_t5pro", BB_PANEL_EPDIY_V7,    BBEP_DISPLAY_ED047TC1, 39,    40,    0,     0xff, 0xff,   BATT_BQ27220,
   NULL, 0, 0, 0, 0, 0, 0, 0, 0,
 }; // Parallel Eink device list
@@ -57,6 +58,7 @@ const TRMNL_DEVICE device_list[] =
   "xiao_epaper_mini", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 2,     1,    6,       BATT_ADC,  EPD_426,
   "xiao_epaper_display", 7, 9,  44,  38,   10,  4,    0xff, 0xff, 5,     1,    6,       BATT_ADC,  EPD_75,
   "xiao_epaper_3clr", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 5,     1,    6,       BATT_ADC,  EPD_75_3CLR,
+  "xiao_epaper_4clr", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 5,     1,    6,       BATT_ADC,  EPD_75_4CLR,
   "xiao_epaper_6clr", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 5,     1,    6,       BATT_ADC,  EPD_75_6CLR,
   "reterminal_e1001", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     1,    21,      BATT_ADC,  EPD_75,
   "reterminal_e1002", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     1,    21,      BATT_ADC,  EPD_75_6CLR,
@@ -198,13 +200,16 @@ void display_init(void)
         bbep.begin(dpList[pDevice->panel_set][0].OneBit);
     }
 #else // Parallel eink devices
+    Log_info("FastEPD init");
 #if defined (BOARD_SEEED_RETERMINAL_E1003)
     bbep.initIT8951(EPD_MOSI_PIN, EPD_MISO_PIN, EPD_SCK_PIN, EPD_CS_PIN, EPD_BUSY_PIN, EPD_RST_PIN, EPD_EN_PIN, EPD_VCC_EN);
     bbep.setPanelSize(BBEP_DISPLAY_ED103TC2);
 #else // normal parallel eink devices
-    bbep.initPanel(pDevice->iBoardType);
-    if (pDevice->iPanelSize != BB_PANEL_NONE) {
-        bbep.setPanelSize(pDevice->iPanelSize);
+    int rc = bbep.initPanel(pDevice->iBoardType);
+    Log_info("initPanel() of iBoardType %d returned %d\n", pDevice->iBoardType, rc);
+    if (pDevice->iPanelSize >= 0) {
+        rc = bbep.setPanelSize(pDevice->iPanelSize);
+        Log_info("setPanelSize() returned %d\n", rc);
     }
 #endif
 #ifdef BOARD_TRMNL_X

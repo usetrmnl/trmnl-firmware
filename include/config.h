@@ -70,9 +70,6 @@
 // TCA9535 expander pins for the BQ25616 charger (open-drain, LOW = active)
 #define TCA9535_PG_PIN     0 // P0_0 — LOW = VBUS OK
 #define TCA9535_STAT_PIN   2 // P0_2 — LOW = charging in progress
-#elif defined(BOARD_TRMNL_X_EPDIY)
-#define PIN_INTERRUPT 0
-#define DEVICE_MODEL  "x"
 #elif defined(BOARD_TRMNL_X_SENSORIAS3)
 #define PIN_INTERRUPT 0
 #define DEVICE_MODEL  "sensoria_s3"
