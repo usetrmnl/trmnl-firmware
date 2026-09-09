@@ -175,6 +175,9 @@ void hw_config_init(void)
  */
 void display_init(void)
 {
+    if (pDevice == NULL) {
+        hw_config_init();
+    }
     Log_info("dev module start");
     iTempProfile = preferences.getUInt(PREFERENCES_TEMP_PROFILE, TEMP_PROFILE_DEFAULT);
     Log_info("Saved temperature profile: %" PRIu32, iTempProfile);
