@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 #ifndef _NO_DEV_CONFIG_
-#include "DEV_Config.h"
+#include "config.h"
 #endif
 
 enum MSG {
@@ -191,5 +191,12 @@ void display_set_light_sleep(uint8_t enabled);
  * @return none
  */
 void display_sleep(void);
+
+/**
+ * @brief Function to wipe the display
+ * @param none
+ * @return none
+ */
+void display_wipe(void);
 
 #endif

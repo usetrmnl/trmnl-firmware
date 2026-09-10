@@ -80,6 +80,19 @@ typedef enum {
 	BAT_LOW  // Set GPOUT to BAT_LOW functionality
 } gpout_function;
 
+// A snapshot of gas gauge readings, as returned by readSnapshot().
+struct BQ27427Snapshot {
+	int soc;             // State-of-charge (%)
+	int health;           // State-of-health (%)
+	int current;          // Average current (mA)
+	float temperature;    // Battery temperature (C)
+	int capacityRemain;   // Remaining capacity (mAh)
+	int capacityFull;     // Full capacity (mAh)
+	unsigned int voltage; // Battery voltage (mV)
+	uint16_t flags;        // flags() register, captured at the same time as the readings above
+	uint8_t energyScale;   // Design energy scale factor used to compute capacityRemain/capacityFull
+};
+
 class BQ27427 {
 public:
 
@@ -506,6 +519,29 @@ public:
 	    @return true if all blocks written and verified successfully.
 	*/
 	bool configureTwoCell();
+
+	/**
+	    Connects to the chip and, if a reset was detected (ITPOR flag set),
+	    reloads the appropriate golden-file profile and waits up to 5s for
+	    the chip to leave INITIALIZATION mode. Sets _initialized to whether
+	    the chip ended up connected and in NORMAL mode.
+
+	    @param sda pin number for I2C data line
+	    @param scl pin number for I2C clock line
+	    @param oneCellPack true for a single-cell pack, false for two-cell
+	    @return the resulting value of _initialized
+	*/
+	bool connectAndConfigure(int sda, int scl, bool oneCellPack);
+
+	/**
+	    Reads a full snapshot of gas gauge registers and checks it against
+	    sane ranges (a failed I2C transaction reads back as 0xFFFF, which is
+	    out of range for a percentage or a plausible pack voltage).
+
+	    @param out snapshot struct to fill in
+	    @return true if _initialized is set and all readings are in range
+	*/
+	bool readSnapshot(BQ27427Snapshot &out);
 
 private:
 	uint8_t _deviceAddress;  // Stores the BQ27427's I2C address
