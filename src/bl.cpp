@@ -1036,9 +1036,12 @@ void bl_init(void)
     }
     else
     {
-      if (current_msg != WIFI_FAILED)
-      {
-        showMessageWithLogo(WIFI_FAILED);
+      if (current_msg != WIFI_FAILED) {
+        int attempts = preferences.getInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT, 1);
+        if (attempts < 10)
+          showMessageWithLogo(WIFI_FAILED);
+        else
+          showMessageWithLogo(WIFI_RETRY_LIMIT);
         current_msg = WIFI_FAILED;
       }
 
@@ -2861,30 +2864,14 @@ static uint8_t *storedLogoOrDefault(int iType)
 
 static void wifiErrorDeepSleep()
 {
-  if (!preferences.isKey(PREFERENCES_CONNECT_WIFI_RETRY_COUNT))
-  {
+  if (!preferences.isKey(PREFERENCES_CONNECT_WIFI_RETRY_COUNT)) {
     preferences.putInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT, 1);
   }
 
   uint8_t retry_count = preferences.getInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT);
-
   Log_info("WIFI connection failed! Retry count: %d \n", retry_count);
 
-  switch (retry_count)
-  {
-  case 1:
-  case 2:
-  case 3:
-    refreshInterval.applyWifiRetry(retry_count);
-    break;
-
-  default:
-    preferences.putInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT, 1);
-    showMessageWithLogo(WIFI_RETRY_LIMIT);
-    display_sleep();
-    goToSleepButtonOnly();
-    return;
-  }
+  refreshInterval.applyWifiRetry(retry_count);
   retry_count++;
   preferences.putInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT, retry_count);
 

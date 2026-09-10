@@ -32,11 +32,12 @@ public:
 
   // Retry ladders; attempt is 1-based.
   uint32_t applyApiRetry(uint8_t attempt);  // 15 / 30 / 60, then DEFAULT_SECONDS
-  uint32_t applyWifiRetry(uint8_t attempt); // 60 / 180, then 300
+  uint32_t applyWifiRetry(uint8_t attempt); // 60 / 120 / 180, then 300
   uint32_t applyDefault();                  // fixed fallback, e.g. /api/setup 404
 
 private:
   static uint32_t fastPollSeconds(uint32_t streak);
+  static uint32_t wifiRetrySeconds(uint8_t attempt);
   bool writeIfChanged(uint32_t value);
 
   Persistence &persistence;

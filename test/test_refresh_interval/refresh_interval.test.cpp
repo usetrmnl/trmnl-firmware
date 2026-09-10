@@ -115,8 +115,12 @@ void test_wifi_retry_ladder(void) {
   MemoryPersistence persistence;
   RefreshInterval refreshInterval(persistence);
   TEST_ASSERT_EQUAL_UINT32(60, refreshInterval.applyWifiRetry(1));
-  TEST_ASSERT_EQUAL_UINT32(180, refreshInterval.applyWifiRetry(2));
-  TEST_ASSERT_EQUAL_UINT32(300, refreshInterval.applyWifiRetry(3));
+  TEST_ASSERT_EQUAL_UINT32(60, refreshInterval.applyWifiRetry(2));
+  TEST_ASSERT_EQUAL_UINT32(120, refreshInterval.applyWifiRetry(3));
+  TEST_ASSERT_EQUAL_UINT32(120, refreshInterval.applyWifiRetry(5));
+  TEST_ASSERT_EQUAL_UINT32(180, refreshInterval.applyWifiRetry(6));
+  TEST_ASSERT_EQUAL_UINT32(180, refreshInterval.applyWifiRetry(9));
+  TEST_ASSERT_EQUAL_UINT32(300, refreshInterval.applyWifiRetry(10));
   TEST_ASSERT_EQUAL_UINT32(300, refreshInterval.seconds());
 }
 
