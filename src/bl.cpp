@@ -1398,6 +1398,10 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   inputs.batteryTemperature = battery().readTemperature();
   inputs.currentBatteryCapacity = battery().readCapacityRemain();
   inputs.maxBatteryCapacity = battery().readCapacityFull();
+  inputs.gaugeSoc = battery().readGaugeSoc();
+  inputs.gaugeHealth = battery().readGaugeHealth();
+  inputs.gaugeCapacityRemain = battery().readGaugeCapacityRemain();
+  inputs.gaugeCapacityFull = battery().readGaugeCapacityFull();
 #endif // BOARD_TRMNL_X
 
   return inputs;
