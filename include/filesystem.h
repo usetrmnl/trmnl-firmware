@@ -1,6 +1,14 @@
 #pragma once
 
 #include <Arduino.h>
+#include <debug_log_capture.h>
+
+/**
+ * @brief The board's filesystem as a LogFileSystem. Only usable between
+ *        filesystem_init() and filesystem_deinit().
+ * @return reference to the singleton adapter
+ */
+LogFileSystem &filesystem_log_store(void);
 
 /**
  * @brief Function to delete old versions of plugin images (by comparing the timestamp)

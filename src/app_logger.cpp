@@ -8,12 +8,15 @@
 #include <string_utils.h>
 #include <trmnl_log.h>
 
-/// Logs at or above this severity will be sent to the server
-static LogLevel store_submit_threshold = LogLevel::LOG_ERROR;
+/// Severity at or above which entries are kept for submission. Collection is
+/// decided once per wake by DebugLogCapture::begin, which runs after the
+/// filesystem is mounted; until then this answers LOG_ERROR. Sending verbose
+/// entries to the ten NVS slots beforehand would evict the errors they hold.
+static LogLevel store_submit_threshold() { return debugLogCapture.active() ? LOG_VERBOSE : LOG_ERROR; }
 
 static void handle_store_submit(LogLevel level, const char *clean_message, const char *file, int line,
                                 LogMode mode = LOG_STORE_ONLY) {
-  if (level >= store_submit_threshold) {
+  if (level >= store_submit_threshold()) {
     if (mode == LOG_STORE_ONLY) {
       logWithAction(LOG_ACTION_STORE, level, clean_message, systemClock().getTime(), line, file);
     } else {

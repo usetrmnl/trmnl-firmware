@@ -46,6 +46,10 @@ struct ApiDisplayResponse {
   SPECIAL_FUNCTION special_function;
   String action;
   String touchbar_mode;
+  /// Epoch seconds to collect verbose logs until. 0 when the response omitted
+  /// the field, which keeps the stored window rather than ending it - see
+  /// DebugLogCapture::next_expiry.
+  uint32_t log_expires_at;
 };
 
 struct ApiDisplayInputs {
