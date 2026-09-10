@@ -2222,6 +2222,26 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         bbep.print(string3);
     }
     break;
+    case IMAGE_DOWNLOAD_FAILED:
+    {
+        const char string1[] = "API responded, but image download failed.";
+        bbep.getStringBox(string1, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, 340);
+        bbep.println(string1);
+#ifndef BOARD_TRMNL_X
+        const char string2[] = "Short click the button on back";
+#else
+        const char string2[] = "Tap the middle of touch bar";
+#endif
+        bbep.getStringBox(string2, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+        bbep.println(string2);
+        const char string3[] = "to advance to the next screen.";
+        bbep.getStringBox(string3, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+        bbep.print(string3);
+    }
+    break;
     case API_UNABLE_TO_CONNECT:
     {
         const char string1[] = "WiFi connected, unable connect to API.";
