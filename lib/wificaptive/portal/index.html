@@ -277,6 +277,17 @@
       color: white;
     }
 
+    .ent-badge {
+      font-size: 10px;
+      font-weight: bold;
+      padding: 1px 4px;
+      border-radius: 3px;
+      margin-left: 5px;
+      vertical-align: middle;
+      background-color: #6f42c1;
+      color: white;
+    }
+
     .loader {
       border: 6px solid #f3f3f3;
       border-radius: 50%;
@@ -580,6 +591,12 @@
         badgeSpan.classList.add(band === '5GHz' ? 'band-5ghz' : 'band-24ghz');
         badgeSpan.textContent = band === '5GHz' ? '5G' : '2.4G';
         th.appendChild(badgeSpan);
+      }
+      if (enterprise) {
+        var entBadge = document.createElement('span');
+        entBadge.classList.add('ent-badge');
+        entBadge.textContent = 'ENT';
+        th.appendChild(entBadge);
       }
       newRow.appendChild(th);
       // append wifi strength
