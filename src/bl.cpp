@@ -2617,19 +2617,13 @@ static void wifiErrorDeepSleep()
 
   Log_info("WIFI connection failed! Retry count: %d \n", retry_count);
 
-  switch (retry_count)
-  {
-  case 1:
-  case 2:
-  case 3:
-    refreshInterval.applyWifiRetry(retry_count);
-    break;
+  refreshInterval.applyWifiRetry(retry_count);
 
-  default:
+  if (retry_count >= MAX_QUIET_SLOW_RETRIES) {
     preferences.putInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT, 1);
     showMessageWithLogo(WIFI_RETRY_LIMIT);
     display_sleep();
-    goToSleepButtonOnly();
+    goToSleep();
     return;
   }
   retry_count++;
