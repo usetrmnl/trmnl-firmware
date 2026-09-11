@@ -6,6 +6,7 @@
 #include <Preferences.h>
 #include <preferences_persistence.h>
 #include <refresh_interval.h>
+#include <ArduinoJson.h>
 #include "battery_small.h"
 #include "battery_hollow.h"
 #include "messages.h"
@@ -26,6 +27,7 @@ BBEPAPER bbep;
 #include <SPIFFS.h>
 #define FS SPIFFS
 #endif // !PARALLEL_EPD
+CLOCK_INFO clock;
 
 // List of supported TRMNL devices with SPI ePaper displays. The list can be in any order since the name is matched
 // The final parameter is the panel type which is from an enumerated list
@@ -1738,6 +1740,31 @@ PNG *png = new PNG();
         }
     } else {
         Log_error("%s [%d]: png->openRAM() returned %d", __FILE__, __LINE__, rc);
+    }
+    if (png->getComment()) {
+        JsonDocument doc;
+        Log_info("PNG image contains tEXt chunk: %s\n", png->getComment());
+        DeserializationError error = deserializeJson(doc, png->getComment());
+        if (error) {
+            Log_info("Json payload error");
+        } else {
+            for (JsonObject obj : doc.as<JsonArray>()) {
+                const char *name = obj["name"];
+                if (!name || strcmp(name, "clock") != 0) {
+                    continue;
+                }
+                if ((obj["v"] | 0) != 1) {
+                    continue;
+                }
+                JsonArray rect = obj["rect"].as<JsonArray>();
+                clock.rect.x = rect[0].as<int>();
+                clock.rect.y = rect[1].as<int>();
+                clock.rect.w = rect[2].as<int>();
+                clock.rect.h = rect[3].as<int>();
+                clock.tz = obj["tz"].as<int>();;
+            }
+            Log_info("Clock parsed info: [%d, %d, %d, %d], tz = %d\n", clock.rect.x, clock.rect.y, clock.rect.w, clock.rect.h, clock.tz);
+        }
     }
     delete(png); // free the decoder instance
     return rc;

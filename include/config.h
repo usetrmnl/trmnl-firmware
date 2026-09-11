@@ -170,6 +170,12 @@ typedef struct tag_trmnl_device {
 } TRMNL_DEVICE;
 #endif // PARALLEL_EPD
 
+typedef struct tag_clock_info {
+  BB_RECT rect;
+  int32_t tz;
+  bool bAnalog;
+} CLOCK_INFO;
+
 // This enum defines sets of display configurations for different SPI panel types
 // These sets are what define the temperature profile - 3 per size (default, A, B)
 enum {
