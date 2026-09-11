@@ -3,6 +3,8 @@
 #include <persistence_interface.h>
 #include <stdint.h>
 
+#define MAX_QUIET_SLOW_RETRIES 12
+
 // Single owner of the device's stored refresh interval ("refresh_rate" in NVS):
 // the number of seconds goToSleep() arms the deep-sleep timer with. Covers the
 // server-provided rate, the fast-poll backoff used while waiting for setup or
@@ -12,7 +14,7 @@ public:
   static constexpr const char *SLEEP_KEY = "refresh_rate";
   static constexpr const char *STREAK_KEY = "fast_polls";
 
-  static constexpr uint32_t DEFAULT_SECONDS = 900;
+  static constexpr uint32_t DEFAULT_SECONDS = 300; // 5 minutes
 
   explicit RefreshInterval(Persistence &persistence);
 
