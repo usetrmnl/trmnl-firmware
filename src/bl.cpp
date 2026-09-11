@@ -1532,6 +1532,8 @@ static https_request_err_e downloadAndShow()
     filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
     Log_info("Modem: saving to %s", szTemp);
     filesystem_purge_old_file(szTemp);
+    if (apiDisplayResult.response.has_playlist_image_names)
+      filesystem_purge_unlisted_images(apiDisplayResult.response.playlist_image_names.c_str());
 
     String _prevPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
     String _prevLastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
@@ -1786,6 +1788,8 @@ static https_request_err_e downloadAndShow()
             filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
             Log.info("%s [%d]: Writing %s to SPIFFS\r\n", __FILE__, __LINE__, szTemp);
             filesystem_purge_old_file(szTemp); // try to delete the old version or older than 24h
+            if (apiDisplayResult.response.has_playlist_image_names)
+              filesystem_purge_unlisted_images(apiDisplayResult.response.playlist_image_names.c_str());
             writeImageToFile(szTemp, buffer, content_size);
             Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
             display_show_image(buffer, content_size, true);

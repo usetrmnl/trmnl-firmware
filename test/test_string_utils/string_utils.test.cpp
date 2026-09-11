@@ -69,6 +69,22 @@ void test_escape_all_special_chars_combined(void) {
 
 void test_escape_multiple_commas(void) { TEST_ASSERT_EQUAL_STRING("a\\,b\\,c", escape_modem_param("a,b,c").c_str()); }
 
+void test_playlist_has_image_matches_a_listed_name(void) {
+  TEST_ASSERT_TRUE(playlist_has_image("/mashup-4d5e6f-1771674964", "plugin-1a2b3c|mashup-4d5e6f"));
+}
+
+void test_playlist_has_image_rejects_an_unlisted_name(void) {
+  TEST_ASSERT_FALSE(playlist_has_image("/plugin-abcdef-1771674964", "plugin-1a2b3c|mashup-4d5e6f"));
+}
+
+void test_playlist_has_image_needs_the_whole_name(void) {
+  TEST_ASSERT_FALSE(playlist_has_image("/plugin-1a2b3c-1771674964", "plugin-1a2b|plugin-1a2b3c99"));
+}
+
+void test_playlist_has_image_rejects_everything_for_an_empty_list(void) {
+  TEST_ASSERT_FALSE(playlist_has_image("/plugin-1a2b3c-1771674964", ""));
+}
+
 void setUp(void) {
     // set stuff up here
 }
@@ -91,6 +107,10 @@ void process() {
   RUN_TEST(test_escape_backslash_before_comma);
   RUN_TEST(test_escape_all_special_chars_combined);
   RUN_TEST(test_escape_multiple_commas);
+  RUN_TEST(test_playlist_has_image_matches_a_listed_name);
+  RUN_TEST(test_playlist_has_image_rejects_an_unlisted_name);
+  RUN_TEST(test_playlist_has_image_needs_the_whole_name);
+  RUN_TEST(test_playlist_has_image_rejects_everything_for_an_empty_list);
   UNITY_END();
 }
 

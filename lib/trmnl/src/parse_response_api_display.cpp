@@ -26,7 +26,9 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
         .reset_firmware = false,
         .special_function = SF_NONE,
         .action = "",
-        .touchbar_mode = ""};
+        .touchbar_mode = "",
+        .has_playlist_image_names = false,
+        .playlist_image_names = ""};
   }
   String special_function_str = doc["special_function"];
   // Convert the temperature profile ("default", "a", "b", "c")
@@ -38,6 +40,15 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
   else if (tp == "b")
     u32TP = 2;
 //     else if (tp == "c") u32TP = 3;
+
+  // The playlist image names arrive as a JSON array; join them with '|' like the playlist order stored in NVS
+  JsonArray names = doc["playlist_image_names"];
+  String playlist_image_names = "";
+  int i, iCount = names.size();
+  for (i = 0; i < iCount; i++) {
+    if (i > 0) playlist_image_names += '|';
+    playlist_image_names += names[i].as<const char *>();
+  }
 
   return ApiDisplayResponse{
       .outcome = ApiDisplayOutcome::Ok,
@@ -55,5 +66,7 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
       .reset_firmware = doc["reset_firmware"],
       .special_function = parseSpecialFunction(special_function_str),
       .action = doc["action"] | "",
-      .touchbar_mode = doc["touchbar_mode"] | ""};
+      .touchbar_mode = doc["touchbar_mode"] | "",
+      .has_playlist_image_names = doc["playlist_image_names"].is<JsonArray>(),
+      .playlist_image_names = playlist_image_names};
 }

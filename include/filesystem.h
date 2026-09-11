@@ -11,6 +11,13 @@
 void filesystem_purge_old_file(const char *name);
 
 /**
+ * @brief Function to delete cached plugin images which are no longer in the playlist
+ * @param names the playlist image names separated by '|', empty when the playlist is empty
+ * @return nothing
+ */
+void filesystem_purge_unlisted_images(const char *names);
+
+/**
  * @brief Function to read a file into a newly allocated buffer
  * @param name filename
  * @param out_buffer pointer to pointer of the output buffer

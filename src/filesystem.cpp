@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <filesystem.h>
 #include <inttypes.h>
+#include <string_utils.h>
 #include <trmnl_log.h>
 
 #if defined(PARALLEL_EPD)
@@ -151,6 +152,35 @@ void filesystem_purge_old_file(const char *name) {
   rootDir.close();
 
 } /* filesystem_purge_old_file() */
+
+/**
+ * @brief Function to delete cached plugin images which are no longer in the playlist
+ *        The server sends the name of every image in the playlist (e.g. plugin-1a2b3c) and
+ *        any timestamped image not on that list gets deleted. Files without a timestamp
+ *        (setup logo, last displayed image) are left alone.
+ * @param names the playlist image names separated by '|', empty when the playlist is empty
+ * @return nothing
+ */
+void filesystem_purge_unlisted_images(const char *names) {
+  File rootDir;
+  char szTemp[36];
+
+  rootDir = FS.open("/");
+  while (File file = rootDir.openNextFile()) {
+    if (file.isDirectory() || filesystem_extract_timestamp(file.name()) == 0) {
+      file.close();
+      continue;
+    }
+    strcpy(szTemp, "/"); // needed on this file operation
+    strcat(szTemp, file.name());
+    file.close();
+    if (!playlist_has_image(szTemp, names)) {
+      Log_info("Deleting image no longer in the playlist - %s", szTemp);
+      FS.remove(szTemp);
+    }
+  }
+  rootDir.close();
+} /* filesystem_purge_unlisted_images() */
 
 /**
  * @brief Function to write data to file

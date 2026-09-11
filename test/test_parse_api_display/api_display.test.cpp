@@ -58,6 +58,32 @@ void test_parseResponse_apiDisplay_missing_fields(void) {
   assert_response_equal(expected, parseResponse_apiDisplay(input));
 }
 
+void test_parseResponse_apiDisplay_playlist_image_names(void) {
+  String input = "{\"status\":0,\"playlist_image_names\":[\"plugin-1a2b3c\",\"mashup-4d5e6f\"]}";
+
+  ApiDisplayResponse actual = parseResponse_apiDisplay(input);
+
+  TEST_ASSERT_TRUE(actual.has_playlist_image_names);
+  TEST_ASSERT_EQUAL_STRING("plugin-1a2b3c|mashup-4d5e6f", actual.playlist_image_names.c_str());
+}
+
+void test_parseResponse_apiDisplay_empty_playlist_image_names(void) {
+  String input = "{\"status\":0,\"playlist_image_names\":[]}";
+
+  ApiDisplayResponse actual = parseResponse_apiDisplay(input);
+
+  TEST_ASSERT_TRUE(actual.has_playlist_image_names);
+  TEST_ASSERT_EQUAL_STRING("", actual.playlist_image_names.c_str());
+}
+
+void test_parseResponse_apiDisplay_no_playlist_image_names(void) {
+  String input = "{\"status\":0}";
+
+  ApiDisplayResponse actual = parseResponse_apiDisplay(input);
+
+  TEST_ASSERT_FALSE(actual.has_playlist_image_names);
+}
+
 void test_parseResponse_apiDisplay_treats_unknown_sf_as_none(void) {
   String input = "{\"status\":200,\"image_url\":\"http://example.com/"
                  "foo.bmp\",\"update_firmware\":true,\"firmware_url\":\"https://example.com/"
@@ -82,6 +108,9 @@ void process() {
   RUN_TEST(test_parseResponse_apiDisplay_deserializationError);
   RUN_TEST(test_parseResponse_apiDisplay_treats_unknown_sf_as_none);
   RUN_TEST(test_parseResponse_apiDisplay_missing_fields);
+  RUN_TEST(test_parseResponse_apiDisplay_playlist_image_names);
+  RUN_TEST(test_parseResponse_apiDisplay_empty_playlist_image_names);
+  RUN_TEST(test_parseResponse_apiDisplay_no_playlist_image_names);
   UNITY_END();
 }
 

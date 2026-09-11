@@ -46,6 +46,8 @@ struct ApiDisplayResponse {
   SPECIAL_FUNCTION special_function;
   String action;
   String touchbar_mode;
+  bool has_playlist_image_names; // false when the server didn't send the list (older server or a system screen)
+  String playlist_image_names; // names separated by '|' e.g. plugin-1a2b3c|mashup-4d5e6f
 };
 
 struct ApiDisplayInputs {
