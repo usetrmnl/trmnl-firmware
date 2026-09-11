@@ -56,24 +56,6 @@
 #include "messages.h"
 #include "displayed_image.h"
 #include <globals.h>
-const char *szHTTPErrors[] = {
-    "HTTPS_NO_ERR",
-    "HTTPS_RESET",
-    "HTTPS_NO_REGISTER",
-    "HTTPS_SUCCESS",
-    "HTTPS_CLIENT_FAILED",
-    "HTTPS_REQUEST_FAILED",
-    "HTTPS_UNABLE_TO_CONNECT",
-    "HTTPS_CONNECTION_FAILED",
-    "HTTPS_RESPONSE_CODE_INVALID",
-    "HTTPS_JSON_PARSING_ERR",
-    "HTTPS_WRONG_IMAGE_SIZE",
-    "HTTPS_WRONG_IMAGE_FORMAT",
-    "HTTPS_IMAGE_FILE_TOO_BIG",
-    "HTTPS_PLUGIN_NOT_ATTACHED",
-    "HTTPS_BAD_CLIENT",
-    "HTTPS_OUT_OF_MEMORY"
-};
 
 static float vBatt;
 static https_request_err_e downloadAndShow(); // download and show the image
@@ -530,18 +512,6 @@ void check_channel_states(void)
             pending_indicator_side = TOUCHBAR_MIDDLE;
             pending_indicator_filled = true;
             has_pending_indicator = true;
-            // Log_info("Middle button held - OTG toggle");
-            // if (otg_state) {
-            //   otg_turn_off();
-            //   showMessageWithLogo(OTG_TURNED_OFF); otg_state = false;
-            // }
-            // else {
-            //   otg_turn_on();
-            //   showMessageWithLogo(OTG_TURNED_ON);
-            //   otg_state = true;
-            // }
-            // delay(1000);
-            // showLastImageAndSleep();
           } else {
             display_draw_touchbar_indicator(TOUCHBAR_MIDDLE, false);
             Log_info("Middle button tapped");
@@ -580,17 +550,6 @@ void check_channel_states(void)
           case 1:
             display_draw_touchbar_indicator(TOUCHBAR_MIDDLE, slider_event == IQS323_GESTURE_HOLD);
             Log_info("Middle button pressed");
-            // if (otg_state) {
-            //   otg_turn_off();
-            //   showMessageWithLogo(OTG_TURNED_OFF); otg_state = false;
-            // }
-            // else {
-            //   otg_turn_on();
-            //   showMessageWithLogo(OTG_TURNED_ON);
-            //   otg_state = true;
-            // }
-            // delay(1000);
-            // showLastImageAndSleep();
             break;
           case 2:
             display_draw_touchbar_indicator(TOUCHBAR_RIGHT, slider_event == IQS323_GESTURE_HOLD);
@@ -941,41 +900,6 @@ void bl_init(void)
   filesystem_init();
 #endif // !BOARD_TRMNL_X
 
-// #ifdef BOARD_TRMNL_X
-
-//   int8_t rslt;
-//   // I2C already initialized by IQS323 - do not call Wire.begin() again as it corrupts the bus on ESP32S3
-//   Serial.printf("Using I2C bus already initialized (SDA: %d, SCL: %d)\n\n", SENSOR_SDA_PIN, SENSOR_SCL_PIN);
-
-//   struct bma5_dev bma530_dev;
-
-//   rslt = bma530_init_device(&bma530_dev);
-//   if (rslt != BMA5_OK) {
-//     Serial.println("Failed to initialize BMA530!");
-//   }
-
-//   rslt = bma530_configure_low_power_mode(&bma530_dev);
-//   if (rslt != BMA5_OK) {
-//     Serial.println("Failed to configure BMA530 low power mode!");
-//   }
-
-//   rslt = bma530_configure_orientation(&bma530_dev);
-//   if (rslt != BMA5_OK) {
-//     Serial.println("Failed to configure BMA530 orientation!");
-//   }
-
-//   // Configure INT1 pin
-//   rslt = bma530_configure_int1(&bma530_dev);
-//   if (rslt != BMA5_OK) {
-//       Serial.println("Failed to configure BMA530 INT1!");
-//   }
-
-//   config_bma530_interrupt();
-
-//   pinMode(TCA9535_INT, INPUT);
-
-// #endif
-
 #ifdef BOARD_TRMNL_X
   // Read the gauge before the panel draws load current, and before the logo
   // is drawn so its battery icon has a snapshot to read.
@@ -1053,7 +977,7 @@ void bl_init(void)
     std::vector<ExternalNetwork> nets;
     for (auto& n : modemNets) {
       if (n.ssid == ownApSsid) continue;
-      nets.push_back({n.ssid, n.rssi, n.open, n.is5GHz});
+      nets.push_back({n.ssid, n.rssi, n.open, n.is5GHz, n.enterprise});
     }
     WifiCaptivePortal.setNetworks(nets);
 
@@ -1069,7 +993,7 @@ void bl_init(void)
       std::vector<ExternalNetwork> nets;
       for (auto& n : modemNets) {
         if (n.ssid == ownApSsid) continue;
-        nets.push_back({n.ssid, n.rssi, n.open, n.is5GHz});
+        nets.push_back({n.ssid, n.rssi, n.open, n.is5GHz, n.enterprise});
       }
       return nets;
     });
@@ -1085,7 +1009,7 @@ void bl_init(void)
 
   MSG current_msg = NONE;
 
-// uncdcomment this to hardcode WiFi credentials (useful for testing wifi errors, etc.)
+// uncomment this to hardcode WiFi credentials (useful for testing wifi errors, etc.)
 // #define HARDCODED_WIFI
 #ifdef HARDCODED_WIFI
   WifiCredentials hardcodedCreds = {.ssid = "ssid-goes-here", .pswd = "password-goes-here"};
@@ -1245,7 +1169,7 @@ void bl_init(void)
 
   // OTA checking, image checking and drawing
   https_request_err_e request_result = downloadAndShow();
-  Log.info("%s [%d]: request result - %s\r\n", __FILE__, __LINE__, szHTTPErrors[request_result]);
+  Log.info("%s [%d]: request result - %s\r\n", __FILE__, __LINE__, https_request_err_str(request_result));
 
   if (request_result == HTTPS_IMAGE_FILE_TOO_BIG)
   {
@@ -1643,9 +1567,6 @@ static https_request_err_e downloadAndShow()
     update_playlist_order(szTemp, _prevPath.c_str());
     preferences.putString(PREFERENCES_BROWSE_PATH_KEY, String(szTemp));
 
-//    new_filename = apiDisplayResult.response.filename;
-//    saveCurrentFileName(new_filename);
-
     if (result != HTTPS_PLUGIN_NOT_ATTACHED)
       result = HTTPS_SUCCESS;
     return result;
@@ -1735,8 +1656,6 @@ static https_request_err_e downloadAndShow()
               httpCode = https.GET();
               content_size = https.getSize();
             }
-//          uint8_t *buffer_old = nullptr; // Disable partial update for now
-//          int file_size_old = 0;
 
           // httpCode will be negative on error
           if (httpCode < 0)
@@ -1894,17 +1813,11 @@ static https_request_err_e downloadAndShow()
           }
           Serial.println();
           String error = "";
-         // uint8_t *imagePointer = buffer;
-//          uint8_t *imagePointer = (decodedPng == nullptr) ? buffer : decodedPng;
-        //  bool lastImageExists = filesystem_file_exists("/last.bmp") || filesystem_file_exists("/last.png");
 
           switch (png_res)
           {
           case PNG_NO_ERR:
           {
-
-           // Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
-           // display_show_image(imagePointer, image_reverse, isPNG);
 
             // Using filename from API response
             new_filename = apiDisplayResult.response.filename;
@@ -2015,7 +1928,7 @@ static https_request_err_e downloadAndShow()
     Log_error_submit("unable to connect");
   }
 
-  Log_info("Returned result - %s", szHTTPErrors[result]);
+  Log_info("Returned result - %s", https_request_err_str(result));
 
   return result;
 }
@@ -2136,7 +2049,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
         result = HTTPS_RESET;
       if (sleep_5_seconds)
         result = HTTPS_PLUGIN_NOT_ATTACHED;
-      Log.info("%s [%d]: result - %s\r\n", __FILE__, __LINE__, szHTTPErrors[result]);
+      Log.info("%s [%d]: result - %s\r\n", __FILE__, __LINE__, https_request_err_str(result));
     }
     break;
     case 202:
@@ -2343,7 +2256,6 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           image_err_e image_proccess_response = PNG_WRONG_FORMAT;
           bmp_err_e bmp_proccess_response = BMP_NOT_BMP;
 
-          // showMessageWithLogo(MSG_FORMAT_ERROR);
           String last_dot_file = filesystem_file_exists("/last.bmp") ? "/last.bmp" : "/last.png";
           if (last_dot_file == "/last.bmp")
           {
@@ -2454,11 +2366,6 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
             Log.info("%s [%d]: send_to_me PNG\r\n", __FILE__, __LINE__);
             image_err_e png_parse_result = PNG_NO_ERR; // DEBUG
             buffer = display_read_file("/current.png", &file_size);
-// Disable partial update for now
-//            if (filesystem_file_exists("/last.png")) {
-//                buffer_old = display_read_file("/last.png", &file_size_old);
-//                Log.info("%s [%d]: loading last PNG for partial update\r\n", __FILE__, __LINE__);
-//            }
             if (png_parse_result != PNG_NO_ERR)
             {
               Log_error_submit("Error parsing PNG header, code: %d", png_parse_result);
