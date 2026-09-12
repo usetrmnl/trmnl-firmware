@@ -2,7 +2,7 @@
 #include <filesystem.h>
 #include <inttypes.h>
 #include <trmnl_log.h>
-
+#include <api_types.h>
 #if defined(PARALLEL_EPD)
 #include <LittleFS.h>
 #define FS LittleFS
@@ -102,6 +102,56 @@ bool filesystem_read_from_file(const char *name, uint8_t *out_buffer, size_t siz
 }
 
 /**
+ * @brief Function to delete any cached images which are NOT part of the current playlist
+ * so that they don't accidentally get displayed when the user navigates forward or back
+ * through the playlist with the touchbar
+ * @param ApiDisplayResponse structure
+ * @return nothing
+ */
+void filesystem_purge_playlist(ApiDisplayResponse *pResponse)
+{
+  File rootDir;
+  int i, iLen;
+  char *s, *d, szTemp[32];
+  bool bDel;
+
+  if (pResponse->playlist_count == 0) return; // nothing to do
+  Log_info("Deleting cached files that are no longer in the current playlist...");
+  rootDir = FS.open("/");
+  while (File file = rootDir.openNextFile()) {
+    Log_info("Checking file \"%s\" for deletion", file.name());
+
+    if (file.isDirectory()) {
+      Log_info("Skipping directory \"%s\"", file.name());
+      file.close();
+      continue;
+    }
+
+    s = (char *)file.name();
+    d = pResponse->playlist_names;
+    // Compare the filename with all of the names in the playlist and if it doesn't
+    // match any, then delete it
+    bDel = true; // assume we delete it unless it matches a name in the current playlist
+    for (i=0; i<pResponse->playlist_count; i++) {
+        iLen = strlen(d); // the playlist names don't have a timestamp and are shorter
+        if (memcmp(s, d, iLen) == 0) {
+          bDel = false; // keep the name
+          i = pResponse->playlist_count; // early exit from the loop
+        }
+        d += iLen + 1; // point to next name in the list
+    }
+    if (bDel) { // to avoid double code
+      Log_info("Deleting obsolete file %s", file.name());
+      strcpy(szTemp, "/"); // needed on this file operation
+      strcat(szTemp, file.name());
+      file.close();
+      FS.remove(szTemp);
+    }
+  } // while
+  rootDir.close();
+} /* filesystem_purge_playlist() */
+
+/**
  * @brief Function to delete old versions of plugin images (by comparing the timestamp)
  *        It also deletes files that are older than 24h to keep SPIFFS from filling up
  * @param name filename
@@ -112,8 +162,7 @@ void filesystem_purge_old_file(const char *name) {
   time_t now;
   File rootDir;
   char *s, szTemp[32];
-  bool bDel;
-
+ 
   time(&now); // get the current epoch time
   rootDir = FS.open("/");
   while (File file = rootDir.openNextFile()) {
@@ -128,8 +177,7 @@ void filesystem_purge_old_file(const char *name) {
     s = (char *)file.name();
 
     timestamp = filesystem_extract_timestamp(s);
-    bDel = false;
-
+ 
     strcpy(szTemp, "/"); // needed on this file operation
     strcat(szTemp, file.name());
 
@@ -137,13 +185,6 @@ void filesystem_purge_old_file(const char *name) {
              (uint32_t)now);
     if (strncmp(name, szTemp, 14) == 0) { // older version of the same file
       Log_info("Deleting older version of plugin image %s - %s", name, file.name());
-      bDel = true;
-    } else if ((uint32_t)now > timestamp + 60 * 60 * 24) { // More than 24h old, or no timestamp
-      Log_info("Deleting image older than 24h - %s", file.name());
-      bDel = true;
-    }
-    if (bDel) { // to avoid double code
-      Log_info("Deleting file %s", szTemp);
       file.close();
       FS.remove(szTemp);
     }
