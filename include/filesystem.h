@@ -1,6 +1,16 @@
 #pragma once
 
 #include <Arduino.h>
+#include <api_types.h>
+
+/**
+ * @brief Function to delete any cached images which are NOT part of the current playlist
+ * so that they don't accidentally get displayed when the user navigates forward or back
+ * through the playlist with the touchbar
+ * @param ApiDisplayResponse structure
+ * @return nothing
+ */
+void filesystem_purge_playlist(ApiDisplayResponse *pResponse);
 
 /**
  * @brief Function to delete old versions of plugin images (by comparing the timestamp)

@@ -1938,6 +1938,8 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
   https_request_err_e result = HTTPS_NO_ERR;
   int file_size = 0;
 
+  filesystem_purge_playlist(&apiResponse);
+
 #ifdef BOARD_TRMNL_X
   // Set touchbar mode and persist to NVS
   if (apiResponse.touchbar_mode.length() == 0 || touchbar_tap_mode == (apiResponse.touchbar_mode == "tap")) {
