@@ -18,13 +18,6 @@ struct ApiSetupResponse {
   String message;
 };
 
-struct ApiSetupInputs {
-  String baseUrl;
-  String macAddress;
-  String firmwareVersion;
-  String model;
-};
-
 enum class ApiDisplayOutcome {
   Ok,
   DeserializationError,
@@ -78,6 +71,8 @@ struct ApiDisplayInputs {
   bool imageCached;
   int prevWakeTime;
 };
+
+using ApiSetupInputs = ApiDisplayInputs;
 
 struct ApiLogInputs {
   String macAddress;

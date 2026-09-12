@@ -2726,18 +2726,6 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 #endif
     }
     break;
-    case MAC_NOT_REGISTERED:
-    {
-        UWORD y_start = 340;
-        UWORD font_width = 18; // DEBUG
-        Paint_DrawMultilineText(0, y_start, message.c_str(), width, font_width, BBEP_BLACK, BBEP_WHITE,
-#if defined( BOARD_TRMNL_X ) || defined( BOARD_TRMNL_X_EPDIY ) || defined( BOARD_TRMNL_X_SENSORIAS3 ) || defined( BOARD_TRMNL_X_SENSORIAC5 ) || defined( BOARD_TRMNL_X_LILYGO ) || defined( BOARD_TRMNL_X_PAPERS3 )
-        Inter_18, true);
-#else
-        nicoclean_8, true);
-#endif
-    }
-    break;
     default:
         break;
     }
