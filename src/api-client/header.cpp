@@ -2,8 +2,8 @@
 
 extern TRMNL_DEVICE *pDevice;
 
-ApiDisplayInputs applyApiHeaders(ApiDisplayInputs &inputs) {
-
+ApiDisplayInputs createApiHeaders() {
+  ApiDisplayInputs inputs;
   char wakeupReasonString[32] = {0};
   if (parseWakeupReasonToStr(wakeupReasonString, sizeof(wakeupReasonString), (esp_sleep_source_t)wakeup_reason)) {
     inputs.updateSource = String(wakeupReasonString);

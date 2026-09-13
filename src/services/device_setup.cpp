@@ -41,9 +41,7 @@ void DeviceSetup::handleInvalidImage(uint32_t bytesRead) {
  *        _result; Success means the image download should proceed
  */
 void DeviceSetup::performApiSetup() {
-  // Set up the API inputs
-  ApiSetupInputs inputs;
-  inputs = applyApiHeaders(inputs);
+  ApiDisplayInputs inputs = createApiHeaders();
   inputs.baseUrl = _persistence.readString(PREFERENCES_API_URL, API_BASE_URL);
 
   Log.info("%s [%d]: [HTTPS] begin /api/setup ...\r\n", __FILE__, __LINE__);

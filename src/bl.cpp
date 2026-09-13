@@ -1341,8 +1341,7 @@ void bl_process(void)
 
 ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
 {
-  ApiDisplayInputs inputs;
-  inputs = applyApiHeaders(inputs);
+  ApiDisplayInputs inputs = createApiHeaders();
   inputs.baseUrl = preferences.getString(PREFERENCES_API_URL, API_BASE_URL);
   Log.info("%s [%d]: baseUrl from preferences: %s\r\n", __FILE__, __LINE__, inputs.baseUrl.c_str());
   return inputs;

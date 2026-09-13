@@ -14,4 +14,4 @@
 #include <config.h>
 #include <ArduinoLog.h>
 
-ApiDisplayInputs applyApiHeaders(ApiDisplayInputs &inputs);
+ApiDisplayInputs createApiHeaders();
