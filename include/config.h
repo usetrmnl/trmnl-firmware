@@ -134,7 +134,7 @@
 
 // Battery measurement types
 // BATT_NONE = use fake voltage
-enum { BATT_NONE = 0, BATT_ADC, BATT_BQ27220, BATT_BQ27427 };
+enum { BATT_NONE = 0, BATT_ADC, BATT_BQ27220, BATT_BQ27427, BATT_BQ27426 };
 
 #ifdef PARALLEL_EPD
 // TRMNL Device structure (slightly different for parallel eink panels)
