@@ -61,19 +61,22 @@ const TRMNL_DEVICE device_list[] =
   "reterminal_e1001", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     1,    21,      BATT_ADC,  EPD_75,
   "reterminal_e1002", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     1,    21,      BATT_ADC,  EPD_75_6CLR,
   "crowpanel42",   0,    0,     0,   0,    0,   0,    0xff, 0xff, 2,     0xff, 0xff,    BATT_NONE, EPD_CROWPANEL, 
-#ifdef CMD_CS1_CS2
+  "zectrix_note4c", 12,  13,    11,  9,    10,  8,    0xff, 0xff, 0,     3,    0xff,    BATT_ADC,  EPD_42_4CLR,
+  #ifdef CMD_CS1_CS2
   "m5_paper_mono", 0,    0,     0,   0,    0,   0,    47,   48,   2,     0xff, 0xff,    BATT_NONE, EPD_PAPER_MONO, 
   "m5_paper_color", 0,   0,     0,   0,    0,   0,    3,    2,    1,     0xff, 0xff,    BATT_NONE, EPD_PAPER_COLOR, 
   "reterminal_e1004", 0, 0,     0,   0,    0,   0,    0xff, 0xff, 4,     1,    21,      BATT_ADC,  EPD_133_COLOR,
   "trmnl_steam",   7,    8,     6,   10,   5,   4,    21,   20,   2,     3,    0xff,    BATT_ADC,  EPD_583,
+  "zectrix_note4", 12,   13,    11,  9,    10,  8,    0xff, 0xff, 0,     3,    0xff,    BATT_NONE,  EPD_42C,
 #endif
   NULL,            0,    0,     0,   0,    0,   0,    0,    0,    0,     0,    0,       0,         0,
 }; // device_list
 
 // TRMNL SPI ePaper panel types list. The list order is fixed and based on enumerated values
 // N.B. ALWAYS ADD NEW PANELS TO THE END OF THE LIST
-const DISPLAY_PROFILE dpList[11][3] = { // 1-bit and 2-bit display types for each profile
+const DISPLAY_PROFILE dpList[13][3] = { // 1-bit and 2-bit display types for each profile
     {{EP75_800x480, EP75_800x480_4GRAY}, {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, {EP75_800x480, EP75_800x480_4GRAY_V2}},
+    {{EP42YR_400x300, EP42YR_400x300}, {EP42YR_400x300, EP42YR_400x300}, {EP42YR_400x300, EP42YR_400x300}},
     {{EP426_800x480, EP426_800x480_4GRAY}, {EP426_800x480, EP426_800x480_4GRAY}, {EP426_800x480, EP426_800x480_4GRAY}},
     {{EP397_800x480, EP397_800x480_4GRAY}, {EP397_800x480, EP397_800x480_4GRAY}, {EP397_800x480, EP397_800x480_4GRAY}},
     {{EP75R_800x480, EP75R_800x480}, {EP75R_800x480, EP75R_800x480}, {EP75R_800x480, EP75R_800x480}}, 
@@ -85,6 +88,7 @@ const DISPLAY_PROFILE dpList[11][3] = { // 1-bit and 2-bit display types for eac
     {{EPD_M5_PAPER_MONO, EPD_M5_PAPER_MONO_4GRAY},{EPD_M5_PAPER_MONO, EPD_M5_PAPER_MONO_4GRAY},{EPD_M5_PAPER_MONO, EPD_M5_PAPER_MONO_4GRAY}},
     {{EPD_M5_PAPER_COLOR, EPD_M5_PAPER_COLOR},{EPD_M5_PAPER_COLOR, EPD_M5_PAPER_COLOR},{EPD_M5_PAPER_COLOR, EPD_M5_PAPER_COLOR}},
     {{EPD_SEEED_E1004, EPD_SEEED_E1004},{EPD_SEEED_E1004, EPD_SEEED_E1004},{EPD_SEEED_E1004, EPD_SEEED_E1004}},
+    {{EP42C_400x300, EP42C_400x300},{EP42C_400x300, EP42C_400x300},{EP42C_400x300, EP42C_400x300}},
 #endif
 };
 uint8_t u8SpectraPal[512]; // RGB333 mapped to closest Spectra6 color
@@ -140,7 +144,10 @@ static bool display_update_epaper(int refreshMode, bool wait, bool writePlane = 
     if (writePlane) {
         bbep.writePlane(plane);
     }
-    if (refreshMode == REFRESH_PARTIAL && !bCanDoPartial) {
+    if (bbep.capabilities() & (BBEP_3COLOR | BBEP_4COLOR | BBEP_7COLOR | BBEP_2BIT_BW)) {
+        Log_info("Color EPD, must use full refresh mode");
+        refreshMode = REFRESH_FULL;
+    } else if (refreshMode == REFRESH_PARTIAL && !bCanDoPartial) {
         refreshMode = REFRESH_FAST;
         Log_info("Can't do partial refresh, no previous image");
     } else {
@@ -190,6 +197,12 @@ void display_init(void)
     pinMode(10, OUTPUT); // SD card enable (if it's powered down, the SPI bus may be blocked)
     digitalWrite(10, 1);
 #endif // BOARD_SEEED_STICKY
+#if defined( BOARD_ZECTRIX_NOTE4C ) || defined ( BOARD_ZECTRIX_NOTE4 )
+    pinMode(6, OUTPUT); // EPD power enable
+    pinMode(17, OUTPUT); // Battery LDO enable
+    digitalWrite(6, HIGH);
+    digitalWrite(17, HIGH);
+#endif // BOARD_ZECTRIX_NOTE4C
     if (pDevice->epd_mosi_pin != 0 || pDevice->epd_sck_pin != 0) {
         bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit); // must be set BEFORE calling initio
         bbep.initIO(pDevice->epd_dc_pin, pDevice->epd_rst_pin, pDevice->epd_busy_pin, pDevice->epd_cs_pin,
@@ -1239,6 +1252,53 @@ int png_draw_4clr(PNGDRAW *pDraw)
     return 1; // continue decoding
 } /* png_draw4clr() */
 #endif // BOARD_TRMNL_4CLR (4 color only)
+//
+// Write 1-bit image data as packed 2-bits per pixel
+// for the SSD2683 EPD controller
+// (Zectrix Note 4 so far)
+//
+int png_draw_2bit_bw(PNGDRAW *pDraw)
+{
+    int x;
+    uint8_t ucBppChanged = 0, ucInvert = 0;
+    uint8_t uc, ucMask, src, *s, *d, *pTemp = bbep.getCache(); // get some scratch memory (not from the stack)
+    int iWidth;
+
+    iWidth = pDraw->iWidth;
+    if (pDraw->y >= bbep.height()) return 0; // stop decoding if we'll go past the bottom
+    if (iWidth > bbep.width()) iWidth = bbep.width(); // crop image width to display size if it's larger
+
+    if (pDraw->iPixelType == PNG_PIXEL_INDEXED || pDraw->iBpp > 2) {
+        if (pDraw->iBpp == 1) { // 1-bit output, just see which color is brighter
+            uint32_t u32Gray0, u32Gray1;
+            u32Gray0 = pDraw->pPalette[0] + (pDraw->pPalette[1]<<2) + pDraw->pPalette[2];
+            u32Gray1 = pDraw->pPalette[3] + (pDraw->pPalette[4]<<2) + pDraw->pPalette[5];
+          if (u32Gray0 < u32Gray1) {
+            ucInvert = 0xff;
+          }
+        } else {
+            // Reduce the source image to 1-bpp or 2-bpp
+            ReduceBpp((pDraw->pUser) ? 2:1, pDraw->iPixelType, pDraw->pPalette, pDraw->pPixels, pTemp, iWidth, pDraw->iBpp);
+            ucBppChanged = 1;
+        }
+    } else if (pDraw->iBpp == 2) {
+        ucInvert = 0xff; // 2-bit non-palette images need to be inverted colors for 4-gray mode
+    }
+    s = (ucBppChanged) ? pTemp : (uint8_t *)pDraw->pPixels;
+    d = pTemp;
+    for (x=0; x<iWidth; x+= 8) {
+        uint8_t uc1=0, uc2=0;
+        for (int bit=0; bit<4; bit++) {
+            uc1 <<= 2; uc2 <<= 2;
+            if (s[0] & (0x80 >> bit)) uc1 |= 1;
+            if (s[0] & (0x08 >> bit)) uc2 |= 1;
+        }
+        s++;
+        *d++ = uc1; *d++ = uc2;
+    }
+    bbep.writeData(pTemp, (iWidth+7)/8);
+    return 1;
+} /* png_draw_2bit_bw() */
 
 int png_draw(PNGDRAW *pDraw)
 {
@@ -1658,6 +1718,16 @@ PNG *png = new PNG();
                 delete(png); // free the decoder instance
                 bbep.writePlane(); // send the pixels to the display panel
                 return REFRESH_FAST;
+            }
+            if (bbep.capabilities() & BBEP_2BIT_BW) {
+                // new SSD2683 controller forces 2-bits per pixel for 1-bit content
+                Log_info("%s [%d]: decoding for SSD2683 special case 2/1-bit\r\n", __FILE__, __LINE__);
+                png->openRAM((uint8_t *)pPNG, iDataSize, png_draw_2bit_bw);
+                bbep.startWrite(PLANE_0); // start writing image data
+                png->decode(NULL, 0);
+                png->close();
+                delete(png); // free the decoder instance
+                return REFRESH_FULL;
             }
 #ifdef BOARD_TRMNL_4CLR
             Log_info("%s [%d]: decoding for 4-color EPD\r\n", __FILE__, __LINE__);
