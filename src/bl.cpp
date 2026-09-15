@@ -1038,7 +1038,7 @@ void bl_init(void)
     }
     else
     {
-      if (current_msg != WIFI_FAILED && should_show_error_now)
+      if (should_show_error_now)
       {
         showMessageWithLogo(WIFI_FAILED);
         current_msg = WIFI_FAILED;
