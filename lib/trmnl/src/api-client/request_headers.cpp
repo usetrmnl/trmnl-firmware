@@ -47,6 +47,9 @@ HttpHeaderList buildSetupHeaders(const ApiSetupInputs &inputs) {
   headers.push_back({"Content-Type", "application/json"});
   headers.push_back({"FW-Version", inputs.firmwareVersion});
   headers.push_back({"Model", inputs.model});
+  headers.push_back({"Width", String(inputs.displayWidth)});
+  headers.push_back({"Height", String(inputs.displayHeight)});
+  headers.push_back({"RSSI", String(inputs.rssi)});
   return headers;
 }
 

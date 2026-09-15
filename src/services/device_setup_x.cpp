@@ -43,11 +43,11 @@ void DeviceSetupX::downloadSetupImage() {
 
   Log_info("Downloading setup image via modem (5 GHz path)");
   _result.outcome = DeviceSetupOutcome::Success;
-  auto httpRes = _modem->httpGet(_result.imageUrl, "/logo.bmp");
+  auto httpRes = _modem->httpGet(_result.imageUrl, "/logo.png");
   if (!httpRes.ok || httpRes.bytesReceived != DISPLAY_BMP_IMAGE_SIZE) {
     Log_error_submit("Modem logo download failed: ok=%d bytes=%u expected=%u", httpRes.ok, httpRes.bytesReceived,
                      DISPLAY_BMP_IMAGE_SIZE);
-    filesystem_file_delete("/logo.bmp");
+    filesystem_file_delete("/logo.png");
     _result.outcome = DeviceSetupOutcome::ImageDownloadError;
   }
   // Show the FRIENDLY_ID screen even when the download failed, matching the
