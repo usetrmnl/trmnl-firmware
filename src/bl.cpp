@@ -739,6 +739,7 @@ void bl_init(void)
 #endif
 
   wakeup_reason = esp_sleep_get_wakeup_cause();
+  bool should_show_error_now = (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER); // don't immediately show errors on timer wakeup
   bool gpio_wakeup = (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO ||
                       wakeup_reason == ESP_SLEEP_WAKEUP_EXT0 ||
                       wakeup_reason == ESP_SLEEP_WAKEUP_EXT1);
@@ -1037,7 +1038,7 @@ void bl_init(void)
     }
     else
     {
-      if (current_msg != WIFI_FAILED)
+      if (current_msg != WIFI_FAILED && should_show_error_now)
       {
         showMessageWithLogo(WIFI_FAILED);
         current_msg = WIFI_FAILED;
@@ -1193,7 +1194,7 @@ void bl_init(void)
   }
   else if (request_result != HTTPS_SUCCESS && request_result != HTTPS_NO_ERR && request_result != HTTPS_NO_REGISTER && request_result != HTTPS_RESET && request_result != HTTPS_PLUGIN_NOT_ATTACHED && current_msg != WIFI_FAILED)
   {
-    if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
+    if (should_show_error_now)
     {
       // Someone is looking at the device (button, touch bar, power-on): show the error right
       // away instead of silently keeping the old image. This wake does not count toward the
@@ -2621,7 +2622,7 @@ static void wifiErrorDeepSleep()
 
   if (retry_count >= MAX_QUIET_SLOW_RETRIES) {
     preferences.putInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT, 1);
-    showMessageWithLogo(WIFI_RETRY_LIMIT);
+    showMessageWithLogo(WIFI_FAILED);
     display_sleep();
     goToSleep();
     return;
