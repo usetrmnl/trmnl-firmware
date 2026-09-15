@@ -26,7 +26,8 @@ enum https_request_err_e {
   HTTPS_PLUGIN_NOT_ATTACHED,
   HTTPS_BAD_CLIENT,
   HTTPS_OUT_OF_MEMORY,
-  HTTPS_TIMED_OUT
+  HTTPS_TIMED_OUT,
+  HTTPS_IMAGE_DOWNLOAD_FAILED,
 };
 
 struct https_request_err_name {
@@ -52,6 +53,7 @@ static const https_request_err_name https_request_err_names[] = {
     {HTTPS_BAD_CLIENT, "HTTPS_BAD_CLIENT"},
     {HTTPS_OUT_OF_MEMORY, "HTTPS_OUT_OF_MEMORY"},
     {HTTPS_TIMED_OUT, "HTTPS_TIMED_OUT"},
+    {HTTPS_IMAGE_DOWNLOAD_FAILED, "HTTPS_IMAGE_DOWNLOAD_FAILED"},
 };
 
 inline const char *https_request_err_str(https_request_err_e err) {
