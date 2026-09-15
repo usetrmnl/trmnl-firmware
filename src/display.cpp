@@ -2140,7 +2140,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         bbep.setCursor(80, 104); // place in upper left corner
 #endif
         bbep.println(string0);
-        const char string1[] = "Can't establish WiFi connection.";
+        const char string1[] = "Can't establish WiFi connection. Will keep trying.";
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w)/2, bbep.height() - (rect.h*2)-140);
         bbep.println(string1);
