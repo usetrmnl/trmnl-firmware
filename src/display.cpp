@@ -50,7 +50,7 @@ const TRMNL_DEVICE device_list[] =
   "og_gen2_4clr",  6,    1,     4,   2,    5,   0,    11,   12,   3,     0xff, 0xff,    BATT_BQ27427,  EPD_75_4CLR, // fake battery == 0xff
   "xteink_x4",     8,    10,    21,  5,    4,   6,    0xff, 0xff, 3,     0,    0xff,    BATT_ADC,  EPD_426,
   "waveshare",     13,   14,    15,  26,   27,  25,   0xff, 0xff, 33,    0xff, 0xff,    BATT_ADC,  EPD_75,
-  "waveshare_397", 11,   12,    10,  46,   9,   3,    41,   42,   0,     0xff, 0xff,    BATT_ADC,  EPD_397,
+  "waveshare_397", 11,   12,    10,  46,   9,   3,    41,   42,   0,     0xff, 0xff,    BATT_AXP2101,  EPD_397,
   "seeed_sticky",  13,   14,    15,  17,   16,  18,   1,    0,    4,     0xff, 0xff,    BATT_BQ27220,  EPD_397,  
   "seeed_esp32c3", 8,    10,    3,   2,    5,   4,    0xff, 0xff, 9,     0xff, 0xff,    BATT_ADC,  EPD_75,
   "seeed_esp32s3", 7,    9,     2,   1,    4,   3,    0xff, 0xff, 0,     0xff, 0xff,    BATT_ADC,  EPD_75,
