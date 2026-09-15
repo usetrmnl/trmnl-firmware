@@ -194,11 +194,6 @@ bool WifiCaptive::startPortal() {
         succesfullyConnected = true;
         break;
       } else {
-        _ssid = "";
-        _password = "";
-        _band = "";
-        _enterprise_credentials = WifiCredentials{};
-
         WiFi.disconnect();
         WiFi.enableSTA(false);
         break;
@@ -229,6 +224,11 @@ bool WifiCaptive::startPortal() {
       status = result.status;
     }
   }
+
+  _ssid = "";
+  _password = "";
+  _band = "";
+  _enterprise_credentials = WifiCredentials{};
 
     // stop dsn
   _dnsServer->stop();
