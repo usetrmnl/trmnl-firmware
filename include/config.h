@@ -29,6 +29,14 @@
 #define PREFERENCES_LOG_KEY                  "log_"
 #define PREFERENCES_LOG_BUFFER_HEAD_KEY      "log_head"
 #define PREFERENCES_LOG_ID_KEY               "log_id"
+#define PREFERENCES_LOG_EXPIRES_AT_KEY       "log_until"
+
+// Total verbose log storage stays under twice this size. Bounded so it leaves
+// room for the image cache on the OG's 256KB partition, and so an upload fits
+// in heap next to an open TLS connection.
+#define DEBUG_LOG_FILE_OLDER                 "/dbg_a"
+#define DEBUG_LOG_FILE_NEWER                 "/dbg_b"
+#define DEBUG_LOG_FILE_MAX_BYTES             8192
 #define PREFERENCES_DEVICE_REGISTERED_KEY    "plugin"
 #define PREFERENCES_SF_KEY                   "sf"
 #define PREFERENCES_FILENAME_KEY             "filename"

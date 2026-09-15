@@ -34,6 +34,50 @@ bool filesystem_init(void) {
  */
 void filesystem_deinit(void) { FS.end(); }
 
+namespace {
+/// Binds DebugLogCapture to whichever filesystem the board uses.
+class FilesystemLogStore : public LogFileSystem {
+public:
+  bool exists(const char *path) override { return FS.exists(path); }
+
+  size_t size(const char *path) override {
+    File file = FS.open(path, FILE_READ);
+    if (!file) return 0;
+
+    size_t size = file.size();
+    file.close();
+    return size;
+  }
+
+  bool append(const char *path, const String &record) override {
+    File file = FS.open(path, FILE_APPEND);
+    if (!file) return false;
+
+    size_t written = file.println(record);
+    file.close();
+    return written == record.length() + 1;
+  }
+
+  String read(const char *path) override {
+    File file = FS.open(path, FILE_READ);
+    if (!file) return "";
+
+    String contents = file.readString();
+    file.close();
+    return contents;
+  }
+
+  bool remove(const char *path) override { return FS.remove(path); }
+
+  bool rename(const char *from, const char *to) override { return FS.rename(from, to); }
+};
+} // namespace
+
+LogFileSystem &filesystem_log_store(void) {
+  static FilesystemLogStore store;
+  return store;
+}
+
 /**
  * @brief Function to read a file into a newly allocated buffer
  * @param name filename
