@@ -3,7 +3,7 @@
 
 RefreshInterval::RefreshInterval(Persistence &persistence) : persistence(persistence) {}
 
-uint32_t RefreshInterval::seconds() { return seconds(DEFAULT_SECONDS); }
+uint32_t RefreshInterval::seconds() { return seconds(SHORT_TERM_SLOW_RETRY_INTERVAL); }
 
 uint32_t RefreshInterval::seconds(uint32_t defaultValue) { return persistence.readUint(SLEEP_KEY, defaultValue); }
 
@@ -29,10 +29,10 @@ uint32_t RefreshInterval::applyApiRetry(uint8_t attempt) {
 }
 
 uint32_t RefreshInterval::applyWifiRetry(uint8_t attempt) {
-  uint32_t sleep = DEFAULT_SECONDS;
+  uint32_t sleep = SHORT_TERM_SLOW_RETRY_INTERVAL;
 
   if (attempt >= MAX_QUIET_SLOW_RETRIES) {
-    sleep = 900; // longer sleep interval to save on battery
+    sleep = LONG_TERM_SLOW_RETRY_INTERVAL; // longer sleep interval to save on battery
   }
 
   writeIfChanged(sleep);
@@ -40,8 +40,8 @@ uint32_t RefreshInterval::applyWifiRetry(uint8_t attempt) {
 }
 
 uint32_t RefreshInterval::applyDefault() {
-  writeIfChanged(DEFAULT_SECONDS);
-  return DEFAULT_SECONDS;
+  writeIfChanged(SHORT_TERM_SLOW_RETRY_INTERVAL);
+  return SHORT_TERM_SLOW_RETRY_INTERVAL;
 }
 
 uint32_t RefreshInterval::fastPollSeconds(uint32_t streak) {

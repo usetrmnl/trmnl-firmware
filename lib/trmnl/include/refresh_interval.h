@@ -3,7 +3,9 @@
 #include <persistence_interface.h>
 #include <stdint.h>
 
-#define MAX_QUIET_SLOW_RETRIES 12
+#define MAX_QUIET_SLOW_RETRIES         12  // 12 tries * 5 minutes = 1 hour
+#define SHORT_TERM_SLOW_RETRY_INTERVAL 300 // 5 minutes
+#define LONG_TERM_SLOW_RETRY_INTERVAL  900 // 15 minutes
 
 // Single owner of the device's stored refresh interval ("refresh_rate" in NVS):
 // the number of seconds goToSleep() arms the deep-sleep timer with. Covers the
@@ -14,11 +16,9 @@ public:
   static constexpr const char *SLEEP_KEY = "refresh_rate";
   static constexpr const char *STREAK_KEY = "fast_polls";
 
-  static constexpr uint32_t DEFAULT_SECONDS = 300; // 5 minutes
-
   explicit RefreshInterval(Persistence &persistence);
 
-  // Stored interval in seconds; returns DEFAULT_SECONDS (or defaultValue) when unset.
+  // Stored interval in seconds; returns SHORT_TERM_SLOW_RETRY_INTERVAL (or defaultValue) when unset.
   uint32_t seconds();
   uint32_t seconds(uint32_t defaultValue);
 
@@ -33,7 +33,7 @@ public:
   void resetFastPollStreak();
 
   // Retry ladders; attempt is 1-based.
-  uint32_t applyApiRetry(uint8_t attempt);  // 15 / 30 / 60, then DEFAULT_SECONDS
+  uint32_t applyApiRetry(uint8_t attempt);  // 15 / 30 / 60, then SHORT_TERM_SLOW_RETRY_INTERVAL
   uint32_t applyWifiRetry(uint8_t attempt); // 60 / 180, then 300
   uint32_t applyDefault();                  // fixed fallback, e.g. /api/setup 404
 

@@ -97,7 +97,7 @@ void test_server_rate_skips_the_write_when_unchanged(void) {
 void test_server_rate_writes_when_key_is_absent_even_at_the_default(void) {
   MemoryPersistence persistence;
   RefreshInterval refreshInterval(persistence);
-  refreshInterval.applyServerRate(RefreshInterval::DEFAULT_SECONDS);
+  refreshInterval.applyServerRate(SHORT_TERM_SLOW_RETRY_INTERVAL);
   TEST_ASSERT_TRUE(persistence.recordExists(RefreshInterval::SLEEP_KEY));
 }
 
