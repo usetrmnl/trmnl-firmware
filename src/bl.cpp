@@ -1541,7 +1541,11 @@ static https_request_err_e downloadAndShow()
   Log.info("%s [%d]: Received successfully; WiFi off.\r\n", __FILE__, __LINE__);
 
   bool image_reverse = false;
-  if (isPNG || isJPEG)
+  if (isPNG)
+    png_res = parsePNGHeader(buffer, content_size); // the decoder reports nothing back
+  else if (isJPEG)
+    png_res = PNG_NO_ERR;
+  if (png_res == PNG_NO_ERR && (isPNG || isJPEG))
   {
     char szTemp[36];
     filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
@@ -1551,7 +1555,6 @@ static https_request_err_e downloadAndShow()
     Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
     display_show_image(buffer, content_size, true);
     DisplayedImage::remember(szTemp); // current image becomes the previous image
-    png_res = PNG_NO_ERR; // DEBUG
     String _curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
     String _lastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
     if (!_curPath.isEmpty() && (_curPath != String(szTemp) || _lastPath.isEmpty()))
@@ -1562,7 +1565,7 @@ static https_request_err_e downloadAndShow()
     #endif
     preferences.putString(PREFERENCES_BROWSE_PATH_KEY, String(szTemp));
   }
-  else
+  else if (!isPNG && !isJPEG)
   {
     bmp_res = parseBMPHeader(buffer, image_reverse);
     Log.info("%s [%d]: BMP Parsing result: %d\r\n", __FILE__, __LINE__, bmp_res);
