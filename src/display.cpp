@@ -46,8 +46,8 @@ const TRMNL_DEVICE device_list[] =
 // name            sck   mosi   cs   rst   dc   busy  sda   scl   intr   batt  batt_en, batt_type, panel
   "og",            7,    8,     6,   10,   5,   4,    21,   20,   2,     3,    0xff,    BATT_ADC,  EPD_75,
   "og_4clr",       7,    8,     6,   10,   5,   4,    21,   20,   2,     3,    0xff,    BATT_ADC,  EPD_75_4CLR,
-  "og_gen2",       6,    1,     4,   2,    5,   0,    23,   10,   3,     0xff, 0xff,    BATT_BQ27427,  EPD_75, // fake battery == 0xff
-  "og_gen2_4clr",  6,    1,     4,   2,    5,   0,    11,   12,   3,     0xff, 0xff,    BATT_BQ27427,  EPD_75_4CLR, // fake battery == 0xff
+  "og_gen2",       6,    1,     4,   2,    5,   0,    23,   10,   3,     0xff, 0xff,    BATT_BQ27427,  EPD_75,
+  "og_gen2_4clr",  6,    1,     4,   2,    5,   0,    23,   10,   3,     0xff, 0xff,    BATT_BQ27427,  EPD_75_4CLR,
   "xteink_x4",     8,    10,    21,  5,    4,   6,    0xff, 0xff, 3,     0,    0xff,    BATT_ADC,  EPD_426,
   "waveshare",     13,   14,    15,  26,   27,  25,   0xff, 0xff, 33,    0xff, 0xff,    BATT_ADC,  EPD_75,
   "waveshare_397", 11,   12,    10,  46,   9,   3,    41,   42,   0,     0xff, 0xff,    BATT_AXP2101,  EPD_397,
@@ -522,7 +522,7 @@ void display_wipe(void)
 {
 #ifdef BB_EPAPER
 
-#ifdef BOARD_TRMNL_4CLR
+#if defined( BOARD_TRMNL_4CLR ) || defined( BOARD_TRMNL_GEN2_4CLR )
     int refreshCount = 2;
 #else
     int refreshCount = 60;
@@ -1134,7 +1134,7 @@ int png_draw_6clr(PNGDRAW *pDraw)
     return 1; // continue decoding
 } /* png_draw_6clr() */
 
-#ifdef BOARD_TRMNL_4CLR
+#if defined( BOARD_TRMNL_4CLR ) || defined( BOARD_TRMNL_GEN2_4CLR )
 //
 // Draw the PNG image into the local framebuffer memory using the drawPixel() method
 // to do color translation and to properly format the memory layout
@@ -1662,7 +1662,7 @@ PNG *png = new PNG();
                 bbep.writePlane(); // send the pixels to the display panel
                 return REFRESH_FAST;
             }
-#ifdef BOARD_TRMNL_4CLR
+#if defined( BOARD_TRMNL_4CLR ) || defined( BOARD_TRMNL_GEN2_4CLR )
             Log_info("%s [%d]: decoding for 4-color EPD\r\n", __FILE__, __LINE__);
             png->openRAM((uint8_t *)pPNG, iDataSize, png_draw_4clr);
             bbep.startWrite(PLANE_1); // start writing image data
