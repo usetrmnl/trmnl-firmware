@@ -15,48 +15,43 @@
 /// @brief Per-cell pack capacity (mAh) assumed when BYPASS_BQ27427_SOC is enabled.
 #define BQ27427_BYPASS_CELL_CAPACITY_MAH 6000
 
-/// Connect to the BQ27427 and fill in a validated snapshot of its readings.
+/// Connect to the BQ27427, run the golden-file/Impedance Track path, and
+/// fill in a validated snapshot of its readings.
 static bool connectAndRead(bool oneCellPack, BQ27427Snapshot &snap) {
+  bool ok = lipo.connectAndConfigure(PIN_INTERNAL_SDA, PIN_INTERNAL_SCL, oneCellPack) && lipo.readSnapshot(snap);
+
+  // Real gas-gauge values, kept for the Gauge-* comparison headers even when
+  // BYPASS_BQ27427_SOC below overrides soc/capacity.
+  snap.gaugeSoc = ok ? snap.soc : -1;
+  snap.gaugeHealth = ok ? snap.health : -1;
+  snap.gaugeCapacityRemain = ok ? snap.capacityRemain : -1;
+  snap.gaugeCapacityFull = ok ? snap.capacityFull : -1;
+
 #ifdef BYPASS_BQ27427_SOC
-  // Charge gauging is bypassed: the IT algorithm's SoC/capacity values are
-  // never used, so skip the golden-file configuration and ITPOR wait. The
-  // chip only supplies direct measurements (voltage, current, temperature);
-  // SoC comes from the voltage and capacity from a fixed per-cell pack size.
-  (void)oneCellPack;
-
-  if (!lipo.begin(PIN_INTERNAL_SDA, PIN_INTERNAL_SCL)) return false;
-  lipo._initialized = true;
-  snap.flags = lipo.flags();
-  snap.energyScale = 1;
-  snap.voltage = lipo.voltage();                                     // mV
-  snap.current = lipo.current(AVG);                                  // mA
-  snap.temperature = float(lipo.temperature(BATTERY) - 2732) / 10.0; // C
-
+  if (ok) {
   // Estimate SoC from the voltage just read. Mirrors the server's
   // percent_charged_calculation: map 3.0 V onto 0 % at 0.012 V per percent,
   // with plateaus near full charge (4.08 V follows a full charge) and a
   // 1 % floor.
-  float voltage = snap.voltage / 1000.0f;
-  float pct = (voltage - 3.0f) / 0.012f;
-  if (pct >= 88.0f)
-    snap.soc = 100;
-  else if (pct >= 85.0f)
-    snap.soc = 95;
-  else if (pct >= 83.0f)
-    snap.soc = 90;
-  else if (pct >= 10.0f)
-    snap.soc = (int)(pct + 0.5f);
-  else
-    snap.soc = 1;
-  snap.capacityFull = battery_count * BQ27427_BYPASS_CELL_CAPACITY_MAH;
-  snap.capacityRemain = snap.capacityFull * snap.soc / 100;
-  snap.health = -1; // State-of-health unavailable without gauging
-  // A failed I2C transaction reads back as 0xFFFF (65535 mV), well outside a
-  // plausible pack voltage.
-  return snap.voltage <= 10000 && snap.temperature >= -40.0 && snap.temperature <= 100.0;
-#else
-  return lipo.connectAndConfigure(PIN_INTERNAL_SDA, PIN_INTERNAL_SCL, oneCellPack) && lipo.readSnapshot(snap);
+    float voltage = snap.voltage / 1000.0f;
+    float pct = (voltage - 3.0f) / 0.012f;
+    if (pct >= 88.0f)
+      snap.soc = 100;
+    else if (pct >= 85.0f)
+      snap.soc = 95;
+    else if (pct >= 83.0f)
+      snap.soc = 90;
+    else if (pct >= 10.0f)
+      snap.soc = (int)(pct + 0.5f);
+    else
+      snap.soc = 1;
+    snap.capacityFull = battery_count * BQ27427_BYPASS_CELL_CAPACITY_MAH;
+    snap.capacityRemain = snap.capacityFull * snap.soc / 100;
+    snap.health = -1; // State-of-health unavailable without gauging
+  }
 #endif // BYPASS_BQ27427_SOC
+
+  return ok;
 }
 
 void BQ27427Battery::gaugeInit() {
@@ -99,6 +94,10 @@ void BQ27427Battery::gaugeInit() {
     _capacityRemain = -1;
     _capacityFull = -1;
     _voltage = -1;
+    _gaugeSoc = -1;
+    _gaugeHealth = -1;
+    _gaugeCapacityRemain = -1;
+    _gaugeCapacityFull = -1;
     return;
   }
 
@@ -109,6 +108,10 @@ void BQ27427Battery::gaugeInit() {
   _capacityRemain = snap.capacityRemain;
   _capacityFull = snap.capacityFull;
   _voltage = snap.voltage / 1000.0; // Convert mV to V
+  _gaugeSoc = snap.gaugeSoc;
+  _gaugeHealth = snap.gaugeHealth;
+  _gaugeCapacityRemain = snap.gaugeCapacityRemain;
+  _gaugeCapacityFull = snap.gaugeCapacityFull;
 
   // Assemble a string to print
   String toPrint = "[" + String(millis() / 1000) + "] ";
