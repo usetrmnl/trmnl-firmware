@@ -2140,7 +2140,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         bbep.setCursor(80, 104); // place in upper left corner
 #endif
         bbep.println(string0);
-        const char string1[] = "Can't establish WiFi connection.";
+        const char string1[] = "Can't establish WiFi connection. Will keep trying.";
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w)/2, bbep.height() - (rect.h*2)-140);
         bbep.println(string1);
@@ -2205,21 +2205,21 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         bbep.print(string1);
     }
     break;
-    case API_REQUEST_FAILED:
+    case IMAGE_DOWNLOAD_FAILED:
     {
-        const char string1[] = "WiFi connected, request to API failed.";
+        const char string1[] = "API responded, but image download failed.";
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, 340);
         bbep.println(string1);
 #ifndef BOARD_TRMNL_X
-        const char string2[] = "Short click the button on back,";
+        const char string2[] = "Short click the button on back";
 #else
-        const char string2[] = "Tap the middle of touch bar,";
+        const char string2[] = "Tap the middle of touch bar";
 #endif
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.println(string2);
-        const char string3[] = "otherwise check your internet.";
+        const char string3[] = "to advance to the next screen.";
         bbep.getStringBox(string3, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.print(string3);
