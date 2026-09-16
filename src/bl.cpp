@@ -61,7 +61,7 @@
 #else
 #include <bb_epaper.h>
 #endif
-
+extern CLOCK_INFO clockinfo;
 static float vBatt;
 static https_request_err_e downloadAndShow(); // download and show the image
 static https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse);
@@ -78,7 +78,7 @@ static uint8_t *storedLogoOrDefault(int iType);
 static DeviceStatusStamp getDeviceStatusStamp();
 void config_gpio_for_lp();
 int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious);
-void ShowClock(BB_RECT *pRect, bool bFirst, int iPanelType);
+void ShowClock(CLOCK_INFO *pClock, bool bFirst);
 
 static unsigned long startup_time = 0;
 
@@ -2554,22 +2554,16 @@ void goToSleep(void)
   filesystem_deinit();
   uint32_t time_to_sleep = refreshInterval.seconds();
 
-  #ifdef FUTURE
 // *** Experimental Clock START ***
-  BB_RECT clockRect;
-  clockRect.x = clockRect.y = 0; // show in upper left corner
-  clockRect.w = 400; clockRect.h = 240; // DEBUG
-  uint32_t u32WakeMinutes = time_to_sleep / 60; // how many minutes we can show the clock
-  uint32_t u32LastWakeDelta =  (systemClock().getTime() - preferences.getUInt(PREFERENCES_LAST_SLEEP_TIME, 0))/60;
-  if (u32LastWakeDelta >= u32WakeMinutes) {
-    // normal plugin wake cycle, draw the clock on a new image and set the last sleep time
-    ShowClock(&clockRect, true, EP75_800x480);
-    preferences.putUInt(PREFERENCES_LAST_SLEEP_TIME, systemClock().getTime());
-  } else {
-    ShowClock(&clockRect, false, EP75_800x480);
+  if (clockinfo.rect.w) { // A clock plugin is part of the last image, show the time for the wakeup period
+    uint32_t u32WakeMinutes = time_to_sleep / 60; // how many minutes we can show the clock
+    for (uint32_t u32Min=0; u32Min < u32WakeMinutes; u32Min++) {
+        ShowClock(&clockinfo, u32Min == 0);
+        esp_sleep_enable_timer_wakeup(60 * 1000 * 1000); // light sleep for a minutes
+        esp_light_sleep_start();
+    }
   }
 // *** Experimental Clock END ***
-#endif // FUTURE
 
   iPrevWakeTime = millis() - startup_time; // save for statistics
   Log.info("%s [%d]: total awake time - %d ms\r\n", __FILE__, __LINE__, iPrevWakeTime); 

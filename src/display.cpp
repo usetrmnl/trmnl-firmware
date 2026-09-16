@@ -27,7 +27,7 @@ BBEPAPER bbep;
 #include <SPIFFS.h>
 #define FS SPIFFS
 #endif // !PARALLEL_EPD
-CLOCK_INFO clock;
+CLOCK_INFO clockinfo;
 
 // List of supported TRMNL devices with SPI ePaper displays. The list can be in any order since the name is matched
 // The final parameter is the panel type which is from an enumerated list
@@ -1757,13 +1757,13 @@ PNG *png = new PNG();
                     continue;
                 }
                 JsonArray rect = obj["rect"].as<JsonArray>();
-                clock.rect.x = rect[0].as<int>();
-                clock.rect.y = rect[1].as<int>();
-                clock.rect.w = rect[2].as<int>();
-                clock.rect.h = rect[3].as<int>();
-                clock.tz = obj["tz"].as<int>();;
+                clockinfo.rect.x = rect[0].as<int>();
+                clockinfo.rect.y = rect[1].as<int>();
+                clockinfo.rect.w = rect[2].as<int>();
+                clockinfo.rect.h = rect[3].as<int>();
+                clockinfo.tz = obj["tz"].as<int>();;
             }
-            Log_info("Clock parsed info: [%d, %d, %d, %d], tz = %d\n", clock.rect.x, clock.rect.y, clock.rect.w, clock.rect.h, clock.tz);
+            Log_info("Clock parsed info: [%d, %d, %d, %d], tz = %d\n", clockinfo.rect.x, clockinfo.rect.y, clockinfo.rect.w, clockinfo.rect.h, clockinfo.tz);
         }
     }
     delete(png); // free the decoder instance

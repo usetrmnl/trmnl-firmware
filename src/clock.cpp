@@ -39,32 +39,22 @@ BB_RECT rect;
 // to know the old pixels and set up the old vs new memory to only touch the area
 // we are drawing into.
 //
-void ShowClock(BB_RECT *pRect, bool bFirst, int iPanelType)
+void ShowClock(CLOCK_INFO *pInfo, bool bFirst)
 {
-#ifdef FUTURE
-struct timeval tv;
+time_t now;
+uint32_t u32Epoch;
 
+    time(&now);
+    u32Epoch = (uint32_t)now + pInfo->tz;
 #ifdef __BB_EPAPER__
     bbep.setPanelType(iPanelType);
     bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
     bbep.allocBuffer();
 #else // FastEPD
-    bbep.initPanel(iPanelType);
+//    bbep.initPanel(iPanelType);
 #endif
     bbep.fillScreen(BBEP_WHITE);
-    if (/*!bFirst && */ u32OldTime) { // not the first clock wakeup, draw the last time value in the old plane
-        DrawTime(u32OldTime, pRect);
-    }
-#ifdef BB_EPAPER
-    bbep.writePlane(PLANE_0_TO_1); // set the data into plane 1 from buffer position 0 (inverted)
-#else // FastEPD
-    bbep.backupPlane();
-#endif
-    bbep.fillScreen(BBEP_WHITE);
-    gettimeofday(&tv, NULL); // current time
-    tv.tv_sec += i32TZOffset; // add timezone offset
-    u32OldTime = tv.tv_sec; // save for next wakeup
-    DrawTime(u32OldTime, pRect);
+    DrawTime(u32Epoch, &pInfo->rect);
 #ifdef BB_EPAPER
     bbep.writePlane(PLANE_0); // draw the current time into the 'new' plane
     bbep.refresh(REFRESH_PARTIAL);
@@ -72,6 +62,4 @@ struct timeval tv;
 #else
     bbep.partialUpdate(false);
 #endif
-
-#endif // FUTURE
 } /* DisplayTime() */

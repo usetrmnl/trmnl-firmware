@@ -1,7 +1,11 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 #include <stdint.h>
-
+#ifdef PARALLEL_EPD
+#include <FastEPD.h>
+#else
+#include <bb_epaper.h>
+#endif
 #define FW_MAJOR_VERSION 1
 #define FW_MINOR_VERSION 8
 #define FW_PATCH_VERSION 16
