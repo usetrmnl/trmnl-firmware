@@ -5,7 +5,7 @@ Plays the server side of /api/setup, /api/display, /api/log and the image
 fetch so that the firmware's error paths in downloadAndShow() can be
 exercised on a real device without touching the real backend.
 
-Failures are injected per route with --display and --image. Each flag
+Failures are injected per route with --display, --image and --log. Each flag
 takes a SPEC and can be repeated; specs for a route form a queue that is
 consumed in order. Once the queue is empty the route behaves normally.
 
@@ -21,6 +21,7 @@ Usage examples:
   scripts/mock_server.py --image truncate:1    # first image download cut short
   scripts/mock_server.py --image slow=1024,20  # stall 20 s after 1 KB, forever
   scripts/mock_server.py --display status=202  # JSON status 202 (unregistered)
+  scripts/mock_server.py --log timeout=20      # /api/log hangs 20 s, forever
 
 Failure kinds and the firmware error they should provoke:
 
@@ -79,6 +80,7 @@ TOO_BIG_LENGTH = 100000
 
 COMMON_KINDS = {"timeout", "reset", "close", "redirect"}
 DISPLAY_KINDS = COMMON_KINDS | {"bad-json", "status", "empty-state"}
+LOG_KINDS = COMMON_KINDS
 IMAGE_KINDS = COMMON_KINDS | {"truncate", "slow", "empty", "too-big",
                               "garbage", "no-length", "wrong-type"}
 
@@ -194,6 +196,7 @@ class MockHandler(BaseHTTPRequestHandler):
     # bound in make_handler()
     display_q: FailureQueue
     image_q: FailureQueue
+    log_q: FailureQueue
     image_bytes: bytes
     image_type: str   # Content-Type sniffed from the file
     image_ext: str    # bmp / png / jpg
@@ -437,6 +440,11 @@ class MockHandler(BaseHTTPRequestHandler):
         self._send_json(200, payload)
 
     def _handle_log(self, body: bytes):
+        spec = self.log_q.next()
+        if spec is not None:
+            self._log(f"/api/log -> FAIL {spec}   [queue: {self.log_q.remaining()}]")
+            self._log(f"/api/log sent {self._apply_common(spec)}")
+            return
         self._log("/api/log -> 204")
         self.send_response(204)
         self.send_header("Connection", "close")
@@ -484,12 +492,13 @@ def sniff_image(data: bytes):
     return None, None
 
 
-def make_handler(display_q, image_q, image_bytes, image_type, image_ext, refresh, setup_status,
-                 quiet=False):
+def make_handler(display_q, image_q, log_q, image_bytes, image_type, image_ext, refresh,
+                 setup_status, quiet=False):
     return type("BoundMockHandler", (MockHandler,), {
         "quiet": quiet,
         "display_q": display_q,
         "image_q": image_q,
+        "log_q": log_q,
         "image_bytes": image_bytes,
         "image_type": image_type,
         "image_ext": image_ext,
@@ -534,6 +543,9 @@ def main():
     ap.add_argument("--image", metavar="SPEC", action="append", default=[],
                     type=lambda s: parse_spec(s, IMAGE_KINDS, "image"),
                     help="failure to inject on the image fetch (repeatable)")
+    ap.add_argument("--log", metavar="SPEC", action="append", default=[],
+                    type=lambda s: parse_spec(s, LOG_KINDS, "log"),
+                    help="failure to inject on POST /api/log (repeatable)")
     ap.add_argument("--image-file", default=DEFAULT_IMAGE,
                     help=f"image to serve (default {os.path.relpath(DEFAULT_IMAGE, REPO_ROOT)})")
     ap.add_argument("--refresh", type=int, default=60,
@@ -556,7 +568,8 @@ def main():
 
     display_q = FailureQueue(args.display)
     image_q = FailureQueue(args.image)
-    handler = make_handler(display_q, image_q, image_bytes, image_type, image_ext,
+    log_q = FailureQueue(args.log)
+    handler = make_handler(display_q, image_q, log_q, image_bytes, image_type, image_ext,
                            args.refresh, args.setup_status, quiet=args.quiet)
 
     server = ThreadingHTTPServer((args.bind, args.port), handler)
@@ -567,6 +580,7 @@ def main():
     print(f"  refresh:  {args.refresh} s")
     print(f"  display failures: {display_q.remaining()}")
     print(f"  image failures:   {image_q.remaining()}")
+    print(f"  log failures:     {log_q.remaining()}")
     if any(s.kind == "status" and s.arg == 500 for s in args.display):
         print("  WARNING: status=500 makes the firmware erase its stored credentials")
 
