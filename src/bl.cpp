@@ -1165,8 +1165,6 @@ void bl_init(void)
     }
   }
 
-  submitStoredLogs();
-
   log_retry = true;
 
   // OTA checking, image checking and drawing
@@ -1535,11 +1533,6 @@ static https_request_err_e downloadAndShow()
     Log.info("BMP file detected");
   }
 
-  submitStoredLogs();
-
-  WiFi.disconnect(true); // no need for WiFi, save power starting here
-  Log.info("%s [%d]: Received successfully; WiFi off.\r\n", __FILE__, __LINE__);
-
   bool image_reverse = false;
   if (isPNG || isJPEG)
   {
@@ -1657,6 +1650,11 @@ static https_request_err_e downloadAndShow()
   default:
     break;
   }
+
+  submitStoredLogs(); // a slow /api/log must not delay the screen
+
+  WiFi.disconnect(true); // no need for WiFi, save power starting here
+  Log.info("%s [%d]: Image shown; WiFi off.\r\n", __FILE__, __LINE__);
 
   if (isPNG && png_res != PNG_NO_ERR)
   {
