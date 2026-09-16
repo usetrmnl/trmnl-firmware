@@ -1209,7 +1209,7 @@ void bl_init(void)
 
       if (retries <= 3)
       {
-        // Keep the current image and quietly retry with backoff (15 s, 30 s, 60 s).
+        // Keep the current image and quietly retry
         Log.info("%s [%d]: retry: %d - time to sleep: %d\r\n", __FILE__, __LINE__, retries, retry_sleep);
         iqs323_task_i2c_lock();
         display_sleep();
@@ -1261,18 +1261,6 @@ void bl_init(void)
   // error handling
   switch (request_result)
   {
-  case HTTPS_REQUEST_FAILED:
-  {
-    if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
-    {
-      showMessageWithLogo(API_REQUEST_FAILED);
-    }
-    else
-    {
-      showMessageWithLogo(WIFI_WEAK);
-    }
-  }
-  break;
   case HTTPS_RESPONSE_CODE_INVALID:
   {
     showMessageWithLogo(WIFI_INTERNAL_ERROR);

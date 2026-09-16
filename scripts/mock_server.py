@@ -27,7 +27,7 @@ Failure kinds and the firmware error they should provoke:
   both routes
     <code>          any HTTP status, e.g. 500 404 503 429
                     display: HTTPS_RESPONSE_CODE_INVALID (retried 5x)
-                    image:   HTTPS_REQUEST_FAILED
+                    image:   HTTPS_IMAGE_DOWNLOAD_FAILED
     timeout[=SECS]  accept, send nothing for SECS (default 20), close
     reset           TCP RST (SO_LINGER 0)
     close           clean close with zero bytes sent
