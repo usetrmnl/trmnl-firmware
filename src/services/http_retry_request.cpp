@@ -37,8 +37,8 @@ https_request_err_e HttpRetryRequest::execute() {
 
     if (!shouldFastRetryCode(_httpCode)) {
       // Deterministic failure (e.g. 404): another identical request will not help.
-      Log_error_submit("HTTP GET failed (code %d, not retried): %s - %s, RSSI %" PRId32, _httpCode,
-                       https_request_err_str(err), _errorDetail.c_str(), signalRssi());
+      Log_error("HTTP GET failed (code %d, not retried): %s - %s, RSSI %" PRId32, _httpCode, https_request_err_str(err),
+                _errorDetail.c_str(), signalRssi());
       return err;
     }
 
@@ -48,8 +48,8 @@ https_request_err_e HttpRetryRequest::execute() {
       delay(HTTP_FAST_RETRY_DELAY_MS);
     }
   }
-  Log_error_submit("HTTP GET failed after %d attempts: %s - %s, RSSI %" PRId32, HTTP_FAST_RETRY_ATTEMPTS,
-                   https_request_err_str(err), _errorDetail.c_str(), signalRssi());
+  Log_error("HTTP GET failed after %d attempts: %s - %s, RSSI %" PRId32, HTTP_FAST_RETRY_ATTEMPTS,
+            https_request_err_str(err), _errorDetail.c_str(), signalRssi());
   return err;
 }
 
@@ -121,7 +121,7 @@ https_request_err_e HttpRetryRequest::attemptOnce() {
 https_request_err_e HttpRetryRequest::finishBody() {
   if (_bodySize == 0) {
     _errorDetail = "No data received";
-    Log_error("Receiving failed. No data received");
+    Log_error_serial("Receiving failed. No data received");
     return HTTPS_WRONG_IMAGE_SIZE;
   }
   if (_contentType.length() == 0) {
@@ -151,12 +151,12 @@ https_request_err_e HttpRetryRequest::attemptWiFi() {
     [this](HTTPClient *https, HttpError error) -> https_request_err_e {
       if (error == HttpError::HTTPCLIENT_WIFICLIENT_ERROR || !https) {
         _errorDetail = "Unable to create WiFiClient";
-        Log_error("%s", _errorDetail.c_str());
+        Log_error_serial("%s", _errorDetail.c_str());
         return HTTPS_UNABLE_TO_CONNECT;
       }
       if (error != HttpError::HTTPCLIENT_SUCCESS) {
         _errorDetail = "Unable to create HTTPClient";
-        Log_error("%s", _errorDetail.c_str());
+        Log_error_serial("%s", _errorDetail.c_str());
         return HTTPS_UNABLE_TO_CONNECT;
       }
 
@@ -180,7 +180,7 @@ https_request_err_e HttpRetryRequest::attemptWiFi() {
       if (code < 0 ||
           !(code == HTTP_CODE_OK || code == HTTP_CODE_MOVED_PERMANENTLY || code == HTTP_CODE_TOO_MANY_REQUESTS)) {
         _errorDetail = "HTTP Client failed with error: " + https->errorToString(code) + "(" + String(code) + ")";
-        Log_error("[HTTPS] GET... failed, error: %s", _errorDetail.c_str());
+        Log_error_serial("[HTTPS] GET... failed, error: %s", _errorDetail.c_str());
         return HTTPS_RESPONSE_CODE_INVALID;
       }
       Log_info("GET... code: %d, RSSI: %d", code, WiFi.RSSI());
@@ -203,7 +203,7 @@ https_request_err_e HttpRetryRequest::readWiFiBody(HTTPClient &https, int conten
     if (written < 0) {
       _errorDetail =
         "connection closed mid-download, error: " + String(written) + " (" + https.errorToString(written) + ")";
-      Log_error("Receiving failed; %s, RSSI %d", _errorDetail.c_str(), WiFi.RSSI());
+      Log_error_serial("Receiving failed; %s, RSSI %d", _errorDetail.c_str(), WiFi.RSSI());
       return HTTPS_TIMED_OUT;
     }
     _payload = std::move(static_cast<String &>(sstream));
@@ -216,14 +216,14 @@ https_request_err_e HttpRetryRequest::readWiFiBody(HTTPClient &https, int conten
   Log_info("Content size: %" PRIu32, expected);
   if (expected > MAX_IMAGE_SIZE) {
     _errorDetail = "file size too big: " + String(expected);
-    Log_error("Receiving failed; %s", _errorDetail.c_str());
+    Log_error_serial("Receiving failed; %s", _errorDetail.c_str());
     return HTTPS_IMAGE_FILE_TOO_BIG;
   }
 
   _bodyBuffer = (uint8_t *)malloc(expected);
   if (!_bodyBuffer) {
     _errorDetail = "Failed to allocate " + String(expected) + " bytes for body";
-    Log_error("%s", _errorDetail.c_str());
+    Log_error_serial("%s", _errorDetail.c_str());
     return HTTPS_OUT_OF_MEMORY;
   }
 
@@ -254,7 +254,7 @@ https_request_err_e HttpRetryRequest::readWiFiBody(HTTPClient &https, int conten
   if (received < expected) {
     _errorDetail = String("incomplete download (") + (closedEarly ? "connection closed early" : "timed out") +
                    "): " + String(received) + "/" + String(expected) + " bytes";
-    Log_error("Receiving failed; %s, RSSI %d", _errorDetail.c_str(), WiFi.RSSI());
+    Log_error_serial("Receiving failed; %s, RSSI %d", _errorDetail.c_str(), WiFi.RSSI());
     releaseBody();
     return HTTPS_TIMED_OUT;
   }
@@ -310,17 +310,17 @@ https_request_err_e HttpRetryRequest::attemptModem() {
   _httpCode = res.statusCode;
   if (tooBig) {
     _errorDetail = "file size too big: more than " + String(MAX_IMAGE_SIZE) + " bytes";
-    Log_error("Receiving failed; %s", _errorDetail.c_str());
+    Log_error_serial("Receiving failed; %s", _errorDetail.c_str());
     return HTTPS_IMAGE_FILE_TOO_BIG;
   }
   if (outOfMemory) {
     _errorDetail = "Failed to grow body buffer past " + String(_bodySize) + " bytes";
-    Log_error("%s", _errorDetail.c_str());
+    Log_error_serial("%s", _errorDetail.c_str());
     return HTTPS_OUT_OF_MEMORY;
   }
   if (!res.ok) {
     _errorDetail = "modem HTTP status " + String(res.statusCode) + ", " + String(res.bytesReceived) + " bytes received";
-    Log_error("Modem GET failed: %s", _errorDetail.c_str());
+    Log_error_serial("Modem GET failed: %s", _errorDetail.c_str());
     return HTTPS_RESPONSE_CODE_INVALID;
   }
   Log_info("Modem GET ok: %" PRIu32 " bytes", _bodySize);
