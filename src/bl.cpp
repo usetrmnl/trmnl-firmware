@@ -1678,6 +1678,14 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
   https_request_err_e result = HTTPS_NO_ERR;
   int file_size = 0;
 
+  filesystem_purge_playlist(&apiResponse);
+  if (apiResponse.playlist_count) {
+     // Free the memory since it was allocated with malloc()
+      apiResponse.playlist_count = 0;
+      free(apiResponse.playlist_names);
+      apiResponse.playlist_names = NULL;
+  }
+
 #ifdef BOARD_TRMNL_X
   // Set touchbar mode and persist to NVS
   if (apiResponse.touchbar_mode.length() == 0 || touchbar_tap_mode == (apiResponse.touchbar_mode == "tap")) {

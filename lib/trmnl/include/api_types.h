@@ -46,6 +46,8 @@ struct ApiDisplayResponse {
   SPECIAL_FUNCTION special_function;
   String action;
   String touchbar_mode;
+  uint32_t playlist_count;
+  char *playlist_names;
 };
 
 struct ApiDisplayInputs {
