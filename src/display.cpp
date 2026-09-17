@@ -251,10 +251,6 @@ void display_init(void)
     iTempProfile = preferences.getUInt(PREFERENCES_TEMP_PROFILE, TEMP_PROFILE_DEFAULT);
     Log_info("Saved temperature profile: %" PRIu32, iTempProfile);
 #ifdef BB_EPAPER
-
-    uint32_t u32ID = get_panel_id();
-    Log_info("Panel ID = 0x%08x\n", u32ID);
-
     Log_info("BB e-Paper init");
 #ifdef BOARD_SEEED_STICKY
 // Special case for the Sticky - it shares the SPI bus with the uSD card, so the EPD CS line
@@ -266,6 +262,9 @@ void display_init(void)
     pinMode(10, OUTPUT); // SD card enable (if it's powered down, the SPI bus may be blocked)
     digitalWrite(10, 1);
 #endif // BOARD_SEEED_STICKY
+    // Read the panel ID after any board-specific power/CS setup, but before bb_epaper takes over the SPI pins
+    uint32_t u32ID = get_panel_id();
+    Log_info("Panel ID = 0x%08x\n", u32ID);
     if (pDevice->epd_mosi_pin != 0 || pDevice->epd_sck_pin != 0) {
         bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit); // must be set BEFORE calling initio
         bbep.initIO(pDevice->epd_dc_pin, pDevice->epd_rst_pin, pDevice->epd_busy_pin, pDevice->epd_cs_pin,
