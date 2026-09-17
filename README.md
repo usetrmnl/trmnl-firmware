@@ -241,7 +241,8 @@ There are technical and non-technical options to flashing firmware.
 ### **Via CLI**
 1. To build the binary run `pio run -e TRMNL_X_dev`
 2. To upload the binary to the device `pio run -e TRMNL_X_dev -t upload`
-3. If PlatformIO uses the wrong port use this
+3. To fully flash the device (full flash) `pio run -e TRMNL_X_dev -t erase`
+4. If PlatformIO uses the wrong port use this
 ```bash
 pio device list # make sure JTAG device is visible
 pio run -e TRMNL_X_dev -t upload --upload-port /dev/cu.usbmodem1234
