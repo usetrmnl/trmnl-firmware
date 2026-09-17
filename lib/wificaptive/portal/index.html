@@ -713,8 +713,6 @@
     }
   </style>
   <script>
-    var emptyScanFocused = false;
-
     function setRefreshButtonState(scanning) {
       var btn = document.getElementById('btnRefresh');
       if (scanning && document.activeElement === btn) btn.blur();
@@ -895,11 +893,6 @@
         });
         var noneFound = otherNetworks.length === 0;
         document.getElementById('no-networks').hidden = !noneFound;
-        if (noneFound && !emptyScanFocused) {
-          emptyScanFocused = true;
-          document.getElementById('ssid').focus();
-        }
-        if (!noneFound) emptyScanFocused = false; // a later successful scan re-arms it
       } else if (response.status == 202) {
         setTimeout(() => getInfo(false), 2000); // poll only - force would restart the scan
       } else {
@@ -955,7 +948,7 @@
       var pw = document.getElementById('password');
       pw.value = '';
       toggleEnterpriseFields(isEnterprise);
-      (isEnterprise ? document.getElementById('identity') : pw).focus();
+      focusField(isEnterprise ? document.getElementById('identity') : pw);
     }
 
     function displayWifiInfo(response) {
@@ -1071,6 +1064,56 @@
         .querySelector('.p-title');
       if (title) title.focus();
     }
+
+    // The iOS captive-portal sheet focuses the page's first text field (Network
+    // name) by itself a moment after every network response - so on each /scan
+    // poll - and pops the keyboard. It does so from outside the page's script
+    // world, so it cannot be intercepted, only undone: a text field keeps focus
+    // only if the press started on the field or its label, if Tab was pressed,
+    // or if the page asked via focusField(). Anything else is sent back.
+    var fieldPressed = false, fieldIntentAt = 0, netSettledAt = 0;
+
+    function focusField(el) {
+      fieldIntentAt = Date.now();
+      el.focus();
+    }
+
+    // touchstart/pointerdown carry the element the finger really landed on.
+    ['pointerdown', 'touchstart'].forEach(function (type) {
+      document.addEventListener(type, function (e) {
+        fieldPressed = !!(e.target.closest && e.target.closest('.field'));
+      }, true);
+    });
+    ['pointerup', 'pointercancel', 'touchend', 'touchcancel'].forEach(function (type) {
+      document.addEventListener(type, function () {
+        if (fieldPressed) fieldIntentAt = Date.now();
+        fieldPressed = false;
+      }, true);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Tab') fieldIntentAt = Date.now();
+    }, true);
+
+    var plainFetch = window.fetch;
+    window.fetch = function () {
+      var settled = function () { netSettledAt = Date.now(); };
+      var p = plainFetch.apply(this, arguments);
+      p.then(settled, settled);
+      return p;
+    };
+
+    document.addEventListener('focusin', function (e) {
+      var el = e.target, from = e.relatedTarget;
+      if (!el.matches || !el.matches('input.inp')) return;
+      if (fieldPressed || Date.now() - fieldIntentAt < 1000) return;
+      var fromField = from && from.matches && from.matches('input.inp');
+      // Field-to-field moves with no press are the keyboard's previous/next
+      // arrows - unless a response just landed, when it is the sheet pulling
+      // focus out of the field being typed in.
+      if (fromField && Date.now() - netSettledAt > 1000) return;
+      if (fromField) focusField(from);
+      else el.blur();
+    });
 
     window.addEventListener('hashchange', showView);
     // This script runs in <head>, before <body> exists, so the initial call
