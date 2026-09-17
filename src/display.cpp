@@ -263,8 +263,8 @@ void display_init(void)
     digitalWrite(10, 1);
 #endif // BOARD_SEEED_STICKY
     // Read the panel ID after any board-specific power/CS setup, but before bb_epaper takes over the SPI pins
-    uint32_t u32ID = get_panel_id();
-    Log_info("Panel ID = 0x%08x\n", u32ID);
+    panel_id = get_panel_id();
+    Log_info("Panel ID = 0x%08x\n", panel_id);
     if (pDevice->epd_mosi_pin != 0 || pDevice->epd_sck_pin != 0) {
         bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit); // must be set BEFORE calling initio
         bbep.initIO(pDevice->epd_dc_pin, pDevice->epd_rst_pin, pDevice->epd_busy_pin, pDevice->epd_cs_pin,

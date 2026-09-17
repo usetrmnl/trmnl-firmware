@@ -42,6 +42,11 @@ void DeviceSetup::performApiSetup() {
   inputs.macAddress = device_mac_address();
   inputs.firmwareVersion = FW_VERSION_STRING;
   inputs.model = String(DEVICE_MODEL);
+  if (panel_id != 0) {
+    char panelId[9];
+    snprintf(panelId, sizeof(panelId), "%08" PRIx32, panel_id);
+    inputs.panelId = panelId;
+  }
 
   Log.info("%s [%d]: [HTTPS] begin /api/setup ...\r\n", __FILE__, __LINE__);
   Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());

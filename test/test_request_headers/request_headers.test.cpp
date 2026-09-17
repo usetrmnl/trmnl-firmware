@@ -63,6 +63,20 @@ void test_setup_headers_names_and_order(void) {
   TEST_ASSERT_EQUAL_STRING("og", valueOf(headers, "Model").c_str());
 }
 
+void test_setup_headers_include_panel_id_when_set(void) {
+  ApiSetupInputs inputs;
+  inputs.macAddress = "AA:BB:CC:DD:EE:FF";
+  inputs.firmwareVersion = "1.8.5";
+  inputs.model = "og";
+  inputs.panelId = "0012ab34";
+
+  auto headers = buildSetupHeaders(inputs);
+
+  TEST_ASSERT_EQUAL_UINT32(5, headers.size());
+  TEST_ASSERT_EQUAL_STRING("Panel-ID", headers[4].first.c_str());
+  TEST_ASSERT_EQUAL_STRING("0012ab34", valueOf(headers, "Panel-ID").c_str());
+}
+
 // --- buildLogHeaders -------------------------------------------------------
 
 void test_log_headers_names_and_values(void) {
@@ -209,6 +223,7 @@ void tearDown(void) {}
 void process() {
   UNITY_BEGIN();
   RUN_TEST(test_setup_headers_names_and_order);
+  RUN_TEST(test_setup_headers_include_panel_id_when_set);
   RUN_TEST(test_log_headers_names_and_values);
   RUN_TEST(test_display_headers_core_values);
   RUN_TEST(test_display_headers_include_update_source_and_temperature_profile);

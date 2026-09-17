@@ -23,6 +23,7 @@ struct ApiSetupInputs {
   String macAddress;
   String firmwareVersion;
   String model;
+  String panelId; // EPD revision as hex; empty = unknown (header omitted)
 };
 
 enum class ApiDisplayOutcome {

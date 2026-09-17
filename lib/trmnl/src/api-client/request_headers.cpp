@@ -50,6 +50,7 @@ HttpHeaderList buildSetupHeaders(const ApiSetupInputs &inputs) {
   headers.push_back({"Content-Type", "application/json"});
   headers.push_back({"FW-Version", inputs.firmwareVersion});
   headers.push_back({"Model", inputs.model});
+  if (inputs.panelId.length() > 0) headers.push_back({"Panel-ID", inputs.panelId});
   return headers;
 }
 
