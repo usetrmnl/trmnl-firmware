@@ -87,14 +87,6 @@
       fill: var(--spark);
     }
 
-    .logo-spark {
-      transform-origin: 22.8px 22.15px;
-    }
-
-    .logo.ticking .logo-spark {
-      animation: tick 1.4s steps(7, end) infinite;
-    }
-
     .spark {
       width: 20px;
       height: 20px;
@@ -105,15 +97,19 @@
       fill: var(--spark);
     }
 
-    .spark g {
-      transform-origin: 15px 15.2px;
+    /* The spinner is a plain HTML box rotated by CSS, with the static SVG inside
+       it: nothing within the SVG is animated, so the compositor can spin the box
+       at full frame rate. Keep it continuous - the spark has 7 identical blades,
+       so stepping in 1/7 turns lands it on itself and only wiggles. The origin
+       is the spark's true centre (15.32, 14.77 in its 30-unit viewBox). */
+    .spinner {
+      display: block;
+      transform-origin: 51.07% 49.23%;
+      animation: spin 2.4s linear infinite;
+      will-change: transform;
     }
 
-    .spark.ticking g {
-      animation: tick 1.4s steps(7, end) infinite;
-    }
-
-    @keyframes tick {
+    @keyframes spin {
       to {
         transform: rotate(360deg);
       }
@@ -861,14 +857,12 @@
     function showScanError() {
       document.getElementById('scanning-loader').hidden = true;
       document.getElementById('scanning-info').hidden = true;
-      document.getElementById('headSpark').classList.remove('ticking');
       document.getElementById('scan-error').hidden = false;
       setRefreshButtonState(false);
     }
 
     async function getInfo(force) {
       setRefreshButtonState(true);
-      document.getElementById('headSpark').classList.add('ticking');
       document.getElementById('scan-error').hidden = true;
       document.getElementById('no-networks').hidden = true;
       let scanningInfoBox = document.getElementById('scanning-info');
@@ -887,7 +881,6 @@
         var json = await response.json();
         scanningInfoBox.hidden = true;
         scanningLoader.hidden = true;
-        document.getElementById('headSpark').classList.remove('ticking');
         setRefreshButtonState(false);
 
         displayInfo(json.mac, json.mac_5ghz);
@@ -1094,9 +1087,9 @@
 <body>
   <header class="p-head">
     <div class="p-head-row">
-      <svg class="logo" id="headSpark" viewBox="0 0 216 45" xmlns="http://www.w3.org/2000/svg" role="img"
+      <svg class="logo" viewBox="0 0 216 45" xmlns="http://www.w3.org/2000/svg" role="img"
         aria-label="TRMNL">
-        <g class="logo-spark" fill-rule="evenodd" clip-rule="evenodd">
+        <g fill-rule="evenodd" clip-rule="evenodd">
           <path d="M11.9439 3.5957L23.6531 7.93423L21.4787 13.6634L9.76953 9.32491L11.9439 3.5957Z" />
           <path d="M30.7173 2.17969L34.5849 13.93L28.6957 15.8224L24.8281 4.07206L30.7173 2.17969Z" />
           <path d="M43.5419 15.805L36.6555 26.1189L31.4863 22.7494L38.3727 12.4355L43.5419 15.805Z" />
@@ -1136,7 +1129,8 @@
           Type your network name below, or tap Scan again.
         </div>
         <div id="scanning-info" class="scanning">
-          <svg class="spark ticking" viewBox="0 0 30 30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <span class="spinner" aria-hidden="true">
+            <svg class="spark" viewBox="0 0 30 30" xmlns="http://www.w3.org/2000/svg">
             <g fill-rule="evenodd" clip-rule="evenodd">
               <path d="M8.02188 2.11328L15.8862 5.07445L14.4258 8.98481L6.56146 6.02364L8.02188 2.11328Z" />
               <path d="M20.6315 1.14647L23.2291 9.16642L19.2738 10.458L16.6761 2.43807L20.6315 1.14647Z" />
@@ -1147,6 +1141,7 @@
               <path d="M0.910558 12.6074L8.11961 8.28L10.2539 11.8645L3.04481 16.192L0.910558 12.6074Z" />
             </g>
           </svg>
+          </span>
           <p>Scanning for networks</p>
         </div>
         <div id="scanning-loader">
