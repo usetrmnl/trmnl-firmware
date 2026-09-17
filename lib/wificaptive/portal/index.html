@@ -477,6 +477,7 @@
         '<span class="caret" aria-hidden="true">&#9654;</span>' +
         '<span class="ssid"></span>' +
         (label ? '<span class="badge">' + label + '</span>' : '') +
+        (enterprise ? '<span class="badge">ENT</span>' : '') +
         (open ? '' : LOCK_SVG) +
         barsHTML(rssi);
       row.querySelector('.ssid').textContent = name;

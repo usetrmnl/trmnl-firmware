@@ -48,6 +48,12 @@ float ADCBattery::readVoltage(TRMNL_DEVICE *pDevice) {
     Wire.begin(pDevice->sensor_sda, pDevice->sensor_scl);
     int16_t sensorValue = readReg16(0x55, 8); // current battery voltage in millivolts (registers 8+9)
     return (float)sensorValue / 1000.0f;
+  } else if (pDevice->batt_type == BATT_AXP2101) {
+    Wire.begin(pDevice->sensor_sda, pDevice->sensor_scl);
+    int16_t sensorValue = readReg16(0x34, 0x34); // current battery voltage in millivolts (registers 0x34+0x35)
+    sensorValue = __builtin_bswap16(sensorValue); // this chip is big-endian
+    sensorValue &= 0x3fff; // top 2 bits are config info
+    return (float)sensorValue / 1000.0f;
   } else { // BQ2742x
     Wire.begin(pDevice->sensor_sda, pDevice->sensor_scl);
     int16_t sensorValue = readReg16(0x55, 4); // current battery voltage in millivolts (registers 4+5)

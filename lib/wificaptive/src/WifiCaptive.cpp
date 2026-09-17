@@ -95,7 +95,7 @@ bool WifiCaptive::startPortal() {
                   saved = true;
                   break;
                 }
-              result.push_back({n.ssid, n.rssi, n.open, saved, n.is5GHz});
+              result.push_back({n.ssid, n.rssi, n.open, saved, n.is5GHz, n.enterprise});
             }
             return result;
           }
@@ -181,7 +181,7 @@ bool WifiCaptive::startPortal() {
       }
 
       bool res = false;
-      if (credentials.is5GHz && _modemConnectCallback) {
+      if (credentials.is5GHz && !credentials.isEnterprise && _modemConnectCallback) {
         res = _modemConnectCallback(credentials.ssid, credentials.pswd);
         if (res) connected_via_modem = true;
       } else {
@@ -194,11 +194,6 @@ bool WifiCaptive::startPortal() {
         succesfullyConnected = true;
         break;
       } else {
-        _ssid = "";
-        _password = "";
-        _band = "";
-        _enterprise_credentials = WifiCredentials{};
-
         WiFi.disconnect();
         WiFi.enableSTA(false);
         break;
@@ -229,6 +224,11 @@ bool WifiCaptive::startPortal() {
       status = result.status;
     }
   }
+
+  _ssid = "";
+  _password = "";
+  _band = "";
+  _enterprise_credentials = WifiCredentials{};
 
     // stop dsn
   _dnsServer->stop();

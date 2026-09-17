@@ -50,7 +50,7 @@ const TRMNL_DEVICE device_list[] =
   "og_gen2_4clr",  6,    1,     4,   2,    5,   0,    11,   12,   3,     0xff, 0xff,    BATT_BQ27427,  EPD_75_4CLR, // fake battery == 0xff
   "xteink_x4",     8,    10,    21,  5,    4,   6,    0xff, 0xff, 3,     0,    0xff,    BATT_ADC,  EPD_426,
   "waveshare",     13,   14,    15,  26,   27,  25,   0xff, 0xff, 33,    0xff, 0xff,    BATT_ADC,  EPD_75,
-  "waveshare_397", 11,   12,    10,  46,   9,   3,    41,   42,   0,     0xff, 0xff,    BATT_ADC,  EPD_397,
+  "waveshare_397", 11,   12,    10,  46,   9,   3,    41,   42,   0,     0xff, 0xff,    BATT_AXP2101,  EPD_397,
   "seeed_sticky",  13,   14,    15,  17,   16,  18,   1,    0,    4,     0xff, 0xff,    BATT_BQ27220,  EPD_397,  
   "seeed_esp32c3", 8,    10,    3,   2,    5,   4,    0xff, 0xff, 9,     0xff, 0xff,    BATT_ADC,  EPD_75,
   "seeed_esp32s3", 7,    9,     2,   1,    4,   3,    0xff, 0xff, 0,     0xff, 0xff,    BATT_ADC,  EPD_75,
@@ -175,6 +175,9 @@ void hw_config_init(void)
  */
 void display_init(void)
 {
+    if (pDevice == NULL) {
+        hw_config_init();
+    }
     Log_info("dev module start");
     iTempProfile = preferences.getUInt(PREFERENCES_TEMP_PROFILE, TEMP_PROFILE_DEFAULT);
     Log_info("Saved temperature profile: %" PRIu32, iTempProfile);
@@ -2137,7 +2140,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         bbep.setCursor(80, 104); // place in upper left corner
 #endif
         bbep.println(string0);
-        const char string1[] = "Can't establish WiFi connection.";
+        const char string1[] = "Can't establish WiFi connection. Will keep trying.";
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w)/2, bbep.height() - (rect.h*2)-140);
         bbep.println(string1);
@@ -2202,21 +2205,21 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         bbep.print(string1);
     }
     break;
-    case API_REQUEST_FAILED:
+    case IMAGE_DOWNLOAD_FAILED:
     {
-        const char string1[] = "WiFi connected, request to API failed.";
+        const char string1[] = "API responded, but image download failed.";
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, 340);
         bbep.println(string1);
 #ifndef BOARD_TRMNL_X
-        const char string2[] = "Short click the button on back,";
+        const char string2[] = "Short click the button on back";
 #else
-        const char string2[] = "Tap the middle of touch bar,";
+        const char string2[] = "Tap the middle of touch bar";
 #endif
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.println(string2);
-        const char string3[] = "otherwise check your internet.";
+        const char string3[] = "to advance to the next screen.";
         bbep.getStringBox(string3, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.print(string3);
