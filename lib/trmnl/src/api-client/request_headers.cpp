@@ -31,6 +31,7 @@ HttpHeaderList buildDisplayHeaders(const ApiDisplayInputs &inputs) {
   headers.push_back({"FW-Version", inputs.firmwareVersion});
   if (inputs.firmwareCommit.length() > 0) headers.push_back({"FW-Commit", inputs.firmwareCommit});
   headers.push_back({"Model", String(inputs.model)});
+  if (inputs.panelId.length() > 0) headers.push_back({"Panel-ID", inputs.panelId});
   headers.push_back({"Image-Cached", inputs.imageCached ? "true" : "false"});
   headers.push_back({"Wake-Time", String(inputs.prevWakeTime)});
   headers.push_back({"RSSI", String(inputs.rssi)});

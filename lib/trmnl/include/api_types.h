@@ -76,6 +76,7 @@ struct ApiDisplayInputs {
   String firmwareVersion;
   String firmwareCommit;
   String model;
+  String panelId; // EPD revision as hex; empty = unknown (header omitted)
   int rssi;
   String wifiBand;
   int displayWidth;

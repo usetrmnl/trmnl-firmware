@@ -186,6 +186,9 @@ uint32_t get_panel_id(void)
     if (pDevice->epd_mosi_pin == 0 && pDevice->epd_sck_pin == 0) { // pre-defined PCB+display in bb_epaper; pins unknown
         return 0;
     }
+    if (pDevice->panel_set != EPD_75) { // REV (0x70) is only known to be a harmless read on the 7.5" B/W UC8179
+        return 0;
+    }
 
     // Initialize the SPI bus in 'bit-bang' mode before running the normal init sequence
     // This will allow us to use MOSI as a bidirectional line for reading data from the panel
@@ -221,6 +224,16 @@ uint32_t get_panel_id(void)
     return u32;
 } /* get_panel_id() */
 #endif // BB_EPAPER
+
+String display_panel_id_string(void)
+{
+    if (panel_id == 0) {
+        return String();
+    }
+    char sz[9];
+    snprintf(sz, sizeof(sz), "%08" PRIx32, panel_id);
+    return String(sz);
+} /* display_panel_id_string() */
 
 void hw_config_init(void)
 {

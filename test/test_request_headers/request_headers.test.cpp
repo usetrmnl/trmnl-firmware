@@ -150,6 +150,18 @@ void test_display_headers_special_function_present_when_set(void) {
   TEST_ASSERT_EQUAL_STRING("true", valueOf(headers, "special_function").c_str());
 }
 
+void test_display_headers_panel_id_omitted_when_empty(void) {
+  auto headers = buildDisplayHeaders(makeDisplayInputs());
+  TEST_ASSERT_EQUAL_INT(-1, indexOf(headers, "Panel-ID"));
+}
+
+void test_display_headers_panel_id_present_when_set(void) {
+  ApiDisplayInputs inputs = makeDisplayInputs();
+  inputs.panelId = "0012ab34";
+  auto headers = buildDisplayHeaders(inputs);
+  TEST_ASSERT_EQUAL_STRING("0012ab34", valueOf(headers, "Panel-ID").c_str());
+}
+
 void test_display_headers_wifi_band_2_4(void) {
   auto inputs = makeDisplayInputs();
   inputs.wifiBand = "2.4";
@@ -230,6 +242,8 @@ void process() {
   RUN_TEST(test_display_headers_image_cached_reflects_input);
   RUN_TEST(test_display_headers_special_function_omitted_when_none);
   RUN_TEST(test_display_headers_special_function_present_when_set);
+  RUN_TEST(test_display_headers_panel_id_omitted_when_empty);
+  RUN_TEST(test_display_headers_panel_id_present_when_set);
   RUN_TEST(test_display_headers_wifi_band_2_4);
   RUN_TEST(test_display_headers_wifi_band_5);
   RUN_TEST(test_display_headers_wifi_band_omitted_when_empty);
