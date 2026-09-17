@@ -34,9 +34,9 @@ struct WifiNetwork {
 };
 
 struct WifiEventData {
-  bool disconnected = false;
+  volatile bool gotIp = false;
+  volatile bool disconnected = false;
   wifi_err_reason_t disconnectReason = wifi_err_reason_t::WIFI_REASON_UNSPECIFIED;
-  int eventCount = 0;
 };
 
 struct WifiConnectionResult {

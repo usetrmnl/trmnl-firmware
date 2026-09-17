@@ -4,6 +4,7 @@
 #include <bl.h>
 #include <wifi_network.h>
 #include <power.h>
+#include <config.h>
 #include <battery.h>
 #include <device_id.h>
 #include <trmnl_log.h>
@@ -11,7 +12,6 @@
 #include <ArduinoLog.h>
 #include <WifiCaptive.h>
 #include <pins.h>
-#include <config.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <display.h>
@@ -36,8 +36,10 @@
 #include "logging_parcers.h"
 #include <SPIFFS.h>
 #include "http_client.h"
+#include <StreamString.h>
 #include <api-client/display.h>
 #include <api-client/request_headers.h>
+#include <services/http_retry_request.h>
 #include "driver/gpio.h"
 #include "esp_flash.h"
 #include <nvs.h>
@@ -55,24 +57,6 @@
 #include "messages.h"
 #include "displayed_image.h"
 #include <globals.h>
-const char *szHTTPErrors[] = {
-    "HTTPS_NO_ERR",
-    "HTTPS_RESET",
-    "HTTPS_NO_REGISTER",
-    "HTTPS_SUCCESS",
-    "HTTPS_CLIENT_FAILED",
-    "HTTPS_REQUEST_FAILED",
-    "HTTPS_UNABLE_TO_CONNECT",
-    "HTTPS_CONNECTION_FAILED",
-    "HTTPS_RESPONSE_CODE_INVALID",
-    "HTTPS_JSON_PARSING_ERR",
-    "HTTPS_WRONG_IMAGE_SIZE",
-    "HTTPS_WRONG_IMAGE_FORMAT",
-    "HTTPS_IMAGE_FILE_TOO_BIG",
-    "HTTPS_PLUGIN_NOT_ATTACHED",
-    "HTTPS_BAD_CLIENT",
-    "HTTPS_OUT_OF_MEMORY"
-};
 
 static float vBatt;
 static https_request_err_e downloadAndShow(); // download and show the image
@@ -98,6 +82,8 @@ static unsigned long startup_time = 0;
 void iqs323_task_i2c_lock(void) {}
 void iqs323_task_i2c_unlock(void) {}
 #endif // !BOARD_TRMNL_X
+void hw_config_init(void);
+extern TRMNL_DEVICE *pDevice;
 
 void wait_for_serial() {
 #ifdef WAIT_FOR_SERIAL
@@ -527,18 +513,6 @@ void check_channel_states(void)
             pending_indicator_side = TOUCHBAR_MIDDLE;
             pending_indicator_filled = true;
             has_pending_indicator = true;
-            // Log_info("Middle button held - OTG toggle");
-            // if (otg_state) {
-            //   otg_turn_off();
-            //   showMessageWithLogo(OTG_TURNED_OFF); otg_state = false;
-            // }
-            // else {
-            //   otg_turn_on();
-            //   showMessageWithLogo(OTG_TURNED_ON);
-            //   otg_state = true;
-            // }
-            // delay(1000);
-            // showLastImageAndSleep();
           } else {
             display_draw_touchbar_indicator(TOUCHBAR_MIDDLE, false);
             Log_info("Middle button tapped");
@@ -577,17 +551,6 @@ void check_channel_states(void)
           case 1:
             display_draw_touchbar_indicator(TOUCHBAR_MIDDLE, slider_event == IQS323_GESTURE_HOLD);
             Log_info("Middle button pressed");
-            // if (otg_state) {
-            //   otg_turn_off();
-            //   showMessageWithLogo(OTG_TURNED_OFF); otg_state = false;
-            // }
-            // else {
-            //   otg_turn_on();
-            //   showMessageWithLogo(OTG_TURNED_ON);
-            //   otg_state = true;
-            // }
-            // delay(1000);
-            // showLastImageAndSleep();
             break;
           case 2:
             display_draw_touchbar_indicator(TOUCHBAR_RIGHT, slider_event == IQS323_GESTURE_HOLD);
@@ -751,9 +714,10 @@ void bl_init(void)
   }
   Log.info("%s [%d]: modem needed = %d\n\r", __FILE__, __LINE__, bModemNeeded);
 #endif // X
+  hw_config_init();
   pins_init();
   buzzer().init();
-  sensor().init();
+  sensor().init(pDevice);
 #ifdef BOARD_TRMNL_X
   // Debug: Print all wakeup_stub_iqs_status structure fields
   Log_info("wakeup_stub_iqs_status.status: 0x%02X 0x%02X", wakeup_stub_iqs_status.status[0], wakeup_stub_iqs_status.status[1]);
@@ -775,6 +739,7 @@ void bl_init(void)
 #endif
 
   wakeup_reason = esp_sleep_get_wakeup_cause();
+  bool should_show_error_now = (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER); // don't immediately show errors on timer wakeup
   bool gpio_wakeup = (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO ||
                       wakeup_reason == ESP_SLEEP_WAKEUP_EXT0 ||
                       wakeup_reason == ESP_SLEEP_WAKEUP_EXT1);
@@ -926,7 +891,7 @@ void bl_init(void)
     }
   }
   // Read the battery voltage BEFORE the display or WiFi is turned on
-  vBatt = battery().readVoltage();
+  vBatt = battery().readVoltage(pDevice);
 
   // EPD init
   // EPD clear
@@ -937,40 +902,17 @@ void bl_init(void)
   filesystem_init();
 #endif // !BOARD_TRMNL_X
 
-// #ifdef BOARD_TRMNL_X
+#ifdef BOARD_TRMNL_X
+  // Read the gauge before the panel draws load current, and before the logo
+  // is drawn so its battery icon has a snapshot to read.
+  battery_count = detect_battery_count();
+  battery_charging = (power().chargingStatus() == ChargingStatus::CHARGING);
+  Log_info("BATTERY COUNT: %d", battery_count);
+  Log_info("BATTERY CHARGING: %s", battery_charging ? "YES" : "NO");
 
-//   int8_t rslt;
-//   // I2C already initialized by IQS323 - do not call Wire.begin() again as it corrupts the bus on ESP32S3
-//   Serial.printf("Using I2C bus already initialized (SDA: %d, SCL: %d)\n\n", SENSOR_SDA_PIN, SENSOR_SCL_PIN);
-
-//   struct bma5_dev bma530_dev;
-
-//   rslt = bma530_init_device(&bma530_dev);
-//   if (rslt != BMA5_OK) {
-//     Serial.println("Failed to initialize BMA530!");
-//   }
-
-//   rslt = bma530_configure_low_power_mode(&bma530_dev);
-//   if (rslt != BMA5_OK) {
-//     Serial.println("Failed to configure BMA530 low power mode!");
-//   }
-
-//   rslt = bma530_configure_orientation(&bma530_dev);
-//   if (rslt != BMA5_OK) {
-//     Serial.println("Failed to configure BMA530 orientation!");
-//   }
-
-//   // Configure INT1 pin
-//   rslt = bma530_configure_int1(&bma530_dev);
-//   if (rslt != BMA5_OK) {
-//       Serial.println("Failed to configure BMA530 INT1!");
-//   }
-
-//   config_bma530_interrupt();
-
-//   pinMode(TCA9535_INT, INPUT);
-
-// #endif
+  battery().gaugeInit();
+  vBatt = battery().readVoltage(); // Read the battery voltage BEFORE WiFi is turned on
+#endif // BOARD_TRMNL_X
 
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
   {
@@ -1000,16 +942,6 @@ void bl_init(void)
     Log.info("%s [%d]: Display TRMNL logo end\r\n", __FILE__, __LINE__);
     preferences.putString(PREFERENCES_FILENAME_KEY, "");
   }
-#ifdef BOARD_TRMNL_X
-  battery_count = detect_battery_count();
-  battery_charging = (power().chargingStatus() == ChargingStatus::CHARGING);
-  Log_info("BATTERY COUNT: %d", battery_count);
-  Log_info("BATTERY CHARGING: %s", battery_charging ? "YES" : "NO");
-
-  battery().gaugeInit();
-  vBatt = battery().readVoltage(); // Read the battery voltage BEFORE WiFi is turned on
-#endif // BOARD_TRMNL_X
-
   Log_info("Firmware version %s", Messages::firmware_version().c_str());
   Log_info("Arduino version %d.%d.%d", ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH);
   Log_info("ESP-IDF version %d.%d.%d", ESP_IDF_VERSION_MAJOR, ESP_IDF_VERSION_MINOR, ESP_IDF_VERSION_PATCH);
@@ -1047,7 +979,7 @@ void bl_init(void)
     std::vector<ExternalNetwork> nets;
     for (auto& n : modemNets) {
       if (n.ssid == ownApSsid) continue;
-      nets.push_back({n.ssid, n.rssi, n.open, n.is5GHz});
+      nets.push_back({n.ssid, n.rssi, n.open, n.is5GHz, n.enterprise});
     }
     WifiCaptivePortal.setNetworks(nets);
 
@@ -1063,7 +995,7 @@ void bl_init(void)
       std::vector<ExternalNetwork> nets;
       for (auto& n : modemNets) {
         if (n.ssid == ownApSsid) continue;
-        nets.push_back({n.ssid, n.rssi, n.open, n.is5GHz});
+        nets.push_back({n.ssid, n.rssi, n.open, n.is5GHz, n.enterprise});
       }
       return nets;
     });
@@ -1079,7 +1011,7 @@ void bl_init(void)
 
   MSG current_msg = NONE;
 
-// uncdcomment this to hardcode WiFi credentials (useful for testing wifi errors, etc.)
+// uncomment this to hardcode WiFi credentials (useful for testing wifi errors, etc.)
 // #define HARDCODED_WIFI
 #ifdef HARDCODED_WIFI
   WifiCredentials hardcodedCreds = {.ssid = "ssid-goes-here", .pswd = "password-goes-here"};
@@ -1106,7 +1038,7 @@ void bl_init(void)
     }
     else
     {
-      if (current_msg != WIFI_FAILED)
+      if (should_show_error_now)
       {
         showMessageWithLogo(WIFI_FAILED);
         current_msg = WIFI_FAILED;
@@ -1239,7 +1171,7 @@ void bl_init(void)
 
   // OTA checking, image checking and drawing
   https_request_err_e request_result = downloadAndShow();
-  Log.info("%s [%d]: request result - %s\r\n", __FILE__, __LINE__, szHTTPErrors[request_result]);
+  Log.info("%s [%d]: request result - %s\r\n", __FILE__, __LINE__, https_request_err_str(request_result));
 
   if (request_result == HTTPS_IMAGE_FILE_TOO_BIG)
   {
@@ -1253,31 +1185,38 @@ void bl_init(void)
     preferences.putInt(PREFERENCES_CONNECT_API_RETRY_COUNT, 1);
   }
 
-  if (request_result != HTTPS_SUCCESS && request_result != HTTPS_NO_ERR && request_result != HTTPS_NO_REGISTER && request_result != HTTPS_RESET && request_result != HTTPS_PLUGIN_NOT_ATTACHED && current_msg != WIFI_FAILED)
+  if (request_result == HTTPS_IMAGE_DOWNLOAD_FAILED)
   {
-    uint8_t retries = preferences.getInt(PREFERENCES_CONNECT_API_RETRY_COUNT);
-    iqs323_task_i2c_lock();
-
-    switch (retries)
+    // The API answered (and already set the refresh interval); only the image host failed.
+    // Show the error now on every wake and sleep for the server's refresh_rate, no backoff.
+    Log_info("Image download failed; showing error and sleeping for the API refresh interval (%d s)", refreshInterval.seconds());
+    preferences.putInt(PREFERENCES_CONNECT_API_RETRY_COUNT, 1);
+  }
+  else if (request_result != HTTPS_SUCCESS && request_result != HTTPS_NO_ERR && request_result != HTTPS_NO_REGISTER && request_result != HTTPS_RESET && request_result != HTTPS_PLUGIN_NOT_ATTACHED && current_msg != WIFI_FAILED)
+  {
+    if (should_show_error_now)
     {
-    case 1:
-    case 2:
-    case 3:
+      // Someone is looking at the device (button, touch bar, power-on): show the error right
+      // away instead of silently keeping the old image. This wake does not count toward the
+      // timer backoff and does not change the sleep interval.
+      Log.info("%s [%d]: Manual wake - showing error now, no retry scheduled\r\n", __FILE__, __LINE__);
+    }
+    else
     {
+      uint8_t retries = preferences.getInt(PREFERENCES_CONNECT_API_RETRY_COUNT);
       uint32_t retry_sleep = refreshInterval.applyApiRetry(retries);
-      Log.info("%s [%d]: retry: %d - time to sleep: %d\r\n", __FILE__, __LINE__, retries, retry_sleep);
-      preferences.putInt(PREFERENCES_CONNECT_API_RETRY_COUNT, ++retries);
-      display_sleep();
-      goToSleep();
-      break;
-    }
+      preferences.putInt(PREFERENCES_CONNECT_API_RETRY_COUNT, retries + 1);
 
-    default:
-      Log.info("%s [%d]: Max retries done. Time to sleep: %d\r\n", __FILE__, __LINE__, refreshInterval.applyApiRetry(retries));
-      preferences.putInt(PREFERENCES_CONNECT_API_RETRY_COUNT, ++retries);
-      break;
+      if (retries <= 3)
+      {
+        // Keep the current image and quietly retry
+        Log.info("%s [%d]: retry: %d - time to sleep: %d\r\n", __FILE__, __LINE__, retries, retry_sleep);
+        iqs323_task_i2c_lock();
+        display_sleep();
+        goToSleep();
+      }
+      Log.info("%s [%d]: Max retries done. Time to sleep: %d\r\n", __FILE__, __LINE__, retry_sleep);
     }
-    iqs323_task_i2c_unlock();
   }
 
   else
@@ -1322,21 +1261,14 @@ void bl_init(void)
   // error handling
   switch (request_result)
   {
-  case HTTPS_REQUEST_FAILED:
-  {
-    if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
-    {
-      showMessageWithLogo(API_REQUEST_FAILED);
-    }
-    else
-    {
-      showMessageWithLogo(WIFI_WEAK);
-    }
-  }
-  break;
   case HTTPS_RESPONSE_CODE_INVALID:
   {
     showMessageWithLogo(WIFI_INTERNAL_ERROR);
+  }
+  break;
+  case HTTPS_IMAGE_DOWNLOAD_FAILED:
+  {
+    showMessageWithLogo(IMAGE_DOWNLOAD_FAILED);
   }
   break;
   case HTTPS_UNABLE_TO_CONNECT:
@@ -1468,6 +1400,10 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   inputs.batteryTemperature = battery().readTemperature();
   inputs.currentBatteryCapacity = battery().readCapacityRemain();
   inputs.maxBatteryCapacity = battery().readCapacityFull();
+  inputs.gaugeSoc = battery().readGaugeSoc();
+  inputs.gaugeHealth = battery().readGaugeHealth();
+  inputs.gaugeCapacityRemain = battery().readGaugeCapacityRemain();
+  inputs.gaugeCapacityFull = battery().readGaugeCapacityFull();
 #endif // BOARD_TRMNL_X
 
   return inputs;
@@ -1495,45 +1431,12 @@ static https_request_err_e downloadAndShow()
   bmp_err_e bmp_res = BMP_NOT_BMP;
   auto apiDisplayInputs = loadApiDisplayInputs(preferences);
 
-#ifdef BOARD_TRMNL_X
-  if (g_modem && WifiCaptivePortal.getLastCredentials().is5GHz)
-  {
-    Log_info("Fetching /api/display via modem (5 GHz path)");
-    String reqHeaders = formatHeaders(buildDisplayHeaders(apiDisplayInputs));
-
-    auto httpRes = g_modem->httpGet(apiDisplayInputs.baseUrl + "/api/display", "", 0, reqHeaders);
-    if (!httpRes.ok)
-    {
-      Log_error_submit("Modem /api/display request failed (%u bytes received)", httpRes.bytesReceived);
-      return HTTPS_REQUEST_FAILED;
-    }
-    auto apiResp = parseResponse_apiDisplay(httpRes.body);
-    if (apiResp.outcome == ApiDisplayOutcome::DeserializationError)
-    {
-      Log_error_submit("Modem /api/display JSON parse error: %s", apiResp.error_detail.c_str());
-      return HTTPS_JSON_PARSING_ERR;
-    }
-    apiDisplayResult = {HTTPS_NO_ERR, apiResp, ""};
-  }
-  else 
-#endif // BOARD_TRMNL_X  
-  {
-    for (int attempt = 1; attempt <= 5; ++attempt)
-    {
-      apiDisplayResult = fetchApiDisplay(apiDisplayInputs);
-      if (apiDisplayResult.error != HTTPS_UNABLE_TO_CONNECT &&
-          apiDisplayResult.error != HTTPS_RESPONSE_CODE_INVALID)
-        break;
-      Log_error_serial("Connection attempt %d/5 failed: %s", attempt, apiDisplayResult.error_detail.c_str());
-      if (attempt < 5) delay(2000);
-    }
-  }
-
+  // Retries, redirects and the transport (Wi-Fi vs. TRMNL X modem) are handled inside
+  // HttpRetryRequest, via fetchApiDisplay(). The result stays in the global for display.cpp
+  // and the OTA check.
+  apiDisplayResult = fetchApiDisplay(apiDisplayInputs);
   if (apiDisplayResult.error != HTTPS_NO_ERR)
-  {
-    Log_error_submit("Error fetching API display: %d, detail: %s", apiDisplayResult.error, apiDisplayResult.error_detail.c_str());
     return apiDisplayResult.error;
-  }
 
   https_request_err_e result = handleApiDisplayResponse(apiDisplayResult.response);
   if (apiDisplayResult.response.filename == "screen_wiper.png") {
@@ -1554,7 +1457,7 @@ static https_request_err_e downloadAndShow()
 
   if (!status && result == HTTPS_SUCCESS) { // this means we already have this image stored in SPIFFS
       char szTemp[36];
-#if BOARD_X_CLASS && !defined(BOARD_SEEED_RETERMINAL_E1003)
+#if PARALLEL_EPD && !defined(BOARD_SEEED_RETERMINAL_E1003)
       if (DisplayedImage::exists()) {
         load_prev_image(); // decode the older image into the previous buffer of FastEPD
       }
@@ -1592,399 +1495,180 @@ static https_request_err_e downloadAndShow()
       return result;
   }
 
-  #ifdef BOARD_TRMNL_X
-// Special logic (TRMNL-X only) to download and disply the image if using a 5GHz AP
-  if (status && !reset_firmware && WifiCaptivePortal.getLastCredentials().is5GHz && g_modem)
-  {
-    Log_info("Downloading image via modem (5 GHz path)");
+  if (!(status && !reset_firmware))
+    return result; // nothing new to download
 
+  status = false;
+
+  // A 202 carries no image_url, so filename is still empty here. HTTPClient::begin() rejects
+  // that and the fetch below would report it as an API failure over the friendly ID screen.
+  if (filename[0] == '\0')
+    return result;
+
+  HttpRetryRequestConfig imageConfig;
+  imageConfig.url = filename;
+  imageConfig.apiBaseUrl = apiDisplayInputs.baseUrl; // ID / Access-Token only go to the API server
+  imageConfig.headers = buildImageHeaders(apiDisplayInputs);
+  imageConfig.readTimeoutSeconds = apiDisplayResult.response.image_url_timeout;
+
+  HttpRetryRequest imageRequest(imageConfig);
+  https_request_err_e fetchResult = imageRequest.execute();
+  if (fetchResult == HTTPS_RESPONSE_CODE_INVALID)
+    fetchResult = HTTPS_IMAGE_DOWNLOAD_FAILED; // dedicated screen: the API answered, the image host did not
+  if (fetchResult != HTTPS_NO_ERR)
+  {
+    Log_info("Returned result - %s", https_request_err_str(fetchResult));
+    return fetchResult;
+  }
+
+  // imageRequest owns the body; the global `buffer` only borrows it for the decode tail below and
+  // must not outlive this function. The guard nulls it on every exit path.
+  buffer = imageRequest.body();
+  uint32_t content_size = imageRequest.bodySize();
+  struct BufferGuard { ~BufferGuard() { buffer = nullptr; } } bufferGuard;
+
+  bool isPNG = imageRequest.contentType() == "image/png";
+  bool isJPEG = imageRequest.contentType() == "image/jpeg";
+  if (content_size >= 2 && buffer[0] == 'B' && buffer[1] == 'M')
+  {
+    isPNG = false;
+    Log.info("BMP file detected");
+  }
+
+  submitStoredLogs();
+
+  WiFi.disconnect(true); // no need for WiFi, save power starting here
+  Log.info("%s [%d]: Received successfully; WiFi off.\r\n", __FILE__, __LINE__);
+
+  bool image_reverse = false;
+  if (isPNG || isJPEG)
+  {
     char szTemp[36];
     filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
-    Log_info("Modem: saving to %s", szTemp);
-    filesystem_purge_old_file(szTemp);
-
-    String _prevPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
-    String _prevLastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
-    if (!_prevPath.isEmpty() && (_prevPath != String(szTemp) || _prevLastPath.isEmpty()))
-      preferences.putString(PREFERENCES_LAST_PATH_KEY, _prevPath);
-
-    // Include ID and Access Token if the image is hosted on the same server as the API
-    String imgHeaders;
-    if (strncmp(filename, apiDisplayInputs.baseUrl.c_str(), apiDisplayInputs.baseUrl.length()) == 0)
-      imgHeaders = formatHeaders(buildImageHeaders(apiDisplayInputs));
-
-    auto httpRes = g_modem->httpGet(String(filename), szTemp, 0, imgHeaders);
-    if (!httpRes.ok)
-    {
-      Log_error_submit("Modem httpGet failed: %u bytes received", httpRes.bytesReceived);
-      return HTTPS_REQUEST_FAILED;
-    }
-
-    int fileSize = 0;
-    uint8_t* buf = display_read_file(szTemp, &fileSize);
-    if (!buf || fileSize == 0)
-    {
-      filesystem_file_delete(szTemp);
-      Log_error_submit("Modem: failed to read downloaded image from %s", szTemp);
-      return HTTPS_WRONG_IMAGE_SIZE;
-    }
-
-    display_show_image(buf, fileSize, true);
-    free(buf);
+    Log.info("%s [%d]: Writing %s to SPIFFS\r\n", __FILE__, __LINE__, szTemp);
+    filesystem_purge_old_file(szTemp); // try to delete the old version or older than 24h
+    writeImageToFile(szTemp, buffer, content_size);
+    Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
+    display_show_image(buffer, content_size, true);
     DisplayedImage::remember(szTemp); // current image becomes the previous image
-
+    png_res = PNG_NO_ERR; // DEBUG
+    String _curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
+    String _lastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
+    if (!_curPath.isEmpty() && (_curPath != String(szTemp) || _lastPath.isEmpty()))
+      preferences.putString(PREFERENCES_LAST_PATH_KEY, _curPath);
     preferences.putString(PREFERENCES_CURRENT_PATH_KEY, String(szTemp));
-    update_playlist_order(szTemp, _prevPath.c_str());
+    #ifdef BOARD_TRMNL_X
+    update_playlist_order(szTemp, _curPath.c_str());
+    #endif
     preferences.putString(PREFERENCES_BROWSE_PATH_KEY, String(szTemp));
+  }
+  else
+  {
+    bmp_res = parseBMPHeader(buffer, image_reverse);
+    Log.info("%s [%d]: BMP Parsing result: %d\r\n", __FILE__, __LINE__, bmp_res);
+  }
+  Serial.println();
+  String error = "";
 
-//    new_filename = apiDisplayResult.response.filename;
-//    saveCurrentFileName(new_filename);
+  switch (png_res)
+  {
+  case PNG_NO_ERR:
+  {
+    // Using filename from API response
+    new_filename = apiDisplayResult.response.filename;
+
+    // Print the extracted string
+    Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
 
     if (result != HTTPS_PLUGIN_NOT_ATTACHED)
       result = HTTPS_SUCCESS;
-    return result;
   }
-#endif // BOARD_TRMNL_X
-
-  withHttp(
-      filename,
-      [&](HTTPClient *httpsp, HttpError error) -> https_request_err_e
-      {
-        if (error != HttpError::HTTPCLIENT_SUCCESS)
-        {
-
-          return HTTPS_UNABLE_TO_CONNECT;
-        }
-
-        HTTPClient &https = *httpsp;
-
-        https.setTimeout(15000);
-        https.setConnectTimeout(15000);
-
-        https.addHeader("Accept-Encoding", "identity"); // Disable compression for raw image data
-
-        // Include ID and Access Token if the image is hosted on the same server as the API
-        if (strncmp(filename, apiDisplayInputs.baseUrl.c_str(), apiDisplayInputs.baseUrl.length()) == 0)
-          applyHeaders(https, buildImageHeaders(apiDisplayInputs));
-
-        if (status && !reset_firmware)
-        {
-          status = false;
-
-          // The timeout will be zero if no value was returned, and in that case we just use the default timeout.
-          // Otherwise, we set the requested timeout.
-          uint32_t requestedTimeout = apiDisplayResult.response.image_url_timeout;
-          if (requestedTimeout > 0)
-          {
-            // Convert from seconds to milliseconds.
-            // A uint32_t should be large enough not to worry about overflow for any reasonable timeout.
-            requestedTimeout *= MS_TO_S_FACTOR;
-            if (requestedTimeout > UINT16_MAX)
-            {
-              // To avoid surprising behaviour if the server returned a timeout of more than 65 seconds
-              // we will send a log message back to the server and truncate the timeout to the maximum.
-              Log_info_submit("Requested image URL timeout too large (%" PRIu32 " ms). Using maximum of %d ms.", requestedTimeout, UINT16_MAX);
-              https.setTimeout(UINT16_MAX);
-            }
-            else
-            {
-              https.setTimeout(uint16_t(requestedTimeout));
-            }
-          }
-
-          const char *headers[] = {"Content-Type"};
-          https.collectHeaders(headers, 1);
-          Log_info("GET...");
-          Log_info("RSSI: %d", WiFi.RSSI());
-          // start connection and send HTTP header
-          int httpCode = https.GET();
-          int content_size = https.getSize();
-          if(httpCode == HTTP_CODE_PERMANENT_REDIRECT ||
-            httpCode == HTTP_CODE_TEMPORARY_REDIRECT){
-              String location = https.getLocation();
-              https.end();
-              String redirectUrl;
-              if (location.startsWith("http://") || location.startsWith("https://")) {
-                redirectUrl = location;
-              } else {
-                // Extract origin from the original image URL for relative redirects
-                String origin = String(filename);
-                int schemeEnd = origin.indexOf("://");
-                if (schemeEnd != -1) {
-                  int pathStart = origin.indexOf('/', schemeEnd + 3);
-                  if (pathStart != -1) origin = origin.substring(0, pathStart);
-                }
-                redirectUrl = origin + location;
-              }
-              https.begin(redirectUrl);
-              Log_info("Redirected to: %s", redirectUrl.c_str());
-              https.setReuse(false); 
-              https.setTimeout(15000);
-              https.setConnectTimeout(15000);
-              httpCode = https.GET();
-              content_size = https.getSize();
-            }
-//          uint8_t *buffer_old = nullptr; // Disable partial update for now
-//          int file_size_old = 0;
-
-          // httpCode will be negative on error
-          if (httpCode < 0)
-          {
-            Log_error_submit("[HTTPS] GET... failed, error: %d (%s)", httpCode, https.errorToString(httpCode).c_str());
-
-            return HTTPS_REQUEST_FAILED;
-          }
-
-          // HTTP header has been send and Server response header has been handled
-          Log.info("%s [%d]: [HTTPS] GET... code: %d\r\n", __FILE__, __LINE__, httpCode);
-          Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
-          // file found at server
-          if (httpCode != HTTP_CODE_OK && httpCode != HTTP_CODE_MOVED_PERMANENTLY)
-          {
-            Log_error_submit("[HTTPS] GET... failed, code: %d (%s)", httpCode, https.errorToString(httpCode).c_str());
-            return HTTPS_REQUEST_FAILED;
-          }
-          
-          Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, https.getSize());
-
-          uint32_t counter = 0;
-          String payload;
-          long lStartTime = millis();
-          if (content_size <= 0)
-          {
-            Log.warning("%s [%d]: Content-Length not provided, using getString()\r\n", __FILE__, __LINE__);
-          }
-
-          bool isPNG = https.header("Content-Type") == "image/png";
-          bool isJPEG = https.header("Content-Type") == "image/jpeg";
-
-          Log.info("%s [%d]: Starting a download at: %d\r\n", __FILE__, __LINE__, systemClock().getTime());
-          heap_caps_check_integrity_all(true);
-
-          buffer = nullptr;
-          bool buffer_malloc = false;
-          if (content_size <= 0) {
-          // getString() handles lack of content size and chunked transfer encoding automatically
-            Log.info("%s [%d]: Downloading image with getString\r\n", __FILE__, __LINE__);
-            payload = https.getString();
-            counter = payload.length();
-            buffer = (uint8_t *)payload.c_str();
-          } else {
-            Log.info("%s [%d]: Downloading image with WifiClient (stream)\r\n", __FILE__, __LINE__);
-            counter = https.getSize();
-            if (counter && counter <= MAX_IMAGE_SIZE) {
-              WiFiClient *stream = https.getStreamPtr();
-              int iCount = 0;
-
-              buffer = (uint8_t *)malloc(counter);
-              if (buffer) {
-                buffer_malloc = true;
-                while (iCount < counter && millis() < (lStartTime + IMAGE_STREAM_INACTIVITY_TIMEOUT_MS)) {
-                  if (stream->available()) {
-                    buffer[iCount++] = stream->read();
-                    lStartTime = millis(); // reset start time
-                  } else { // 15 seconds with no activity => stop trying
-                    vTaskDelay(1); // yield to allow time for the data to arrive
-                  }
-                }
-              } // if buffer
-              stream->stop(); // Important! If you don't do this, WiFi will have a memory exception later
-              if (millis() > (lStartTime + IMAGE_STREAM_INACTIVITY_TIMEOUT_MS)) { // we timed out
-                  Log_error_submit("Receiving failed; download timed out. Image size = %" PRIu32, counter);
-                  return HTTPS_TIMED_OUT;
-              }
-            }
-          } // if payload size is non-zero
-          Log.info("%s [%d]: %d bytes received in %d milliseconds\r\n", __FILE__, __LINE__, counter, (int)(millis() - lStartTime));
-
-          if (counter == 0)
-          {
-            Log_error_submit("Receiving failed. No data received");
-            return HTTPS_WRONG_IMAGE_SIZE;
-          }
-
-          if (counter > MAX_IMAGE_SIZE)
-          {
-            Log_error_submit("Receiving failed; file size too big: %" PRIu32, counter);
-            return HTTPS_IMAGE_FILE_TOO_BIG;
-          }
-
-          if (buffer == NULL)
-          {
-            Log_error_submit("Failed to allocate %" PRIu32 " bytes for image buffer", counter);
-            return HTTPS_OUT_OF_MEMORY;
-          }
-
-          //memcpy(buffer, payload.c_str(), counter);
-          content_size = counter;
-
-          if (counter >= 2 && buffer[0] == 'B' && buffer[1] == 'M')
-          {
-            isPNG = false;
-            Log.info("BMP file detected");
-          }
-
-          submitStoredLogs();
-
-          WiFi.disconnect(true); // no need for WiFi, save power starting here
-          Log.info("%s [%d]: Received successfully; WiFi off.\r\n", __FILE__, __LINE__);
-
-          bool image_reverse = false;
-          if (isPNG || isJPEG)
-          {
-            char szTemp[36];
-            filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
-            Log.info("%s [%d]: Writing %s to SPIFFS\r\n", __FILE__, __LINE__, szTemp);
-            filesystem_purge_old_file(szTemp); // try to delete the old version or older than 24h
-            writeImageToFile(szTemp, buffer, content_size);
-            Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
-            display_show_image(buffer, content_size, true);
-            DisplayedImage::remember(szTemp); // current image becomes the previous image
-            if (buffer_malloc) {
-              Log.info("%s [%d]: Freeing the image buffer we allocated\r\n", __FILE__, __LINE__);
-              free(buffer);
-            }
-            buffer = nullptr;
-            png_res = PNG_NO_ERR; // DEBUG
-            String _curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
-            String _lastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
-            if (!_curPath.isEmpty() && (_curPath != String(szTemp) || _lastPath.isEmpty()))
-              preferences.putString(PREFERENCES_LAST_PATH_KEY, _curPath);
-            preferences.putString(PREFERENCES_CURRENT_PATH_KEY, String(szTemp));
-            #ifdef BOARD_TRMNL_X
-            update_playlist_order(szTemp, _curPath.c_str());
-            #endif
-            preferences.putString(PREFERENCES_BROWSE_PATH_KEY, String(szTemp));
-          }
-          else
-          {
-            bmp_res = parseBMPHeader(buffer, image_reverse);
-            Log.info("%s [%d]: BMP Parsing result: %d\r\n", __FILE__, __LINE__, bmp_res);
-          }
-          Serial.println();
-          String error = "";
-         // uint8_t *imagePointer = buffer;
-//          uint8_t *imagePointer = (decodedPng == nullptr) ? buffer : decodedPng;
-        //  bool lastImageExists = filesystem_file_exists("/last.bmp") || filesystem_file_exists("/last.png");
-
-          switch (png_res)
-          {
-          case PNG_NO_ERR:
-          {
-
-           // Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
-           // display_show_image(imagePointer, image_reverse, isPNG);
-
-            // Using filename from API response
-            new_filename = apiDisplayResult.response.filename;
-
-            // Print the extracted string
-            Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
-
-            if (result != HTTPS_PLUGIN_NOT_ATTACHED)
-              result = HTTPS_SUCCESS;
-          }
-          break;
-          case PNG_WRONG_FORMAT:
-          {
-            error = "Wrong image format. Did not pass signature check";
-          }
-          break;
-          case PNG_BAD_SIZE:
-          {
-            error = "IMAGE width, height or size are invalid";
-          }
-          break;
-          case PNG_DECODE_ERR:
-          {
-            error = "could not decode png image";
-          }
-          break;
-          case PNG_MALLOC_FAILED:
-          {
-            error = "could not allocate memory for png image decoder";
-          }
-          break;
-          default:
-            break;
-          }
-
-          switch (bmp_res)
-          {
-          case BMP_NO_ERR:
-          {
-            if (!filesystem_file_exists("/current.png"))
-            {
-              writeImageToFile("/current.bmp", buffer, content_size);
-            }
-            Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
-            display_show_image(buffer, content_size, true);
-            {
-              char szTemp[36];
-              filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
-              DisplayedImage::remember(szTemp);
-            }
-
-            if (buffer_malloc) {
-              Log.info("%s [%d]: Freeing the image buffer we allocated\r\n", __FILE__, __LINE__);
-              free(buffer);
-            }
-            buffer = nullptr;
-
-            // Using filename from API response
-            new_filename = apiDisplayResult.response.filename;
-
-            // Print the extracted string
-            Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
-
-            if (result != HTTPS_PLUGIN_NOT_ATTACHED)
-              result = HTTPS_SUCCESS;
-          }
-          break;
-          case BMP_NOT_BMP:
-          {
-            error = "First two header bytes are invalid!";
-          }
-          break;
-          case BMP_BAD_SIZE:
-          {
-            error = "BMP width, height or size are invalid";
-          }
-          break;
-          case BMP_COLOR_SCHEME_FAILED:
-          {
-            error = "BMP color scheme is invalid";
-          }
-          break;
-          case BMP_INVALID_OFFSET:
-          {
-            error = "BMP header offset is invalid";
-          }
-          break;
-          default:
-            break;
-          }
-
-          if (isPNG && png_res != PNG_NO_ERR)
-          {
-            char szTemp[36];
-            filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
-            filesystem_file_delete(szTemp);
-            Log_error_submit("error parsing image file - %s", error.c_str());
-
-            return HTTPS_WRONG_IMAGE_FORMAT;
-          }
-        }
-
-        return result;
-      });
-
-  if (result == HTTPS_UNABLE_TO_CONNECT)
+  break;
+  case PNG_WRONG_FORMAT:
   {
-    Log_error_submit("unable to connect");
+    error = "Wrong image format. Did not pass signature check";
+  }
+  break;
+  case PNG_BAD_SIZE:
+  {
+    error = "IMAGE width, height or size are invalid";
+  }
+  break;
+  case PNG_DECODE_ERR:
+  {
+    error = "could not decode png image";
+  }
+  break;
+  case PNG_MALLOC_FAILED:
+  {
+    error = "could not allocate memory for png image decoder";
+  }
+  break;
+  default:
+    break;
   }
 
-  Log_info("Returned result - %s", szHTTPErrors[result]);
+  switch (bmp_res)
+  {
+  case BMP_NO_ERR:
+  {
+    if (!filesystem_file_exists("/current.png"))
+    {
+      writeImageToFile("/current.bmp", buffer, content_size);
+    }
+    Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
+    display_show_image(buffer, content_size, true);
+    {
+      char szTemp[36];
+      filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
+      DisplayedImage::remember(szTemp);
+    }
+
+    // Using filename from API response
+    new_filename = apiDisplayResult.response.filename;
+
+    // Print the extracted string
+    Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
+
+    if (result != HTTPS_PLUGIN_NOT_ATTACHED)
+      result = HTTPS_SUCCESS;
+  }
+  break;
+  case BMP_NOT_BMP:
+  {
+    error = "First two header bytes are invalid!";
+  }
+  break;
+  case BMP_BAD_SIZE:
+  {
+    error = "BMP width, height or size are invalid";
+  }
+  break;
+  case BMP_COLOR_SCHEME_FAILED:
+  {
+    error = "BMP color scheme is invalid";
+  }
+  break;
+  case BMP_INVALID_OFFSET:
+  {
+    error = "BMP header offset is invalid";
+  }
+  break;
+  default:
+    break;
+  }
+
+  if (isPNG && png_res != PNG_NO_ERR)
+  {
+    char szTemp[36];
+    filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
+    filesystem_file_delete(szTemp);
+    Log_error_submit("error parsing image file - %s", error.c_str());
+
+    return HTTPS_WRONG_IMAGE_FORMAT;
+  }
+
+  Log_info("Returned result - %s", https_request_err_str(result));
 
   return result;
 }
@@ -2105,7 +1789,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
         result = HTTPS_RESET;
       if (sleep_5_seconds)
         result = HTTPS_PLUGIN_NOT_ATTACHED;
-      Log.info("%s [%d]: result - %s\r\n", __FILE__, __LINE__, szHTTPErrors[result]);
+      Log.info("%s [%d]: result - %s\r\n", __FILE__, __LINE__, https_request_err_str(result));
     }
     break;
     case 202:
@@ -2312,7 +1996,6 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           image_err_e image_proccess_response = PNG_WRONG_FORMAT;
           bmp_err_e bmp_proccess_response = BMP_NOT_BMP;
 
-          // showMessageWithLogo(MSG_FORMAT_ERROR);
           String last_dot_file = filesystem_file_exists("/last.bmp") ? "/last.bmp" : "/last.png";
           if (last_dot_file == "/last.bmp")
           {
@@ -2423,11 +2106,6 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
             Log.info("%s [%d]: send_to_me PNG\r\n", __FILE__, __LINE__);
             image_err_e png_parse_result = PNG_NO_ERR; // DEBUG
             buffer = display_read_file("/current.png", &file_size);
-// Disable partial update for now
-//            if (filesystem_file_exists("/last.png")) {
-//                buffer_old = display_read_file("/last.png", &file_size_old);
-//                Log.info("%s [%d]: loading last PNG for partial update\r\n", __FILE__, __LINE__);
-//            }
             if (png_parse_result != PNG_NO_ERR)
             {
               Log_error_submit("Error parsing PNG header, code: %d", png_parse_result);
@@ -2577,7 +2255,7 @@ void goToSleep(void)
   submitStoredLogs();
 
 // DEBUG - workaround to prevent crash in the WiFi stack of unknown origin
-#ifndef BOARD_X_CLASS
+#ifndef PARALLEL_EPD
   if (WiFi.status() == WL_CONNECTED) {
     WiFi.disconnect();
   }
@@ -2618,12 +2296,16 @@ void goToSleep(void)
   // Configure GPIO pin for wakeup
 #if CONFIG_IDF_TARGET_ESP32
   #define BUTTON_PIN_BITMASK(GPIO) (1ULL << GPIO)  // 2 ^ GPIO_NUMBER in hex
-  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK(PIN_INTERRUPT), ESP_EXT1_WAKEUP_ALL_LOW);
+  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK(pDevice->interrupt_pin), ESP_EXT1_WAKEUP_ALL_LOW);
 #elif defined(CONFIG_IDF_TARGET_ESP32C3) || defined (CONFIG_IDF_TARGET_ESP32C5)
-  pinMode(PIN_INTERRUPT, INPUT); // needed to not immediately wake up
-  esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
+  pinMode(pDevice->interrupt_pin, INPUT); // needed to not immediately wake up
+  esp_deep_sleep_enable_gpio_wakeup(1 << pDevice->interrupt_pin, ESP_GPIO_WAKEUP_GPIO_LOW);
 #elif defined(CONFIG_IDF_TARGET_ESP32S3)
+#ifdef BOARD_TRMNL_X
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
+#else
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)pDevice->interrupt_pin, 0);
+#endif
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
 #endif
@@ -2654,11 +2336,15 @@ static void goToSleepButtonOnly(void)
   preferences.end();
 #if CONFIG_IDF_TARGET_ESP32
   #define BUTTON_PIN_BITMASK_BTN(GPIO) (1ULL << GPIO)
-  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK_BTN(PIN_INTERRUPT), ESP_EXT1_WAKEUP_ALL_LOW);
+  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK_BTN(pDevice->interrupt_pin), ESP_EXT1_WAKEUP_ALL_LOW);
 #elif defined( CONFIG_IDF_TARGET_ESP32C3 ) || defined ( CONFIG_IDF_TARGET_ESP32C5 )
-  esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
+  esp_deep_sleep_enable_gpio_wakeup(1 << pDevice->interrupt_pin, ESP_GPIO_WAKEUP_GPIO_LOW);
 #elif CONFIG_IDF_TARGET_ESP32S3
+#ifdef BOARD_TRMNL_X
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
+#else
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)pDevice->interrupt_pin, 0);
+#endif
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
 #endif
@@ -2896,7 +2582,7 @@ static uint8_t *storedLogoOrDefault(int iType)
       }
    }
   }
-#ifdef BOARD_X_CLASS
+#ifdef PARALLEL_EPD
     return const_cast<uint8_t *>(logo_medium);
 #else
   if (iType == 0) {
@@ -2924,19 +2610,13 @@ static void wifiErrorDeepSleep()
 
   Log_info("WIFI connection failed! Retry count: %d \n", retry_count);
 
-  switch (retry_count)
-  {
-  case 1:
-  case 2:
-  case 3:
-    refreshInterval.applyWifiRetry(retry_count);
-    break;
+  refreshInterval.applyWifiRetry(retry_count);
 
-  default:
+  if (retry_count >= MAX_QUIET_SLOW_RETRIES) {
     preferences.putInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT, 1);
-    showMessageWithLogo(WIFI_RETRY_LIMIT);
+    showMessageWithLogo(WIFI_FAILED);
     display_sleep();
-    goToSleepButtonOnly();
+    goToSleep();
     return;
   }
   retry_count++;
