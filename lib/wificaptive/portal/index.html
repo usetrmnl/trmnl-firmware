@@ -77,6 +77,41 @@
       justify-content: space-between;
     }
 
+    .p-head-lead {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* The visible box is small; ::before stretches the touch target to 44px.
+       The negative margin keeps the box from making the header any taller. */
+    .head-back {
+      position: relative;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .12em;
+      line-height: 1;
+      text-transform: uppercase;
+      color: var(--ink);
+      background: transparent;
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      cursor: pointer;
+      padding: 7px 9px;
+      margin: -4px 0;
+      transition: border-color .12s steps(3);
+    }
+
+    .head-back::before {
+      content: "";
+      position: absolute;
+      inset: -9px -6px;
+    }
+
+    .head-back:hover {
+      border-color: var(--ink);
+    }
+
     .logo {
       height: 20px;
       width: auto;
@@ -1059,6 +1094,7 @@
       document.getElementById('view-advanced').hidden = !advanced;
       document.getElementById('modeText').textContent = advanced ? 'Advanced' : 'Setup mode';
       document.getElementById('modeDot').hidden = advanced;
+      document.getElementById('headBack').hidden = !advanced;
       window.scrollTo(0, 0);
       var title = (advanced ? document.getElementById('view-advanced') : document.getElementById('view-setup'))
         .querySelector('.p-title');
@@ -1130,6 +1166,8 @@
 <body>
   <header class="p-head">
     <div class="p-head-row">
+      <div class="p-head-lead">
+      <button class="head-back" id="headBack" type="button" onclick="location.hash = '#setup'" hidden>&larr; Back</button>
       <svg class="logo" viewBox="0 0 216 45" xmlns="http://www.w3.org/2000/svg" role="img"
         aria-label="TRMNL">
         <g fill-rule="evenodd" clip-rule="evenodd">
@@ -1149,6 +1187,7 @@
           <path d="M198.543 11.2168H193.449V34.1703H215.356V29.7604H198.543V11.2168Z" />
         </g>
       </svg>
+      </div>
       <span class="mode"><i class="dot" id="modeDot"></i> <span id="modeText">Setup mode</span></span>
     </div>
   </header>
