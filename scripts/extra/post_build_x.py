@@ -3,7 +3,6 @@ import subprocess
 import urllib.request
 from pathlib import Path
 
-# Prebuilt LittleFS image (fonts/assets) shipped with the TRMNL X family.
 LITTLEFS_URL = "https://trmnl-fw.s3.us-east-2.amazonaws.com/littlefs.bin"
 LITTLEFS_OFFSET = "0x620000"
 
@@ -17,10 +16,6 @@ def post_build(source, target, env):
         "0x20000", str(build_dir / "firmware.bin"),
     ]
 
-    # Only include the LittleFS image for envs that actually mount LittleFS
-    # (board_build.filesystem = littlefs). Envs on SPIFFS, e.g. seeed_sticky,
-    # share the same partition layout but format that partition on first boot,
-    # so flashing the image would only bloat the merged binary.
     filesystem = env.BoardConfig().get("build.filesystem", "spiffs")
     if filesystem == "littlefs":
         littlefs = build_dir / "littlefs.bin"
