@@ -139,37 +139,6 @@
       }
     }
 
-    .p-head-mac {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      padding-top: 9px;
-      border-top: 1px solid var(--rule-soft);
-    }
-
-    .mac-value-hdr {
-      font-family: var(--mono);
-      font-size: 16px;
-      color: var(--ink);
-      font-variant-numeric: tabular-nums;
-      letter-spacing: .01em;
-      -webkit-user-select: all;
-      user-select: all;
-    }
-
-    .mac-band {
-      font-family: var(--mono);
-      font-size: 9.5px;
-      letter-spacing: .06em;
-      line-height: 1.2;
-      padding: 2px 4px;
-      border: 1px solid var(--ink-3);
-      color: var(--ink-2);
-      border-radius: 2px;
-      flex: 0 0 auto;
-    }
-
     .p-body {
       padding: 22px 20px 32px;
       display: flex;
@@ -195,9 +164,16 @@
     .mac-footer {
       display: flex;
       flex-direction: column;
-      gap: 5px;
+      gap: 6px;
       padding-top: 14px;
       border-top: 1px solid var(--rule);
+    }
+
+    .mac-line {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
     }
 
     .mac-label {
@@ -210,7 +186,7 @@
 
     .mac-alt {
       font-family: var(--mono);
-      font-size: 13.5px;
+      font-size: 12.5px;
       color: var(--ink-2);
       font-variant-numeric: tabular-nums;
       -webkit-user-select: all;
@@ -993,13 +969,16 @@
 
     function displayInfo(mac, mac5) {
       if (mac) {
-        document.getElementById('mac24').textContent = mac;
-        document.getElementById('mac-row').hidden = false;
+        document.getElementById('mac24').textContent = mac.toUpperCase();
+        document.getElementById('mac24-row').hidden = false;
       }
       if (mac5) {
         document.getElementById('mac5').textContent = mac5.toUpperCase();
-        document.getElementById('info-message').hidden = false;
+        document.getElementById('mac5-row').hidden = false;
+        // Only dual-band boards report a second MAC; single-band ones keep the plain label.
+        document.getElementById('mac24-label').textContent = '2.4 GHz MAC';
       }
+      if (mac || mac5) document.getElementById('info-message').hidden = false;
     }
 
     function displayAlert(message) {
@@ -1126,10 +1105,6 @@
       </span>
       <span class="mode"><i class="dot" id="modeDot"></i> <span id="modeText">Setup mode</span></span>
     </div>
-    <div class="p-head-mac" id="mac-row" hidden>
-      <span class="mac-value-hdr" id="mac24"></span>
-      <span class="mac-band">2.4G</span>
-    </div>
   </header>
   <div class="p-body">
     <div class="view" id="view-setup">
@@ -1220,10 +1195,6 @@
         <button id="btnAdvanced" class="btn btn-quiet" type="button" onclick="location.hash = '#advanced'">Advanced
           settings</button>
       </div>
-      <div class="mac-footer" id="info-message" hidden>
-        <span class="mac-label">5 GHz MAC</span>
-        <span class="mac-alt" id="mac5"></span>
-      </div>
     </div>
 
     <div class="view" id="view-advanced" hidden>
@@ -1310,6 +1281,17 @@
       </div>
 
     </div>
+
+    <footer class="mac-footer" id="info-message" hidden>
+      <div class="mac-line" id="mac24-row" hidden>
+        <span class="mac-label" id="mac24-label">MAC address</span>
+        <span class="mac-alt" id="mac24"></span>
+      </div>
+      <div class="mac-line" id="mac5-row" hidden>
+        <span class="mac-label">5 GHz MAC</span>
+        <span class="mac-alt" id="mac5"></span>
+      </div>
+    </footer>
   </div>
 
   <div id="confirmationModal" class="modal">
