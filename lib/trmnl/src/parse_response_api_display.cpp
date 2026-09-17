@@ -38,8 +38,10 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
   // protocol v1: missing/unknown values fall back to the stock behaviour (full refresh via image_url)
   String v1ActionStr = doc["action"] | "";
   V1Action v1Action = V1_ACTION_FULL;
-  if (v1ActionStr == "none") v1Action = V1_ACTION_NONE;
-  else if (v1ActionStr == "partial") v1Action = V1_ACTION_PARTIAL;
+  if (v1ActionStr == "none")
+    v1Action = V1_ACTION_NONE;
+  else if (v1ActionStr == "partial")
+    v1Action = V1_ACTION_PARTIAL;
   String fullModeStr = doc["full_mode"] | "";
   String sleepModeStr = doc["sleep_mode"] | "";
   String imageUrl = doc["image_url"] | "";

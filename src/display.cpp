@@ -2333,7 +2333,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         bbep.print(string2);
     }
     break;
-    case MSG_MUSTHAVE_TEXT:
+    case MSG_FREE_TEXT:
     {
         const char *text = message_text ? message_text : "";
         bbep.getStringBox(text, &rect);
@@ -2782,10 +2782,10 @@ void display_sleep(void)
 #endif
 }
 
-#ifdef MUSTHAVE_FW
-// Declared in display.h upstream but never defined; the must-have fork uses it for "waiting for update".
+#ifdef BYOS_PROTOCOL_V1
+// Declared in display.h upstream but never defined; BYOS v1 uses it for "waiting for update".
 void display_show_msg_api(uint8_t *image_buffer, String message)
 {
-    display_show_msg(image_buffer, MSG_MUSTHAVE_TEXT, message.c_str());
+    display_show_msg(image_buffer, MSG_FREE_TEXT, message.c_str());
 }
 #endif

@@ -37,7 +37,7 @@ enum MSG {
   MAC_NOT_REGISTERED,
   TEST,
   FILL_WHITE,
-  MSG_MUSTHAVE_TEXT,  // must-have: logo + free text (display_show_msg_api)
+  MSG_FREE_TEXT,  // BYOS v1: logo + free text (display_show_msg_api)
   WIFI_RETRY_LIMIT,
   CAPTIVE_WIFI_TIMEOUT,
   IMAGE_DOWNLOAD_FAILED,

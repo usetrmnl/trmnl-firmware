@@ -30,7 +30,7 @@ enum class ApiDisplayOutcome {
   DeserializationError,
 };
 
-// Protocol v1 (must-have fork): what the server wants the device to do with the panel.
+// BYOS protocol v1: what the server wants the device to do with the panel.
 enum V1Action { V1_ACTION_NONE = 0, V1_ACTION_PARTIAL = 1, V1_ACTION_FULL = 2 };
 enum V1FullMode { V1_FULL_FULL = 0, V1_FULL_FAST = 1 };
 enum V1SleepMode { V1_SLEEP_DEEP = 0, V1_SLEEP_LIGHT = 1 };

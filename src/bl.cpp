@@ -747,16 +747,16 @@ void bl_init(void)
 
   Log_info("preferences start");
   bool res = preferences.begin("data", false);
-#ifdef MUSTHAVE_SERVER_URL
+#ifdef BYOS_SERVER_URL
   {
-    // must-have fork: the BYOS server URL is baked in at build time, so no captive-portal round trip
+    // BYOS v1: the server URL is baked in at build time, so no captive-portal round trip
     // is needed to repoint the device. Changing the URL forces a fresh /api/setup (new api key).
-    String wanted = MUSTHAVE_SERVER_URL;
+    String wanted = BYOS_SERVER_URL;
     if (wanted.length() > 0 && preferences.getString(PREFERENCES_API_URL, "") != wanted) {
       preferences.putString(PREFERENCES_API_URL, wanted);
       preferences.remove(PREFERENCES_API_KEY);
       preferences.remove(PREFERENCES_FRIENDLY_ID);
-      Log.info("%s [%d]: musthave: api_url set to %s, re-pairing\r\n", __FILE__, __LINE__, wanted.c_str());
+      Log.info("%s [%d]: byos: api_url set to %s, re-pairing\r\n", __FILE__, __LINE__, wanted.c_str());
     }
   }
 #endif
@@ -1352,7 +1352,7 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   ApiDisplayInputs inputs;
 
   inputs.baseUrl = preferences.getString(PREFERENCES_API_URL, API_BASE_URL);
-#ifdef MUSTHAVE_FW
+#ifdef BYOS_PROTOCOL_V1
   inputs.frameId = preferences.getString(PREFERENCES_FRAME_ID_KEY, "");
 #endif
 
@@ -1486,7 +1486,7 @@ static https_request_err_e downloadAndShow()
         return result;
       }
       DisplayedImage::remember(szTemp);
-#ifdef MUSTHAVE_FW
+#ifdef BYOS_PROTOCOL_V1
       preferences.putString(PREFERENCES_FRAME_ID_KEY, apiDisplayResult.response.frame_id);
 #endif
       Log.info("%s [%d]: Reading %s from SPIFFS\r\n", __FILE__, __LINE__, szTemp);
@@ -1501,7 +1501,7 @@ static https_request_err_e downloadAndShow()
       free(buffer);
       buffer = nullptr;
       DisplayedImage::remember(szTemp); // current image becomes the previous image
-#ifdef MUSTHAVE_FW
+#ifdef BYOS_PROTOCOL_V1
       preferences.putString(PREFERENCES_FRAME_ID_KEY, apiDisplayResult.response.frame_id);
 #endif
       // Rotate NVS path keys: last ← current ← szTemp
@@ -1573,7 +1573,7 @@ static https_request_err_e downloadAndShow()
     Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
     display_show_image(buffer, content_size, true);
     DisplayedImage::remember(szTemp); // current image becomes the previous image
-#ifdef MUSTHAVE_FW
+#ifdef BYOS_PROTOCOL_V1
     preferences.putString(PREFERENCES_FRAME_ID_KEY, apiDisplayResult.response.frame_id);
 #endif
     png_res = PNG_NO_ERR; // DEBUG
@@ -1647,7 +1647,7 @@ static https_request_err_e downloadAndShow()
       char szTemp[36];
       filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
       DisplayedImage::remember(szTemp);
-#ifdef MUSTHAVE_FW
+#ifdef BYOS_PROTOCOL_V1
       preferences.putString(PREFERENCES_FRAME_ID_KEY, apiDisplayResult.response.frame_id);
 #endif
     }
@@ -1728,14 +1728,14 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
       String image_url = apiResponse.image_url;
       uint64_t rate = apiResponse.refresh_rate;
       reset_firmware = apiResponse.reset_firmware;
-#ifdef MUSTHAVE_FW
+#ifdef BYOS_PROTOCOL_V1
       if (apiResponse.ota_wait)
       {
         // OTA waiting mode: short polls, no drawing; the server flips update_firmware when the binary is ready.
-        Log.info("%s [%d]: musthave: ota_wait, polling every %d s\r\n", __FILE__, __LINE__, (int)rate);
+        Log.info("%s [%d]: byos: ota_wait, polling every %d s\r\n", __FILE__, __LINE__, (int)rate);
         if (!preferences.getBool(PREFERENCES_OTA_WAIT_SHOWN, false))
         {
-          display_show_msg_api(storedLogoOrDefault(0), "Waiting for firmware update from jakubjirak.com ...");
+          display_show_msg_api(storedLogoOrDefault(0), "Waiting for firmware update...");
           preferences.putBool(PREFERENCES_OTA_WAIT_SHOWN, true);
         }
       }
@@ -1746,7 +1746,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
       }
       if (apiResponse.v1_action == V1_ACTION_NONE)
       {
-        Log.info("%s [%d]: musthave: action none, frame %s stays\r\n", __FILE__, __LINE__, apiResponse.frame_id.c_str());
+        Log.info("%s [%d]: byos: action none, frame %s stays\r\n", __FILE__, __LINE__, apiResponse.frame_id.c_str());
         refreshInterval.applyServerRate(rate);
         refreshInterval.resetFastPollStreak();
         status = false;

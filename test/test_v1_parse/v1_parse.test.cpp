@@ -1,22 +1,22 @@
-// Protocol v1 (must-have fork): action none|partial|full, frame_id, full_url, regions_url, full_mode, sleep_mode.
+// BYOS protocol v1: action none|partial|full, frame_id, full_url, regions_url, full_mode, sleep_mode.
 #include <api_response_parsing.h>
 #include <unity.h>
 
 void test_v1_partial_fields_are_parsed(void) {
   String input =
-    "{\"status\":0,\"action\":\"partial\",\"frame_id\":\"musthave-1a2b3c4d5e\","
-    "\"full_url\":\"http://rpi:8080/frames/musthave-1a2b3c4d5e.png\","
-    "\"regions_url\":\"http://rpi:8080/frames/musthave-1a2b3c4d5e.regions?from=musthave-0f9e8d7c6b\","
+    "{\"status\":0,\"action\":\"partial\",\"frame_id\":\"frame-1a2b3c4d5e\","
+    "\"full_url\":\"http://rpi:8080/frames/frame-1a2b3c4d5e.png\","
+    "\"regions_url\":\"http://rpi:8080/frames/frame-1a2b3c4d5e.regions?from=frame-0f9e8d7c6b\","
     "\"full_mode\":\"fast\",\"sleep_mode\":\"light\",\"refresh_rate\":60,"
-    "\"image_url\":\"http://rpi:8080/frames/musthave-1a2b3c4d5e.png\",\"filename\":\"musthave-1a2b3c4d5e\","
+    "\"image_url\":\"http://rpi:8080/frames/frame-1a2b3c4d5e.png\",\"filename\":\"frame-1a2b3c4d5e\","
     "\"update_firmware\":false,\"firmware_url\":null,\"reset_firmware\":false,\"special_function\":\"none\"}";
 
   auto r = parseResponse_apiDisplay(input);
   TEST_ASSERT_EQUAL(ApiDisplayOutcome::Ok, r.outcome);
   TEST_ASSERT_EQUAL(V1_ACTION_PARTIAL, r.v1_action);
-  TEST_ASSERT_EQUAL_STRING("musthave-1a2b3c4d5e", r.frame_id.c_str());
-  TEST_ASSERT_EQUAL_STRING("http://rpi:8080/frames/musthave-1a2b3c4d5e.png", r.full_url.c_str());
-  TEST_ASSERT_EQUAL_STRING("http://rpi:8080/frames/musthave-1a2b3c4d5e.regions?from=musthave-0f9e8d7c6b",
+  TEST_ASSERT_EQUAL_STRING("frame-1a2b3c4d5e", r.frame_id.c_str());
+  TEST_ASSERT_EQUAL_STRING("http://rpi:8080/frames/frame-1a2b3c4d5e.png", r.full_url.c_str());
+  TEST_ASSERT_EQUAL_STRING("http://rpi:8080/frames/frame-1a2b3c4d5e.regions?from=frame-0f9e8d7c6b",
                            r.regions_url.c_str());
   TEST_ASSERT_EQUAL(V1_FULL_FAST, r.full_mode);
   TEST_ASSERT_EQUAL(V1_SLEEP_LIGHT, r.sleep_mode);
@@ -24,7 +24,7 @@ void test_v1_partial_fields_are_parsed(void) {
 }
 
 void test_v1_none_action(void) {
-  String input = "{\"status\":0,\"action\":\"none\",\"frame_id\":\"musthave-1a2b3c4d5e\",\"sleep_mode\":\"deep\","
+  String input = "{\"status\":0,\"action\":\"none\",\"frame_id\":\"frame-1a2b3c4d5e\",\"sleep_mode\":\"deep\","
                  "\"refresh_rate\":300}";
   auto r = parseResponse_apiDisplay(input);
   TEST_ASSERT_EQUAL(V1_ACTION_NONE, r.v1_action);

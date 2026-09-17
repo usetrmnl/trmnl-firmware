@@ -12,9 +12,9 @@ static String headerValue(const HttpHeaderList &headers, const char *name) {
 void test_frame_id_header_is_sent_when_known(void) {
   ApiDisplayInputs inputs = {};
   inputs.macAddress = "AA:BB:CC:DD:EE:FF";
-  inputs.frameId = "musthave-1a2b3c4d5e";
+  inputs.frameId = "frame-1a2b3c4d5e";
   auto headers = buildDisplayHeaders(inputs);
-  TEST_ASSERT_EQUAL_STRING("musthave-1a2b3c4d5e", headerValue(headers, "X-Frame-Id").c_str());
+  TEST_ASSERT_EQUAL_STRING("frame-1a2b3c4d5e", headerValue(headers, "X-Frame-Id").c_str());
 }
 
 void test_frame_id_header_is_omitted_when_empty(void) {
