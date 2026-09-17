@@ -1,4 +1,3 @@
-#include <DEV_Config.h> // BQ25616_PG_PIN / BQ25616_STAT_PIN (gen2)
 #include <config.h>     // TCA9535_PG_PIN / TCA9535_STAT_PIN (TRMNL X)
 #include <power.h>
 
