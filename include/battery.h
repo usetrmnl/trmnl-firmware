@@ -50,6 +50,15 @@ public:
   int readCapacityRemain() const { return _capacityRemain; } // mAh
   int readCapacityFull() const { return _capacityFull; }     // mAh
 
+  /// @brief Real gas-gauge (Impedance Track) readings, gathered alongside the
+  ///        approximated values when BYPASS_BQ27427_SOC is active, purely for
+  ///        comparison/data-gathering. Equal to the readSoc()/etc. values
+  ///        above when the bypass isn't active.
+  int readGaugeSoc() const { return _gaugeSoc; }                     // %
+  int readGaugeHealth() const { return _gaugeHealth; }               // %
+  int readGaugeCapacityRemain() const { return _gaugeCapacityRemain; } // mAh
+  int readGaugeCapacityFull() const { return _gaugeCapacityFull; }     // mAh
+
 private:
   int _soc = -1;
   int _health = -1;
@@ -58,6 +67,11 @@ private:
   int _capacityRemain = -1;
   int _capacityFull = -1;
   float _voltage = -1;
+
+  int _gaugeSoc = -1;
+  int _gaugeHealth = -1;
+  int _gaugeCapacityRemain = -1;
+  int _gaugeCapacityFull = -1;
 };
 #endif // INCLUDE_BQ27427
 

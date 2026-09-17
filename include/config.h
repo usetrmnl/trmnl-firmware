@@ -90,8 +90,8 @@
 #define PIN_INTERRUPT                                                                                                  \
   9 // the boot button on the XIAO ESP32-C3, this button can't be used as wakeup  source though
                         // because it's not in the RTC GPIO group. Instead, you can always use the reset button to
-    // wake up the device. Resetting WiFi configuration needs special routine - press reset button
-    // then press the boot button in less than 2 seconds, and hold it for 5 seconds.
+// wake up the device. Resetting WiFi configuration needs special routine - press reset button
+// then press the boot button in less than 2 seconds, and hold it for 5 seconds.
 #define FAKE_BATTERY_VOLTAGE
 #elif defined(BOARD_SEEED_XIAO_ESP32S3)
 #define DEVICE_MODEL  "seeed_esp32s3"
@@ -126,7 +126,6 @@
 #define BUTTON_SOFT_RESET_TIME             15000
 #define BUTTON_DOUBLE_CLICK_WINDOW         800
 
-#define SERVER_MAX_RETRIES                 3
 #define API_BASE_URL                       "https://trmnl.app"
 
 // Abort an image download when the stream goes this long with no data.
@@ -134,7 +133,7 @@
 
 // Battery measurement types
 // BATT_NONE = use fake voltage
-enum { BATT_NONE = 0, BATT_ADC, BATT_BQ27220, BATT_BQ27427 };
+enum { BATT_NONE = 0, BATT_ADC, BATT_BQ27220, BATT_BQ27427, BATT_AXP2101 };
 
 #ifdef PARALLEL_EPD
 // TRMNL Device structure (slightly different for parallel eink panels)
