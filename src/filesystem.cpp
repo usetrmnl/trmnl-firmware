@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <config.h>
 #include <filesystem.h>
 #include <inttypes.h>
 #include <trmnl_log.h>
@@ -269,6 +270,62 @@ void list_files() {
     Log_info("  %d  %s", file.size(), file.name());
   }
   rootDir.close();
+}
+
+bool filesystem_purge_if_full(void) {
+  size_t total = FS.totalBytes();
+  size_t freeBytes = total - FS.usedBytes();
+  size_t minFree = _min(total * 20 / 100, (size_t)MAX_IMAGE_SIZE);
+
+  if (freeBytes > minFree) {
+    return false;
+  }
+
+  struct CachedFile {
+    char name[36];
+    size_t size;
+  };
+  CachedFile files[64];
+  size_t n = 0;
+  size_t deleted = 0;
+
+  Log_info("FS free low (%u/%u, need %u); purging largest cached files", (unsigned)freeBytes, (unsigned)total,
+           (unsigned)minFree);
+
+  File rootDir = FS.open("/");
+  while (File file = rootDir.openNextFile()) {
+    if (file.isDirectory()) {
+      file.close();
+      continue;
+    }
+    if (n >= 64) {
+      file.close();
+      break;
+    }
+    snprintf(files[n].name, sizeof(files[n].name), "/%s", file.name());
+    files[n].size = file.size();
+    file.close();
+    n++;
+  }
+  rootDir.close();
+
+  while (n > 0 && freeBytes <= minFree) {
+    size_t best = 0;
+    for (size_t j = 1; j < n; j++) {
+      if (files[j].size > files[best].size) best = j;
+    }
+    Log_info("Deleting %s (%u bytes)", files[best].name, (unsigned)files[best].size);
+    if (FS.remove(files[best].name)) {
+      deleted++;
+    } else {
+      Log_error("Failed to delete %s", files[best].name);
+    }
+    files[best] = files[--n];
+    freeBytes = total - FS.usedBytes();
+  }
+
+  Log_info("FS after purge: %u/%u deleted=%u", (unsigned)FS.usedBytes(), (unsigned)total, (unsigned)deleted);
+  return deleted > 0;
 }
 
 uint32_t filesystem_extract_timestamp(const char *filename) {
