@@ -747,6 +747,19 @@ void bl_init(void)
 
   Log_info("preferences start");
   bool res = preferences.begin("data", false);
+#ifdef MUSTHAVE_SERVER_URL
+  {
+    // must-have fork: the BYOS server URL is baked in at build time, so no captive-portal round trip
+    // is needed to repoint the device. Changing the URL forces a fresh /api/setup (new api key).
+    String wanted = MUSTHAVE_SERVER_URL;
+    if (wanted.length() > 0 && preferences.getString(PREFERENCES_API_URL, "") != wanted) {
+      preferences.putString(PREFERENCES_API_URL, wanted);
+      preferences.remove(PREFERENCES_API_KEY);
+      preferences.remove(PREFERENCES_FRIENDLY_ID);
+      Log.info("%s [%d]: musthave: api_url set to %s, re-pairing\r\n", __FILE__, __LINE__, wanted.c_str());
+    }
+  }
+#endif
   if (res)
   {
     Log_info("preferences init success (%d free entries)", preferences.freeEntries());
@@ -1339,6 +1352,9 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   ApiDisplayInputs inputs;
 
   inputs.baseUrl = preferences.getString(PREFERENCES_API_URL, API_BASE_URL);
+#ifdef MUSTHAVE_FW
+  inputs.frameId = preferences.getString(PREFERENCES_FRAME_ID_KEY, "");
+#endif
 
   Log.info("%s [%d]: baseUrl from preferences: %s\r\n", __FILE__, __LINE__, inputs.baseUrl.c_str());
 
@@ -1470,6 +1486,9 @@ static https_request_err_e downloadAndShow()
         return result;
       }
       DisplayedImage::remember(szTemp);
+#ifdef MUSTHAVE_FW
+      preferences.putString(PREFERENCES_FRAME_ID_KEY, apiDisplayResult.response.frame_id);
+#endif
       Log.info("%s [%d]: Reading %s from SPIFFS\r\n", __FILE__, __LINE__, szTemp);
       size_t content_size = filesystem_read_and_allocate(szTemp, &buffer);
       if (!buffer || content_size == 0) {
@@ -1482,6 +1501,9 @@ static https_request_err_e downloadAndShow()
       free(buffer);
       buffer = nullptr;
       DisplayedImage::remember(szTemp); // current image becomes the previous image
+#ifdef MUSTHAVE_FW
+      preferences.putString(PREFERENCES_FRAME_ID_KEY, apiDisplayResult.response.frame_id);
+#endif
       // Rotate NVS path keys: last ← current ← szTemp
       String _curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
       String _lastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
@@ -1551,6 +1573,9 @@ static https_request_err_e downloadAndShow()
     Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
     display_show_image(buffer, content_size, true);
     DisplayedImage::remember(szTemp); // current image becomes the previous image
+#ifdef MUSTHAVE_FW
+    preferences.putString(PREFERENCES_FRAME_ID_KEY, apiDisplayResult.response.frame_id);
+#endif
     png_res = PNG_NO_ERR; // DEBUG
     String _curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
     String _lastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
@@ -1622,6 +1647,9 @@ static https_request_err_e downloadAndShow()
       char szTemp[36];
       filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
       DisplayedImage::remember(szTemp);
+#ifdef MUSTHAVE_FW
+      preferences.putString(PREFERENCES_FRAME_ID_KEY, apiDisplayResult.response.frame_id);
+#endif
     }
 
     // Using filename from API response
@@ -1700,6 +1728,41 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
       String image_url = apiResponse.image_url;
       uint64_t rate = apiResponse.refresh_rate;
       reset_firmware = apiResponse.reset_firmware;
+#ifdef MUSTHAVE_FW
+      if (apiResponse.ota_wait)
+      {
+        // OTA waiting mode: short polls, no drawing; the server flips update_firmware when the binary is ready.
+        Log.info("%s [%d]: musthave: ota_wait, polling every %d s\r\n", __FILE__, __LINE__, (int)rate);
+        if (!preferences.getBool(PREFERENCES_OTA_WAIT_SHOWN, false))
+        {
+          display_show_msg_api(storedLogoOrDefault(0), "Waiting for firmware update from jakubjirak.com ...");
+          preferences.putBool(PREFERENCES_OTA_WAIT_SHOWN, true);
+        }
+      }
+      else if (preferences.getBool(PREFERENCES_OTA_WAIT_SHOWN, false))
+      {
+        preferences.putBool(PREFERENCES_OTA_WAIT_SHOWN, false);
+        preferences.remove(PREFERENCES_FRAME_ID_KEY); // the panel shows the waiting screen, force a full frame next
+      }
+      if (apiResponse.v1_action == V1_ACTION_NONE)
+      {
+        Log.info("%s [%d]: musthave: action none, frame %s stays\r\n", __FILE__, __LINE__, apiResponse.frame_id.c_str());
+        refreshInterval.applyServerRate(rate);
+        refreshInterval.resetFastPollStreak();
+        status = false;
+        result = HTTPS_SUCCESS;
+        if (reset_firmware)
+          result = HTTPS_RESET;
+        break;
+      }
+      // partial: until windowed regions land, download the full frame; display_show_image() already does a
+      // non-flashing REFRESH_PARTIAL against the cached previous image, so only changed pixels move.
+      // full + full_mode=full: the server asks for a real full refresh (ghost cleaning) → maximum_compatibility.
+      if (apiResponse.v1_action == V1_ACTION_FULL && apiResponse.full_mode == V1_FULL_FULL)
+        apiResponse.maximum_compatibility = true;
+      else
+        apiResponse.maximum_compatibility = false;
+#endif
 
       bool sleep_5_seconds = false;
 

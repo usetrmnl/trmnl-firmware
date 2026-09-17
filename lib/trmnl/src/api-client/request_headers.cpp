@@ -29,6 +29,7 @@ HttpHeaderList buildDisplayHeaders(const ApiDisplayInputs &inputs) {
   headers.push_back({"Gauge-Capacity", String(inputs.gaugeCapacityRemain) + "/" + String(inputs.gaugeCapacityFull)});
 #endif // BOARD_TRMNL_X
   headers.push_back({"FW-Version", inputs.firmwareVersion});
+  if (inputs.frameId.length() > 0) headers.push_back({"X-Frame-Id", inputs.frameId});  // protocol v1
   if (inputs.firmwareCommit.length() > 0) headers.push_back({"FW-Commit", inputs.firmwareCommit});
   headers.push_back({"Model", String(inputs.model)});
   headers.push_back({"Image-Cached", inputs.imageCached ? "true" : "false"});

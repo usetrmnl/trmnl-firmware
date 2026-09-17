@@ -34,7 +34,12 @@ bool FirmwareUpdateService::isUpdateDue(bool update_firmware, const String &firm
   Log_info("%s [%d]: firmware_url: %s\r\n", __FILE__, __LINE__, _firmwareUrl);
 
   uint32_t now = _clock.getTime();
+#ifdef MUSTHAVE_FW
+  // must-have: the BYOS server only sets update_firmware when the version really differs, so no 24h throttle
+  if (false) {
+#else
   if (!otaAttemptDue(now, otaLastAttempt(_persistence))) {
+#endif
     Log_info("%s [%d]: Last OTA attempt was < 24h ago, skipping...\r\n", __FILE__, __LINE__);
     return false;
   }

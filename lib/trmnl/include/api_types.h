@@ -30,6 +30,11 @@ enum class ApiDisplayOutcome {
   DeserializationError,
 };
 
+// Protocol v1 (must-have fork): what the server wants the device to do with the panel.
+enum V1Action { V1_ACTION_NONE = 0, V1_ACTION_PARTIAL = 1, V1_ACTION_FULL = 2 };
+enum V1FullMode { V1_FULL_FULL = 0, V1_FULL_FAST = 1 };
+enum V1SleepMode { V1_SLEEP_DEEP = 0, V1_SLEEP_LIGHT = 1 };
+
 struct ApiDisplayResponse {
   ApiDisplayOutcome outcome;
   String error_detail;
@@ -46,6 +51,14 @@ struct ApiDisplayResponse {
   SPECIAL_FUNCTION special_function;
   String action;
   String touchbar_mode;
+  // protocol v1 (defaults keep stock servers working: full via image_url/filename)
+  V1Action v1_action;
+  String frame_id;
+  String full_url;
+  String regions_url;
+  V1FullMode full_mode;
+  V1SleepMode sleep_mode;
+  bool ota_wait;  // server is preparing an update: poll fast, do not draw, do not deep-sleep long
 };
 
 struct ApiDisplayInputs {
@@ -83,6 +96,7 @@ struct ApiDisplayInputs {
   UsbStatus usbStatus;
   bool imageCached;
   int prevWakeTime;
+  String frameId;  // protocol v1: frame currently on the panel (empty = unknown)
 };
 
 struct ApiLogInputs {
