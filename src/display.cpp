@@ -2789,6 +2789,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
  */
 void display_sleep(void)
 {
+    if (clockinfo.rect.w) return; // don't sleep, display a clock
     Log_info("Goto Sleep...");
 #ifdef BB_EPAPER
     bbep.sleep(LIGHT_SLEEP);

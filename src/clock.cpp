@@ -23,6 +23,7 @@ const time_t t = (time_t)u32Epoch;
 char szTemp[32];
 BB_RECT rect;
 
+    bbep.fillRect(pRect->x, pRect->y, pRect->w, pRect->h, BBEP_WHITE);
     gmtime_r(&t, &myTime); // convert epoch into broken out hour/min/etc
     bbep.setFont(Roboto_Black_75);
     bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
@@ -53,7 +54,6 @@ uint32_t u32Epoch;
 #else // FastEPD
 //    bbep.initPanel(iPanelType);
 #endif
-    bbep.fillScreen(BBEP_WHITE);
     DrawTime(u32Epoch, &pInfo->rect);
 #ifdef BB_EPAPER
     bbep.writePlane(PLANE_0); // draw the current time into the 'new' plane

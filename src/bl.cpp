@@ -2517,6 +2517,22 @@ static void resetDeviceCredentials(void)
  */
 void goToSleep(void)
 {
+  uint32_t time_to_sleep = refreshInterval.seconds();
+// *** Experimental Clock START ***
+  if (clockinfo.rect.w) { // A clock plugin is part of the last image, show the time for the wakeup period
+    uint32_t u32WakeMinutes = time_to_sleep / 60; // how many minutes we can show the clock
+ //   for (uint32_t u32Min=0; u32Min < u32WakeMinutes; u32Min++) {
+ //   Log_info("Drawing real time clock at: %d,%d %d x %d", clockinfo.rect.x, clockinfo.rect.y, clockinfo.rect.w, clockinfo.rect.h);
+ //       ShowClock(&clockinfo, u32Min == 0);
+  //      esp_sleep_enable_timer_wakeup(60 * 1000 * 1000); // light sleep for a minutes
+  //      esp_light_sleep_start();
+ //       delay(60000);
+ //   }
+    memset(&clockinfo, 0, sizeof(clockinfo)); // allow normal sleep to proceed
+    display_sleep();
+  }
+// *** Experimental Clock END ***
+
   Log.info("%s [%d]: go to sleep\r\n", __FILE__, __LINE__);
   submitStoredLogs();
 
@@ -2552,18 +2568,6 @@ void goToSleep(void)
 #endif
 
   filesystem_deinit();
-  uint32_t time_to_sleep = refreshInterval.seconds();
-
-// *** Experimental Clock START ***
-  if (clockinfo.rect.w) { // A clock plugin is part of the last image, show the time for the wakeup period
-    uint32_t u32WakeMinutes = time_to_sleep / 60; // how many minutes we can show the clock
-    for (uint32_t u32Min=0; u32Min < u32WakeMinutes; u32Min++) {
-        ShowClock(&clockinfo, u32Min == 0);
-        esp_sleep_enable_timer_wakeup(60 * 1000 * 1000); // light sleep for a minutes
-        esp_light_sleep_start();
-    }
-  }
-// *** Experimental Clock END ***
 
   iPrevWakeTime = millis() - startup_time; // save for statistics
   Log.info("%s [%d]: total awake time - %d ms\r\n", __FILE__, __LINE__, iPrevWakeTime); 
