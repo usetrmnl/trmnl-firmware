@@ -60,7 +60,7 @@ typedef struct theBrand {
 void display_init(void);
 
 /**
- * @brief Panel ID (EPD revision) as 8 hex digits for the Panel-ID request header
+ * @brief Panel ID (EPD revision) as 8 hex digits for the Panel-Rev request header
  * @return hex string, or empty if the ID is unknown/not read
  */
 String display_panel_id_string(void);

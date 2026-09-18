@@ -73,8 +73,8 @@ void test_setup_headers_include_panel_id_when_set(void) {
   auto headers = buildSetupHeaders(inputs);
 
   TEST_ASSERT_EQUAL_UINT32(5, headers.size());
-  TEST_ASSERT_EQUAL_STRING("Panel-ID", headers[4].first.c_str());
-  TEST_ASSERT_EQUAL_STRING("0012ab34", valueOf(headers, "Panel-ID").c_str());
+  TEST_ASSERT_EQUAL_STRING("Panel-Rev", headers[4].first.c_str());
+  TEST_ASSERT_EQUAL_STRING("0012ab34", valueOf(headers, "Panel-Rev").c_str());
 }
 
 // --- buildLogHeaders -------------------------------------------------------
@@ -152,14 +152,14 @@ void test_display_headers_special_function_present_when_set(void) {
 
 void test_display_headers_panel_id_omitted_when_empty(void) {
   auto headers = buildDisplayHeaders(makeDisplayInputs());
-  TEST_ASSERT_EQUAL_INT(-1, indexOf(headers, "Panel-ID"));
+  TEST_ASSERT_EQUAL_INT(-1, indexOf(headers, "Panel-Rev"));
 }
 
 void test_display_headers_panel_id_present_when_set(void) {
   ApiDisplayInputs inputs = makeDisplayInputs();
   inputs.panelId = "0012ab34";
   auto headers = buildDisplayHeaders(inputs);
-  TEST_ASSERT_EQUAL_STRING("0012ab34", valueOf(headers, "Panel-ID").c_str());
+  TEST_ASSERT_EQUAL_STRING("0012ab34", valueOf(headers, "Panel-Rev").c_str());
 }
 
 void test_display_headers_wifi_band_2_4(void) {
