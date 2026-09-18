@@ -2418,6 +2418,14 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         bbep.print(string2);
     }
     break;
+    case MSG_FREE_TEXT:
+    {
+        const char *text = message_text ? message_text : "";
+        bbep.getStringBox(text, &rect);
+        bbep.setCursor((bbep.width() - rect.w) / 2, 400);
+        bbep.print(text);
+    }
+    break;
     case FW_UPDATE:
     {
         const char string1[] = "Firmware update available! Starting now...";
@@ -2858,3 +2866,11 @@ void display_sleep(void)
     bbep.deInit();
 #endif
 }
+
+#ifdef BYOS_PROTOCOL_V1
+// Declared in display.h upstream but never defined; BYOS v1 uses it for "waiting for update".
+void display_show_msg_api(uint8_t *image_buffer, String message)
+{
+    display_show_msg(image_buffer, MSG_FREE_TEXT, message.c_str());
+}
+#endif
