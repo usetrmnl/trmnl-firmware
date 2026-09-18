@@ -23,7 +23,6 @@ enum MSG {
   WIFI_INTERNAL_ERROR,
   WIFI_IMAGE_TIMEOUT,
   API_ERROR,
-  API_REQUEST_FAILED,
   API_SIZE_ERROR,
   API_UNABLE_TO_CONNECT,
   API_SETUP_FAILED,
@@ -40,6 +39,7 @@ enum MSG {
   FILL_WHITE,
   WIFI_RETRY_LIMIT,
   CAPTIVE_WIFI_TIMEOUT,
+  IMAGE_DOWNLOAD_FAILED,
 };
 
 typedef struct dp_tag {
@@ -58,6 +58,12 @@ typedef struct theBrand {
  * @return none
  */
 void display_init(void);
+
+/**
+ * @brief Panel ID (EPD revision) as 8 hex digits for the Panel-Rev request header
+ * @return hex string, or empty if the ID is unknown/not read
+ */
+String display_panel_rev_string(void);
 
 uint8_t tca9535_interrupt_clear();
 void config_bma530_interrupt();

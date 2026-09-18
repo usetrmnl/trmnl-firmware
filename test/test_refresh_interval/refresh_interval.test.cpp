@@ -97,40 +97,42 @@ void test_server_rate_skips_the_write_when_unchanged(void) {
 void test_server_rate_writes_when_key_is_absent_even_at_the_default(void) {
   MemoryPersistence persistence;
   RefreshInterval refreshInterval(persistence);
-  refreshInterval.applyServerRate(RefreshInterval::DEFAULT_SECONDS);
+  refreshInterval.applyServerRate(SHORT_TERM_SLOW_RETRY_INTERVAL);
   TEST_ASSERT_TRUE(persistence.recordExists(RefreshInterval::SLEEP_KEY));
 }
 
-void test_api_retry_ladder(void) {
+// API failures retry on a flat 5 minute interval regardless of attempt number.
+void test_api_retry_is_flat_five_minutes(void) {
   MemoryPersistence persistence;
   RefreshInterval refreshInterval(persistence);
-  TEST_ASSERT_EQUAL_UINT32(15, refreshInterval.applyApiRetry(1));
-  TEST_ASSERT_EQUAL_UINT32(30, refreshInterval.applyApiRetry(2));
-  TEST_ASSERT_EQUAL_UINT32(60, refreshInterval.applyApiRetry(3));
-  TEST_ASSERT_EQUAL_UINT32(900, refreshInterval.applyApiRetry(4));
-  TEST_ASSERT_EQUAL_UINT32(900, refreshInterval.seconds());
+  TEST_ASSERT_EQUAL_UINT32(SHORT_TERM_SLOW_RETRY_INTERVAL, refreshInterval.applyApiRetry(1));
+  TEST_ASSERT_EQUAL_UINT32(SHORT_TERM_SLOW_RETRY_INTERVAL, refreshInterval.applyApiRetry(4));
+  TEST_ASSERT_EQUAL_UINT32(SHORT_TERM_SLOW_RETRY_INTERVAL, refreshInterval.applyApiRetry(100));
+  TEST_ASSERT_EQUAL_UINT32(SHORT_TERM_SLOW_RETRY_INTERVAL, refreshInterval.seconds());
 }
 
-void test_wifi_retry_ladder(void) {
+// Wi-Fi failures retry every 5 minutes for about an hour, then back off to 15 minutes.
+void test_wifi_retry_backs_off_after_quiet_retries(void) {
   MemoryPersistence persistence;
   RefreshInterval refreshInterval(persistence);
-  TEST_ASSERT_EQUAL_UINT32(60, refreshInterval.applyWifiRetry(1));
-  TEST_ASSERT_EQUAL_UINT32(180, refreshInterval.applyWifiRetry(2));
-  TEST_ASSERT_EQUAL_UINT32(300, refreshInterval.applyWifiRetry(3));
-  TEST_ASSERT_EQUAL_UINT32(300, refreshInterval.seconds());
+  TEST_ASSERT_EQUAL_UINT32(SHORT_TERM_SLOW_RETRY_INTERVAL, refreshInterval.applyWifiRetry(1));
+  TEST_ASSERT_EQUAL_UINT32(SHORT_TERM_SLOW_RETRY_INTERVAL, refreshInterval.applyWifiRetry(MAX_QUIET_SLOW_RETRIES - 1));
+  TEST_ASSERT_EQUAL_UINT32(LONG_TERM_SLOW_RETRY_INTERVAL, refreshInterval.applyWifiRetry(MAX_QUIET_SLOW_RETRIES));
+  TEST_ASSERT_EQUAL_UINT32(LONG_TERM_SLOW_RETRY_INTERVAL, refreshInterval.applyWifiRetry(MAX_QUIET_SLOW_RETRIES + 5));
+  TEST_ASSERT_EQUAL_UINT32(LONG_TERM_SLOW_RETRY_INTERVAL, refreshInterval.seconds());
 }
 
-void test_default_fallback_is_fifteen_minutes(void) {
+void test_default_fallback_is_five_minutes(void) {
   MemoryPersistence persistence;
   RefreshInterval refreshInterval(persistence);
-  TEST_ASSERT_EQUAL_UINT32(900, refreshInterval.applyDefault());
-  TEST_ASSERT_EQUAL_UINT32(900, refreshInterval.seconds());
+  TEST_ASSERT_EQUAL_UINT32(SHORT_TERM_SLOW_RETRY_INTERVAL, refreshInterval.applyDefault());
+  TEST_ASSERT_EQUAL_UINT32(SHORT_TERM_SLOW_RETRY_INTERVAL, refreshInterval.seconds());
 }
 
 void test_seconds_defaults(void) {
   MemoryPersistence persistence;
   RefreshInterval refreshInterval(persistence);
-  TEST_ASSERT_EQUAL_UINT32(900, refreshInterval.seconds());
+  TEST_ASSERT_EQUAL_UINT32(SHORT_TERM_SLOW_RETRY_INTERVAL, refreshInterval.seconds());
   TEST_ASSERT_EQUAL_UINT32(0, refreshInterval.seconds(0)); // telemetry contract
   refreshInterval.applyServerRate(120);
   TEST_ASSERT_EQUAL_UINT32(120, refreshInterval.seconds());
@@ -152,9 +154,9 @@ void process() {
   RUN_TEST(test_server_rate_is_stored);
   RUN_TEST(test_server_rate_skips_the_write_when_unchanged);
   RUN_TEST(test_server_rate_writes_when_key_is_absent_even_at_the_default);
-  RUN_TEST(test_api_retry_ladder);
-  RUN_TEST(test_wifi_retry_ladder);
-  RUN_TEST(test_default_fallback_is_fifteen_minutes);
+  RUN_TEST(test_api_retry_is_flat_five_minutes);
+  RUN_TEST(test_wifi_retry_backs_off_after_quiet_retries);
+  RUN_TEST(test_default_fallback_is_five_minutes);
   RUN_TEST(test_seconds_defaults);
   UNITY_END();
 }
