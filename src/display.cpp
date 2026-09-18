@@ -178,7 +178,7 @@ return u8;
  * @param none
  * @return 32-bit value read from the panel's revision (REV) command
  */
-uint32_t get_panel_id(void)
+uint32_t get_panel_rev(void)
 {
     uint32_t u32 = 0;
     uint8_t u8;
@@ -222,18 +222,18 @@ uint32_t get_panel_id(void)
     }
     digitalWrite(pDevice->epd_cs_pin, 1);
     return u32;
-} /* get_panel_id() */
+} /* get_panel_rev() */
 #endif // BB_EPAPER
 
-String display_panel_id_string(void)
+String display_panel_rev_string(void)
 {
-    if (panel_id == 0) {
+    if (panel_rev == 0) {
         return String();
     }
     char sz[9];
-    snprintf(sz, sizeof(sz), "%08" PRIx32, panel_id);
+    snprintf(sz, sizeof(sz), "%08" PRIx32, panel_rev);
     return String(sz);
-} /* display_panel_id_string() */
+} /* display_panel_rev_string() */
 
 void hw_config_init(void)
 {
@@ -276,8 +276,8 @@ void display_init(void)
     digitalWrite(10, 1);
 #endif // BOARD_SEEED_STICKY
     // Read the panel ID after any board-specific power/CS setup, but before bb_epaper takes over the SPI pins
-    panel_id = get_panel_id();
-    Log_info("Panel ID = 0x%08x\n", panel_id);
+    panel_rev = get_panel_rev();
+    Log_info("Panel ID = 0x%08x\n", panel_rev);
     if (pDevice->epd_mosi_pin != 0 || pDevice->epd_sck_pin != 0) {
         bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit); // must be set BEFORE calling initio
         bbep.initIO(pDevice->epd_dc_pin, pDevice->epd_rst_pin, pDevice->epd_busy_pin, pDevice->epd_cs_pin,

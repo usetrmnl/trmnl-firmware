@@ -1385,7 +1385,7 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   inputs.displayWidth = display_width();
   inputs.displayHeight = display_height();
   inputs.model = DEVICE_MODEL;
-  inputs.panelId = display_panel_id_string();
+  inputs.panelId = display_panel_rev_string();
   inputs.specialFunction = special_function;
   inputs.imageCached = bUsedCachedImage;
   inputs.prevWakeTime = iPrevWakeTime;

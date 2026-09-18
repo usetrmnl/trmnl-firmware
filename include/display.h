@@ -63,7 +63,7 @@ void display_init(void);
  * @brief Panel ID (EPD revision) as 8 hex digits for the Panel-Rev request header
  * @return hex string, or empty if the ID is unknown/not read
  */
-String display_panel_id_string(void);
+String display_panel_rev_string(void);
 
 uint8_t tca9535_interrupt_clear();
 void config_bma530_interrupt();
