@@ -43,31 +43,31 @@ const TRMNL_DEVICE device_list[] =
 #else // BB_EPAPER boards
 const TRMNL_DEVICE device_list[] = 
 {
-// name            sck   mosi   cs   rst   dc   busy  sda   scl   intr   batt  batt_en, batt_type, panel
-  "og",            7,    8,     6,   10,   5,   4,    21,   20,   2,     3,    0xff,    BATT_ADC,  EPD_75,
-  "og_4clr",       7,    8,     6,   10,   5,   4,    21,   20,   2,     3,    0xff,    BATT_ADC,  EPD_75_4CLR,
-  "og_gen2",       6,    1,     4,   2,    5,   0,    23,   10,   3,     0xff, 0xff,    BATT_BQ27427,  EPD_75, // fake battery == 0xff
-  "og_gen2_4clr",  6,    1,     4,   2,    5,   0,    11,   12,   3,     0xff, 0xff,    BATT_BQ27427,  EPD_75_4CLR, // fake battery == 0xff
-  "xteink_x4",     8,    10,    21,  5,    4,   6,    0xff, 0xff, 3,     0,    0xff,    BATT_ADC,  EPD_426,
-  "waveshare",     13,   14,    15,  26,   27,  25,   0xff, 0xff, 33,    0xff, 0xff,    BATT_ADC,  EPD_75,
-  "waveshare_397", 11,   12,    10,  46,   9,   3,    41,   42,   0,     0xff, 0xff,    BATT_AXP2101,  EPD_397,
-  "seeed_sticky",  13,   14,    15,  17,   16,  18,   1,    0,    4,     0xff, 0xff,    BATT_BQ27220,  EPD_397,  
-  "seeed_esp32c3", 8,    10,    3,   2,    5,   4,    0xff, 0xff, 9,     0xff, 0xff,    BATT_ADC,  EPD_75,
-  "seeed_esp32s3", 7,    9,     2,   1,    4,   3,    0xff, 0xff, 0,     0xff, 0xff,    BATT_ADC,  EPD_75,
-  "xiao_epaper_mini", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 2,     1,    6,       BATT_ADC,  EPD_426,
-  "xiao_epaper_display", 7, 9,  44,  38,   10,  4,    0xff, 0xff, 5,     1,    6,       BATT_ADC,  EPD_75,
-  "xiao_epaper_3clr", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 5,     1,    6,       BATT_ADC,  EPD_75_3CLR,
-  "xiao_epaper_6clr", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 5,     1,    6,       BATT_ADC,  EPD_75_6CLR,
-  "reterminal_e1001", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     1,    21,      BATT_ADC,  EPD_75,
-  "reterminal_e1002", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     1,    21,      BATT_ADC,  EPD_75_6CLR,
-  "crowpanel42",   0,    0,     0,   0,    0,   0,    0xff, 0xff, 2,     0xff, 0xff,    BATT_NONE, EPD_CROWPANEL, 
+// name            sck   mosi   cs   rst   dc   busy  sda   scl   intr   batt  batt_en, epd_en  batt_type, panel
+  "og",            7,    8,     6,   10,   5,   4,    21,   20,   2,     3,    0xff,    0xff,   BATT_ADC,  EPD_75,
+  "og_4clr",       7,    8,     6,   10,   5,   4,    21,   20,   2,     3,    0xff,    0xff,   BATT_ADC,  EPD_75_4CLR,
+  "og_gen2",       6,    1,     4,   2,    5,   0,    23,   10,   3,     0xff, 0xff,    0xff,   BATT_BQ27427,  EPD_75, // fake battery == 0xff
+  "og_gen2_4clr",  6,    1,     4,   2,    5,   0,    11,   12,   3,     0xff, 0xff,    0xff,   BATT_BQ27427,  EPD_75_4CLR, // fake battery == 0xff
+  "xteink_x4",     8,    10,    21,  5,    4,   6,    0xff, 0xff, 3,     0,    0xff,    0xff,   BATT_ADC,  EPD_426,
+  "waveshare",     13,   14,    15,  26,   27,  25,   0xff, 0xff, 33,    0xff, 0xff,    0xff,   BATT_ADC,  EPD_75,
+  "waveshare_397", 11,   12,    10,  46,   9,   3,    41,   42,   0,     0xff, 0xff,    0xff,   BATT_AXP2101,  EPD_397,
+  "seeed_sticky",  13,   14,    15,  17,   16,  18,   1,    0,    4,     0xff, 0xff,    0xff,   BATT_BQ27220,  EPD_397,  
+  "seeed_esp32c3", 8,    10,    3,   2,    5,   4,    0xff, 0xff, 9,     0xff, 0xff,    0xff,   BATT_ADC,  EPD_75,
+  "seeed_esp32s3", 7,    9,     2,   1,    4,   3,    0xff, 0xff, 0,     0xff, 0xff,    0xff,   BATT_ADC,  EPD_75,
+  "xiao_epaper_mini", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 2,     1,    6,       0xff,   BATT_ADC,  EPD_426,
+  "xiao_epaper_display", 7, 9,  44,  38,   10,  4,    0xff, 0xff, 5,     1,    6,       0xff,   BATT_ADC,  EPD_75,
+  "xiao_epaper_3clr", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 5,     1,    6,       0xff,   BATT_ADC,  EPD_75_3CLR,
+  "xiao_epaper_6clr", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 5,     1,    6,       0xff,   BATT_ADC,  EPD_75_6CLR,
+  "reterminal_e1001", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     1,    21,      0xff,   BATT_ADC,  EPD_75,
+  "reterminal_e1002", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     1,    21,      0xff,   BATT_ADC,  EPD_75_6CLR,
+  "crowpanel42",   0,    0,     0,   0,    0,   0,    0xff, 0xff, 2,     0xff, 0xff,    0xff,   BATT_NONE, EPD_CROWPANEL, 
 #ifdef CMD_CS1_CS2
-  "m5_paper_mono", 0,    0,     0,   0,    0,   0,    47,   48,   2,     0xff, 0xff,    BATT_NONE, EPD_PAPER_MONO, 
-  "m5_paper_color", 0,   0,     0,   0,    0,   0,    3,    2,    1,     0xff, 0xff,    BATT_NONE, EPD_PAPER_COLOR, 
-  "reterminal_e1004", 0, 0,     0,   0,    0,   0,    0xff, 0xff, 4,     1,    21,      BATT_ADC,  EPD_133_COLOR,
-  "trmnl_steam",   7,    8,     6,   10,   5,   4,    21,   20,   2,     3,    0xff,    BATT_ADC,  EPD_583,
+  "m5_paper_mono", 0,    0,     0,   0,    0,   0,    47,   48,   2,     0xff, 0xff,    0xff,   BATT_NONE, EPD_PAPER_MONO, 
+  "m5_paper_color", 0,   0,     0,   0,    0,   0,    3,    2,    1,     0xff, 0xff,    0xff,   BATT_NONE, EPD_PAPER_COLOR, 
+  "reterminal_e1004", 0, 0,     0,   0,    0,   0,    0xff, 0xff, 4,     1,    21,      12,     BATT_ADC,  EPD_133_COLOR,
+  "trmnl_steam",   7,    8,     6,   10,   5,   4,    21,   20,   2,     3,    0xff,    0xff,   BATT_ADC,  EPD_583,
 #endif
-  NULL,            0,    0,     0,   0,    0,   0,    0,    0,    0,     0,    0,       0,         0,
+  NULL,            0,    0,     0,   0,    0,   0,    0,    0,    0,     0,    0,       0,      0,         0,
 }; // device_list
 
 // TRMNL SPI ePaper panel types list. The list order is fixed and based on enumerated values
@@ -513,7 +513,11 @@ void modem_reset_target(void) {
 void display_set_light_sleep(uint8_t enabled)
 {
 #ifdef BB_EPAPER
+#ifdef CMD_CS1_CS2
+    bbep.setLightSleep(enabled, pDevice->epd_en_pin);
+#else
     bbep.setLightSleep(enabled);
+#endif
 #endif
 }
 
@@ -1889,8 +1893,11 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
 #ifdef DO_NOT_LIGHT_SLEEP
     bbep.setLightSleep(false);
 #else
+#ifdef CMD_CS1_CS2
+    bbep.setLightSleep(true, pDevice->epd_en_pin);
+#else
     bbep.setLightSleep(true);
-
+#endif
 #endif // DO_NOT_LIGHT_SLEEP
 #endif // !BOARD_SEEED_RETERMINAL_E1002
     if (bbep.getPanelType() == EP397_800x480 && iRefreshMode == REFRESH_FAST) {

@@ -164,6 +164,7 @@ typedef struct tag_trmnl_device {
   uint8_t interrupt_pin;
   uint8_t batt_pin;
   uint8_t batt_en_pin;
+  uint8_t epd_en_pin;
   uint8_t batt_type; // ADC, BQ27xx
   uint8_t panel_set;
 } TRMNL_DEVICE;
