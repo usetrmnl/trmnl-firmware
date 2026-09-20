@@ -47,19 +47,19 @@ uint32_t u32Epoch;
 
     time(&now);
     u32Epoch = (uint32_t)now + pInfo->tz;
-#ifdef __BB_EPAPER__
-    bbep.setPanelType(iPanelType);
-    bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
-    bbep.allocBuffer();
-#else // FastEPD
+//#ifdef __BB_EPAPER__
+//    bbep.setPanelType(iPanelType);
+//    bbep.initIO(EPD_DC_PIN, EPD_RST_PIN, EPD_BUSY_PIN, EPD_CS_PIN, EPD_MOSI_PIN, EPD_SCK_PIN, 8000000);
+//    bbep.allocBuffer();
+//#else // FastEPD
 //    bbep.initPanel(iPanelType);
-#endif
+//#endif
     DrawTime(u32Epoch, &pInfo->rect);
-#ifdef BB_EPAPER
+#ifdef PARALLEL_EPD
+    bbep.partialUpdate(false);
+#else
     bbep.writePlane(PLANE_0); // draw the current time into the 'new' plane
     bbep.refresh(REFRESH_PARTIAL);
     bbep.sleep(DEEP_SLEEP);
-#else
-    bbep.partialUpdate(false);
 #endif
 } /* DisplayTime() */
