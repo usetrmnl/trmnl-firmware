@@ -61,6 +61,7 @@ const TRMNL_DEVICE device_list[] =
   "reterminal_e1001", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     1,    21,      0xff,   BATT_ADC,  EPD_75,
   "reterminal_e1002", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     1,    21,      0xff,   BATT_ADC,  EPD_75_6CLR,
   "crowpanel42",   0,    0,     0,   0,    0,   0,    0xff, 0xff, 2,     0xff, 0xff,    0xff,   BATT_NONE, EPD_CROWPANEL, 
+  "waveshare_154", 0,    0,     0,   0,    0,   0,    0xff, 0xff, 0,     4,    0xff,    6,      BATT_ADC,  EPD_WS_154, 
 #ifdef CMD_CS1_CS2
   "m5_paper_mono", 0,    0,     0,   0,    0,   0,    47,   48,   2,     0xff, 0xff,    0xff,   BATT_NONE, EPD_PAPER_MONO, 
   "m5_paper_color", 0,   0,     0,   0,    0,   0,    3,    2,    1,     0xff, 0xff,    0xff,   BATT_NONE, EPD_PAPER_COLOR, 
@@ -72,7 +73,7 @@ const TRMNL_DEVICE device_list[] =
 
 // TRMNL SPI ePaper panel types list. The list order is fixed and based on enumerated values
 // N.B. ALWAYS ADD NEW PANELS TO THE END OF THE LIST
-const DISPLAY_PROFILE dpList[11][3] = { // 1-bit and 2-bit display types for each profile
+const DISPLAY_PROFILE dpList[12][3] = { // 1-bit and 2-bit display types for each profile
     {{EP75_800x480, EP75_800x480_4GRAY}, {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, {EP75_800x480, EP75_800x480_4GRAY_V2}},
     {{EP426_800x480, EP426_800x480_4GRAY}, {EP426_800x480, EP426_800x480_4GRAY}, {EP426_800x480, EP426_800x480_4GRAY}},
     {{EP397_800x480, EP397_800x480_4GRAY}, {EP397_800x480, EP397_800x480_4GRAY}, {EP397_800x480, EP397_800x480_4GRAY}},
@@ -80,6 +81,7 @@ const DISPLAY_PROFILE dpList[11][3] = { // 1-bit and 2-bit display types for eac
     {{EP75YR_800x480, EP75YR_800x480}, {EP75YR_800x480, EP75YR_800x480}, {EP75YR_800x480, EP75YR_800x480}}, 
     {{EP73_SPECTRA_800x480, EP73_SPECTRA_800x480}, {EP73_SPECTRA_800x480, EP73_SPECTRA_800x480}, {EP73_SPECTRA_800x480, EP73_SPECTRA_800x480}},
     {{EPD_CROWPANEL42, EPD_CROWPANEL42_4GRAY},{EPD_CROWPANEL42, EPD_CROWPANEL42_4GRAY},{EPD_CROWPANEL42, EPD_CROWPANEL42_4GRAY}},
+    {{EPD_WAVESHARE_154, EPD_WAVESHARE_154_4GRAY},{EPD_WAVESHARE_154, EPD_WAVESHARE_154_4GRAY},{EPD_WAVESHARE_154, EPD_WAVESHARE_154_4GRAY}},
 #ifdef CMD_CS1_CS2
     {{EP583_648x480, EP583_648x480_4GRAY}, {EP583_648x480, EP583_648x480_4GRAY}, {EP583_648x480, EP583_648x480_4GRAY}},
     {{EPD_M5_PAPER_MONO, EPD_M5_PAPER_MONO_4GRAY},{EPD_M5_PAPER_MONO, EPD_M5_PAPER_MONO_4GRAY},{EPD_M5_PAPER_MONO, EPD_M5_PAPER_MONO_4GRAY}},
@@ -1643,7 +1645,7 @@ PNG *png = new PNG();
     png->close();
     if (rc == PNG_SUCCESS) {
         Log_info("Decoding %d x %d PNG", png->getWidth(), png->getHeight());
-        if (png->getWidth() == bbep.height() && png->getHeight() == bbep.width()) {
+        if (png->getWidth() == bbep.height() && png->getHeight() == bbep.width() && bbep.width() != bbep.height()) {
             Log_info("Rotating canvas to portrait orientation");
         } else if (png->getWidth() > bbep.width() || png->getHeight() > bbep.height()) {
             Log_info("PNG image is larger than the display (%dx%d), it will be cropped", png->getWidth(), png->getHeight());
@@ -1678,7 +1680,13 @@ PNG *png = new PNG();
             bbep.setAddrWindow(0, 0, bbep.width(), bbep.height());
             if (png->getBpp() == 1 || (png->getBpp() == 2 && png_count_colors(png, pPNG, iDataSize) == 2)) { // 1-bit image (single plane)
                 png->close(); // use a different PNGDraw callback for color matching
-                bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit);
+                if (pDevice->epd_mosi_pin != 0 || pDevice->epd_sck_pin != 0) {
+                    bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit);
+                    bbep.initIO(pDevice->epd_dc_pin, pDevice->epd_rst_pin, pDevice->epd_busy_pin, pDevice->epd_cs_pin,
+                    pDevice->epd_mosi_pin, pDevice->epd_sck_pin, 8000000);
+                } else {
+                    bbep.begin(dpList[pDevice->panel_set][0].OneBit);
+                }
                 rc = REFRESH_PARTIAL; // the new image is 1bpp - try a partial update
                 bbep.startWrite(PLANE_0); // start writing image data to plane 0
                 png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
