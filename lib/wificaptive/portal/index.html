@@ -3,258 +3,751 @@
 
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <title>TRMNL Wi-Fi Configuration</title>
   <style>
     :root {
-      --paper: #F0F0EB; --surface: #FFFFFF; --ink: #1B1B19; --ink-2: #63635C;
-      --ink-3: #93938B; --rule: #CFCFC7; --rule-soft: #E1E1DA; --spark: #F86527;
-      --invert-fg: #F0F0EB; --warn-bg: #FBF0DC; --warn-ink: #6B4E12; --spark-fg: #FFF;
+      --paper: #F0F0EB;
+      --surface: #FFFFFF;
+      --ink: #1B1B19;
+      --ink-2: #63635C;
+      --ink-3: #93938B;
+      --rule: #CFCFC7;
+      --rule-soft: #E1E1DA;
+      --spark: #F86527;
+      --invert-fg: #F0F0EB;
+      --warn-bg: #FBF0DC;
+      --warn-ink: #6B4E12;
+      --spark-fg: #FFF;
       --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
       --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     }
+
     @media (prefers-color-scheme: dark) {
       :root {
-        --paper: #1A1A17; --surface: #242420; --ink: #EDEDE6; --ink-2: #9E9E95;
-        --ink-3: #6E6E66; --rule: #3A3A33; --rule-soft: #2C2C27; --spark: #FA7C41;
-        --invert-fg: #1A1A17; --warn-bg: #322A16; --warn-ink: #E3C77E;
+        --paper: #1A1A17;
+        --surface: #242420;
+        --ink: #EDEDE6;
+        --ink-2: #9E9E95;
+        --ink-3: #6E6E66;
+        --rule: #3A3A33;
+        --rule-soft: #2C2C27;
+        --spark: #FA7C41;
+        --invert-fg: #1A1A17;
+        --warn-bg: #322A16;
+        --warn-ink: #E3C77E;
       }
     }
-    * { box-sizing: border-box; }
+
+    * {
+      box-sizing: border-box;
+    }
+
     /* Author-origin display rules beat the UA's [hidden]{display:none}, so every
        `display:` rule below would silently un-hide anything carrying the attribute.
        This restores it once, globally, for every element in every task. */
-    [hidden] { display: none !important; }
+    [hidden] {
+      display: none !important;
+    }
+
     body {
-      margin: 0; background: var(--paper); color: var(--ink);
-      font: 400 13.5px/1.55 var(--sans); -webkit-text-size-adjust: 100%;
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font: 400 13.5px/1.55 var(--sans);
+      -webkit-text-size-adjust: 100%;
     }
+
     .p-head {
-      display: flex; flex-direction: column; align-items: stretch; gap: 10px;
-      padding: 14px 20px 11px; border-bottom: 1px solid var(--rule);
-      position: sticky; top: 0; background: var(--paper); z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
+      padding: 14px 20px 11px;
+      border-bottom: 1px solid var(--rule);
+      position: sticky;
+      top: 0;
+      background: var(--paper);
+      z-index: 2;
     }
-    .p-head-row { display: flex; align-items: center; justify-content: space-between; }
-    .lockup { display: flex; align-items: center; gap: 9px; }
-    .lockup .word {
-      font-family: var(--mono); font-size: 15px; font-weight: 600; letter-spacing: .16em;
+
+    .p-head-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
-    .spark { width: 20px; height: 20px; display: block; }
-    .spark path { fill: var(--spark); }
-    .spark g { transform-origin: 15px 15.2px; }
-    .spark.ticking g { animation: tick 1.4s steps(7, end) infinite; }
-    @keyframes tick { to { transform: rotate(360deg); } }
+
+    .p-head-lead {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* The visible box is small; ::before stretches the touch target to 44px.
+       The negative margin keeps the box from making the header any taller. */
+    .head-back {
+      position: relative;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .12em;
+      line-height: 1;
+      text-transform: uppercase;
+      color: var(--ink);
+      background: transparent;
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      cursor: pointer;
+      padding: 7px 9px;
+      margin: -4px 0;
+      transition: border-color .12s steps(3);
+    }
+
+    .head-back::before {
+      content: "";
+      position: absolute;
+      inset: -9px -6px;
+    }
+
+    .head-back:hover {
+      border-color: var(--ink);
+    }
+
+    .logo {
+      height: 20px;
+      width: auto;
+      display: block;
+    }
+
+    .logo path {
+      fill: var(--spark);
+    }
+
+    .spark {
+      width: 20px;
+      height: 20px;
+      display: block;
+    }
+
+    .spark path {
+      fill: var(--spark);
+    }
+
+    /* The spinner is a plain HTML box rotated by CSS, with the static SVG inside
+       it: nothing within the SVG is animated, so the compositor can spin the box
+       at full frame rate. Keep it continuous - the spark has 7 identical blades,
+       so stepping in 1/7 turns lands it on itself and only wiggles. The origin
+       is the spark's true centre (15.32, 14.77 in its 30-unit viewBox). */
+    .spinner {
+      display: block;
+      transform-origin: 51.07% 49.23%;
+      animation: spin 2.4s linear infinite;
+      will-change: transform;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
     .mode {
-      font-family: var(--mono); font-size: 10px; letter-spacing: .12em;
-      text-transform: uppercase; color: var(--ink-2);
-      display: flex; align-items: center; gap: 6px;
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--ink-2);
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
+
     .mode .dot {
-      width: 6px; height: 6px; background: var(--spark); border-radius: 50%;
+      width: 6px;
+      height: 6px;
+      background: var(--spark);
+      border-radius: 50%;
       animation: pulse 2s steps(2, end) infinite;
     }
-    @keyframes pulse { 50% { opacity: .25; } }
-    .p-head-mac {
-      display: flex; align-items: center; justify-content: space-between; gap: 10px;
-      padding-top: 9px; border-top: 1px solid var(--rule-soft);
+
+    @keyframes pulse {
+      50% {
+        opacity: .25;
+      }
     }
-    .mac-value-hdr {
-      font-family: var(--mono); font-size: 16px; color: var(--ink);
-      font-variant-numeric: tabular-nums; letter-spacing: .01em;
-      -webkit-user-select: all; user-select: all;
-    }
-    .mac-band {
-      font-family: var(--mono); font-size: 9.5px; letter-spacing: .06em; line-height: 1.2;
-      padding: 2px 4px; border: 1px solid var(--ink-3); color: var(--ink-2);
-      border-radius: 2px; flex: 0 0 auto;
-    }
+
     .p-body {
-      padding: 22px 20px 32px; display: flex; flex-direction: column; gap: 26px;
-      max-width: 480px; margin: 0 auto;
+      padding: 22px 20px 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 26px;
+      max-width: 480px;
+      margin: 0 auto;
     }
+
     .p-title {
-      font-family: var(--mono); font-size: 21px; font-weight: 600;
-      letter-spacing: -.015em; margin: 0 0 6px;
+      font-family: var(--mono);
+      font-size: 21px;
+      font-weight: 600;
+      letter-spacing: -.015em;
+      margin: 0 0 6px;
     }
-    .p-sub { color: var(--ink-2); margin: 0; }
+
+    .p-sub {
+      color: var(--ink-2);
+      margin: 0;
+    }
+
     .mac-footer {
-      display: flex; flex-direction: column; gap: 5px;
-      padding-top: 14px; border-top: 1px solid var(--rule);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding-top: 14px;
+      border-top: 1px solid var(--rule);
     }
+
+    .mac-line {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
     .mac-label {
-      font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em;
-      text-transform: uppercase; color: var(--ink-3);
+      font-family: var(--mono);
+      font-size: 10.5px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--ink-3);
     }
+
     .mac-alt {
-      font-family: var(--mono); font-size: 13.5px; color: var(--ink-2);
-      font-variant-numeric: tabular-nums; -webkit-user-select: all; user-select: all;
+      font-family: var(--mono);
+      font-size: 12.5px;
+      color: var(--ink-2);
+      font-variant-numeric: tabular-nums;
+      -webkit-user-select: all;
+      user-select: all;
     }
-    :focus-visible { outline: 2px solid var(--spark); outline-offset: 2px; }
+
+    :focus-visible {
+      outline: 2px solid var(--spark);
+      outline-offset: 2px;
+    }
+
     @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after {
-        animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+
+      *,
+      *::before,
+      *::after {
+        animation-duration: .001ms !important;
+        animation-iteration-count: 1 !important;
         transition-duration: .001ms !important;
       }
     }
 
     .grp-label {
-      font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em;
-      text-transform: uppercase; color: var(--ink-3);
-      display: flex; align-items: center; justify-content: space-between;
-      padding-bottom: 8px; border-bottom: 1px solid var(--rule);
+      font-family: var(--mono);
+      font-size: 10.5px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--rule);
     }
+
     .grp-label button {
-      font: inherit; background: none; border: 0; cursor: pointer;
+      font: inherit;
+      background: none;
+      border: 0;
+      cursor: pointer;
       color: var(--spark);
-      padding: 15px 0; margin: -15px 0; min-height: 48px;
-      border-bottom: 0; text-decoration: underline; text-underline-offset: 3px;
+      padding: 15px 0;
+      margin: -15px 0;
+      min-height: 48px;
+      border-bottom: 0;
+      text-decoration: underline;
+      text-underline-offset: 3px;
     }
-    .grp-label button:disabled { color: var(--ink-3); cursor: default; }
-    .netlist { display: flex; flex-direction: column; }
+
+    .grp-label button:disabled {
+      color: var(--ink-3);
+      cursor: default;
+    }
+
+    .netlist {
+      display: flex;
+      flex-direction: column;
+    }
+
     .net {
-      display: flex; align-items: center; gap: 10px; min-height: 48px;
-      padding: 0 10px; margin: 0 -10px; width: calc(100% + 20px);
-      border: 0; border-bottom: 1px solid var(--rule-soft);
-      background: transparent; color: var(--ink); font: inherit; text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 48px;
+      padding: 0 10px;
+      margin: 0 -10px;
+      width: calc(100% + 20px);
+      border: 0;
+      border-bottom: 1px solid var(--rule-soft);
+      background: transparent;
+      color: var(--ink);
+      font: inherit;
+      text-align: left;
       transition: background-color .12s steps(3), color .12s steps(3);
     }
-    .net:last-child { border-bottom: 0; }
-    button.net { cursor: pointer; }
-    button.net:not([aria-checked="true"]):hover { background: var(--rule-soft); }
-    .net:focus-visible { outline: 2px solid var(--spark); outline-offset: -2px; }
-    .net[aria-checked="true"] { background: var(--ink); color: var(--invert-fg); }
-    .net[aria-checked="true"] .badge { border-color: var(--invert-fg); color: var(--invert-fg); }
-    .net[aria-checked="true"] .bar { border-color: var(--invert-fg); }
-    .net[aria-checked="true"] .bar.on { background: var(--invert-fg); }
-    .net[aria-checked="true"] .lock { fill: var(--invert-fg); }
-    .net[aria-checked="true"] .caret { opacity: 1; }
-    .ssid {
-      font-family: var(--mono); font-size: 14.5px; flex: 1 1 auto;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+
+    .net:last-child {
+      border-bottom: 0;
     }
-    .caret { color: var(--spark); font-family: var(--mono); font-size: 12px; opacity: 0; flex: 0 0 8px; }
+
+    button.net {
+      cursor: pointer;
+    }
+
+    button.net:not([aria-checked="true"]):hover {
+      background: var(--rule-soft);
+    }
+
+    .net:focus-visible {
+      outline: 2px solid var(--spark);
+      outline-offset: -2px;
+    }
+
+    .net[aria-checked="true"] {
+      background: var(--ink);
+      color: var(--invert-fg);
+    }
+
+    .net[aria-checked="true"] .badge {
+      border-color: var(--invert-fg);
+      color: var(--invert-fg);
+    }
+
+    .net[aria-checked="true"] .bar {
+      border-color: var(--invert-fg);
+    }
+
+    .net[aria-checked="true"] .bar.on {
+      background: var(--invert-fg);
+    }
+
+    .net[aria-checked="true"] .lock {
+      fill: var(--invert-fg);
+    }
+
+    .net[aria-checked="true"] .caret {
+      opacity: 1;
+    }
+
+    .ssid {
+      font-family: var(--mono);
+      font-size: 14.5px;
+      flex: 1 1 auto;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .caret {
+      color: var(--spark);
+      font-family: var(--mono);
+      font-size: 12px;
+      opacity: 0;
+      flex: 0 0 8px;
+    }
+
     .badge {
-      font-family: var(--mono); font-size: 9.5px; letter-spacing: .06em; line-height: 1.2;
-      padding: 2px 4px; border: 1px solid var(--ink-3); color: var(--ink-2); border-radius: 2px;
+      font-family: var(--mono);
+      font-size: 9.5px;
+      letter-spacing: .06em;
+      line-height: 1.2;
+      padding: 2px 4px;
+      border: 1px solid var(--ink-3);
+      color: var(--ink-2);
+      border-radius: 2px;
       flex: 0 0 auto;
     }
-    .lock { width: 11px; height: 11px; fill: var(--ink-3); flex: 0 0 auto; }
-    .bars { display: flex; align-items: flex-end; gap: 2px; height: 12px; flex: 0 0 auto; }
-    .bar { width: 3px; border: 1px solid var(--ink-3); border-radius: 1px; }
-    .bar:nth-child(1) { height: 5px; }
-    .bar:nth-child(2) { height: 8.5px; }
-    .bar:nth-child(3) { height: 12px; }
-    .bar.on { background: var(--ink); border-color: var(--ink); }
+
+    .lock {
+      width: 11px;
+      height: 11px;
+      fill: var(--ink-3);
+      flex: 0 0 auto;
+    }
+
+    .bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 12px;
+      flex: 0 0 auto;
+    }
+
+    .bar {
+      width: 3px;
+      border: 1px solid var(--ink-3);
+      border-radius: 1px;
+    }
+
+    .bar:nth-child(1) {
+      height: 5px;
+    }
+
+    .bar:nth-child(2) {
+      height: 8.5px;
+    }
+
+    .bar:nth-child(3) {
+      height: 12px;
+    }
+
+    .bar.on {
+      background: var(--ink);
+      border-color: var(--ink);
+    }
+
     .dither {
       background-image:
         linear-gradient(45deg, var(--rule) 25%, transparent 25%, transparent 75%, var(--rule) 75%),
         linear-gradient(45deg, var(--rule) 25%, transparent 25%, transparent 75%, var(--rule) 75%);
-      background-size: 4px 4px; background-position: 0 0, 2px 2px;
-    }
-    .skel { height: 48px; border-bottom: 1px solid var(--rule-soft); display: flex; align-items: center; }
-    .skel span { height: 9px; border-radius: 1px; opacity: .6; }
-    .scanning { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 26px 0 22px; }
-    .scanning .spark { width: 30px; height: 30px; }
-    .scanning p {
-      font-family: var(--mono); font-size: 11px; letter-spacing: .12em;
-      text-transform: uppercase; color: var(--ink-2); margin: 0;
+      background-size: 4px 4px;
+      background-position: 0 0, 2px 2px;
     }
 
-    .fields { display: flex; flex-direction: column; gap: 16px; }
-    .field { display: flex; flex-direction: column; gap: 6px; }
+    .skel {
+      height: 48px;
+      border-bottom: 1px solid var(--rule-soft);
+      display: flex;
+      align-items: center;
+    }
+
+    .skel span {
+      height: 9px;
+      border-radius: 1px;
+      opacity: .6;
+    }
+
+    .scanning {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      padding: 26px 0 22px;
+    }
+
+    .scanning .spark {
+      width: 30px;
+      height: 30px;
+    }
+
+    .scanning p {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--ink-2);
+      margin: 0;
+    }
+
+    .fields {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
     .field label {
-      font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em;
-      text-transform: uppercase; color: var(--ink-3);
+      font-family: var(--mono);
+      font-size: 10.5px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--ink-3);
     }
-    .field .opt { text-transform: none; letter-spacing: 0; }
-    .hint { font-size: 12.5px; color: var(--ink-3); margin: 0; }
+
+    .field .opt {
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    .hint {
+      font-size: 12.5px;
+      color: var(--ink-3);
+      margin: 0;
+    }
+
     .inp {
-      font-family: var(--mono); font-size: 15px; color: var(--ink);
-      background: var(--surface); border: 1px solid var(--rule); border-radius: 2px;
-      padding: 13px 12px; width: 100%; min-height: 48px; transition: border-color .1s steps(2);
+      font-family: var(--mono);
+      font-size: 15px;
+      color: var(--ink);
+      background: var(--surface);
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      padding: 13px 12px;
+      width: 100%;
+      min-height: 48px;
+      transition: border-color .1s steps(2);
     }
-    .inp::placeholder { color: var(--ink-3); }
+
+    .inp::placeholder {
+      color: var(--ink-3);
+    }
+
     .inp:focus {
-      outline: none; border-color: var(--spark); box-shadow: inset 0 0 0 1px var(--spark);
+      outline: none;
+      border-color: var(--spark);
+      box-shadow: inset 0 0 0 1px var(--spark);
     }
-    .pw-wrap { position: relative; display: flex; }
-    .pw-wrap .inp { padding-right: 62px; }
+
+    .pw-wrap {
+      position: relative;
+      display: flex;
+    }
+
+    .pw-wrap .inp {
+      padding-right: 62px;
+    }
+
     .pw-toggle {
-      position: absolute; right: 1px; top: 0; bottom: 0; padding: 0 12px;
-      background: none; border: 0; border-left: 1px solid var(--rule-soft);
-      font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em;
-      text-transform: uppercase; color: var(--ink-2); cursor: pointer;
+      position: absolute;
+      right: 1px;
+      top: 0;
+      bottom: 0;
+      padding: 0 12px;
+      background: none;
+      border: 0;
+      border-left: 1px solid var(--rule-soft);
+      font-family: var(--mono);
+      font-size: 10.5px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--ink-2);
+      cursor: pointer;
     }
-    .actions { display: flex; flex-direction: column; gap: 10px; }
+
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
     .btn {
-      font-family: var(--mono); font-size: 14px; letter-spacing: .1em;
-      text-transform: uppercase; padding: 15px 18px; border-radius: 2px;
-      border: 1px solid transparent; cursor: pointer; width: 100%; min-height: 48px;
+      font-family: var(--mono);
+      font-size: 14px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      padding: 15px 18px;
+      border-radius: 2px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      width: 100%;
+      min-height: 48px;
       transition: background-color .12s steps(3), color .12s steps(3), border-color .12s steps(3);
     }
-    .btn-primary { background: var(--spark); color: var(--spark-fg); border-color: var(--spark); }
-    .btn-primary:hover:not(:disabled) { background: var(--ink); border-color: var(--ink); color: var(--invert-fg); }
-    .btn:disabled { opacity: .55; cursor: default; }
-    .btn-quiet, .btn-danger { background: transparent; color: var(--ink); border-color: var(--rule); }
-    .btn-quiet:hover { border-color: var(--ink); }
-    .btn-danger:hover { background: var(--ink); color: var(--invert-fg); border-color: var(--ink); }
+
+    .btn-primary {
+      background: var(--spark);
+      color: var(--spark-fg);
+      border-color: var(--spark);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: var(--ink);
+      border-color: var(--ink);
+      color: var(--invert-fg);
+    }
+
+    .btn:disabled {
+      opacity: .55;
+      cursor: default;
+    }
+
+    .btn-quiet,
+    .btn-danger {
+      background: transparent;
+      color: var(--ink);
+      border-color: var(--rule);
+    }
+
+    .btn-quiet:hover {
+      border-color: var(--ink);
+    }
+
+    .btn-danger:hover {
+      background: var(--ink);
+      color: var(--invert-fg);
+      border-color: var(--ink);
+    }
+
     .msg {
-      border: 1px solid var(--rule); border-left: 3px solid var(--ink-3);
-      background: var(--surface); color: var(--ink-2);
-      padding: 12px 14px; border-radius: 2px;
+      border: 1px solid var(--rule);
+      border-left: 3px solid var(--ink-3);
+      background: var(--surface);
+      color: var(--ink-2);
+      padding: 12px 14px;
+      border-radius: 2px;
     }
-    .msg strong { color: var(--ink); font-weight: 600; display: block; margin-bottom: 2px; }
+
+    .msg strong {
+      color: var(--ink);
+      font-weight: 600;
+      display: block;
+      margin-bottom: 2px;
+    }
+
     .msg-warn {
-      background: var(--warn-bg); color: var(--warn-ink);
-      border-color: transparent; border-left-color: var(--spark);
+      background: var(--warn-bg);
+      color: var(--warn-ink);
+      border-color: transparent;
+      border-left-color: var(--spark);
     }
-    .msg-warn strong { color: var(--warn-ink); }
-    .msg-live { border-left-color: var(--spark); }
+
+    .msg-warn strong {
+      color: var(--warn-ink);
+    }
+
+    .msg-live {
+      border-left-color: var(--spark);
+    }
+
     .progress {
-      height: 4px; margin-top: 10px; border: 1px solid var(--rule);
-      border-radius: 1px; overflow: hidden;
+      height: 4px;
+      margin-top: 10px;
+      border: 1px solid var(--rule);
+      border-radius: 1px;
+      overflow: hidden;
     }
-    .progress i { display: block; height: 100%; width: 45%; animation: crawl 2.4s steps(9, end) infinite; }
-    @keyframes crawl { from { transform: translateX(-100%); } to { transform: translateX(230%); } }
-    .row2 { display: flex; gap: 10px; }
-    .row2 .btn { width: auto; flex: 1 1 0; }
+
+    .progress i {
+      display: block;
+      height: 100%;
+      width: 45%;
+      animation: crawl 2.4s steps(9, end) infinite;
+    }
+
+    @keyframes crawl {
+      from {
+        transform: translateX(-100%);
+      }
+
+      to {
+        transform: translateX(230%);
+      }
+    }
+
+    .row2 {
+      display: flex;
+      gap: 10px;
+    }
+
+    .row2 .btn {
+      width: auto;
+      flex: 1 1 0;
+    }
 
     /* Two views in one document. Only one is ever visible - the global
        [hidden] { display: none !important } rule from Task 2 does the hiding,
        so no extra display rule is needed here. */
-    .view { display: flex; flex-direction: column; gap: 26px; }
-    .p-title[tabindex] { outline: none; }
+    .view {
+      display: flex;
+      flex-direction: column;
+      gap: 26px;
+    }
+
+    .p-title[tabindex] {
+      outline: none;
+    }
+
     .p-title[tabindex]:focus,
-    .p-title[tabindex]:focus-visible { outline: none; }
-    .adv-sec { display: flex; flex-direction: column; gap: 12px; }
-    .adv-sec > h3 {
-      font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em;
-      text-transform: uppercase; color: var(--ink-3); margin: 0;
-      padding-bottom: 8px; border-bottom: 1px solid var(--rule);
+    .p-title[tabindex]:focus-visible {
+      outline: none;
     }
-    .switch { display: flex; align-items: center; gap: 10px; cursor: pointer; min-height: 48px; }
-    .switch input { width: 18px; height: 18px; accent-color: var(--spark); flex: 0 0 auto; }
+
+    .adv-sec {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .adv-sec>h3 {
+      font-family: var(--mono);
+      font-size: 10.5px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      margin: 0;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--rule);
+    }
+
+    .switch {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      min-height: 48px;
+    }
+
+    .switch input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--spark);
+      flex: 0 0 auto;
+    }
+
     .danger-zone {
-      border: 1px solid var(--rule); border-radius: 2px; padding: 16px;
-      display: flex; flex-direction: column; gap: 12px;
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
     }
-    .danger-zone p { margin: 0; color: var(--ink-2); }
+
+    .danger-zone p {
+      margin: 0;
+      color: var(--ink-2);
+    }
+
     .modal {
-      display: none; position: fixed; inset: 0; z-index: 10;
-      background: rgba(0, 0, 0, .45); padding: 20px;
-      align-items: center; justify-content: center;
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      background: rgba(0, 0, 0, .45);
+      padding: 20px;
+      align-items: center;
+      justify-content: center;
     }
-    .modal[open] { display: flex; }
+
+    .modal[open] {
+      display: flex;
+    }
+
     .modal-content {
-      background: var(--paper); border: 1px solid var(--rule); border-radius: 2px;
-      padding: 20px; width: 100%; max-width: 420px;
-      display: flex; flex-direction: column; gap: 16px;
+      background: var(--paper);
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      padding: 20px;
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
     }
-    .modal-content p { margin: 0; }
+
+    .modal-content p {
+      margin: 0;
+    }
   </style>
   <script>
-    var emptyScanFocused = false;
-
     function setRefreshButtonState(scanning) {
       var btn = document.getElementById('btnRefresh');
       if (scanning && document.activeElement === btn) btn.blur();
@@ -397,14 +890,12 @@
     function showScanError() {
       document.getElementById('scanning-loader').hidden = true;
       document.getElementById('scanning-info').hidden = true;
-      document.getElementById('headSpark').classList.remove('ticking');
       document.getElementById('scan-error').hidden = false;
       setRefreshButtonState(false);
     }
 
     async function getInfo(force) {
       setRefreshButtonState(true);
-      document.getElementById('headSpark').classList.add('ticking');
       document.getElementById('scan-error').hidden = true;
       document.getElementById('no-networks').hidden = true;
       let scanningInfoBox = document.getElementById('scanning-info');
@@ -423,7 +914,6 @@
         var json = await response.json();
         scanningInfoBox.hidden = true;
         scanningLoader.hidden = true;
-        document.getElementById('headSpark').classList.remove('ticking');
         setRefreshButtonState(false);
 
         displayInfo(json.mac, json.mac_5ghz);
@@ -438,11 +928,6 @@
         });
         var noneFound = otherNetworks.length === 0;
         document.getElementById('no-networks').hidden = !noneFound;
-        if (noneFound && !emptyScanFocused) {
-          emptyScanFocused = true;
-          document.getElementById('ssid').focus();
-        }
-        if (!noneFound) emptyScanFocused = false; // a later successful scan re-arms it
       } else if (response.status == 202) {
         setTimeout(() => getInfo(false), 2000); // poll only - force would restart the scan
       } else {
@@ -498,7 +983,7 @@
       var pw = document.getElementById('password');
       pw.value = '';
       toggleEnterpriseFields(isEnterprise);
-      (isEnterprise ? document.getElementById('identity') : pw).focus();
+      focusField(isEnterprise ? document.getElementById('identity') : pw);
     }
 
     function displayWifiInfo(response) {
@@ -510,13 +995,16 @@
 
     function displayInfo(mac, mac5) {
       if (mac) {
-        document.getElementById('mac24').textContent = mac;
-        document.getElementById('mac-row').hidden = false;
+        document.getElementById('mac24').textContent = mac.toUpperCase();
+        document.getElementById('mac24-row').hidden = false;
       }
       if (mac5) {
         document.getElementById('mac5').textContent = mac5.toUpperCase();
-        document.getElementById('info-message').hidden = false;
+        document.getElementById('mac5-row').hidden = false;
+        // Only dual-band boards report a second MAC; single-band ones keep the plain label.
+        document.getElementById('mac24-label').textContent = '2.4 GHz MAC';
       }
+      if (mac || mac5) document.getElementById('info-message').hidden = false;
     }
 
     function displayAlert(message) {
@@ -606,11 +1094,62 @@
       document.getElementById('view-advanced').hidden = !advanced;
       document.getElementById('modeText').textContent = advanced ? 'Advanced' : 'Setup mode';
       document.getElementById('modeDot').hidden = advanced;
+      document.getElementById('headBack').hidden = !advanced;
       window.scrollTo(0, 0);
       var title = (advanced ? document.getElementById('view-advanced') : document.getElementById('view-setup'))
         .querySelector('.p-title');
       if (title) title.focus();
     }
+
+    // The iOS captive-portal sheet focuses the page's first text field (Network
+    // name) by itself a moment after every network response - so on each /scan
+    // poll - and pops the keyboard. It does so from outside the page's script
+    // world, so it cannot be intercepted, only undone: a text field keeps focus
+    // only if the press started on the field or its label, if Tab was pressed,
+    // or if the page asked via focusField(). Anything else is sent back.
+    var fieldPressed = false, fieldIntentAt = 0, netSettledAt = 0;
+
+    function focusField(el) {
+      fieldIntentAt = Date.now();
+      el.focus();
+    }
+
+    // touchstart/pointerdown carry the element the finger really landed on.
+    ['pointerdown', 'touchstart'].forEach(function (type) {
+      document.addEventListener(type, function (e) {
+        fieldPressed = !!(e.target.closest && e.target.closest('.field'));
+      }, true);
+    });
+    ['pointerup', 'pointercancel', 'touchend', 'touchcancel'].forEach(function (type) {
+      document.addEventListener(type, function () {
+        if (fieldPressed) fieldIntentAt = Date.now();
+        fieldPressed = false;
+      }, true);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Tab') fieldIntentAt = Date.now();
+    }, true);
+
+    var plainFetch = window.fetch;
+    window.fetch = function () {
+      var settled = function () { netSettledAt = Date.now(); };
+      var p = plainFetch.apply(this, arguments);
+      p.then(settled, settled);
+      return p;
+    };
+
+    document.addEventListener('focusin', function (e) {
+      var el = e.target, from = e.relatedTarget;
+      if (!el.matches || !el.matches('input.inp')) return;
+      if (fieldPressed || Date.now() - fieldIntentAt < 1000) return;
+      var fromField = from && from.matches && from.matches('input.inp');
+      // Field-to-field moves with no press are the keyboard's previous/next
+      // arrows - unless a response just landed, when it is the sheet pulling
+      // focus out of the field being typed in.
+      if (fromField && Date.now() - netSettledAt > 1000) return;
+      if (fromField) focusField(from);
+      else el.blur();
+    });
 
     window.addEventListener('hashchange', showView);
     // This script runs in <head>, before <body> exists, so the initial call
@@ -627,100 +1166,125 @@
 <body>
   <header class="p-head">
     <div class="p-head-row">
-      <span class="lockup">
-        <svg class="spark" id="headSpark" viewBox="0 0 30 30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g fill-rule="evenodd" clip-rule="evenodd"><path d="M8.02188 2.11328L15.8862 5.07445L14.4258 8.98481L6.56146 6.02364L8.02188 2.11328Z"/><path d="M20.6315 1.14647L23.2291 9.16642L19.2738 10.458L16.6761 2.43807L20.6315 1.14647Z"/><path d="M29.244 10.4452L24.6188 17.4848L21.147 15.185L25.7722 8.14549L29.244 10.4452Z"/><path d="M27.374 23.0034L19.0089 23.7616L18.6349 19.6023L27 18.8441L27.374 23.0034Z"/><path d="M16.4297 29.3638L10.6237 23.2697L13.6293 20.3828L19.4352 26.4769L16.4297 29.3638Z"/><path d="M4.65232 24.7423L5.77753 16.3849L9.89932 16.9443L8.77411 25.3017L4.65232 24.7423Z"/><path d="M0.910558 12.6074L8.11961 8.28L10.2539 11.8645L3.04481 16.192L0.910558 12.6074Z"/></g></svg>
-        <span class="word">TRMNL</span>
-      </span>
+      <div class="p-head-lead">
+        <button class="head-back" id="headBack" type="button" onclick="location.hash = '#setup'" hidden>&larr;
+          Back</button>
+        <svg class="logo" viewBox="0 0 216 45" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="TRMNL">
+          <g fill-rule="evenodd" clip-rule="evenodd">
+            <path d="M11.9439 3.5957L23.6531 7.93423L21.4787 13.6634L9.76953 9.32491L11.9439 3.5957Z" />
+            <path d="M30.7173 2.17969L34.5849 13.93L28.6957 15.8224L24.8281 4.07206L30.7173 2.17969Z" />
+            <path d="M43.5419 15.805L36.6555 26.1189L31.4863 22.7494L38.3727 12.4355L43.5419 15.805Z" />
+            <path d="M40.7576 34.2015L28.3028 35.3124L27.7461 29.2183L40.2008 28.1074L40.7576 34.2015Z" />
+            <path d="M24.4628 43.5214L15.8184 34.5929L20.2933 30.3633L28.9378 39.2919L24.4628 43.5214Z" />
+            <path d="M6.92773 36.7506L8.60305 24.5059L14.74 25.3256L13.0647 37.5703L6.92773 36.7506Z" />
+            <path d="M1.35547 18.975L12.089 12.6348L15.2667 17.8866L4.53316 24.2269L1.35547 18.975Z" />
+          </g>
+          <g fill-rule="evenodd" clip-rule="evenodd">
+            <path d="M52.0352 15.6267V11.2168H78.7043V15.6267H67.9168V34.1703H62.8543V15.6267H52.0352Z" />
+            <path
+              d="M83.9219 11.2168V34.1703H89.016V26.1296H102.808C103.768 26.1296 104.395 26.3313 104.785 26.6862C105.167 27.0343 105.402 27.6058 105.402 28.5371V34.1703H110.464V27.945C110.464 26.5333 109.976 25.377 109.087 24.5645C108.578 24.0994 107.952 23.7596 107.239 23.5456C108.091 23.1363 108.796 22.5967 109.34 21.9301C110.197 20.8788 110.622 19.5478 110.622 18.0031C110.622 15.8273 109.887 14.0972 108.321 12.9279C106.778 11.7757 104.49 11.2168 101.483 11.2168H83.9219ZM100.6 21.8443H89.016V15.4709H100.6C102.285 15.4709 103.489 15.6906 104.264 16.1725C104.995 16.6268 105.402 17.3528 105.402 18.5641C105.402 19.7951 104.991 20.5734 104.252 21.0689C103.478 21.5881 102.276 21.8443 100.6 21.8443Z" />
+            <path
+              d="M117.002 34.1703V11.2168H124.056L134.184 28.3713L144.281 11.2168H151.304V34.1703H146.241V17.2398L136.391 34.1703H131.946L122.096 17.2398V34.1703H117.002Z" />
+            <path
+              d="M165.115 11.2168H158.275V34.1703H163.37V16.5226L179.651 34.1703H186.459V11.2168H181.396V28.8645L165.115 11.2168Z" />
+            <path d="M198.543 11.2168H193.449V34.1703H215.356V29.7604H198.543V11.2168Z" />
+          </g>
+        </svg>
+      </div>
       <span class="mode"><i class="dot" id="modeDot"></i> <span id="modeText">Setup mode</span></span>
-    </div>
-    <div class="p-head-mac" id="mac-row" hidden>
-      <span class="mac-value-hdr" id="mac24"></span>
-      <span class="mac-band">2.4G</span>
     </div>
   </header>
   <div class="p-body">
     <div class="view" id="view-setup">
-    <div>
-      <h1 class="p-title" tabindex="-1">Connect your TRMNL</h1>
-      <p class="p-sub">Pick your network and enter its password. Your TRMNL restarts once it's online.</p>
-    </div>
-    <div id="saved-networks" hidden>
-      <div class="grp-label"><span>Saved</span></div>
-      <div class="netlist" id="table-saved"></div>
-    </div>
-
-    <div>
-      <div class="grp-label">
-        <span>In range</span>
-        <button id="btnRefresh" type="button" onclick="refresh()">Scan again</button>
+      <div>
+        <h1 class="p-title" tabindex="-1">Connect your TRMNL</h1>
       </div>
-      <div id="scan-error" class="msg msg-warn" role="alert" hidden>
-        <strong>Couldn't scan for networks</strong>
-        Type your network name below, or tap Scan again.
-      </div>
-      <div id="scanning-info" class="scanning">
-        <svg class="spark ticking" viewBox="0 0 30 30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g fill-rule="evenodd" clip-rule="evenodd"><path d="M8.02188 2.11328L15.8862 5.07445L14.4258 8.98481L6.56146 6.02364L8.02188 2.11328Z"/><path d="M20.6315 1.14647L23.2291 9.16642L19.2738 10.458L16.6761 2.43807L20.6315 1.14647Z"/><path d="M29.244 10.4452L24.6188 17.4848L21.147 15.185L25.7722 8.14549L29.244 10.4452Z"/><path d="M27.374 23.0034L19.0089 23.7616L18.6349 19.6023L27 18.8441L27.374 23.0034Z"/><path d="M16.4297 29.3638L10.6237 23.2697L13.6293 20.3828L19.4352 26.4769L16.4297 29.3638Z"/><path d="M4.65232 24.7423L5.77753 16.3849L9.89932 16.9443L8.77411 25.3017L4.65232 24.7423Z"/><path d="M0.910558 12.6074L8.11961 8.28L10.2539 11.8645L3.04481 16.192L0.910558 12.6074Z"/></g></svg>
-        <p>Scanning for networks</p>
-      </div>
-      <div id="scanning-loader">
-        <div class="skel"><span class="dither" style="width:58%"></span></div>
-        <div class="skel"><span class="dither" style="width:41%"></span></div>
-        <div class="skel"><span class="dither" style="width:66%"></span></div>
-      </div>
-      <div class="netlist" id="table-others" role="radiogroup" aria-label="Networks in range"></div>
-      <div id="no-networks" class="msg" hidden>
-        <strong>No networks found</strong>
-        Move closer to your router, or type your network name below.
-      </div>
-    </div>
-    <div class="fields">
-      <div class="field">
-        <label for="ssid">Network name</label>
-        <input class="inp" type="text" id="ssid" name="ssid" placeholder="Tap a network above"
-               oninput="document.getElementById('band').value = ''">
+      <div id="saved-networks" hidden>
+        <div class="grp-label"><span>Saved</span></div>
+        <div class="netlist" id="table-saved"></div>
       </div>
 
-      <input type="hidden" id="isEnterpriseHidden" value="false">
-      <input type="hidden" id="band" name="band" value="">
+      <div>
+        <div class="grp-label">
+          <span>In range</span>
+          <button id="btnRefresh" type="button" onclick="refresh()">Scan again</button>
+        </div>
+        <div id="scan-error" class="msg msg-warn" role="alert" hidden>
+          <strong>Couldn't scan for networks</strong>
+          Type your network name below, or tap Scan again.
+        </div>
+        <div id="scanning-info" class="scanning">
+          <span class="spinner" aria-hidden="true">
+            <svg class="spark" viewBox="0 0 30 30" xmlns="http://www.w3.org/2000/svg">
+              <g fill-rule="evenodd" clip-rule="evenodd">
+                <path d="M8.02188 2.11328L15.8862 5.07445L14.4258 8.98481L6.56146 6.02364L8.02188 2.11328Z" />
+                <path d="M20.6315 1.14647L23.2291 9.16642L19.2738 10.458L16.6761 2.43807L20.6315 1.14647Z" />
+                <path d="M29.244 10.4452L24.6188 17.4848L21.147 15.185L25.7722 8.14549L29.244 10.4452Z" />
+                <path d="M27.374 23.0034L19.0089 23.7616L18.6349 19.6023L27 18.8441L27.374 23.0034Z" />
+                <path d="M16.4297 29.3638L10.6237 23.2697L13.6293 20.3828L19.4352 26.4769L16.4297 29.3638Z" />
+                <path d="M4.65232 24.7423L5.77753 16.3849L9.89932 16.9443L8.77411 25.3017L4.65232 24.7423Z" />
+                <path d="M0.910558 12.6074L8.11961 8.28L10.2539 11.8645L3.04481 16.192L0.910558 12.6074Z" />
+              </g>
+            </svg>
+          </span>
+          <p>Scanning for networks</p>
+        </div>
+        <div id="scanning-loader">
+          <div class="skel"><span class="dither" style="width:58%"></span></div>
+          <div class="skel"><span class="dither" style="width:41%"></span></div>
+          <div class="skel"><span class="dither" style="width:66%"></span></div>
+        </div>
+        <div class="netlist" id="table-others" role="radiogroup" aria-label="Networks in range"></div>
+        <div id="no-networks" class="msg" hidden>
+          <strong>No networks found</strong>
+          Move closer to your router, or type your network name below.
+        </div>
+      </div>
+      <div class="fields">
+        <div class="field">
+          <label for="ssid">Network name</label>
+          <input class="inp" type="text" id="ssid" name="ssid" placeholder="Tap a network above"
+            oninput="document.getElementById('band').value = ''">
+        </div>
 
-      <div class="msg" id="enterprise_indicator" hidden>
-        <strong>This network uses WPA2 Enterprise</strong>
-        If you only have a username and password, put the username in Identity.
-      </div>
-      <div class="field" id="enterprise_fields" hidden>
-        <label for="identity">Identity</label>
-        <input class="inp" type="text" id="identity" name="identity" placeholder="you@company.com">
-      </div>
-      <div class="field" id="enterprise_username_group" hidden>
-        <label for="username">Username <span class="opt">&mdash; optional</span></label>
-        <input class="inp" type="text" id="username" name="username" placeholder="Only if different from identity">
-      </div>
+        <input type="hidden" id="isEnterpriseHidden" value="false">
+        <input type="hidden" id="band" name="band" value="">
 
-      <div class="field">
-        <label for="password">Password</label>
-        <div class="pw-wrap">
-          <input class="inp" type="password" id="password" name="password" placeholder="Network password">
-          <button class="pw-toggle" id="toggler" type="button" onclick="togglePassword()">Show</button>
+        <div class="msg" id="enterprise_indicator" hidden>
+          <strong>This network uses WPA2 Enterprise</strong>
+          If you only have a username and password, put the username in Identity.
+        </div>
+        <div class="field" id="enterprise_fields" hidden>
+          <label for="identity">Identity</label>
+          <input class="inp" type="text" id="identity" name="identity" placeholder="you@company.com">
+        </div>
+        <div class="field" id="enterprise_username_group" hidden>
+          <label for="username">Username <span class="opt">&mdash; optional</span></label>
+          <input class="inp" type="text" id="username" name="username" placeholder="Only if different from identity">
+        </div>
+
+        <div class="field">
+          <label for="password">Password</label>
+          <div class="pw-wrap">
+            <input class="inp" type="password" id="password" name="password" placeholder="Network password">
+            <button class="pw-toggle" id="toggler" type="button" onclick="togglePassword()">Show</button>
+          </div>
+        </div>
+
+        <div class="msg msg-warn" id="message" role="alert" hidden></div>
+
+        <div class="msg msg-live" id="connect-status" role="status" hidden>
+          <strong id="connect-status-title">Connecting</strong>
+          <span>Keep this page open. Your TRMNL restarts when it's connected.</span>
+          <div class="progress"><i class="dither"></i></div>
         </div>
       </div>
 
-      <div class="msg msg-warn" id="message" role="alert" hidden></div>
-
-      <div class="msg msg-live" id="connect-status" role="status" hidden>
-        <strong id="connect-status-title">Connecting</strong>
-        <span>Keep this page open. Your TRMNL restarts when it's connected.</span>
-        <div class="progress"><i class="dither"></i></div>
+      <div class="actions">
+        <button id="btnConnect" class="btn btn-primary" type="button" onclick="connect()">Connect</button>
+        <button id="btnAdvanced" class="btn btn-quiet" type="button" onclick="location.hash = '#advanced'">Advanced
+          settings</button>
       </div>
-    </div>
-
-    <div class="actions">
-      <button id="btnConnect" class="btn btn-primary" type="button" onclick="connect()">Connect</button>
-      <button id="btnAdvanced" class="btn btn-quiet" type="button" onclick="location.hash = '#advanced'">Advanced settings</button>
-    </div>
-    <div class="mac-footer" id="info-message" hidden>
-      <span class="mac-label">5 GHz MAC</span>
-      <span class="mac-alt" id="mac5"></span>
-    </div>
     </div>
 
     <div class="view" id="view-advanced" hidden>
@@ -737,7 +1301,7 @@
         <div class="field">
           <label for="server">API server</label>
           <input class="inp" type="url" id="server" name="server" placeholder="https://trmnl.app">
-          <p class="hint">Point your TRMNL at your own server (BYOS). No trailing slash.</p>
+          <p class="hint">Point your TRMNL at your own server (BYOS).</p>
         </div>
       </div>
 
@@ -795,8 +1359,10 @@
       <div class="adv-sec">
         <h3>Reset</h3>
         <div class="danger-zone">
-          <p>A soft reset erases saved Wi-Fi networks, the device ID and the API key. You'll set the device up again from scratch.</p>
-          <button id="btnReset" class="btn btn-danger" type="button" onclick="confirmSoftReset()">Soft reset this TRMNL</button>
+          <p>A soft reset erases saved Wi-Fi networks, the device ID and the API key. You'll set the device up again
+            from scratch.</p>
+          <button id="btnReset" class="btn btn-danger" type="button" onclick="confirmSoftReset()">Soft reset this
+            TRMNL</button>
         </div>
       </div>
 
@@ -805,6 +1371,17 @@
       </div>
 
     </div>
+
+    <footer class="mac-footer" id="info-message" hidden>
+      <div class="mac-line" id="mac24-row" hidden>
+        <span class="mac-label" id="mac24-label">MAC address</span>
+        <span class="mac-alt" id="mac24"></span>
+      </div>
+      <div class="mac-line" id="mac5-row" hidden>
+        <span class="mac-label">5 GHz MAC</span>
+        <span class="mac-alt" id="mac5"></span>
+      </div>
+    </footer>
   </div>
 
   <div id="confirmationModal" class="modal">
@@ -818,4 +1395,5 @@
     </div>
   </div>
 </body>
+
 </html>
