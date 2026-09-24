@@ -218,7 +218,7 @@ bool WifiCaptive::startPortal() {
     }
   }
 
-    // SSID provided, stop server
+  // SSID provided, stop server
   WiFi.scanDelete();
   WiFi.softAPdisconnect(true);
   delay(1000);
@@ -228,10 +228,10 @@ bool WifiCaptive::startPortal() {
     if (status != WL_CONNECTED) {
       Log_info("Not connected after AP disconnect");
       WiFi.mode(WIFI_STA);
-            // Always start with _enterprise_credentials to preserve static IP settings
+      // Always start with _enterprise_credentials to preserve static IP settings
       WifiCredentials credentials = _enterprise_credentials;
       if (!credentials.isEnterprise) {
-                // For non-enterprise, ensure basic fields are set
+        // For non-enterprise, ensure basic fields are set
         credentials.ssid = _ssid;
         credentials.pswd = _password;
       }
@@ -247,16 +247,16 @@ bool WifiCaptive::startPortal() {
   _band = "";
   _enterprise_credentials = WifiCredentials{};
 
-    // stop dsn
+  // stop dsn
   _dnsServer->stop();
   delete _dnsServer;
   _dnsServer = nullptr;
 
-    // stop server
+  // stop server
   _server->end();
   delete _server;
   _server = nullptr;
-// Take different action for timeout (go to sleep)
+  // Take different action for timeout (go to sleep)
   if ((millis() - lTime) > PORTAL_TIMEOUT) {
 #ifdef BOARD_TRMNL_X
     if (power().usbStatus() == UsbStatus::CONNECTED) {
@@ -304,7 +304,7 @@ void WifiCaptive::resetSettings() {
     preferences.remove(WIFI_ENT_KEY(i));
     preferences.remove(WIFI_USERNAME_KEY(i));
     preferences.remove(WIFI_IDENTITY_KEY(i));
-        // Remove static IP settings
+    // Remove static IP settings
     preferences.remove(WIFI_USE_STATIC_KEY(i));
     preferences.remove(WIFI_STATIC_IP_KEY(i));
     preferences.remove(WIFI_STATIC_GW_KEY(i));
@@ -318,7 +318,7 @@ void WifiCaptive::resetSettings() {
     _savedWifis[i] = WifiCredentials{};
   }
 
-    // Clean up any WPA2 Enterprise state
+  // Clean up any WPA2 Enterprise state
   disableWpa2Enterprise();
 
   WiFi.disconnect(true, true);
@@ -362,7 +362,7 @@ void WifiCaptive::readWifiCredentials() {
     _savedWifis[i].isEnterprise = preferences.getBool(WIFI_ENT_KEY(i), false);
     _savedWifis[i].username = preferences.getString(WIFI_USERNAME_KEY(i), "");
     _savedWifis[i].identity = preferences.getString(WIFI_IDENTITY_KEY(i), "");
-        // Load static IP settings
+    // Load static IP settings
     _savedWifis[i].useStaticIP = preferences.getBool(WIFI_USE_STATIC_KEY(i), false);
     _savedWifis[i].staticIP = preferences.getString(WIFI_STATIC_IP_KEY(i), "");
     _savedWifis[i].gateway = preferences.getString(WIFI_STATIC_GW_KEY(i), "");
@@ -382,16 +382,16 @@ void WifiCaptive::saveWifiCredentials(const WifiCredentials credentials) {
   Log_info("Saving wifi credentials: %s (Enterprise: %s)", credentials.ssid.c_str(),
            credentials.isEnterprise ? "yes" : "no");
 
-    // Check if the credentials already exist
+  // Check if the credentials already exist
   for (u16_t i = 0; i < WIFI_MAX_SAVED_CREDS; i++) {
-        // For regular networks, check SSID and password
+    // For regular networks, check SSID and password
     if (!credentials.isEnterprise && !_savedWifis[i].isEnterprise) {
       if (_savedWifis[i].ssid == credentials.ssid && _savedWifis[i].pswd == credentials.pswd) {
         Log_info("Duplicate regular network found, not saving");
         return; // Avoid saving duplicate networks
       }
     }
-        // For enterprise networks, check SSID, username, identity, and password
+    // For enterprise networks, check SSID, username, identity, and password
     else if (credentials.isEnterprise && _savedWifis[i].isEnterprise) {
       if (_savedWifis[i].ssid == credentials.ssid && _savedWifis[i].username == credentials.username &&
           _savedWifis[i].identity == credentials.identity && _savedWifis[i].pswd == credentials.pswd) {
@@ -416,7 +416,7 @@ void WifiCaptive::saveWifiCredentials(const WifiCredentials credentials) {
     preferences.putBool(WIFI_ENT_KEY(i), _savedWifis[i].isEnterprise);
     preferences.putString(WIFI_USERNAME_KEY(i), _savedWifis[i].username);
     preferences.putString(WIFI_IDENTITY_KEY(i), _savedWifis[i].identity);
-        // Save static IP settings
+    // Save static IP settings
     preferences.putBool(WIFI_USE_STATIC_KEY(i), _savedWifis[i].useStaticIP);
     preferences.putString(WIFI_STATIC_IP_KEY(i), _savedWifis[i].staticIP);
     preferences.putString(WIFI_STATIC_GW_KEY(i), _savedWifis[i].gateway);
@@ -432,12 +432,12 @@ void WifiCaptive::saveLastUsedWifiIndex(int index) {
   Preferences preferences;
   preferences.begin("wificaptive", false);
 
-    // if index is out of bounds, set to 0
+  // if index is out of bounds, set to 0
   if (index < 0 || index >= WIFI_MAX_SAVED_CREDS) {
     index = 0;
   }
 
-    // if index is greater than the total number of saved wifis, set to 0
+  // if index is greater than the total number of saved wifis, set to 0
   if (index > 0) {
     readWifiCredentials();
     if (_savedWifis[index].ssid == "") {
@@ -453,12 +453,12 @@ int WifiCaptive::readLastUsedWifiIndex() {
   Preferences preferences;
   preferences.begin("wificaptive", true);
   int index = preferences.getInt(WIFI_LAST_INDEX, 0);
-    // if index is out of range, return 0
+  // if index is out of range, return 0
   if (index < 0 || index >= WIFI_MAX_SAVED_CREDS) {
     index = 0;
   }
 
-    // if index is greater than the total number of saved wifis, set to 0
+  // if index is greater than the total number of saved wifis, set to 0
   if (index > 0) {
     readWifiCredentials();
     if (_savedWifis[index].ssid == "") {
