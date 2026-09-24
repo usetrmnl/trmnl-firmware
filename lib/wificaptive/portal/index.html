@@ -377,13 +377,75 @@
         body: JSON.stringify(body)
       })
         .then(response => response.json())
-        .then(response => { displayWifiInfo(response); })
+        .then(response => {
+          displayWifiInfo(response);
+          pollConnectionStatus(isEnterprise);
+        })
         .catch(_ => {
           document.getElementById('connect-status').hidden = true;
-          btn.disabled = false;
-          btn.textContent = 'Connect';
+          resetConnectButton();
           displayAlert('Could not reach your TRMNL. Check that you are still on its Wi-Fi network, then try again.');
         });
+    }
+
+    function pollConnectionStatus(isEnterprise) {
+      fetch('/connection-status')
+        .then(response => response.json())
+        .then(response => {
+          if (response.status === 'connecting' || response.status === 'idle') {
+            setTimeout(() => pollConnectionStatus(isEnterprise), 500);
+            return;
+          }
+
+          displayConnectionResult(response.status, isEnterprise);
+        })
+        .catch(_ => {
+          setTimeout(() => pollConnectionStatus(isEnterprise), 500);
+        });
+    }
+
+    // Shared by the live poll above and restoreConnectionStatus() below, which
+    // recovers the same result after a page reload (the STA radio changing
+    // channel on connect can briefly drop captive-portal clients, reloading
+    // the page and losing pollConnectionStatus's in-memory poll loop).
+    function displayConnectionResult(status, isEnterprise) {
+      document.getElementById('connect-status').hidden = true;
+
+      if (status === 'connected') {
+        displayAlert('Wi-Fi connected.');
+        return;
+      }
+
+      resetConnectButton();
+      if (status === 'authentication_failed') {
+        var message = isEnterprise
+          ? 'Wi-Fi authentication failed. Check your credentials and try again.'
+          : 'Incorrect Wi-Fi password. Please try again.';
+        displayAlert(message);
+        document.getElementById('password').focus();
+      } else if (status === 'network_not_found') {
+        displayAlert('Wi-Fi network not found. Check the network name and try again.');
+      } else {
+        displayAlert('Unable to connect to Wi-Fi. Please try again.');
+      }
+    }
+
+    function restoreConnectionStatus() {
+      fetch('/connection-status')
+        .then(response => response.json())
+        .then(response => {
+          if (response.status !== 'idle' && response.status !== 'connecting') {
+            var isEnterprise = document.getElementById('isEnterpriseHidden').value === 'true';
+            displayConnectionResult(response.status, isEnterprise);
+          }
+        })
+        .catch(_ => {});
+    }
+
+    function resetConnectButton() {
+      var btn = document.getElementById('btnConnect');
+      btn.disabled = false;
+      btn.textContent = 'Connect';
     }
 
     function togglePassword() {
@@ -621,6 +683,8 @@
 
     setTimeout(getInfo, 500);
     setTimeout(loadServerFromDevice, 100);
+    setTimeout(restoreConnectionStatus, 100);
+    setTimeout(restoreConnectionStatus, 100);
   </script>
 </head>
 
