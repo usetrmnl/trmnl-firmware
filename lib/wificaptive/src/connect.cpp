@@ -201,7 +201,9 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
     }
 
         // configure WPA2 Enterprise
-    WiFi.mode(WIFI_STA);
+    // Keep the setup portal's AP up while joining from it (AP+STA), so a failed join
+    // leaves the portal reachable
+    WiFi.mode((WiFi.getMode() & WIFI_MODE_AP) ? WIFI_MODE_APSTA : WIFI_MODE_STA);
     applyWifiHostname(WifiCaptivePortal.getHostname());
     WiFi.disconnect();
     delay(100);
@@ -267,7 +269,9 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
     Log_info("WiFi: WPA2 Enterprise configured, starting from status %s", wifiStatusStr(beginResult));
   } else {
         // regular connection
-    WiFi.mode(WIFI_STA);
+    // Keep the setup portal's AP up while joining from it (AP+STA), so a failed join
+    // leaves the portal reachable
+    WiFi.mode((WiFi.getMode() & WIFI_MODE_AP) ? WIFI_MODE_APSTA : WIFI_MODE_STA);
 
     setWiFiBand(credentials);
 
