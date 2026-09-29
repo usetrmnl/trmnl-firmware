@@ -37,6 +37,7 @@ const TRMNL_DEVICE device_list[] =
   "m5_papers3",   BB_PANEL_M5PAPERS3,   BB_PANEL_NONE,         0xff,  0xff,  0xff,  3,    0xff,   BATT_ADC,
   "sensoria_c5",  BB_PANEL_SENSORIA_C5, BB_PANEL_NONE,         7,     6,     0,     0xff, 0xff,   BATT_ADC,
   "lilygo_t5pro", BB_PANEL_EPDIY_V7,    BBEP_DISPLAY_ED047TC1, 39,    40,    0,     0xff, 0xff,   BATT_BQ27220,
+  "reterminal_e1003", BB_PANEL_NONE,    BB_PANEL_NONE,         0xff,  0xff,  3,     1,    40,     BATT_ADC, // IT8951 init is in display_init()
   NULL, 0, 0, 0, 0, 0, 0, 0, 0,
 }; // Parallel Eink device list
 
@@ -248,7 +249,7 @@ void hw_config_init(void)
         Log_info("Found device model at index %d\n", i);
         pDevice = (TRMNL_DEVICE *)&device_list[i];
     } else {
-        Log_info("Device name (%s) not found in supported list!", device_list[i].device_name);
+        Log_info("Device name (%s) not found in supported list!", DEVICE_MODEL);
     }
 } /* hw_config_init() */
 
