@@ -131,7 +131,8 @@ uint16_t display_width();
  * @param is_center_aligned If true, center the text; if false, left-align
  * @return none
  */
-void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message, uint16_t max_width, UWORD color_fg, UWORD color_bg, const void *font);
+void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message, uint16_t max_width, UWORD color_fg,
+                             UWORD color_bg, const void *font);
 
 /**
  * @brief Function to show the image on the display
