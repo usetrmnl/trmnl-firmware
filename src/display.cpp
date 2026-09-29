@@ -751,7 +751,7 @@ void display_draw_touchbar_indicator(touchbar_side_t side, bool filled)
 void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message,
                              uint16_t max_width, UWORD color_fg, UWORD color_bg, const void *font)
 {
-char szTemp[128]; // up to 127 characters per line when split
+char szTemp[80]; // up to 79 characters per line: getStringBox() copies the string to an 80-byte buffer
 char c, *d, *s = (char *)message;
 BB_RECT rect;
 bool bDone = false;
@@ -766,8 +766,8 @@ int iWidthLimit = (max_width * 3)/4; // don't let the text go all the way to the
         *d++ = c;
         d[0] = 0; // test the string length
         bbep.getStringBox(szTemp, &rect);
-        if (c == 0 || c == '\n' || (c == ' ' && rect.w >= iWidthLimit)) {
-            if (s[0] == 0) bDone = true;
+        if (c == 0 || c == '\n' || (c == ' ' && rect.w >= iWidthLimit) || d == &szTemp[sizeof(szTemp) - 1]) {
+            if (c == 0 || s[0] == 0) bDone = true;
             if (c == ' ' || c == '\n') d[-1] = 0; // don't print the space/newline
             // Display the current partial string
             bbep.setCursor(x_start + (max_width - rect.w) / 2, -1);
