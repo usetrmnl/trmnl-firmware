@@ -214,8 +214,6 @@ bool startQA() {
     Log.info("QA Test started\n");
     attachInterrupt(digitalPinToInterrupt(PIN_INTERRUPT), onBtnPress, FALLING);
 
-    uint8_t *buffer = (uint8_t *)malloc(48000);
-    memset(buffer, 255, 48000);
     display_init();
 
     display_show_msg(const_cast<uint8_t *>(logo_small), QA_START);
@@ -249,7 +247,7 @@ bool startQA() {
 
     Log.info("Displaying results\n");
     display_init();
-    display_show_msg_qa(buffer, voltage, temperature, result);
+    display_show_msg_qa(voltage, temperature, result);
     break;
   }
 
@@ -297,8 +295,6 @@ bool startQA() {
 
   while (!stopRequested) {
 
-    uint8_t *buffer = (uint8_t *)malloc(48000);
-    memset(buffer, 255, 48000);
     display_init();
 
   // Disable light sleep before display operation to prevent workflow interruption
@@ -319,7 +315,6 @@ bool startQA() {
 
     if (stopRequested) {
       Log.info("QA test stopped by user\n");
-      free(buffer);
       savePassedTest();
       return true;
     }
@@ -327,7 +322,6 @@ bool startQA() {
     float last_temp = measureTemperatureAverage();
     if (stopRequested) {
       Log.info("QA test stopped by user\n");
-      free(buffer);
       savePassedTest();
       return true;
     }
@@ -335,7 +329,6 @@ bool startQA() {
     float last_voltage = measureVoltageAverage();
     if (stopRequested) {
       Log.info("QA test stopped by user\n");
-      free(buffer);
       savePassedTest();
       return true;
     }
@@ -352,8 +345,7 @@ bool startQA() {
 
     Log.info("Displaying results\n");
     display_init();
-    display_show_msg_qa(buffer, voltage, temperature, result);
-    free(buffer);
+    display_show_msg_qa(voltage, temperature, result);
     break;
   }
 
@@ -380,18 +372,12 @@ bool startQA() {
 
 void testLoadScreen() {
   display_init();
-  uint8_t *buffer = (uint8_t *)malloc(48000);
-  memset(buffer, 255, 48000);
   display_show_msg(const_cast<uint8_t *>(logo_small), QA_START);
-  free(buffer);
 }
 
 void testResultScreen(bool result) {
   display_init();
-  uint8_t *buffer = (uint8_t *)malloc(48000);
-  memset(buffer, 255, 48000);
   float temperature[3] = {0, 0, 0};
   float voltage[3] = {0, 0, 0};
-  display_show_msg_qa(buffer, voltage, temperature, result);
-  free(buffer);
+  display_show_msg_qa(voltage, temperature, result);
 }

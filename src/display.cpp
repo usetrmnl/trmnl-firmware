@@ -2471,39 +2471,19 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
 }
 
 
-void display_show_msg_qa(uint8_t *image_buffer, const float *voltage, const float *temperature, bool qa_result)
+void display_show_msg_qa(const float *voltage, const float *temperature, bool qa_result)
 {
-    auto width = display_width();
-    auto height = display_height();
-    UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
     BB_RECT rect;
 
     Log_info("display_show_msg start");
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef BB_EPAPER
     bbep.allocBuffer(false);
+    bbep.fillScreen(BBEP_WHITE); // the results go on a blank screen
 #else
     bbep.setMode(BB_MODE_1BPP);
     bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
 #endif
-    if (*(uint16_t *)image_buffer == BB_BITMAP_MARKER)
-    {
-        // G5 compressed image
-        BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
-        int x = (width - pBBB->width)/2;
-        int y = (height - pBBB->height)/2; // center it
-        if (x > 0 || y > 0) // only clear if the image is smaller than the display
-        {
-            bbep.fillScreen(BBEP_WHITE);
-        }
-        bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
-    }
-    else
-    {
-#ifdef BB_EPAPER
-        memcpy(bbep.getBuffer(), image_buffer+62, Imagesize); // uncompressed 1-bpp bitmap
-#endif
-    }
 
     bbep.setFont(nicoclean_8); //Roboto_20);
     bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
