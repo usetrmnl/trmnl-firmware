@@ -11,6 +11,7 @@
 #include "logo_small.h"
 #include "pins.h"
 extern TRMNL_DEVICE *pDevice;
+void hw_config_init(void);
 
 extern "C" {
 #include "esp_timer.h"   // esp_timer_get_time()
@@ -288,6 +289,8 @@ bool startQA() {
   Serial.begin(115200);
 
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
+  // QA runs before bl_init(), which is where pDevice is normally set up.
+  if (pDevice == NULL) hw_config_init();
   pins_init();
   Log.info("QA Test started\n");
   attachInterrupt(digitalPinToInterrupt(pDevice->interrupt_pin), onBtnPress, FALLING);
