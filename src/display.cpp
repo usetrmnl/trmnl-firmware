@@ -59,7 +59,7 @@ const TRMNL_DEVICE device_list[] =
   "xiao_epaper_3clr", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 5,     1,    6,       0xff,   BATT_ADC,  EPD_75_3CLR,
   "xiao_epaper_6clr", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 5,     1,    6,       0xff,   BATT_ADC,  EPD_75_6CLR,
   "reterminal_e1001", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     1,    21,      0xff,   BATT_ADC,  EPD_75,
-  "reterminal_e1002", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     1,    21,      0xff,   BATT_ADC,  EPD_75_6CLR,
+  "reterminal_e1002", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     1,    21,      12,     BATT_ADC,  EPD_75_6CLR,
   "crowpanel42",   0,    0,     0,   0,    0,   0,    0xff, 0xff, 2,     0xff, 0xff,    0xff,   BATT_NONE, EPD_CROWPANEL, 
 #ifdef CMD_CS1_CS2
   "m5_paper_mono", 0,    0,     0,   0,    0,   0,    47,   48,   2,     0xff, 0xff,    0xff,   BATT_NONE, EPD_PAPER_MONO, 
@@ -579,9 +579,7 @@ void display_reset(void)
     Log_info("e-Paper Clear start");
     bbep.fillScreen(BBEP_WHITE);
 #ifdef BB_EPAPER
-#ifndef BOARD_SEEED_RETERMINAL_E1002
     bbep.setLightSleep(true);
-#endif
     if (!display_update_epaper(apiDisplayResult.response.maximum_compatibility ? REFRESH_FULL : REFRESH_FAST, true)) {
         Log_error("display_reset: e-paper update failed");
     }
@@ -1860,9 +1858,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
 #endif // BB_EPAPER
         }
 #ifdef BB_EPAPER
-#ifndef BOARD_SEEED_RETERMINAL_E1002
         bbep.writePlane(); // send image data to the EPD
-#endif // !BOARD_SEEED_RETERMINAL_E1002
         iRefreshMode = REFRESH_PARTIAL;
 #endif // BB_EPAPER
         iUpdateCount = 1; // use partial update
@@ -1889,7 +1885,6 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
         iRefreshMode = REFRESH_FAST; // fast update when showing loading screen
     }
     Log_info("%s [%d]: EPD refresh mode: %d\r\n", __FILE__, __LINE__, iRefreshMode);
-#ifndef BOARD_SEEED_RETERMINAL_E1002
 #ifdef DO_NOT_LIGHT_SLEEP
     bbep.setLightSleep(false);
 #else
@@ -1899,7 +1894,6 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
     bbep.setLightSleep(true);
 #endif
 #endif // DO_NOT_LIGHT_SLEEP
-#endif // !BOARD_SEEED_RETERMINAL_E1002
     if (bbep.getPanelType() == EP397_800x480 && iRefreshMode == REFRESH_FAST) {
         // Seeed Sticky: fast refresh on this panel isn't working and full refresh = fast
         iRefreshMode = REFRESH_FULL;
