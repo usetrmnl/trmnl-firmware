@@ -278,9 +278,15 @@ void display_init(void)
     pinMode(10, OUTPUT); // SD card enable (if it's powered down, the SPI bus may be blocked)
     digitalWrite(10, 1);
 #endif // BOARD_SEEED_STICKY
-    // Read the panel ID after any board-specific power/CS setup, but before bb_epaper takes over the SPI pins
-    panel_rev = get_panel_rev();
-    Log_info("Panel ID = 0x%08x\n", panel_rev);
+    // Read the panel ID after any board-specific power/CS setup, but before bb_epaper takes over the SPI pins.
+    // Only on the first call: the bit-banged read detaches SCK/MOSI from the SPI peripheral, and
+    // SPI.begin() is a no-op once the bus is running, so a second read would leave the panel unreachable.
+    static bool panel_rev_read = false;
+    if (!panel_rev_read) {
+        panel_rev = get_panel_rev();
+        panel_rev_read = true;
+        Log_info("Panel ID = 0x%08x\n", panel_rev);
+    }
     if (pDevice->epd_mosi_pin != 0 || pDevice->epd_sck_pin != 0) {
         bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit); // must be set BEFORE calling initio
         bbep.initIO(pDevice->epd_dc_pin, pDevice->epd_rst_pin, pDevice->epd_busy_pin, pDevice->epd_cs_pin,
