@@ -61,6 +61,7 @@ uint8_t *HttpRetryRequest::body() const {
 
 String HttpRetryRequest::bodyAsString() const {
   if (_bodyBuffer) {
+    // The buffer is NUL-terminated past the body: Arduino 2's concat(buf, len) copies len + 1.
     String s;
     s.reserve(_bodySize);
     s.concat((const char *)_bodyBuffer, _bodySize);
@@ -220,7 +221,7 @@ https_request_err_e HttpRetryRequest::readWiFiBody(HTTPClient &https, int conten
     return HTTPS_IMAGE_FILE_TOO_BIG;
   }
 
-  _bodyBuffer = (uint8_t *)malloc(expected);
+  _bodyBuffer = (uint8_t *)malloc(expected + 1); // + a NUL, see bodyAsString()
   if (!_bodyBuffer) {
     _errorDetail = "Failed to allocate " + String(expected) + " bytes for body";
     Log_error_serial("%s", _errorDetail.c_str());
@@ -259,6 +260,7 @@ https_request_err_e HttpRetryRequest::readWiFiBody(HTTPClient &https, int conten
     return HTTPS_TIMED_OUT;
   }
 
+  _bodyBuffer[received] = '\0';
   _bodySize = received;
   Log_info("%" PRIu32 " bytes received in %lu ms", _bodySize, millis() - start);
   return HTTPS_NO_ERR;
@@ -288,11 +290,12 @@ https_request_err_e HttpRetryRequest::attemptModem() {
         tooBig = true;
         return false;
       }
-      if (_bodySize + len > capacity) {
+      // one byte more than the body for its NUL, see bodyAsString()
+      if (_bodySize + len + 1 > capacity) {
         uint32_t next = capacity ? capacity * 2 : 16384;
-        while (next < _bodySize + len)
+        while (next < _bodySize + len + 1)
           next *= 2;
-        if (next > MAX_IMAGE_SIZE) next = MAX_IMAGE_SIZE;
+        if (next > MAX_IMAGE_SIZE + 1) next = MAX_IMAGE_SIZE + 1;
         uint8_t *grown = (uint8_t *)realloc(_bodyBuffer, next);
         if (!grown) {
           outOfMemory = true;
@@ -303,6 +306,7 @@ https_request_err_e HttpRetryRequest::attemptModem() {
       }
       memcpy(_bodyBuffer + _bodySize, data, len);
       _bodySize += len;
+      _bodyBuffer[_bodySize] = '\0';
       return true;
     },
     0, reqHeaders, timeoutMs);
