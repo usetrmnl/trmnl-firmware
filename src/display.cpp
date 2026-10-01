@@ -61,8 +61,8 @@ const TRMNL_DEVICE device_list[] =
   "reterminal_e1001", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     1,    21,      0xff,   BATT_ADC,  EPD_75,
   "reterminal_e1002", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     1,    21,      0xff,   BATT_ADC,  EPD_75_6CLR,
   "crowpanel42",   0,    0,     0,   0,    0,   0,    0xff, 0xff, 2,     0xff, 0xff,    0xff,   BATT_NONE, EPD_CROWPANEL, 
-  "waveshare_154", 0,    0,     0,   0,    0,   0,    0xff, 0xff, 0,     4,    0xff,    6,      BATT_ADC,  EPD_WS_154,
-  "waveshare_154_4clr", 0, 0,   0,   0,    0,   0,    0xff, 0xff, 0,     4,    0xff,    6,      BATT_ADC,  EPD_WS_154_4CLR,
+  "waveshare_154", 0,    0,     0,   0,    0,   0,    47,   48,   0,     4,    0xff,    6,      BATT_ADC,  EPD_WS_154,
+  "waveshare_154_4clr", 0, 0,   0,   0,    0,   0,    47,   48,   0,     4,    0xff,    6,      BATT_ADC,  EPD_WS_154_4CLR,
 #ifdef CMD_CS1_CS2
   "m5_paper_mono", 0,    0,     0,   0,    0,   0,    47,   48,   2,     0xff, 0xff,    0xff,   BATT_NONE, EPD_PAPER_MONO, 
   "m5_paper_color", 0,   0,     0,   0,    0,   0,    3,    2,    1,     0xff, 0xff,    0xff,   BATT_NONE, EPD_PAPER_COLOR, 
