@@ -687,6 +687,12 @@ void bl_init(void)
   digitalWrite(46, 0);
   digitalWrite(46, 1); // Hold the battery power enabled for after the user releases the power button
 #endif
+#ifdef BOARD_WAVESHARE_154
+ // Keep the battery power on and allow timed wakeup
+  pinMode(17, OUTPUT);
+  digitalWrite(17, HIGH); // keep the battery enable pin on to run on battery power
+#endif // BOARD_WAVESHARE_154
+
 #ifdef BOARD_TRMNL_X
   uint32_t init_time = esp_cpu_get_cycle_count() / esp_rom_get_cpu_ticks_per_us();
 #else
@@ -2322,6 +2328,11 @@ void goToSleep(void)
   gpio_deep_sleep_hold_en(); // Needed to keep the battery power enabled during RTC sleep
 #endif
 #endif
+#ifdef BOARD_WAVESHARE_154
+ // Keep the battery power on and allow timed wakeup
+  gpio_hold_en(GPIO_NUM_17); // MOSFET enabling the battery power
+  gpio_deep_sleep_hold_en(); // Needed to keep the battery power enabled during RTC sleep
+#endif // BOARD_WAVESHARE_154
   esp_deep_sleep_start();
 }
 
