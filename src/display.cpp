@@ -1117,10 +1117,13 @@ int png_draw_6clr(PNGDRAW *pDraw)
 int png_draw_4clr(PNGDRAW *pDraw)
 {
     uint8_t r=0, g=0, b=0, *s, *pPal, *pPalette = pDraw->pPalette;
-    int x, iDelta, iBpp = pDraw->iBpp;
+    int x, iWidth, iDelta, iBpp = pDraw->iBpp;
     uint8_t uc=0, *d, *pTemp = bbep.getCache(); // get some scratch memory (not from the stack)
 
     d = pTemp;
+    iWidth = pDraw->iWidth;
+    if (iWidth > bbep.width()) iWidth = bbep.width(); // truncate large images to panel width
+    if (pDraw->y >= bbep.height()) return 0; // past the bottom of the panel; stop decoding
     switch (pDraw->iPixelType) {
         case PNG_PIXEL_INDEXED:
             break;
@@ -1142,7 +1145,7 @@ int png_draw_4clr(PNGDRAW *pDraw)
     } // switch on pixel type
     iDelta = iBpp/8;
     s = pDraw->pPixels;
-    for (x=0; x<pDraw->iWidth; x++) { // slower code, but less code :)
+    for (x=0; x<iWidth; x++) { // slower code, but less code :)
         switch (iBpp) {
             case 24:
             case 32:
@@ -1213,7 +1216,13 @@ int png_draw_4clr(PNGDRAW *pDraw)
                 *d++ = uc;
             }
         } // for x
-    bbep.writeData(pTemp, (pDraw->iWidth+3)/4);
+    bbep.writeData(pTemp, (iWidth+3)/4);
+    if (iWidth < bbep.width()) { // fill in missing pixels for images that are narrower than the panel width
+        int i = (bbep.width()+3)/4;
+        i -= ((iWidth+3)/4);
+        memset(pTemp, 0x55, i); // fill with white
+        bbep.writeData(pTemp, i);
+    }
     return 1; // continue decoding
 } /* png_draw4clr() */
 #endif // BOARD_TRMNL_4CLR (4 color only)
@@ -1301,6 +1310,12 @@ int png_draw(PNGDRAW *pDraw)
         }
     }
     bbep.writeData(pTemp, (iWidth+7)/8);
+    if (iWidth < bbep.width()) { // fill in missing pixels for images that are narrower than the panel width
+        int i = (bbep.width()+7)/8;
+        i -= ((iWidth+7)/8);
+        memset(pTemp, 0xff, i);
+        bbep.writeData(pTemp, i);
+    }
     return 1;
 } /* png_draw() */
 #else // TRMNL_X version
