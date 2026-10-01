@@ -15,6 +15,8 @@ BYOD_ENVS=(
     seeed_reTerminal_E1001
     seeed_reTerminal_E1002
     TRMNL_X_E1003
+    xteink_x3
+    seeed_sticky
 )
 
 CONFIG="include/config.h"

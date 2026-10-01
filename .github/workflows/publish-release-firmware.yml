@@ -1,6 +1,6 @@
 name: publish-release-firmware
 
-# Publishes a tagged release: builds all TRMNL environments via
+# Publishes a tagged release: builds the selected environments via
 # scripts/prepare_release.sh, uploads the OTA and full-flash bins to S3, and
 # records draft Firmware/FlashFirmware releases in the TRMNL web app for an
 # admin to promote/publish.
@@ -23,6 +23,52 @@ on:
         description: "Re-upload files that already exist in S3"
         type: boolean
         default: false
+      # One checkbox per env (workflow_dispatch has no multi-select input type).
+      # Inputs must be named build_<pio env>; each env also needs an S3_PREFIXES entry.
+      build_trmnl:
+        description: "Build trmnl (OG)"
+        type: boolean
+        default: true
+      build_trmnl_4clr:
+        description: "Build trmnl_4clr (BWRY)"
+        type: boolean
+        default: true
+      build_TRMNL_X:
+        description: "Build TRMNL_X"
+        type: boolean
+        default: true
+      build_TRMNL_7inch5_OG_DIY_Kit:
+        description: "Build TRMNL_7inch5_OG_DIY_Kit (BYOD)"
+        type: boolean
+        default: false
+      build_seeed_xiao_esp32c3:
+        description: "Build seeed_xiao_esp32c3 (BYOD)"
+        type: boolean
+        default: false
+      build_seeed_reTerminal_E1001:
+        description: "Build seeed_reTerminal_E1001 (BYOD)"
+        type: boolean
+        default: false
+      build_seeed_reTerminal_E1002:
+        description: "Build seeed_reTerminal_E1002 (BYOD)"
+        type: boolean
+        default: false
+      build_TRMNL_X_E1003:
+        description: "Build TRMNL_X_E1003 (BYOD)"
+        type: boolean
+        default: false
+      build_xteink_x4:
+        description: "Build xteink_x4 (BYOD)"
+        type: boolean
+        default: false
+      build_xteink_x3:
+        description: "Build xteink_x3 (BYOD)"
+        type: boolean
+        default: false
+      build_seeed_sticky:
+        description: "Build seeed_sticky (BYOD)"
+        type: boolean
+        default: false
 
 concurrency:
   group: publish-release-firmware
@@ -35,7 +81,7 @@ env:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
 
     steps:
       - uses: actions/checkout@v7
@@ -54,6 +100,20 @@ jobs:
           fi
           echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
 
+      - name: Select environments
+        env:
+          INPUTS: ${{ toJSON(inputs) }}
+        run: |
+          ENVS=$(jq -r 'to_entries[]
+            | select((.key | startswith("build_")) and (.value == true or .value == "true"))
+            | .key | ltrimstr("build_")' <<<"$INPUTS" | xargs)
+          if [[ -z "$ENVS" ]]; then
+            echo "::error::No environments selected"
+            exit 1
+          fi
+          echo "Selected environments: ${ENVS}"
+          echo "ENVS=${ENVS}" >> "$GITHUB_ENV"
+
       - uses: actions/cache@v6
         with:
           path: |
@@ -71,7 +131,7 @@ jobs:
       - name: Build release firmware
         env:
           INCLUDE_GIT_HASH_IN_VERSION_NUMBER: "false"
-        run: ./scripts/prepare_release.sh ${{ inputs.force && '--force' || '' }} trmnl
+        run: ./scripts/prepare_release.sh ${{ inputs.force && '--force' || '' }} ${ENVS}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
@@ -88,8 +148,20 @@ jobs:
         run: |
           set -euo pipefail
 
-          # PlatformIO env -> S3 slug (must cover TRMNL_ENVS in prepare_release.sh)
-          declare -A SLUGS=( [trmnl]=trmnl_og [trmnl_4clr]=trmnl_bwry [TRMNL_X]=trmnl_x )
+          # PlatformIO env -> S3 prefix (must cover every build_<env> input)
+          declare -A S3_PREFIXES=(
+            [trmnl]=trmnl_og
+            [trmnl_4clr]=trmnl_bwry
+            [TRMNL_X]=trmnl_x
+            [TRMNL_7inch5_OG_DIY_Kit]=byod/seeed_OG_DIY_Kit
+            [seeed_xiao_esp32c3]=byod/seeed_xiao_esp32c3
+            [seeed_reTerminal_E1001]=byod/seeed_E1001
+            [seeed_reTerminal_E1002]=byod/seeed_E1002
+            [TRMNL_X_E1003]=byod/seeed_E1003
+            [xteink_x4]=byod/xteink_x4
+            [xteink_x3]=byod/xteink_x3
+            [seeed_sticky]=byod/seeed_sticky
+          )
           FILE="FW${VERSION}.bin"
 
           upload() { # <local file> <s3 key>
@@ -102,8 +174,12 @@ jobs:
 
           echo "## 🚀 Release ${TAG}" >> "$GITHUB_STEP_SUMMARY"
 
-          for pio_env in trmnl trmnl_4clr TRMNL_X; do
-            slug=${SLUGS[$pio_env]}
+          for pio_env in ${ENVS}; do
+            slug=${S3_PREFIXES[$pio_env]:-}
+            if [[ -z "$slug" ]]; then
+              echo "::error::No S3 prefix configured for ${pio_env}"
+              exit 1
+            fi
             ota_src=".pio/release/${pio_env}/ota/${FILE}"
             flash_src=".pio/release/${pio_env}/flash/${FILE}"
             ota_key="${slug}/${FILE}"
