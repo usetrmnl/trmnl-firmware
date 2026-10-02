@@ -1,9 +1,10 @@
 name: publish-release-firmware
 
 # Publishes a tagged release: builds the selected environments via
-# scripts/prepare_release.sh, uploads the OTA and full-flash bins to S3, and
-# records draft Firmware/FlashFirmware releases in the TRMNL web app for an
-# admin to promote/publish.
+# scripts/prepare_release.sh, uploads the full-flash bins (plus OTA bins for
+# the models in OTA_SLUGS; BYOD builds are flash-only) to S3, and records draft
+# Firmware/FlashFirmware releases in the TRMNL web app for an admin to
+# promote/publish.
 #
 # Idempotent: already-uploaded S3 objects are skipped (unless overwrite is
 # set) and the admin API upserts, so a failed run can safely be re-run.
@@ -162,6 +163,8 @@ jobs:
             [xteink_x3]=byod/xteink_x3
             [seeed_sticky]=byod/seeed_sticky
           )
+          # S3 prefixes that get OTA updates; all others (BYOD) are flash-only
+          OTA_SLUGS=" trmnl_og trmnl_x trmnl_bwry "
           FILE="FW${VERSION}.bin"
 
           upload() { # <local file> <s3 key>
@@ -180,27 +183,40 @@ jobs:
               echo "::error::No S3 prefix configured for ${pio_env}"
               exit 1
             fi
-            ota_src=".pio/release/${pio_env}/ota/${FILE}"
             flash_src=".pio/release/${pio_env}/flash/${FILE}"
-            ota_key="${slug}/${FILE}"
             flash_key="${slug}/flash/${FILE}"
 
-            upload "$ota_src" "$ota_key"
             upload "$flash_src" "$flash_key"
 
             jq -n \
               --arg version "$VERSION" \
               --arg tag "$TAG" \
-              --arg ota_url "${S3_BASE_URL}/${ota_key}" \
-              --argjson ota_size "$(stat -c%s "$ota_src")" \
               --arg flash_url "${S3_BASE_URL}/${flash_key}" \
               --argjson flash_size "$(stat -c%s "$flash_src")" \
               '{
                 version: $version,
                 tag: $tag,
-                ota: { url: $ota_url, size: $ota_size },
                 flash: { url: $flash_url, size: $flash_size }
               }' > payload.json
+
+            summary="### ${slug}"$'\n'
+
+            if [[ "$OTA_SLUGS" == *" ${slug} "* ]]; then
+              ota_src=".pio/release/${pio_env}/ota/${FILE}"
+              ota_key="${slug}/${FILE}"
+
+              upload "$ota_src" "$ota_key"
+
+              jq \
+                --arg ota_url "${S3_BASE_URL}/${ota_key}" \
+                --argjson ota_size "$(stat -c%s "$ota_src")" \
+                '. + { ota: { url: $ota_url, size: $ota_size } }' payload.json > payload.tmp
+              mv payload.tmp payload.json
+
+              summary+="- OTA: \`${S3_BASE_URL}/${ota_key}\` ($(stat -c%s "$ota_src") bytes)"$'\n'
+            fi
+
+            summary+="- Flash: \`${S3_BASE_URL}/${flash_key}\` ($(stat -c%s "$flash_src") bytes)"
 
             echo "Recording draft release for ${slug}:"
             curl --fail-with-body -sS -X POST \
@@ -210,12 +226,8 @@ jobs:
               https://trmnl.com/admin_api/firmware_releases
             echo
 
-            {
-              echo "### ${slug}"
-              echo "- OTA: \`${S3_BASE_URL}/${ota_key}\` ($(stat -c%s "$ota_src") bytes)"
-              echo "- Flash: \`${S3_BASE_URL}/${flash_key}\` ($(stat -c%s "$flash_src") bytes)"
-            } >> "$GITHUB_STEP_SUMMARY"
+            echo "$summary" >> "$GITHUB_STEP_SUMMARY"
           done
 
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Draft Firmware and FlashFirmware records created — promote/publish them in the admin." >> "$GITHUB_STEP_SUMMARY"
+          echo "Draft FlashFirmware (and OTA Firmware, where applicable) records created — promote/publish them in the admin." >> "$GITHUB_STEP_SUMMARY"
