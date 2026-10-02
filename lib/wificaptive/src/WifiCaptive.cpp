@@ -197,6 +197,11 @@ bool WifiCaptive::startPortal() {
         auto result = initiateConnectionAndWaitForOutcome(credentials);
         res = result.status == WL_CONNECTED;
         if (!res) failureState = classifyConnectionFailure(result);
+        if (!res) {
+          // The main chip dropped the portal AP to try this network, so restart to avoid leaving the device stuck
+          Log_info("Connection failed, restarting device to bring the portal back up");
+          ESP.restart();
+        }
       }
 
       if (res) {
