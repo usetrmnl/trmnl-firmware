@@ -131,6 +131,7 @@ extern BQ27427 lipo; // Use lipo.[] to interact with the library in an Arduino
 #include <inttypes.h>
 #include <trmnl_log.h>
 #include "png_flip.h"
+#include "bmp.h"
 #include "fonts/nicoclean_8.h"
 #include "fonts/Inter_18.h"
 #include "fonts/Roboto_Black_24.h"
@@ -1235,9 +1236,9 @@ int png_draw(PNGDRAW *pDraw)
             uint32_t u32Gray0, u32Gray1;
             u32Gray0 = pDraw->pPalette[0] + (pDraw->pPalette[1]<<2) + pDraw->pPalette[2];
             u32Gray1 = pDraw->pPalette[3] + (pDraw->pPalette[4]<<2) + pDraw->pPalette[5];
-          if (u32Gray0 < u32Gray1) {
-            ucInvert = 0xff;
-          }
+            if (u32Gray0 > u32Gray1) { // index 0 is the brighter color; output needs 0 = black
+                ucInvert = 0xff;
+            }
         } else {
             // Reduce the source image to 1-bpp or 2-bpp
             ReduceBpp((pDraw->pUser) ? 2:1, pDraw->iPixelType, pDraw->pPalette, pDraw->pPixels, pTemp, iWidth, pDraw->iBpp);
@@ -1825,6 +1826,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
         else
         {
          // This work-around is due to a lack of RAM; the correct method would be to use loadBMP()
+            bmpNormalizePolarity(image_buffer, image_buffer+62, (bbep.width() / 8) * bbep.height()); // palette may be [white, black]
             flip_image(image_buffer+62, bbep.width(), bbep.height(), false); // fix bottom-up bitmap images
 #ifdef BB_EPAPER
             bbep.setBuffer(image_buffer+62); // uncompressed 1-bpp bitmap
