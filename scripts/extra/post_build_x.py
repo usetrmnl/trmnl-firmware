@@ -1,7 +1,11 @@
 Import("env")
 import subprocess
+import sys
 import urllib.request
 from pathlib import Path
+
+sys.path.insert(0, str(Path(env.subst("$PROJECT_DIR")) / "scripts" / "extra"))
+from versioned_copy import copy_versioned
 
 LITTLEFS_URL = "https://trmnl-fw.s3.us-east-2.amazonaws.com/littlefs.bin"
 LITTLEFS_OFFSET = "0x620000"
@@ -41,3 +45,4 @@ def post_build(source, target, env):
 
 
 env.AddPostAction("$BUILD_DIR/${PROGNAME}.bin", post_build)
+env.AddPostAction("buildprog", lambda source, target, env: copy_versioned(env))
