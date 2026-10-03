@@ -1,0 +1,119 @@
+name: integration
+
+# Boots real builds in trmnl-sim against mock TRMNL servers and checks them with the RSpec
+# suite in spec/ (see spec/README.md).
+
+on:
+  push:
+    branches: ["main", "add-specs"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: spec
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+          working-directory: spec
+
+      # Style, and the specs load and their metadata is valid for every device (no firmware needed).
+      - name: rubocop, dry run
+        run: bundle exec rake check
+
+  integration:
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - env: trmnl
+            envs: "trmnl:full"
+          - env: TRMNL_X
+            envs: "TRMNL_X"
+          - env: trmnl_4clr # BWRY
+            envs: "trmnl_4clr"
+
+    name: integration (${{ matrix.env }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio
+          key: ${{ runner.os }}-pio-${{ hashFiles('platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Install PlatformIO Core
+        run: pip install --upgrade platformio==6.1.19
+
+      # TRMNL_X also fetches its filesystem image (with the ESP32-C5 modem firmware) in post_build_x.py.
+      - name: Build firmware (${{ matrix.env }})
+        run: pio run -e ${{ matrix.env }} -j 4
+
+      # The latest headless release; it finds the chips' ROM ELFs in the rom/ next to it.
+      - name: Download trmnl-sim
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/trmnl-sim"
+          cd "$RUNNER_TEMP/trmnl-sim"
+          gh release download -R usetrmnl/trmnl-sim -p '*-linux-x86_64-headless.tar.gz' -p SHA256SUMS.txt
+          sha256sum --check --ignore-missing SHA256SUMS.txt
+          ls trmnl-sim-*-linux-x86_64-headless.tar.gz
+          tar xzf trmnl-sim-*-linux-x86_64-headless.tar.gz --strip-components=1
+          echo "SIM_BIN=$PWD/trmnl-sim" >> "$GITHUB_ENV"
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+          working-directory: spec
+
+      - name: Integration tests
+        working-directory: spec
+        env:
+          ENVS: ${{ matrix.envs }}
+          # every setup flow in full
+          NO_CACHE: "1"
+        run: bundle exec rake spec
+
+      - name: Collect screen diffs
+        if: failure()
+        run: |
+          mkdir -p spec/out/artifacts
+          find spec/golden -name '*.actual.png' -exec cp {} spec/out/artifacts/ \; || true
+
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: simulator-logs-and-screens-${{ matrix.env }}
+          path: spec/out/artifacts/
+          if-no-files-found: ignore
+
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: firmware-coverage-${{ matrix.env }}
+          path: |
+            spec/out/cov/merged.info
+            spec/out/cov/html/
+          if-no-files-found: ignore
