@@ -9,6 +9,7 @@
 #include <filesystem.h>
 #include <globals.h>
 #include <http_client.h>
+#include <http_utils.h>
 #include <inttypes.h>
 #include <preferences_persistence.h>
 #include <services/device_setup.h>
@@ -138,9 +139,11 @@ void DeviceSetup::downloadSetupImage() {
     int httpCode = https->GET();
 
     if (httpCode == HTTP_CODE_PERMANENT_REDIRECT || httpCode == HTTP_CODE_TEMPORARY_REDIRECT) {
+      // the Location may be relative (as in HttpRetryRequest)
+      String redirectUrl = resolveRedirectLocation(https->getLocation(), httpOriginOf(_result.imageUrl));
       https->end();
-      https->begin(https->getLocation());
-      Log_info("Redirected to: %s", https->getLocation().c_str());
+      https->begin(redirectUrl);
+      Log_info("Redirected to: %s", redirectUrl.c_str());
       https->setTimeout(15000);
       https->setConnectTimeout(15000);
       httpCode = https->GET();
