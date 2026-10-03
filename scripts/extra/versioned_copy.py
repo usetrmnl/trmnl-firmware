@@ -33,3 +33,7 @@ def copy_versioned(env):
         dst = build_dir / f"{prefix}{suffix}"
         shutil.copyfile(src, dst)
         print(f"Copied {src.name} -> {dst}")
+
+    # trmnl-sim loads the ELF next to the image it runs, with the image's name (spec/).
+    shutil.copyfile(build_dir / elf, build_dir / "merged_firmware.elf")
+    print(f"Copied {elf} -> {build_dir / 'merged_firmware.elf'}")
