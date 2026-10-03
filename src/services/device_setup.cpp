@@ -178,7 +178,9 @@ void DeviceSetup::downloadSetupImage() {
       Log_error_submit("Failed to allocate buffer for setup image (%d bytes)", contentSize);
       return false;
     }
-    if (stream->available() && contentSize > 0) {
+    // Not gated on stream->available(): right after the headers the body may not have arrived yet
+    // (often over TLS); downloadStream waits for it.
+    if (contentSize > 0) {
       counter = downloadStream(stream, contentSize, imageBuffer);
     }
 
