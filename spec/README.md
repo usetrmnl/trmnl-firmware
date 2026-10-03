@@ -137,8 +137,10 @@ See the trmnl-sim README for the control API, fault injection and memcheck detai
 
 ## CI
 
-The firmware's [integration.yml](../.github/workflows/integration.yml) runs `rake check`, then
-one job each for `trmnl` (`:full`), `TRMNL_X` and `trmnl_4clr` (BWRY): it builds the env and
-runs `rake spec` uncached on it with the latest headless
+The firmware's [build.yml](../.github/workflows/build.yml) builds `trmnl`, `TRMNL_X` and
+`trmnl_4clr` (BWRY) on Linux in its `build-integration` job and uploads them, then calls
+[integration.yml](../.github/workflows/integration.yml): it runs `rake check`, then one job
+each for `trmnl` (`:full`), `TRMNL_X` and `trmnl_4clr` that downloads its build and runs
+`rake spec` uncached on it with the latest headless
 [trmnl-sim release](https://github.com/usetrmnl/trmnl-sim/releases), uploading logs, screens
 and diffs on failure and coverage always.

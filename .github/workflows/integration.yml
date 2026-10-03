@@ -1,13 +1,11 @@
 name: integration
 
 # Boots real builds in trmnl-sim against mock TRMNL servers and checks them with the RSpec
-# suite in spec/ (see spec/README.md).
+# suite in spec/ (see spec/README.md). Called from build.yml, whose build-integration job uploads
+# the firmware it tests (the integration-builds artifact).
 
 on:
-  push:
-    branches: ["main", "add-specs"]
-  pull_request:
-  workflow_dispatch:
+  workflow_call:
 
 jobs:
   check:
@@ -50,25 +48,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/cache@v6
+      # The firmware build-integration built (build.yml), into .pio/build/<env> where the specs look.
+      - uses: actions/download-artifact@v7
         with:
-          path: |
-            ~/.cache/pip
-            ~/.platformio
-          key: ${{ runner.os }}-pio-${{ hashFiles('platformio.ini') }}
-          restore-keys: |
-            ${{ runner.os }}-pio-
-
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.13"
-
-      - name: Install PlatformIO Core
-        run: pip install --upgrade platformio==6.1.19
-
-      # TRMNL_X also fetches its filesystem image (with the ESP32-C5 modem firmware) in post_build_x.py.
-      - name: Build firmware (${{ matrix.env }})
-        run: pio run -e ${{ matrix.env }} -j 4
+          name: integration-builds
+          path: .pio/build
 
       # The latest headless release; it finds the chips' ROM ELFs in the rom/ next to it.
       - name: Download trmnl-sim

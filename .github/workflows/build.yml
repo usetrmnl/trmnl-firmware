@@ -66,7 +66,9 @@ jobs:
           g++ --version
           gcc --version
 
+      # On Linux, build-integration builds the firmware (once, for the integration tests too).
       - name: build (trmnl)
+        if: runner.os != 'Linux'
         run: pio run -j ${{ runner.os == 'Windows' && '1' || '4' }} -v
 
       #- name: build (TRMNL_X)
@@ -83,8 +85,76 @@ jobs:
       - name: static analysis
         run: pio check --skip-packages --fail-on-defect high
 
+  # The Linux firmware builds, on their own so the integration tests needn't wait for the
+  # build-test matrix.
+  build-integration:
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio
+            ~/.buildcache
+          key: ${{ runner.os }}-pio-${{ hashFiles('platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-
+
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: ${{ runner.os }}-ccache-${{ hashFiles('platformio.ini') }}
+          job-summary: "" # disabled
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Install PlatformIO Core
+        run: pip install --upgrade platformio==6.1.19
+
+      - name: Configure ccache for PlatformIO
+        run: |
+          echo "PLATFORMIO_BUILD_CACHE_DIR=$HOME/.buildcache" >> $GITHUB_ENV
+
+      - name: build (trmnl)
+        run: pio run -e trmnl -j 4 -v
+
+      # TRMNL_X also fetches its filesystem image (with the ESP32-C5 modem firmware) in post_build_x.py.
+      - name: build (TRMNL_X)
+        run: pio run -e TRMNL_X -j 4 -v
+
+      - name: build (trmnl_4clr)
+        run: pio run -e trmnl_4clr -j 4 -v
+
+      # What the simulator runs (merged image and its ELF) and the files the specs read
+      # (firmware.bin for OTA, partitions.bin).
+      - name: upload builds for the integration tests
+        uses: actions/upload-artifact@v6
+        with:
+          name: integration-builds
+          path: |
+            .pio/build/trmnl/*.bin
+            .pio/build/trmnl/merged_firmware.elf
+            .pio/build/TRMNL_X/*.bin
+            .pio/build/TRMNL_X/merged_firmware.elf
+            .pio/build/trmnl_4clr/*.bin
+            .pio/build/trmnl_4clr/merged_firmware.elf
+          if-no-files-found: error
+          include-hidden-files: true # .pio
+          retention-days: 7
+
+  integration:
+    needs: build-integration
+    uses: ./.github/workflows/integration.yml
+
   publish-engineering-build:
-    needs: build-test
+    needs: [build-test, build-integration]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     uses: ./.github/workflows/publish-firmware.yml
     with:
@@ -92,7 +162,7 @@ jobs:
       filename_suffix_type: git_short_hash
 
   publish-tagged-build:
-    needs: build-test
+    needs: [build-test, build-integration]
     if: startsWith(github.ref, 'refs/tags/')
     uses: ./.github/workflows/publish-firmware.yml
     with:
@@ -100,7 +170,7 @@ jobs:
       filename_suffix_type: git_tag
 
   publish-dev-builds:
-    needs: build-test
+    needs: [build-test, build-integration]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     uses: ./.github/workflows/publish-dev-firmware.yml
     secrets: inherit
