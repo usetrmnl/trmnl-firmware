@@ -831,7 +831,7 @@ void ReduceBpp(int iDestBpp, int iPixelType, uint8_t *pPalette, uint8_t *pSrc, u
                         pPal = &pPalette[(s[0] & 0xf) * 3];
                         g = (pPal[0] + pPal[1]*2 + pPal[2])/4;
                     } else {
-                        g = (s[0] & 0xf) | (s[0] << 4);
+                        g = (s[0] & 0xf) | ((s[0] & 0xf) << 4); // the low nibble only: g is an int
                     }
                     s++;
                 } else {
