@@ -1826,8 +1826,10 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
         else
         {
          // This work-around is due to a lack of RAM; the correct method would be to use loadBMP()
-            bmpNormalizePolarity(image_buffer, image_buffer+62, (bbep.width() / 8) * bbep.height()); // palette may be [white, black]
-            flip_image(image_buffer+62, bbep.width(), bbep.height(), false); // fix bottom-up bitmap images
+            const int iBmpWidth = image_buffer[18] | (image_buffer[19] << 8);
+            const int iBmpHeight = image_buffer[22] | (image_buffer[23] << 8);
+            bmpNormalizePolarity(image_buffer, image_buffer+62, (iBmpWidth / 8) * iBmpHeight); // palette may be [white, black]
+            flip_image(image_buffer+62, iBmpWidth, iBmpHeight, false); // fix bottom-up bitmap images
 #ifdef BB_EPAPER
             bbep.setBuffer(image_buffer+62); // uncompressed 1-bpp bitmap
 #endif // BB_EPAPER
