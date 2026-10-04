@@ -66,7 +66,9 @@ jobs:
           g++ --version
           gcc --version
 
+      # On Linux, build-integration builds the firmware (once, for the integration tests too).
       - name: build (trmnl)
+        if: runner.os != 'Linux'
         run: pio run -j ${{ runner.os == 'Windows' && '1' || '4' }} -v
 
       #- name: build (TRMNL_X)
@@ -83,8 +85,78 @@ jobs:
       - name: static analysis
         run: pio check --skip-packages --fail-on-defect high
 
+  # The Linux firmware builds, on their own so the integration tests needn't wait for the
+  # build-test matrix.
+  build-integration:
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio
+            ~/.platformio-pioarduino
+            ~/.buildcache
+          key: ${{ runner.os }}-pio-integration-${{ hashFiles('platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-integration-
+
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: ${{ runner.os }}-ccache-${{ hashFiles('platformio.ini') }}
+          job-summary: "" # disabled
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Install PlatformIO Core
+        run: pip install --upgrade platformio==6.1.19
+
+      - name: Configure ccache for PlatformIO
+        run: |
+          echo "PLATFORMIO_BUILD_CACHE_DIR=$HOME/.buildcache" >> $GITHUB_ENV
+
+      # Each env's outputs are staged as soon as it builds: switching PLATFORMIO_CORE_DIR changes
+      # the project checksum, and PlatformIO then wipes every env's .pio/build.
+      - name: build (trmnl)
+        run: |
+          pio run -e trmnl -j 4 -v
+          scripts/stage_integration_build.sh trmnl
+
+      # TRMNL_X also fetches its filesystem image (with the ESP32-C5 modem firmware) in post_build_x.py.
+      # Its platform (pioarduino) gets its own core dir: it and espressif32 6.x install different
+      # packages under the same names, breaking the other envs' builds (see prepare_release.sh).
+      - name: build (TRMNL_X)
+        run: |
+          PLATFORMIO_CORE_DIR="$HOME/.platformio-pioarduino" pio run -e TRMNL_X -j 4 -v
+          scripts/stage_integration_build.sh TRMNL_X
+
+      - name: build (trmnl_4clr)
+        run: |
+          pio run -e trmnl_4clr -j 4 -v
+          scripts/stage_integration_build.sh trmnl_4clr
+
+      - name: upload builds for the integration tests
+        uses: actions/upload-artifact@v6
+        with:
+          name: integration-builds
+          path: integration-builds/
+          if-no-files-found: error
+          retention-days: 7
+
+  integration:
+    needs: build-integration
+    uses: ./.github/workflows/integration.yml
+
   publish-engineering-build:
-    needs: build-test
+    needs: [build-test, build-integration]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     uses: ./.github/workflows/publish-firmware.yml
     with:
@@ -92,7 +164,7 @@ jobs:
       filename_suffix_type: git_short_hash
 
   publish-tagged-build:
-    needs: build-test
+    needs: [build-test, build-integration]
     if: startsWith(github.ref, 'refs/tags/')
     uses: ./.github/workflows/publish-firmware.yml
     with:
@@ -100,7 +172,7 @@ jobs:
       filename_suffix_type: git_tag
 
   publish-dev-builds:
-    needs: build-test
+    needs: [build-test, build-integration]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     uses: ./.github/workflows/publish-dev-firmware.yml
     secrets: inherit
