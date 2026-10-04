@@ -65,3 +65,19 @@ bmp_err_e parseBMPHeader(uint8_t *data, bool &reversed) {
     return BMP_INVALID_OFFSET;
   }
 }
+
+bool bmpIsPaletteReversed(const uint8_t *data) {
+  // Color table starts at offset 54; entries are B, G, R, A
+  const uint8_t *c0 = &data[54];
+  const uint8_t *c1 = &data[58];
+  uint32_t gray0 = c0[0] + (c0[1] << 1) + c0[2];
+  uint32_t gray1 = c1[0] + (c1[1] << 1) + c1[2];
+  return gray0 > gray1;
+}
+
+void bmpNormalizePolarity(const uint8_t *data, uint8_t *pixels, uint32_t pixelBytes) {
+  if (data[0] != 'B' || data[1] != 'M' || !bmpIsPaletteReversed(data)) return;
+  for (uint32_t i = 0; i < pixelBytes; i++) {
+    pixels[i] = ~pixels[i];
+  }
+}

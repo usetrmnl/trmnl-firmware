@@ -23,7 +23,6 @@ enum MSG {
   WIFI_INTERNAL_ERROR,
   WIFI_IMAGE_TIMEOUT,
   API_ERROR,
-  API_REQUEST_FAILED,
   API_SIZE_ERROR,
   API_UNABLE_TO_CONNECT,
   API_SETUP_FAILED,
@@ -40,6 +39,7 @@ enum MSG {
   FILL_WHITE,
   WIFI_RETRY_LIMIT,
   CAPTIVE_WIFI_TIMEOUT,
+  IMAGE_DOWNLOAD_FAILED,
 };
 
 typedef struct dp_tag {
@@ -58,6 +58,12 @@ typedef struct theBrand {
  * @return none
  */
 void display_init(void);
+
+/**
+ * @brief Panel ID (EPD revision) as 8 hex digits for the Panel-Rev request header
+ * @return hex string, or empty if the ID is unknown/not read
+ */
+String display_panel_rev_string(void);
 
 uint8_t tca9535_interrupt_clear();
 void config_bma530_interrupt();
@@ -125,8 +131,8 @@ uint16_t display_width();
  * @param is_center_aligned If true, center the text; if false, left-align
  * @return none
  */
-void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message, uint16_t max_width, uint16_t font_width,
-                             UWORD color_fg, UWORD color_bg, const void *font, bool is_center_aligned);
+void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message, uint16_t max_width, UWORD color_fg,
+                             UWORD color_bg, const void *font);
 
 /**
  * @brief Function to show the image on the display
@@ -174,7 +180,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
  */
 void display_show_msg_api(uint8_t *image_buffer, String message);
 
-void display_show_msg_qa(uint8_t *image_buffer, const float *voltage, const float *temperature, bool qa_result);
+void display_show_msg_qa(const float *voltage, const float *temperature, bool qa_result);
 
 /**
  * @brief Enable or disable light sleep at runtime

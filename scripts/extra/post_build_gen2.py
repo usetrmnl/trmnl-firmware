@@ -1,6 +1,10 @@
 Import("env")
 import subprocess
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(env.subst("$PROJECT_DIR")) / "scripts" / "extra"))
+from versioned_copy import copy_versioned
 
 def post_build(source, target, env):
     build_dir = Path(env.subst("$BUILD_DIR"))
@@ -23,3 +27,4 @@ def post_build(source, target, env):
 
 
 env.AddPostAction("$BUILD_DIR/${PROGNAME}.bin", post_build)
+env.AddPostAction("buildprog", lambda source, target, env: copy_versioned(env))
