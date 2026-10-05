@@ -9,7 +9,7 @@ on:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 10
 
     defaults:
@@ -44,7 +44,7 @@ jobs:
             envs: "trmnl_4clr"
 
     name: integration (${{ matrix.env }})
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 45
 
     steps:
