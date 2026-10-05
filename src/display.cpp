@@ -139,8 +139,75 @@ extern BQ27427 lipo; // Use lipo.[] to interact with the library in an Arduino
 static uint8_t *pDither;
 
 #ifdef BB_EPAPER
+#ifdef BOARD_TRMNL_4CLR
+// The 4-color panel's frame buffer is 2 bits per pixel (96 KB), often more contiguous heap than
+// is free (e.g. while the portal runs). Black-and-white screens are drawn as on the OG's panel,
+// into a 1-bit buffer (48 KB), and expanded as they are sent.
+#define EPD_4CLR_AS_1BIT EP75_800x480
+
+// Send 1-bit rows (1 = white) to the 4-color panel as 2-bit pixels (black 00, white 01).
+static void display_send_1bit_as_4clr(const uint8_t *s, int iWidth, int iHeight)
+{
+    const int iPitch = iWidth / 8;
+    uint8_t *d = bbep.getCache(); // a row of 2-bit pixels (200 bytes) fits
+    bbep.startWrite(PLANE_1);
+    for (int y = 0; y < iHeight; y++, s += iPitch) {
+        for (int x = 0; x < iPitch; x++) {
+            uint16_t us = 0;
+            for (int bit = 7; bit >= 0; bit--) {
+                us = (us << 2) | ((s[x] >> bit) & 1);
+            }
+            d[x * 2] = (uint8_t)(us >> 8);
+            d[x * 2 + 1] = (uint8_t)us;
+        }
+        bbep.writeData(d, iPitch * 2);
+    }
+}
+
+// Before a refresh: if the screen was drawn in 1 bit, switch to the panel itself and, when
+// writePlane is set, send the buffer as 2-bit rows. Returns whether the screen was drawn in 1 bit.
+static bool display_4clr_begin_1bit_update(bool writePlane)
+{
+    if (bbep.getPanelType() != EPD_4CLR_AS_1BIT) {
+        return false;
+    }
+    bbep.setPanelType(EP75YR_800x480); // the panel itself
+    if (writePlane) {
+        display_send_1bit_as_4clr((const uint8_t *)bbep.getBuffer(), bbep.width(), bbep.height());
+    }
+    return true;
+}
+
+// After a refresh: anything drawn next is still 1 bit.
+static void display_4clr_end_1bit_update(bool b1Bit)
+{
+    if (b1Bit) {
+        bbep.setPanelType(EPD_4CLR_AS_1BIT);
+    }
+}
+#endif // BOARD_TRMNL_4CLR
+
+// Allocate the frame buffer for a black-and-white screen (messages, logos).
+static int display_alloc_buffer()
+{
+#ifdef BOARD_TRMNL_4CLR
+    bbep.setPanelType(EPD_4CLR_AS_1BIT);
+#endif
+    int rc = bbep.allocBuffer(false);
+    if (rc != BBEP_SUCCESS) {
+        Log_error("No room for a frame buffer (largest free block %" PRIu32 ")", ESP.getMaxAllocHeap());
+    }
+    return rc;
+}
+
 static bool display_update_epaper(int refreshMode, bool wait, bool writePlane = false, uint8_t plane = PLANE_0)
 {
+#ifdef BOARD_TRMNL_4CLR
+    const bool b1Bit = display_4clr_begin_1bit_update(writePlane);
+    if (b1Bit) {
+        writePlane = false; // already sent
+    }
+#endif
     if (writePlane) {
         bbep.writePlane(plane);
     }
@@ -151,6 +218,9 @@ static bool display_update_epaper(int refreshMode, bool wait, bool writePlane = 
         Log_info("Have valid previous image in EPD memory, doing partial refresh");
     }
     bbep.refresh(refreshMode, wait);
+#ifdef BOARD_TRMNL_4CLR
+    display_4clr_end_1bit_update(b1Bit);
+#endif
     // The next update can be a partial update because the current is 1-bpp and stays in the EPD RAM
     bCanDoPartial = (bbep.getPanelType() == dpList[pDevice->panel_set][iTempProfile].OneBit);
     return true;
@@ -1741,6 +1811,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
     static int i426Workaround = 0;
 #ifdef BB_EPAPER
     int iRefreshMode = REFRESH_FULL; // assume full (slow) refresh
+    bool bStreamed = false; // the image was sent to the panel as it was decoded (no plane to write)
 #else
     int iRefreshMode = 0;
 #endif
@@ -1833,13 +1904,20 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
             const int iBmpHeight = image_buffer[22] | (image_buffer[23] << 8);
             bmpNormalizePolarity(image_buffer, image_buffer+62, (iBmpWidth / 8) * iBmpHeight); // palette may be [white, black]
             flip_image(image_buffer+62, iBmpWidth, iBmpHeight, false); // fix bottom-up bitmap images
-#ifdef BB_EPAPER
+#ifdef BOARD_TRMNL_4CLR
+            // The 4-color panel's frame buffer is 2 bits per pixel, twice the size of this bitmap:
+            // expand each row as it is sent, as png_draw_4clr() does.
+            display_send_1bit_as_4clr(image_buffer + 62, iBmpWidth, iBmpHeight);
+            bStreamed = true;
+#elif defined(BB_EPAPER)
             bbep.setBuffer(image_buffer+62); // uncompressed 1-bpp bitmap
-#endif // BB_EPAPER
+#endif // BOARD_TRMNL_4CLR
         }
 #ifdef BB_EPAPER
 #ifndef BOARD_SEEED_RETERMINAL_E1002
-        bbep.writePlane(); // send image data to the EPD
+        if (!bStreamed) {
+            bbep.writePlane(); // send image data to the EPD
+        }
 #endif // !BOARD_SEEED_RETERMINAL_E1002
         iRefreshMode = REFRESH_PARTIAL;
 #endif // BB_EPAPER
@@ -1972,7 +2050,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
     Log_info("display_show_msg start");
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef BB_EPAPER
-    bbep.allocBuffer(false);
+    display_alloc_buffer();
 #else
     bbep.setMode(BB_MODE_1BPP); // message screens are 1-bit
 #endif
@@ -2491,7 +2569,7 @@ void display_show_msg_qa(const float *voltage, const float *temperature, bool qa
     Log_info("display_show_msg start");
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef BB_EPAPER
-    bbep.allocBuffer(false);
+    display_alloc_buffer();
     bbep.fillScreen(BBEP_WHITE); // the results go on a blank screen
 #else
     bbep.setMode(BB_MODE_1BPP);
@@ -2582,7 +2660,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     Log_info("Free heap in display_show_msg - %" PRIu32, ESP.getMaxAllocHeap());
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef BB_EPAPER
-    bbep.allocBuffer(false);
+    display_alloc_buffer();
     Log_info("Free heap after bbep.allocBuffer() - %" PRIu32, ESP.getMaxAllocHeap());
 #else
     bbep.setMode(BB_MODE_1BPP); // message screens are 1-bit
