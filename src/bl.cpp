@@ -1470,6 +1470,26 @@ static https_request_err_e downloadAndShow()
         buffer = nullptr;
         return result;
       }
+      if (!filesystem_file_exists(szTemp)) {
+        // BMPs aren't cached under their filename (e.g. after a sleep special function); redraw /current.bmp
+        buffer = nullptr;
+        size_t current_size = 0;
+        if (filesystem_file_exists("/current.bmp")) {
+          current_size = filesystem_read_and_allocate("/current.bmp", &buffer);
+        }
+        if (!buffer || current_size == 0) {
+          Log_info("%s isn't cached; keeping the current screen", szTemp);
+          if (buffer) free(buffer);
+          buffer = nullptr;
+          return result;
+        }
+        Log_info("%s isn't cached; showing /current.bmp", szTemp);
+        display_show_image(buffer, current_size, true);
+        free(buffer);
+        buffer = nullptr;
+        DisplayedImage::remember(szTemp);
+        return result;
+      }
       DisplayedImage::remember(szTemp);
       Log.info("%s [%d]: Reading %s from SPIFFS\r\n", __FILE__, __LINE__, szTemp);
       size_t content_size = filesystem_read_and_allocate(szTemp, &buffer);
