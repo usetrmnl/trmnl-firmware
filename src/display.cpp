@@ -776,7 +776,10 @@ int iWidthLimit = (max_width * 3)/4; // don't let the text go all the way to the
         bbep.getStringBox(szTemp, &rect);
         if (c == 0 || c == '\n' || (c == ' ' && rect.w >= iWidthLimit) || d == &szTemp[sizeof(szTemp) - 1]) {
             if (c == 0 || s[0] == 0) bDone = true;
-            if (c == ' ' || c == '\n') d[-1] = 0; // don't print the space/newline
+            if (c == ' ' || c == '\n') {
+                d[-1] = 0; // don't print the space/newline
+                bbep.getStringBox(szTemp, &rect); // and don't center it either
+            }
             // Display the current partial string
             bbep.setCursor(x_start + (max_width - rect.w) / 2, -1);
             bbep.println(szTemp);
