@@ -140,9 +140,10 @@ static uint8_t *pDither;
 
 #ifdef BB_EPAPER
 #ifdef BOARD_TRMNL_4CLR
-// The 4-color panel's frame buffer is 2 bits per pixel (96 KB), often more contiguous heap than
-// is free (e.g. while the portal runs). Black-and-white screens are drawn as on the OG's panel,
-// into a 1-bit buffer (48 KB), and expanded as they are sent.
+// The 4-color panel never gets a back buffer of its own: 2 bits per pixel (96 KB) is often more
+// contiguous heap than is free (e.g. while the portal runs). Color images are streamed to it as
+// they are decoded; black-and-white screens are drawn as on the OG's panel, into a 1-bit buffer
+// (48 KB), and expanded as they are sent.
 #define EPD_4CLR_AS_1BIT EP75_800x480
 
 // Send 1-bit rows (1 = white) to the 4-color panel as 2-bit pixels (black 00, white 01).
@@ -163,28 +164,6 @@ static void display_send_1bit_as_4clr(const uint8_t *s, int iWidth, int iHeight)
         bbep.writeData(d, iPitch * 2);
     }
 }
-
-// Before a refresh: if the screen was drawn in 1 bit, switch to the panel itself and, when
-// writePlane is set, send the buffer as 2-bit rows. Returns whether the screen was drawn in 1 bit.
-static bool display_4clr_begin_1bit_update(bool writePlane)
-{
-    if (bbep.getPanelType() != EPD_4CLR_AS_1BIT) {
-        return false;
-    }
-    bbep.setPanelType(EP75YR_800x480); // the panel itself
-    if (writePlane) {
-        display_send_1bit_as_4clr((const uint8_t *)bbep.getBuffer(), bbep.width(), bbep.height());
-    }
-    return true;
-}
-
-// After a refresh: anything drawn next is still 1 bit.
-static void display_4clr_end_1bit_update(bool b1Bit)
-{
-    if (b1Bit) {
-        bbep.setPanelType(EPD_4CLR_AS_1BIT);
-    }
-}
 #endif // BOARD_TRMNL_4CLR
 
 // Allocate the frame buffer for a black-and-white screen (messages, logos).
@@ -200,16 +179,23 @@ static int display_alloc_buffer()
     return rc;
 }
 
-static bool display_update_epaper(int refreshMode, bool wait, bool writePlane = false, uint8_t plane = PLANE_0)
+// Send the frame buffer to the panel (on the 4-color panel, the 1-bit buffer as 2-bit rows).
+static void display_write_plane(int plane)
 {
 #ifdef BOARD_TRMNL_4CLR
-    const bool b1Bit = display_4clr_begin_1bit_update(writePlane);
-    if (b1Bit) {
-        writePlane = false; // already sent
+    bbep.setPanelType(EP75YR_800x480); // the panel itself
+    if (bbep.getBuffer()) {
+        display_send_1bit_as_4clr((const uint8_t *)bbep.getBuffer(), bbep.width(), bbep.height());
     }
+#else
+    bbep.writePlane(plane);
 #endif
+}
+
+static bool display_update_epaper(int refreshMode, bool wait, bool writePlane = false, uint8_t plane = PLANE_0)
+{
     if (writePlane) {
-        bbep.writePlane(plane);
+        display_write_plane(plane);
     }
     if (refreshMode == REFRESH_PARTIAL && !bCanDoPartial) {
         refreshMode = REFRESH_FAST;
@@ -219,7 +205,9 @@ static bool display_update_epaper(int refreshMode, bool wait, bool writePlane = 
     }
     bbep.refresh(refreshMode, wait);
 #ifdef BOARD_TRMNL_4CLR
-    display_4clr_end_1bit_update(b1Bit);
+    if (writePlane) {
+        bbep.setPanelType(EPD_4CLR_AS_1BIT); // anything drawn next is still 1 bit
+    }
 #endif
     // The next update can be a partial update because the current is 1-bpp and stays in the EPD RAM
     bCanDoPartial = (bbep.getPanelType() == dpList[pDevice->panel_set][iTempProfile].OneBit);
@@ -1811,7 +1799,6 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
     static int i426Workaround = 0;
 #ifdef BB_EPAPER
     int iRefreshMode = REFRESH_FULL; // assume full (slow) refresh
-    bool bStreamed = false; // the image was sent to the panel as it was decoded (no plane to write)
 #else
     int iRefreshMode = 0;
 #endif
@@ -1860,8 +1847,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
             // G5 compressed image
             BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
 #ifdef BB_EPAPER
-            if (bbep.allocBuffer(false) != BBEP_SUCCESS) {
-                Log_info("Error allocating bb_epaper frame buffer");
+            if (display_alloc_buffer() != BBEP_SUCCESS) {
                 return;
             }
             bAlloc = true;
@@ -1904,20 +1890,13 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
             const int iBmpHeight = image_buffer[22] | (image_buffer[23] << 8);
             bmpNormalizePolarity(image_buffer, image_buffer+62, (iBmpWidth / 8) * iBmpHeight); // palette may be [white, black]
             flip_image(image_buffer+62, iBmpWidth, iBmpHeight, false); // fix bottom-up bitmap images
-#ifdef BOARD_TRMNL_4CLR
-            // The 4-color panel's frame buffer is 2 bits per pixel, twice the size of this bitmap:
-            // expand each row as it is sent, as png_draw_4clr() does.
-            display_send_1bit_as_4clr(image_buffer + 62, iBmpWidth, iBmpHeight);
-            bStreamed = true;
-#elif defined(BB_EPAPER)
+#ifdef BB_EPAPER
             bbep.setBuffer(image_buffer+62); // uncompressed 1-bpp bitmap
-#endif // BOARD_TRMNL_4CLR
+#endif // BB_EPAPER
         }
 #ifdef BB_EPAPER
 #ifndef BOARD_SEEED_RETERMINAL_E1002
-        if (!bStreamed) {
-            bbep.writePlane(); // send image data to the EPD
-        }
+        display_write_plane(PLANE_BOTH); // send image data to the EPD
 #endif // !BOARD_SEEED_RETERMINAL_E1002
         iRefreshMode = REFRESH_PARTIAL;
 #endif // BB_EPAPER
