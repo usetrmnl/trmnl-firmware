@@ -1440,7 +1440,7 @@ static https_request_err_e downloadAndShow()
     return apiDisplayResult.error;
 
   https_request_err_e result = handleApiDisplayResponse(apiDisplayResult.response);
-  if (apiDisplayResult.response.filename == "screen_wiper.png") {
+  if (apiDisplayResult.response.filename.startsWith("screen_wiper")) {
       // Guard against re-fetching forever if the wiper is the only playlist item
       static bool wiped_this_wake = false;
       if (wiped_this_wake) {
