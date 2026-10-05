@@ -13,7 +13,7 @@ jobs:
       fail-fast: false
       max-parallel: 3
       matrix:
-        os: [ubuntu-latest, macos-15, windows-latest]
+        os: [blacksmith-4vcpu-ubuntu-2404, blacksmith-6vcpu-macos-15, blacksmith-4vcpu-windows-2025]
 
     runs-on: ${{ matrix.os }}
 
@@ -43,7 +43,7 @@ jobs:
           python-version: "3.13"
 
       - uses: maxim-lobanov/setup-xcode@v1
-        if: matrix.os == 'macos-15'
+        if: runner.os == 'macOS'
         with:
           xcode-version: latest-stable
 
@@ -73,11 +73,11 @@ jobs:
       #  run: pio run -e TRMNL_X -j ${{ runner.os == 'Windows' && '1' || '4' }} -v
 
       - name: test
-        if: matrix.os != 'windows-latest'
+        if: runner.os != 'Windows'
         run: pio test -e native -v
 
       - name: test (windows)
-        if: matrix.os == 'windows-latest'
+        if: runner.os == 'Windows'
         run: pio test -e native-windows -v
 
       - name: static analysis
