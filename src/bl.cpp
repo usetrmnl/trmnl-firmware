@@ -2009,7 +2009,8 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           {
             Log.info("Rewind PNG\n\r");
             buffer = display_read_file(last_dot_file.c_str(), &file_size);
-            image_proccess_response = PNG_NO_ERR; // DEBUG
+            // NULL without a previous image: nothing to show
+            image_proccess_response = buffer ? PNG_NO_ERR : PNG_WRONG_FORMAT;
           }
 
           if (file_check_bmp)
