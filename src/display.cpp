@@ -51,6 +51,7 @@ const TRMNL_DEVICE device_list[] =
   "og_gen2_4clr",  6,    1,     4,   2,    5,   0,    11,   12,   3,     0xff, 0xff,    BATT_BQ27427,  EPD_75_4CLR, // fake battery == 0xff
   "xteink_x4",     8,    10,    21,  5,    4,   6,    0xff, 0xff, 3,     0xff, 0xff,    BATT_ADC,  EPD_426,
   "xteink_x3",     8,    10,    21,  5,    4,   6,    20,   0,    3,     0xff, 0xff,    BATT_BQ27220,  EPD_368,
+  "xteink_x3_uc8279", 8, 10,    21,  5,    4,   6,    20,   0,    3,     0xff, 0xff,    BATT_BQ27220,  EPD_368_UC8279,
   "waveshare",     13,   14,    15,  26,   27,  25,   0xff, 0xff, 33,    0xff, 0xff,    BATT_ADC,  EPD_75,
   "waveshare_397", 11,   12,    10,  46,   9,   3,    41,   42,   0,     0xff, 0xff,    BATT_AXP2101,  EPD_397,
   "seeed_sticky",  13,   14,    15,  17,   16,  18,   1,    0,    4,     0xff, 0xff,    BATT_BQ27220,  EPD_397,  
@@ -74,7 +75,7 @@ const TRMNL_DEVICE device_list[] =
 
 // TRMNL SPI ePaper panel types list. The list order is fixed and based on enumerated values
 // N.B. ALWAYS ADD NEW PANELS TO THE END OF THE LIST
-const DISPLAY_PROFILE dpList[12][3] = { // 1-bit and 2-bit display types for each profile
+const DISPLAY_PROFILE dpList[13][3] = { // 1-bit and 2-bit display types for each profile
     {{EP75_800x480, EP75_800x480_4GRAY}, {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, {EP75_800x480, EP75_800x480_4GRAY_V2}},
     {{EP426_800x480, EP426_800x480_4GRAY}, {EP426_800x480, EP426_800x480_4GRAY}, {EP426_800x480, EP426_800x480_4GRAY}},
     {{EP397_800x480, EP397_800x480_4GRAY}, {EP397_800x480, EP397_800x480_4GRAY}, {EP397_800x480, EP397_800x480_4GRAY}},
@@ -88,6 +89,9 @@ const DISPLAY_PROFILE dpList[12][3] = { // 1-bit and 2-bit display types for eac
     {{EPD_M5_PAPER_COLOR, EPD_M5_PAPER_COLOR},{EPD_M5_PAPER_COLOR, EPD_M5_PAPER_COLOR},{EPD_M5_PAPER_COLOR, EPD_M5_PAPER_COLOR}},
     {{EPD_SEEED_E1004, EPD_SEEED_E1004},{EPD_SEEED_E1004, EPD_SEEED_E1004},{EPD_SEEED_E1004, EPD_SEEED_E1004}},
     {{EP368_792x528, EP368_792x528_4GRAY}, {EP368_792x528, EP368_792x528_4GRAY}, {EP368_792x528, EP368_792x528_4GRAY}},
+#ifdef BOARD_XTEINK_X3 // the other envs pin bb_epaper versions without the UC8279 panels
+    {{EP368_792x528_UC8279, EP368_792x528_UC8279_4GRAY}, {EP368_792x528_UC8279, EP368_792x528_UC8279_4GRAY}, {EP368_792x528_UC8279, EP368_792x528_UC8279_4GRAY}},
+#endif
 #endif
 };
 uint8_t u8SpectraPal[512]; // RGB333 mapped to closest Spectra6 color
@@ -239,19 +243,93 @@ String display_panel_rev_string(void)
     return String(sz);
 } /* display_panel_rev_string() */
 
-void hw_config_init(void)
+#ifdef BOARD_XTEINK_X3
+/**
+ * @brief Xteink ships the X3 with either a UC8253 or a UC8279d panel controller on the same board.
+ * Follows the stock firmware's detection: reset, wait for BUSY, then read 3 bytes of REV (0x70)
+ * sampling SDA while SCK is high. The UC8279d answers 0x66 in the third byte.
+ * @param pDev device entry providing the EPD pins
+ * @return true if the panel is driven by a UC8279d
+ */
+static bool x3_has_uc8279(const TRMNL_DEVICE *pDev)
+{
+    uint8_t u8Rev[3] = {0};
+
+    pinMode(pDev->epd_cs_pin, OUTPUT);
+    digitalWrite(pDev->epd_cs_pin, 1);
+    pinMode(pDev->epd_sck_pin, OUTPUT);
+    digitalWrite(pDev->epd_sck_pin, 0);
+    pinMode(pDev->epd_dc_pin, OUTPUT);
+    pinMode(pDev->epd_mosi_pin, OUTPUT);
+    pinMode(pDev->epd_busy_pin, INPUT);
+    pinMode(pDev->epd_rst_pin, OUTPUT);
+    digitalWrite(pDev->epd_rst_pin, 1);
+    delay(10);
+    digitalWrite(pDev->epd_rst_pin, 0);
+    delay(50);
+    digitalWrite(pDev->epd_rst_pin, 1);
+    delay(50);
+    const unsigned long ulStart = millis();
+    while (digitalRead(pDev->epd_busy_pin) == 0 && millis() - ulStart < 300) {
+        delay(1);
+    }
+
+    digitalWrite(pDev->epd_cs_pin, 0);
+    digitalWrite(pDev->epd_dc_pin, 0);
+    for (int i = 0; i < 8; i++) {
+        digitalWrite(pDev->epd_mosi_pin, (0x70 << i) & 0x80 ? 1 : 0);
+        digitalWrite(pDev->epd_sck_pin, 1);
+        delayMicroseconds(1);
+        digitalWrite(pDev->epd_sck_pin, 0);
+        delayMicroseconds(1);
+    }
+    digitalWrite(pDev->epd_dc_pin, 1);
+    pinMode(pDev->epd_mosi_pin, INPUT);
+    delayMicroseconds(2);
+    for (int i = 0; i < 3; i++) {
+        for (int bit = 0; bit < 8; bit++) {
+            digitalWrite(pDev->epd_sck_pin, 0);
+            delayMicroseconds(1);
+            digitalWrite(pDev->epd_sck_pin, 1);
+            delayMicroseconds(1);
+            u8Rev[i] = (u8Rev[i] << 1) | digitalRead(pDev->epd_mosi_pin);
+        }
+        digitalWrite(pDev->epd_sck_pin, 0);
+        delayMicroseconds(1);
+    }
+    digitalWrite(pDev->epd_cs_pin, 1);
+    pinMode(pDev->epd_mosi_pin, OUTPUT);
+    Log_info("X3 panel REV = %02x %02x %02x", u8Rev[0], u8Rev[1], u8Rev[2]);
+    return u8Rev[2] == 0x66;
+} /* x3_has_uc8279() */
+#endif // BOARD_XTEINK_X3
+
+static TRMNL_DEVICE *find_device(const char *szName)
 {
     int i = 0;
-    // Match the device name with the configuration in the list
-    while (device_list[i].device_name && strcmp(device_list[i].device_name, DEVICE_MODEL) != 0) {
+    while (device_list[i].device_name && strcmp(device_list[i].device_name, szName) != 0) {
         i++;
     }
-    if (device_list[i].device_name) {
-        Log_info("Found device model at index %d\n", i);
-        pDevice = (TRMNL_DEVICE *)&device_list[i];
-    } else {
-        Log_info("Device name (%s) not found in supported list!", DEVICE_MODEL);
+    if (!device_list[i].device_name) {
+        return NULL;
     }
+    Log_info("Found device model %s at index %d\n", szName, i);
+    return (TRMNL_DEVICE *)&device_list[i];
+} /* find_device() */
+
+void hw_config_init(void)
+{
+    // Match the device name with the configuration in the list
+    pDevice = find_device(DEVICE_MODEL);
+    if (pDevice == NULL) {
+        Log_info("Device name (%s) not found in supported list!", DEVICE_MODEL);
+        return;
+    }
+#ifdef BOARD_XTEINK_X3
+    if (x3_has_uc8279(pDevice)) {
+        pDevice = find_device("xteink_x3_uc8279");
+    }
+#endif
 } /* hw_config_init() */
 
 /**
