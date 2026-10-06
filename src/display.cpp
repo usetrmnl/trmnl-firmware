@@ -1789,6 +1789,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
             // G5 compressed image
             BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
 #ifdef BB_EPAPER
+            bbep.setMemoryMode(BB_MODE_1BPP); // use 1-bit mode to save memory
             if (bbep.allocBuffer(false) != BBEP_SUCCESS) {
                 Log_info("Error allocating bb_epaper frame buffer");
                 return;
@@ -1879,7 +1880,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
         // Seeed Sticky: fast refresh on this panel isn't working and full refresh = fast
         iRefreshMode = REFRESH_FULL;
     }
-    if (!display_update_epaper(iRefreshMode, bWait)) {
+    if (!display_update_epaper(iRefreshMode, bWait, bAlloc)) {
         Log_error("display_show_image: e-paper update failed");
         if (bAlloc) {
             bbep.freeBuffer();
@@ -1972,6 +1973,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
     Log_info("display_show_msg start");
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef BB_EPAPER
+    bbep.setMemoryMode(BB_MODE_1BPP); // use 1-bit mode to save memory
     bbep.allocBuffer(false);
 #else
     bbep.setMode(BB_MODE_1BPP); // message screens are 1-bit
@@ -2491,6 +2493,7 @@ void display_show_msg_qa(const float *voltage, const float *temperature, bool qa
     Log_info("display_show_msg start");
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef BB_EPAPER
+    bbep.setMemoryMode(BB_MODE_1BPP); // use 1-bit mode to save memory
     bbep.allocBuffer(false);
     bbep.fillScreen(BBEP_WHITE); // the results go on a blank screen
 #else
@@ -2582,6 +2585,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     Log_info("Free heap in display_show_msg - %" PRIu32, ESP.getMaxAllocHeap());
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef BB_EPAPER
+    bbep.setMemoryMode(BB_MODE_1BPP); // use 1-bit mode to save memory
     bbep.allocBuffer(false);
     Log_info("Free heap after bbep.allocBuffer() - %" PRIu32, ESP.getMaxAllocHeap());
 #else
