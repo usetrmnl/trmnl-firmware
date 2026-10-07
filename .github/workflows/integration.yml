@@ -35,6 +35,9 @@ jobs:
         include:
           - env: trmnl
             envs: "trmnl:full"
+            # savepoints_spec checks a save point is refused by another build: the BWRY's (it
+            # shares the OG's platform, so it builds quickly after it).
+            also_build: trmnl_4clr
           # The X's own specs and the full general suite take well over half an hour on a 4-vCPU
           # runner, and the load trips wall-clock waits: one example per area instead.
           - env: TRMNL_X
@@ -82,6 +85,10 @@ jobs:
       # (with the ESP32-C5 modem firmware) in post_build_x.py.
       - name: build (${{ matrix.env }})
         run: pio run -e ${{ matrix.env }} -j 4 -v
+
+      - name: build (${{ matrix.also_build }})
+        if: matrix.also_build
+        run: pio run -e ${{ matrix.also_build }} -j 4 -v
 
       # The latest headless release; it finds the chips' ROM ELFs in the rom/ next to it.
       - name: Download trmnl-sim
