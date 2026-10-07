@@ -43,6 +43,11 @@ bundle exec rspec                                     # default ENVS
 bundle exec rspec spec/general/setup/portal_spec.rb:42
 ```
 
+From the firmware checkout, `scripts/spec.sh <env> [rspec args...]` builds one env and runs the
+specs on it with `ENVS=<env>:full`: all of them in parallel, or with arguments (paths,
+`file:line`, `-e`) a single `rspec`. In VS Code, the "Integration specs (active env)" task runs
+it on the PlatformIO env selected in the status bar.
+
 `ENVS` lists PlatformIO environments or families (`core`: the TRMNL-branded devices; `byod`:
 every other board; `all`), each optionally `:full` or `:smoke`. A listed device runs its own
 specs plus the general `:smoke` examples (one per area); `:full` runs every general example on

@@ -1,0 +1,16 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run integration test specs",
+      "detail": "Build and test the current PlatformIO env",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/spec.sh",
+      "args": [
+        "${command:platformio-ide.activeEnvironment}"
+      ],
+      "group": "test",
+      "problemMatcher": []
+    }
+  ]
+}
