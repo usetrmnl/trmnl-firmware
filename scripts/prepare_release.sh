@@ -11,6 +11,7 @@ TRMNL_ENVS=(
 BYOD_ENVS=(
     seeed_xiao_esp32c3
     xteink_x4
+    xteink_x4_pwr_btn
     TRMNL_7inch5_OG_DIY_Kit
     seeed_reTerminal_E1001
     seeed_reTerminal_E1002
