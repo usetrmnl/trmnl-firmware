@@ -1831,13 +1831,12 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
             bmpNormalizePolarity(image_buffer, image_buffer+62, (iBmpWidth / 8) * iBmpHeight); // palette may be [white, black]
             flip_image(image_buffer+62, iBmpWidth, iBmpHeight, false); // fix bottom-up bitmap images
 #ifdef BB_EPAPER
+            bbep.setMemoryMode(BB_MODE_1BPP);
             bbep.setBuffer(image_buffer+62); // uncompressed 1-bpp bitmap
 #endif // BB_EPAPER
         }
 #ifdef BB_EPAPER
-#ifndef BOARD_SEEED_RETERMINAL_E1002
-        bbep.writePlane(); // send image data to the EPD
-#endif // !BOARD_SEEED_RETERMINAL_E1002
+        bbep.writePlane(); // send image data to the EPD (converting it if needed to 4/6-clr)
         iRefreshMode = REFRESH_PARTIAL;
 #endif // BB_EPAPER
         iUpdateCount = 1; // use partial update
