@@ -407,8 +407,9 @@ trmnl_test     integration/test_all  PASSED    00:00:56.488
 
 [trmnl-sim](https://github.com/usetrmnl/trmnl-sim) runs firmware builds without a device, and
 GDB can debug them there: breakpoints, stepping, watchpoints and backtraces, and a crash stops
-at the faulting instruction. With a trmnl-sim checkout next to this one (or `TRMNL_SIM` set to
-it):
+at the faulting instruction. The debug script downloads the latest trmnl-sim release for you
+(macOS arm64 or Linux x86_64) and caches it in `.pio/sim-debug/trmnl-sim`; set
+`TRMNL_SIM_VERSION` (e.g. `v0.3.1`) to pin a release.
 
 1. Open `trmnl.code-workspace` in VS Code and select the env in PlatformIO's status bar.
 2. In the Run and Debug view, start **Debug in simulator**. It builds the env, opens the

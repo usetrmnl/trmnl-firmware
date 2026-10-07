@@ -1,6 +1,6 @@
 {
   // "Debug in simulator" (Run and Debug view) builds PlatformIO's selected env, runs it in the
-  // simulator (scripts/debug_sim.sh, needs a trmnl-sim checkout next to this one or $TRMNL_SIM)
+  // simulator (scripts/debug_sim.sh, downloads the latest trmnl-sim release)
   // and attaches GDB; ending the debug session stops the simulator. Needs the C/C++ extension
   // (ms-vscode.cpptools), which the PlatformIO extension installs.
   "folders": [{ "path": "." }],
