@@ -1,8 +1,8 @@
 name: integration
 
-# Boots real builds in trmnl-sim against mock TRMNL servers and checks them with the RSpec
-# suite in spec/ (see spec/README.md). Called from build.yml, whose build-integration job uploads
-# the firmware it tests (the integration-builds artifact).
+# Builds the firmware, boots it in trmnl-sim against mock TRMNL servers and checks it with the
+# RSpec suite in spec/ (see spec/README.md): one job per env, each building only its own.
+# Called from build.yml.
 
 on:
   workflow_call:
@@ -29,7 +29,6 @@ jobs:
         run: bundle exec rake check
 
   integration:
-    needs: check
     strategy:
       fail-fast: false
       matrix:
@@ -45,16 +44,44 @@ jobs:
 
     name: integration (${{ matrix.env }})
     runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v7
 
-      # The firmware build-integration built (build.yml), into .pio/build/<env> where the specs look.
-      - uses: actions/download-artifact@v7
+      # Each env caches its own PlatformIO core: TRMNL_X's platform (pioarduino) and espressif32
+      # 6.x install different packages under the same names (see prepare_release.sh).
+      - uses: actions/cache@v6
         with:
-          name: integration-builds
-          path: .pio/build
+          path: |
+            ~/.cache/pip
+            ~/.platformio
+            ~/.buildcache
+          key: ${{ runner.os }}-pio-integration-${{ matrix.env }}-${{ hashFiles('platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-integration-${{ matrix.env }}-
+
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: ${{ runner.os }}-ccache-${{ matrix.env }}-${{ hashFiles('platformio.ini') }}
+          job-summary: "" # disabled
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Install PlatformIO Core
+        run: pip install --upgrade platformio==6.1.19
+
+      - name: Configure ccache for PlatformIO
+        run: |
+          echo "PLATFORMIO_BUILD_CACHE_DIR=$HOME/.buildcache" >> $GITHUB_ENV
+
+      # Into .pio/build/<env>, where the specs look. TRMNL_X also fetches its filesystem image
+      # (with the ESP32-C5 modem firmware) in post_build_x.py.
+      - name: build (${{ matrix.env }})
+        run: pio run -e ${{ matrix.env }} -j 4 -v
 
       # The latest headless release; it finds the chips' ROM ELFs in the rom/ next to it.
       - name: Download trmnl-sim
