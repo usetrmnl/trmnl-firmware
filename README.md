@@ -403,6 +403,21 @@ Environment    Test                  Status    Duration
 trmnl_test     integration/test_all  PASSED    00:00:56.488
 ```
 
+### Debugging in the simulator
+
+[trmnl-sim](https://github.com/usetrmnl/trmnl-sim) runs firmware builds without a device, and
+GDB can debug them there: breakpoints, stepping, watchpoints and backtraces, and a crash stops
+at the faulting instruction. With a trmnl-sim checkout next to this one (or `TRMNL_SIM` set to
+it):
+
+1. Open `trmnl.code-workspace` in VS Code and select the env in PlatformIO's status bar.
+2. In the Run and Debug view, start **Debug in simulator**. It builds the env, opens the
+   simulator held at reset, and attaches the debugger, so breakpoints catch the boot.
+   Stopping the debug session stops the simulator.
+
+From a terminal, `scripts/debug_sim.sh <env>` builds and runs the simulator, waiting for GDB on
+127.0.0.1:3333 (`scripts/debug_sim.sh --help`).
+
 ## Code Formatting
 
 We use `clang-format` for formatting C/C++ source files. You can install it [via Homebrew](https://formulae.brew.sh/formula/clang-format) or your package manager of choice - it's part of `llvm`.
