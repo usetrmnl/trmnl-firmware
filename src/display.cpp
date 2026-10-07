@@ -194,7 +194,7 @@ uint32_t get_panel_rev(void)
     if (pDevice->epd_mosi_pin == 0 && pDevice->epd_sck_pin == 0) { // pre-defined PCB+display in bb_epaper; pins unknown
         return 0;
     }
-    if (pDevice->panel_set != EPD_75) { // REV (0x70) is only known to be a harmless read on the 7.5" B/W UC8179
+    if (pDevice->panel_set != EPD_75 && pDevice->panel_set != EPD_368) { // REV (0x70) is only known to be a harmless read on the 7.5" B/W UC8179 and the X3 (the stock X3 firmware reads it too)
         return 0;
     }
 
@@ -243,67 +243,6 @@ String display_panel_rev_string(void)
     return String(sz);
 } /* display_panel_rev_string() */
 
-#ifdef BOARD_XTEINK_X3
-/**
- * @brief Xteink ships the X3 with either a UC8253 or a UC8279d panel controller on the same board.
- * Follows the stock firmware's detection: reset, wait for BUSY, then read 3 bytes of REV (0x70)
- * sampling SDA while SCK is high. The UC8279d answers 0x66 in the third byte.
- * @param pDev device entry providing the EPD pins
- * @return true if the panel is driven by a UC8279d
- */
-static bool x3_has_uc8279(const TRMNL_DEVICE *pDev)
-{
-    uint8_t u8Rev[3] = {0};
-
-    pinMode(pDev->epd_cs_pin, OUTPUT);
-    digitalWrite(pDev->epd_cs_pin, 1);
-    pinMode(pDev->epd_sck_pin, OUTPUT);
-    digitalWrite(pDev->epd_sck_pin, 0);
-    pinMode(pDev->epd_dc_pin, OUTPUT);
-    pinMode(pDev->epd_mosi_pin, OUTPUT);
-    pinMode(pDev->epd_busy_pin, INPUT);
-    pinMode(pDev->epd_rst_pin, OUTPUT);
-    digitalWrite(pDev->epd_rst_pin, 1);
-    delay(10);
-    digitalWrite(pDev->epd_rst_pin, 0);
-    delay(50);
-    digitalWrite(pDev->epd_rst_pin, 1);
-    delay(50);
-    const unsigned long ulStart = millis();
-    while (digitalRead(pDev->epd_busy_pin) == 0 && millis() - ulStart < 300) {
-        delay(1);
-    }
-
-    digitalWrite(pDev->epd_cs_pin, 0);
-    digitalWrite(pDev->epd_dc_pin, 0);
-    for (int i = 0; i < 8; i++) {
-        digitalWrite(pDev->epd_mosi_pin, (0x70 << i) & 0x80 ? 1 : 0);
-        digitalWrite(pDev->epd_sck_pin, 1);
-        delayMicroseconds(1);
-        digitalWrite(pDev->epd_sck_pin, 0);
-        delayMicroseconds(1);
-    }
-    digitalWrite(pDev->epd_dc_pin, 1);
-    pinMode(pDev->epd_mosi_pin, INPUT);
-    delayMicroseconds(2);
-    for (int i = 0; i < 3; i++) {
-        for (int bit = 0; bit < 8; bit++) {
-            digitalWrite(pDev->epd_sck_pin, 0);
-            delayMicroseconds(1);
-            digitalWrite(pDev->epd_sck_pin, 1);
-            delayMicroseconds(1);
-            u8Rev[i] = (u8Rev[i] << 1) | digitalRead(pDev->epd_mosi_pin);
-        }
-        digitalWrite(pDev->epd_sck_pin, 0);
-        delayMicroseconds(1);
-    }
-    digitalWrite(pDev->epd_cs_pin, 1);
-    pinMode(pDev->epd_mosi_pin, OUTPUT);
-    Log_info("X3 panel REV = %02x %02x %02x", u8Rev[0], u8Rev[1], u8Rev[2]);
-    return u8Rev[2] == 0x66;
-} /* x3_has_uc8279() */
-#endif // BOARD_XTEINK_X3
-
 static TRMNL_DEVICE *find_device(const char *szName)
 {
     int i = 0;
@@ -323,13 +262,7 @@ void hw_config_init(void)
     pDevice = find_device(DEVICE_MODEL);
     if (pDevice == NULL) {
         Log_info("Device name (%s) not found in supported list!", DEVICE_MODEL);
-        return;
     }
-#ifdef BOARD_XTEINK_X3
-    if (x3_has_uc8279(pDevice)) {
-        pDevice = find_device("xteink_x3_uc8279");
-    }
-#endif
 } /* hw_config_init() */
 
 /**
@@ -365,6 +298,12 @@ void display_init(void)
         panel_rev = get_panel_rev();
         panel_rev_read = true;
         Log_info("Panel ID = 0x%08x\n", panel_rev);
+#ifdef BOARD_XTEINK_X3
+        // Xteink ships the X3 with a UC8253 or a UC8279d on the same board; the UC8279d reports 0x66 in REV
+        if ((panel_rev & 0xff) == 0x66) {
+            pDevice = find_device("xteink_x3_uc8279");
+        }
+#endif
     }
     if (pDevice->epd_mosi_pin != 0 || pDevice->epd_sck_pin != 0) {
         bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit); // must be set BEFORE calling initio
