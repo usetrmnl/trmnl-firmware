@@ -1220,6 +1220,10 @@ int png_draw_4clr(PNGDRAW *pDraw)
                 *d++ = uc;
             }
         } // for x
+    if (iWidth & 3) { // last partial byte: pad it with white (01) pixels
+        x = 4 - (iWidth & 3); // unused pixels
+        *d = (uint8_t)((uc << (x * 2)) | (0x55 >> ((4 - x) * 2)));
+    }
     bbep.writeData(pTemp, (iWidth+3)/4);
     if (iWidth < bbep.width()) { // fill in missing pixels for images that are narrower than the panel width
         int i = (bbep.width()+3)/4;
@@ -1230,6 +1234,25 @@ int png_draw_4clr(PNGDRAW *pDraw)
     return 1; // continue decoding
 } /* png_draw4clr() */
 #endif // BOARD_TRMNL_4CLR (4 color only)
+
+// The byte of 8 white pixels in the plane data png_draw() writes for iPlane: 1 bits in the
+// 1-bit planes, 0 bits in their inverted copies (the "old" plane, or the red plane of 3-color
+// panels) and in the 4-gray planes (whose pixels are inverted relative to 1-bit).
+static uint8_t png_white_byte(int iPlane)
+{
+    return (iPlane == PNG_1_BIT || iPlane == PNG_2_BIT_BOTH) ? 0xff : 0x00;
+} /* png_white_byte() */
+
+// After png_draw() / png_draw_4clr() have written an image shorter than the panel, fill the rows
+// below it (the panel's address window covers all of it) with white.
+static void png_fill_rows(PNG *png, uint8_t ucWhite, int iPitch)
+{
+    uint8_t *pTemp = bbep.getCache();
+    memset(pTemp, ucWhite, iPitch);
+    for (int y = png->getHeight(); y < bbep.height(); y++) {
+        bbep.writeData(pTemp, iPitch);
+    }
+} /* png_fill_rows() */
 
 int png_draw(PNGDRAW *pDraw)
 {
@@ -1265,7 +1288,7 @@ int png_draw(PNGDRAW *pDraw)
         // 1-bit output, decode the single plane and write it
         if (iPlane == PNG_1_BIT_INVERTED) ucInvert = ~ucInvert; // to do PLANE_FALSE_DIFF
         if (iPlane == PNG_1_BIT_INVERTED && (bbep.capabilities() & BBEP_3COLOR)) { // write the red plane as 0's for this case
-            memset(d, 0, iWidth/8);
+            memset(d, 0, (iWidth+7)/8);
         } else {
             for (x=0; x<iWidth; x+= 8) {
                 d[0] = s[0] ^ ucInvert;
@@ -1295,6 +1318,7 @@ int png_draw(PNGDRAW *pDraw)
                     *d++ = uc;
                 }
             } // for x
+            if (iWidth & 7) *d = uc << (8 - (iWidth & 7)); // last partial byte
         } else { // normal 0/1 split plane
             ucMask = (iPlane == PNG_2_BIT_0) ? 0x40 : 0x80; // lower or upper source bit
             for (x=0; x<iWidth; x++) {
@@ -1311,13 +1335,19 @@ int png_draw(PNGDRAW *pDraw)
                     *d++ = uc;
                 }
             } // for x
+            if (iWidth & 7) *d = uc << (8 - (iWidth & 7)); // last partial byte
         }
+    }
+    uint8_t ucPad = png_white_byte(iPlane);
+    if (iWidth & 7) { // pad the last partial byte with white pixels
+        ucMask = 0xff >> (iWidth & 7); // the unused pixels
+        pTemp[iWidth/8] = (pTemp[iWidth/8] & ~ucMask) | (ucPad & ucMask);
     }
     bbep.writeData(pTemp, (iWidth+7)/8);
     if (iWidth < bbep.width()) { // fill in missing pixels for images that are narrower than the panel width
         int i = (bbep.width()+7)/8;
         i -= ((iWidth+7)/8);
-        memset(pTemp, 0xff, i);
+        memset(pTemp, ucPad, i);
         bbep.writeData(pTemp, i);
     }
     return 1;
@@ -1345,14 +1375,21 @@ static void Expand2bppLineTo4bpp(const uint8_t *src, uint8_t *dest, int width)
     } // for x
 } /* Expand2bppLineTo4bpp() */
 
+// Set by png_to_epd() before decoding: the image is the panel turned to portrait (drawn
+// rotated), and its height (an image smaller than the panel is drawn in its top left corner on
+// white).
+static bool bPngRotated;
+static int iPngHeight;
+
 int png_draw(PNGDRAW *pDraw)
 {
     int x, y = pDraw->y;
     uint8_t uc = 0;
     uint8_t ucMask, ucPixel, src, *s, *d;
-    int iPitch, iBpp;
+    int iPitch, iBpp, iWidth;
 
-    if (y >= bbep.height() && pDraw->iWidth != bbep.height()) return 0; // image is larger than the display (and not rotated), stop decoding it
+    if (y >= bbep.height() && !bPngRotated) return 0; // image is larger than the display (and not rotated), stop decoding it
+    iWidth = (pDraw->iWidth > bbep.width()) ? bbep.width() : pDraw->iWidth; // crop larger images
     if (pDraw->iPixelType == PNG_PIXEL_INDEXED || pDraw->iBpp > 4) { // need to convert through the palette and/or reduce the bpp
         s = bbep.tempBuffer(); // temp space we can use
         iBpp = (pDraw->iBpp > 4) ? 4 : pDraw->iBpp;
@@ -1377,10 +1414,12 @@ int png_draw(PNGDRAW *pDraw)
     }
     iPitch = bbep.width()/2;
     if (iBpp == 1) {
-        if (bbep.width() >= pDraw->iWidth) { // normal orientation
+        if (!bPngRotated) { // normal orientation
             iPitch = (bbep.width() + 7)/8;
             d += y * iPitch; // point to the correct line
-            memcpy(d, s, (pDraw->iWidth+7)/8);
+            memcpy(d, s, (iWidth+7)/8);
+            if (iWidth & 7) d[iWidth/8] |= 0xff >> (iWidth & 7); // white past the image's last pixel
+            memset(&d[(iWidth+7)/8], 0xff, iPitch - (iWidth+7)/8); // white past a narrower image
         } else { // rotated
             uint8_t ucPixel, ucMask, j;
             d += (bbep.height() - 1) * iPitch;
@@ -1402,9 +1441,11 @@ int png_draw(PNGDRAW *pDraw)
             iBpp = 4;
         }
         // 4-bit native format (includes expanded 2-bit)
-        if (bbep.width() == pDraw->iWidth) { // normal orientation
+        if (!bPngRotated) { // normal orientation
             d += y * iPitch; // point to the correct line
-            memcpy(d, s, (pDraw->iWidth+1)/2);
+            memcpy(d, s, (iWidth+1)/2);
+            if (iWidth & 1) d[iWidth/2] |= 0xf; // white past the image's last pixel
+            memset(&d[(iWidth+1)/2], 0xff, iPitch - (iWidth+1)/2); // white past a narrower image
         } else { // rotated
             d += (bbep.height() - 1) * iPitch;
             d += (y / 2);
@@ -1430,6 +1471,10 @@ int png_draw(PNGDRAW *pDraw)
                 } // for x
             }
         }
+    }
+    if (!bPngRotated && y == iPngHeight - 1 && y < bbep.height() - 1) { // white below a shorter image
+        d += iPitch; // the next line (d points to this one)
+        memset(d, 0xff, (bbep.height() - 1 - y) * iPitch);
     }
     return 1;
 } /* png_draw() */
@@ -1661,6 +1706,7 @@ PNG *png = new PNG();
             png->openRAM((uint8_t *)pPNG, iDataSize, png_draw_4clr);
             bbep.startWrite(PLANE_1); // start writing image data
             png->decode(NULL, 0);
+            png_fill_rows(png, 0x55, (bbep.width()+3)/4); // white below a shorter image
             png->close();
             delete(png); // free the decoder instance
             return REFRESH_FULL;
@@ -1682,6 +1728,7 @@ PNG *png = new PNG();
                         Log_info("%s [%d]: Error decoding image = %d\n", __FILE__, __LINE__, png->getLastError());
                     }
                 }
+                png_fill_rows(png, png_white_byte(iPlane), (bbep.width()+7)/8); // white below a shorter image
                 png->close();
                 if (bbep.getPanelType() != EP75_800x480) { // need to write the inverted plane to do PLANE_FALSE_DIFF
                     bbep.startWrite(PLANE_1); // start writing image data to plane 1
@@ -1692,6 +1739,7 @@ PNG *png = new PNG();
                         iPlane = PNG_2_BIT_INVERTED; // inverted 2-bit -> 1-bit to second plane
                     }
                     png->decode(&iPlane, 0);
+                    png_fill_rows(png, png_white_byte(iPlane), (bbep.width()+7)/8);
                 } // temp profile needs the second plane written
             } else { // 2-bpp (or greater, but reduced to 2-bpp)
                 if (pDevice->epd_mosi_pin != 0 || pDevice->epd_sck_pin != 0) {
@@ -1708,12 +1756,14 @@ PNG *png = new PNG();
                 Log_info("%s [%d]: decoding 4-gray plane 0\r\n", __FILE__, __LINE__);
                 png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
                 png->decode(&iPlane, 0); // tell PNGDraw to use bits for plane 0
+                png_fill_rows(png, png_white_byte(iPlane), (bbep.width()+7)/8); // white below a shorter image
                 png->close(); // start over for plane 1
                 iPlane = PNG_2_BIT_1;
                 Log_info("%s [%d]: decoding 4-gray plane 1\r\n", __FILE__, __LINE__);
                 png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
                 bbep.startWrite(PLANE_1); // start writing image data to plane 1
                 png->decode(&iPlane, 0); // decode it again to get plane 1 data
+                png_fill_rows(png, png_white_byte(iPlane), (bbep.width()+7)/8);
             }
 #else // FastEPD
             switch (png->getBpp()) {
@@ -1729,6 +1779,8 @@ PNG *png = new PNG();
                 break;
             }
             Log_info("%s [%d]: FastEPD graphics mode set to: %d\n", __FILE__, __LINE__, bbep.getMode());
+            bPngRotated = (png->getWidth() == bbep.height() && png->getHeight() == bbep.width());
+            iPngHeight = png->getHeight();
             png->decode((void *)bPrevious, 0);
             png->close();
 #endif

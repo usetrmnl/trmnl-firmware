@@ -176,6 +176,60 @@ General.describe "Images" do
       end
     end
 
+    # Images smaller than the panel are drawn from its top left corner on white: png_draw /
+    # png_draw_4clr (display.cpp) pad each row out to the panel's width, png_to_epd the rows below
+    # the image. They're shown over a black screen, so whatever isn't redrawn shows.
+    # `level` is the digit with a 16 px black border along the image's right and bottom edges, and
+    # white outside the image.
+    def small(width, height, black, white)
+      ->(x, y) { x < width && y < height && (seven.(x, y) || x >= width - 16 || y >= height - 16) ? black : white }
+    end
+
+    def show_small(name, level, bits, width:, height:)
+      show("black-#{name}", png(->(_, _) { 0 }, bits), "image/png") do |s|
+        show_next(s, name, png(level, bits, width:, height:))
+        yield s
+      end
+    end
+
+    it "narrower png is padded" do
+      level = small(w - 200, h, 0, 1)
+      show_small("narrow.png", level, 1, width: w - 200, height: h) do |s|
+        expect(s).to show_image(expected(level, 1), tolerance: 64, max_ratio: 0)
+      end
+    end
+
+    it "shorter png is padded" do
+      level = small(w, h - 120, 0, 1)
+      show_small("short.png", level, 1, width: w, height: h - 120) do |s|
+        expect(s).to show_image(expected(level, 1), tolerance: 64, max_ratio: 0)
+      end
+    end
+
+    it "narrower png of a width in part bytes is padded" do
+      level = small(w - 203, h, 0, 1)
+      show_small("narrow-odd.png", level, 1, width: w - 203, height: h) do |s|
+        expect(s).to show_image(expected(level, 1), tolerance: 64, max_ratio: 0)
+      end
+    end
+
+    it "smaller 2bit png with two colors is padded" do
+      level = small(w - 200, h - 120, 0, 3)
+      show_small("small-two-colors.png", level, 2, width: w - 200, height: h - 120) do |s|
+        expect(s).to show_image(expected(level, 2), tolerance: 64, max_ratio: 0)
+      end
+    end
+
+    it "smaller 2bit png with 4 gray levels is padded" do
+      nw = w - 200
+      nh = h - 120
+      edge = small(nw, nh, 0, 3)
+      level = ->(x, y) { x < nw && y < nh && edge.(x, y) == 3 ? [3, x * 4 / nw].min : edge.(x, y) }
+      show_small("small-gray4.png", level, 2, width: nw, height: nh) do |s|
+        expect(s).to show_image(expected(level, 2), tolerance: 48, max_ratio: 0.01)
+      end
+    end
+
     it "corrupt png is not drawn" do
       data = png(digit(0, 1))
       survives("corrupt.png", data.byteslice(0, 40) + zeros(data.bytesize - 40), "image/png")
