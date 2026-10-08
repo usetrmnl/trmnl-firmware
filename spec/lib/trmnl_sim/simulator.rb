@@ -272,6 +272,14 @@ module TrmnlSim
     # The in-memory save points, oldest first.
     def save_points = get_json("/savepoints")["savepoints"]
 
+    # ---- preferences ----------------------------------------------------------------------------------
+
+    # The firmware's NVS preferences in `namespace` as read from flash, as {key => value}
+    # (strings as-is, integers as decimal strings, blobs as hex).
+    def preferences(namespace = "data")
+      get_json("/preferences")["entries"].select { _1["namespace"] == namespace }.to_h { [_1["key"], _1["value"]] }
+    end
+
     # ---- faults ---------------------------------------------------------------------------------------
 
     # Current faults: faults, summary, power_losses, flash (programs, erases),

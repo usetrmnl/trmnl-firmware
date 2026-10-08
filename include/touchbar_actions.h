@@ -3,10 +3,7 @@
 
 // Confirmation-flow orchestration, cached-image cycling, and intent dispatch
 // - the app-level side effects built on top of touchbar_gesture.h.
-
-// Inserts/refreshes new_path in the cached-image playlist order, anchored
-// after prev_path's position. Called whenever a new image is cached.
-void update_playlist_order(const char *new_path, const char *prev_path);
+// Playlist order NVS lives in filesystem.h (update_playlist_order).
 
 // Resolves the current navigation intent and dispatches it. Called once per wake.
 void process_iqs323_data(void);
