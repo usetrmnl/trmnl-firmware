@@ -5,9 +5,11 @@
 #include <api-client/setup.h>
 #include <config.h>
 #include <device_id.h>
+#include <display.h>
 #include <filesystem.h>
 #include <globals.h>
 #include <http_client.h>
+#include <http_utils.h>
 #include <inttypes.h>
 #include <preferences_persistence.h>
 #include <services/device_setup.h>
@@ -42,6 +44,7 @@ void DeviceSetup::performApiSetup() {
   inputs.macAddress = device_mac_address();
   inputs.firmwareVersion = FW_VERSION_STRING;
   inputs.model = String(DEVICE_MODEL);
+  inputs.panelId = display_panel_rev_string();
 
   Log.info("%s [%d]: [HTTPS] begin /api/setup ...\r\n", __FILE__, __LINE__);
   Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
@@ -136,9 +139,11 @@ void DeviceSetup::downloadSetupImage() {
     int httpCode = https->GET();
 
     if (httpCode == HTTP_CODE_PERMANENT_REDIRECT || httpCode == HTTP_CODE_TEMPORARY_REDIRECT) {
+      // the Location may be relative (as in HttpRetryRequest)
+      String redirectUrl = resolveRedirectLocation(https->getLocation(), httpOriginOf(_result.imageUrl));
       https->end();
-      https->begin(https->getLocation());
-      Log_info("Redirected to: %s", https->getLocation().c_str());
+      https->begin(redirectUrl);
+      Log_info("Redirected to: %s", redirectUrl.c_str());
       https->setTimeout(15000);
       https->setConnectTimeout(15000);
       httpCode = https->GET();
@@ -173,7 +178,9 @@ void DeviceSetup::downloadSetupImage() {
       Log_error_submit("Failed to allocate buffer for setup image (%d bytes)", contentSize);
       return false;
     }
-    if (stream->available() && contentSize > 0) {
+    // Not gated on stream->available(): right after the headers the body may not have arrived yet
+    // (often over TLS); downloadStream waits for it.
+    if (contentSize > 0) {
       counter = downloadStream(stream, contentSize, imageBuffer);
     }
 

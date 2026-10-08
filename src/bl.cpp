@@ -1385,6 +1385,7 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   inputs.displayWidth = display_width();
   inputs.displayHeight = display_height();
   inputs.model = DEVICE_MODEL;
+  inputs.panelId = display_panel_rev_string();
   inputs.specialFunction = special_function;
   inputs.imageCached = bUsedCachedImage;
   inputs.prevWakeTime = iPrevWakeTime;
@@ -1467,6 +1468,26 @@ static https_request_err_e downloadAndShow()
         // We just displayed the same image, don't refresh the display
         Log.info("%s [%d]: The image hasn't changed since the last wakeup, don't refresh the display.\r\n", __FILE__, __LINE__);
         buffer = nullptr;
+        return result;
+      }
+      if (!filesystem_file_exists(szTemp)) {
+        // BMPs aren't cached under their filename (e.g. after a sleep special function); redraw /current.bmp
+        buffer = nullptr;
+        size_t current_size = 0;
+        if (filesystem_file_exists("/current.bmp")) {
+          current_size = filesystem_read_and_allocate("/current.bmp", &buffer);
+        }
+        if (!buffer || current_size == 0) {
+          Log_info("%s isn't cached; keeping the current screen", szTemp);
+          if (buffer) free(buffer);
+          buffer = nullptr;
+          return result;
+        }
+        Log_info("%s isn't cached; showing /current.bmp", szTemp);
+        display_show_image(buffer, current_size, true);
+        free(buffer);
+        buffer = nullptr;
+        DisplayedImage::remember(szTemp);
         return result;
       }
       DisplayedImage::remember(szTemp);
@@ -2012,7 +2033,8 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           {
             Log.info("Rewind PNG\n\r");
             buffer = display_read_file(last_dot_file.c_str(), &file_size);
-            image_proccess_response = PNG_NO_ERR; // DEBUG
+            // NULL without a previous image: nothing to show
+            image_proccess_response = buffer ? PNG_NO_ERR : PNG_WRONG_FORMAT;
           }
 
           if (file_check_bmp)
@@ -2313,7 +2335,7 @@ void goToSleep(void)
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
 #endif
-#ifdef BOARD_XTEINK_X4
+#if defined( BOARD_XTEINK_X4 ) || defined ( BOARD_XTEINK_X3 ) 
 // The Xteink X4 has a high current draw in deep sleep (3-4mA), so allow the user to select
 // if they want to completely shut down the power and only update with a physical button press
 // or have short battery life (5-7 days) in the normal TRMNL wakeup mode
