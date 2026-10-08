@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <Preferences.h>
 
 /**
  * @brief Function to delete old versions of plugin images (by comparing the timestamp)
@@ -73,6 +74,17 @@ size_t filesystem_write_to_file(const char *name, uint8_t *in_buffer, size_t siz
  * @return none
  */
 void writeImageToFile(const char *name, uint8_t *in_buffer, size_t size);
+
+/**
+ * @brief Update the X playlist order NVS string after a new image becomes current.
+ *        Refreshes an existing same-plugin entry in place, or inserts after prev_path.
+ *        Drops playlist entries whose files no longer exist (except prev_path).
+ * @param preferences NVS "data" namespace
+ * @param new_path path that is now current
+ * @param prev_path previous current path (may be empty)
+ * @return none
+ */
+void update_playlist_order(Preferences &preferences, const char *new_path, const char *prev_path);
 
 /**
  * @brief Function to shorten a filename (if needed) to fit the SPIFFS file length

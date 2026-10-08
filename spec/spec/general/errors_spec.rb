@@ -106,11 +106,11 @@ General.describe "Errors" do
     end
 
     # WiFi connect failures (wifiErrorDeepSleep, src/sleep_session.cpp:192): the attempt number
-    # is kept in NVS ("wifi_retry", reset to 1 on every successful connect, src/bl.cpp:480), and
+    # is kept in NVS ("wifi_retry", reset to 1 on every successful connect, src/wifi_session.cpp:118), and
     # RefreshInterval::applyWifiRetry (lib/trmnl/src/refresh_interval.cpp:31) stores the sleep:
     # SHORT_TERM_SLOW_RETRY_INTERVAL (300 s) below MAX_QUIET_SLOW_RETRIES (12), else
     # LONG_TERM_SLOW_RETRY_INTERVAL (900 s). Timer wakes don't show the error right away
-    # (should_show_error_now, src/bl.cpp:191).
+    # (should_show_error_now, src/bl.cpp:180).
 
     # Wake on the timer with WiFi out of range; returns the status once asleep again, after
     # checking the attempt number the device logged.
