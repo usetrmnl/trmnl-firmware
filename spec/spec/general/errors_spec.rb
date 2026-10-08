@@ -104,6 +104,66 @@ General.describe "Errors" do
         s.wait_for_deep_sleep
       end
     end
+
+    # WiFi connect failures (wifiErrorDeepSleep, src/sleep_session.cpp:192): the attempt number
+    # is kept in NVS ("wifi_retry", reset to 1 on every successful connect, src/bl.cpp:480), and
+    # RefreshInterval::applyWifiRetry (lib/trmnl/src/refresh_interval.cpp:31) stores the sleep:
+    # SHORT_TERM_SLOW_RETRY_INTERVAL (300 s) below MAX_QUIET_SLOW_RETRIES (12), else
+    # LONG_TERM_SLOW_RETRY_INTERVAL (900 s). Timer wakes don't show the error right away
+    # (should_show_error_now, src/bl.cpp:191).
+
+    # Wake on the timer with WiFi out of range; returns the status once asleep again, after
+    # checking the attempt number the device logged.
+    def wifi_failure(s, attempt)
+      s.wake
+      s.wait(console: /WIFI connection failed! Retry count: #{attempt}\b/, timeout: 240)
+      s.wait(state: "deep_sleep", timeout: 240, settle_ms: 200)["status"]
+    end
+
+    def sleep_s(status) = status["wake_at_s"] - status["sim_time_s"]
+
+    it "wifi failures on timer wakes retry quietly every 5 minutes" do
+      dev.boot_asleep do |s|
+        s.wait_for_deep_sleep
+        # a server rate other than the retry interval, so the retries must replace it
+        dev.mock.display = { image: "default", refresh_rate: 600 }
+        dev.mock.next_request("/api/display", timeout: 90) { s.wake }
+        expect(sleep_s(s.wait_for_deep_sleep)).to be_within(15).of(600)
+        screen = s.screenshot
+        s.set_wifi(false)
+        expect do
+          (1..3).each do |attempt|
+            expect(sleep_s(wifi_failure(s, attempt))).to be_within(15).of(300), "attempt #{attempt}"
+            expect(s).to show_image(screen, tolerance: 0, max_ratio: 0), "attempt #{attempt} redrew the screen"
+          end
+        end.not_to(change { dev.mock.requests.size })
+      end
+    end
+
+    it "wifi failures at the retry limit show the wifi error and sleep longer" do
+      dev.boot_asleep do |s|
+        s.wait_for_deep_sleep
+        screen = s.screenshot
+        s.set_wifi(false)
+        (1..11).each do |attempt|
+          expect(sleep_s(wifi_failure(s, attempt))).to be_within(15).of(300), "attempt #{attempt}"
+          expect(s).to show_image(screen, tolerance: 0, max_ratio: 0), "attempt #{attempt} redrew the screen"
+        end
+        # The 12th shows WIFI_FAILED (not WIFI_RETRY_LIMIT's "press button" screen) and still
+        # arms the timer, for 15 minutes (src/sleep_session.cpp:203).
+        st = wifi_failure(s, 12)
+        expect(st["wake_at_s"]).not_to be_nil, "the timer must still wake it"
+        expect(sleep_s(st)).to be_within(15).of(900)
+        expect(s).not_to show_image(screen, tolerance: 0, max_ratio: 0)
+        # "Can't establish WiFi connection. Will keep trying." (only the X has a golden of it)
+        expect(s).to match_golden("wifi_failed_message.png") if Golden.own_region("wifi_failed_message.png", device)
+        # the count starts over, back on the 5-minute retries
+        expect(sleep_s(wifi_failure(s, 1))).to be_within(15).of(300)
+        s.set_wifi(true)
+        dev.mock.next_request("/api/display", timeout: 120) { s.wake }
+        s.wait_for_deep_sleep(timeout: 120)
+      end
+    end
   end
 
   # Onboarding against a server whose /api/setup misbehaves.
