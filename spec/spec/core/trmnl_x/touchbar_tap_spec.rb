@@ -45,13 +45,14 @@ RSpec.describe "TRMNL X touch bar: tap mode", env: "TRMNL_X" do
   describe "WifiResetConfirmation" do
     include_context "provisioned X"
 
-    # Boot asleep and ask to reset WiFi; yields the simulator and the console index before.
+    # Ask the X showing "2" (boot_two_images) to reset WiFi; yields the simulator, the console
+    # index before and the expected screen of "2". A cancel (or no answer) redraws the image the
+    # prompt covered, then sleeps (showLastImageAndSleep, src/touchbar_actions.cpp:100).
     def ask
-      dev.boot_asleep do |s|
-        s.wait(state: "deep_sleep", timeout: 15)
+      boot_two_images do |s, _one, two|
         c = s.status["console_total"]
         TrmnlX.ask_to_reset_wifi(s, c)
-        yield s, c
+        yield s, c, two
       end
     end
 
@@ -63,26 +64,29 @@ RSpec.describe "TRMNL X touch bar: tap mode", env: "TRMNL_X" do
     end
 
     it "tapping an edge cancels" do
-      ask do |s, c|
+      ask do |s, c, two|
         s.touch("left", ms: 150)
         s.wait(console: /Confirmation cancelled - outer button/, since: c, timeout: 15)
-        st = s.wait(state: "deep_sleep", timeout: 15)["status"]
+        st = s.wait(state: "deep_sleep", timeout: 15, settle_ms: 500)["status"]
         expect(st["portal_url"]).to be_nil
+        expect(s).to show_image(two, tolerance: 64, max_ratio: 0)
       end
     end
 
     it "tapping the middle cancels" do
-      ask do |s, c|
+      ask do |s, c, two|
         s.touch("center", ms: 150)
         s.wait(console: /Confirmation cancelled - tap on middle/, since: c, timeout: 15)
-        s.wait(state: "deep_sleep", timeout: 15)
+        s.wait(state: "deep_sleep", timeout: 15, settle_ms: 500)
+        expect(s).to show_image(two, tolerance: 64, max_ratio: 0)
       end
     end
 
     it "no answer cancels after 15 seconds" do
-      ask do |s, c|
+      ask do |s, c, two|
         s.wait(console: /Confirmation timeout - cancelling/, since: c, timeout: 15)
-        s.wait(state: "deep_sleep", timeout: 15)
+        s.wait(state: "deep_sleep", timeout: 15, settle_ms: 500)
+        expect(s).to show_image(two, tolerance: 64, max_ratio: 0)
       end
     end
   end

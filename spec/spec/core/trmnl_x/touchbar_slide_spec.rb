@@ -78,11 +78,23 @@ RSpec.describe "TRMNL X touch bar: slide mode", env: "TRMNL_X" do
       end
     end
 
+    # The mode only reaches the IQS323 on the way to sleep: goToSleep writes it
+    # (touchbar_prepare_for_sleep, src/sleep_session.cpp:53) between preparing the controller
+    # and stopping its task, and setGestureConfig(tap) drops swipes from GESTURE_SELECT (0x09,
+    # lib/IQS323/IQS323.cpp:691). So once the server picks tap mode, the slide config the
+    # controller slept with before is gone and a swipe no longer wakes the X.
     it "goes back to tap mode" do
       boot_two_images("slide") do |s, one|
         dev.mock.display = { image: "two", refresh_rate: 300, touchbar_mode: "tap" }
         dev.mock.next_request("/api/display", timeout: 15) { s.wake }
         s.wait(state: "deep_sleep", timeout: 15, settle_ms: 500)
+        boots = s.status["boot_count"]
+        n = dev.mock.cursor
+        s.gesture("swipe_back")
+        t0 = s.status["sim_time_s"]
+        sleep 0.1 while s.status["sim_time_s"] < t0 + 2
+        expect(s.status.values_at("state", "boot_count")).to eq(["deep_sleep", boots])
+        expect(dev.mock.cursor).to eq(n)
         touch_and_sleep(s, "left", 150, /Back button tapped/)
         expect(s).to show_image(one, tolerance: 64, max_ratio: 0)
       end
