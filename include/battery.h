@@ -2,6 +2,8 @@
 
 #include <stdint.h>
 
+#include "config.h"
+
 //
 // derive device-specific battery flags
 //
@@ -16,36 +18,14 @@ public:
 
   /// @brief Read the battery voltage.
   /// @return voltage in Volts, or a negative value if the reading failed
+  virtual float readVoltage(TRMNL_DEVICE *pDevice) = 0;
   virtual float readVoltage() = 0;
 };
-
-/// @brief Reports a fixed 4.2 V on boards with no battery sense hardware
-///        (FAKE_BATTERY_VOLTAGE).
-class FakeBattery : public BaseBattery {
-public:
-  float readVoltage() override;
-};
-
 /// @brief Reads the battery through a 1:2 resistor divider on an ADC pin.
 class ADCBattery : public BaseBattery {
 public:
-  explicit ADCBattery(uint8_t pin);
+  float readVoltage(TRMNL_DEVICE *pDevice) override;
   float readVoltage() override;
-
-private:
-  uint8_t _pin;
-};
-
-/// @brief Seeed boards gate the battery divider behind a load switch that must
-///        be enabled before sampling the ADC (and disabled after to save power).
-class SeeedBattery : public ADCBattery {
-public:
-  SeeedBattery(uint8_t pin, uint8_t switchPin, uint8_t switchOnLevel);
-  float readVoltage() override;
-
-private:
-  uint8_t _switchPin;
-  uint8_t _switchOnLevel;
 };
 
 #ifdef INCLUDE_BQ27427
@@ -55,6 +35,7 @@ class BQ27427Battery : public BaseBattery {
 public:
   /// @brief Battery voltage from the last gaugeInit() snapshot.
   /// @return voltage in Volts, or a negative value if the last reading failed
+  float readVoltage(TRMNL_DEVICE *pDevice) override { return 0.0f; }
   float readVoltage() override { return _voltage; } // V
 
   /// @brief Connects to the BQ27427 gas gauge, (re)configures it if needed,
@@ -69,6 +50,15 @@ public:
   int readCapacityRemain() const { return _capacityRemain; } // mAh
   int readCapacityFull() const { return _capacityFull; }     // mAh
 
+  /// @brief Real gas-gauge (Impedance Track) readings, gathered alongside the
+  ///        approximated values when BYPASS_BQ27427_SOC is active, purely for
+  ///        comparison/data-gathering. Equal to the readSoc()/etc. values
+  ///        above when the bypass isn't active.
+  int readGaugeSoc() const { return _gaugeSoc; }                     // %
+  int readGaugeHealth() const { return _gaugeHealth; }               // %
+  int readGaugeCapacityRemain() const { return _gaugeCapacityRemain; } // mAh
+  int readGaugeCapacityFull() const { return _gaugeCapacityFull; }     // mAh
+
 private:
   int _soc = -1;
   int _health = -1;
@@ -77,6 +67,11 @@ private:
   int _capacityRemain = -1;
   int _capacityFull = -1;
   float _voltage = -1;
+
+  int _gaugeSoc = -1;
+  int _gaugeHealth = -1;
+  int _gaugeCapacityRemain = -1;
+  int _gaugeCapacityFull = -1;
 };
 #endif // INCLUDE_BQ27427
 

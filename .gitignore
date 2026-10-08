@@ -8,6 +8,7 @@
 .vscode/ipch
 .idea
 .vscode/settings.json
+__pycache__
 
 # Per-target ESP-IDF sdkconfigs are committed under sdkconfigs/.
 # Ignore any sdkconfig.* generated at the repo root (legacy / non-redirected envs).
