@@ -193,6 +193,26 @@ General.describe "Images" do
       end
     end
 
+    it "plugin image shown again is redrawn from the cache" do
+      # A new PNG is drawn first and written to flash under its filename afterwards
+      # (downloadAndShow in bl.cpp); when the server names it again after another image, the
+      # device finds it there (filesystem_fixed_file_exists) and redraws it without downloading.
+      one = digit(0, 1, "1")
+      path = serve("cached1.png", png(one), "image/png")
+      first = dev.mock.display.dup
+      boot_and_fetch(path) do |s|
+        two = digit(0, 1, "2")
+        show_next(s, "cached2.png", png(two))
+        expect(s).to show_image(expected(two, 1), tolerance: 64, max_ratio: 0)
+        n = dev.mock.cursor
+        dev.mock.display = first
+        dev.mock.next_request("/api/display", timeout: 90) { s.wake }
+        s.wait(state: "deep_sleep", display_idle: true, timeout: 90, settle_ms: 200)
+        expect(dev.mock.paths.drop(n)).to eq(["/api/display"])
+        expect(s).to show_image(expected(one, 1), tolerance: 64, max_ratio: 0)
+      end
+    end
+
     it "new version of a plugin image replaces the cached one" do
       m = dev.mock
       old = png(digit(0, 1, "1"))
