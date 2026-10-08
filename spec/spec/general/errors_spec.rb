@@ -177,6 +177,46 @@ General.describe "Errors" do
       end
     end
 
+    it "unregistered mac shows the server's image" do
+      # with an image_url the device downloads it like the setup logo and shows it instead of
+      # the message (DeviceSetup::perform, bl_init)
+      path, expected = device_image(mock, "unregistered", device_number("7"))
+      mock.setup = nil
+      mock.set_fault("/api/setup", body: JSON.generate({ status: 404, api_key: nil, friendly_id: nil,
+                                                         image_url: mock.device_url + path,
+                                                         message: "MAC not registered" }))
+      onboard do |s|
+        mock.wait_for_request(path, timeout: 120)
+        st = settle(s)
+        expect([st["boot_count"], st["state"]]).to eq([1, "deep_sleep"])
+        expect(mock.count("/api/display")).to eq(0)
+        s.wait(display_idle: true, timeout: 60)
+        expect(s).to show_image(expected, tolerance: 64, max_ratio: 0)
+      end
+    end
+
+    it "unregistered after an earlier setup shows the message, not the old logo" do
+      # The first onboarding saves the server's PNG setup logo to flash; the server then resets
+      # the device (reset_firmware), which forgets its credentials but not that file, and its
+      # next /api/setup answers "not registered" without an image.
+      w, h = device.size
+      mock.images["setup.png"] = TrmnlSim::Images.png_image(->(_x, _y) { 0 }, w, h) # all ink
+      mock.setup = { image_url: "#{mock.device_url}/images/setup.png" }
+      mock.display = { image: "default", reset_firmware: true, refresh_rate: 300 }
+      onboard do |s|
+        mock.wait_for_request("/images/setup.png", timeout: 120)
+        mock.wait_for_request("/api/display", timeout: 120)
+        s.wait(portal: true, min_boots: 2, timeout: 120)
+        mock.setup = nil
+        mock.next_request("/api/setup", timeout: 120) do
+          s.portal_connect("TRMNL-Sim", "password", server: mock.device_url)
+        end
+        st = s.wait(state: "deep_sleep", display_idle: true, timeout: 120, settle_ms: 200)["status"]
+        expect(st["boot_count"]).to eq(2)
+        expect_centred_lines(s, 2)
+      end
+    end
+
     it "setup server error" do
       mock.set_fault("/api/setup", status: 500)
       onboard_and_sleep
