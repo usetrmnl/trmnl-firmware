@@ -78,11 +78,15 @@ RSpec.describe "TRMNL X touch bar: slide mode", env: "TRMNL_X" do
       end
     end
 
+    # The answer's touchbar_mode switches the mode and saves it (touchbar_mode, a bool: "1" is
+    # tap) for the next boot to read (src/display_session.cpp:28-34, src/bl.cpp:263).
     it "goes back to tap mode" do
       boot_two_images("slide") do |s, one|
+        expect(s.preferences["touchbar_mode"]).to eq("0")
         dev.mock.display = { image: "two", refresh_rate: 300, touchbar_mode: "tap" }
         dev.mock.next_request("/api/display", timeout: 15) { s.wake }
         s.wait(state: "deep_sleep", timeout: 15, settle_ms: 500)
+        expect(s.preferences["touchbar_mode"]).to eq("1")
         touch_and_sleep(s, "left", 150, /Back button tapped/)
         expect(s).to show_image(one, tolerance: 64, max_ratio: 0)
       end

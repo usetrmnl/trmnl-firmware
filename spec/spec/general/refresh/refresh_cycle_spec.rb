@@ -26,6 +26,21 @@ General.describe "Refresh cycle" do
       end
     end
 
+    # One answer's image, special function and refresh rate all land: handleApiDisplayResponse
+    # (src/display_session.cpp:41-112) saves the function for the next button wake (sf, an
+    # SPECIAL_FUNCTION in lib/trmnl/include/special_function.h) and the rate as refresh_rate.
+    it "applies the image, special function and refresh rate of an answer", :smoke do
+      path, expected = device_image(dev.mock, "three", device_number("3"))
+      dev.mock.display = { image: "three", refresh_rate: 900, special_function: "identify" }
+      dev.boot do |s|
+        dev.mock.wait_for_request(path, timeout: 90)
+        st = s.wait(state: "deep_sleep", display_idle: true, timeout: 120)["status"]
+        expect(s).to show_image(expected, tolerance: 64, max_ratio: 0)
+        expect(st["wake_at_s"] - st["sim_time_s"]).to be_within(15).of(900)
+        expect(s.preferences.values_at("sf", "refresh_rate")).to eq(%w[1 900])
+      end
+    end
+
     it "fetches the next image on a timer wake", :smoke do
       _, expected = device_image(dev.mock, "two", device_number("2"))
       dev.mock.display = { image: "two", refresh_rate: 300 }
