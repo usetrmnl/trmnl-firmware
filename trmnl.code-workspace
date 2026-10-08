@@ -1,7 +1,8 @@
 {
   // "Debug in simulator" (Run and Debug view) builds PlatformIO's selected env, runs it in the
-  // simulator (scripts/debug_sim.sh, downloads the latest trmnl-sim release)
-  // and attaches GDB; ending the debug session stops the simulator. Needs the C/C++ extension
+  // simulator and attaches GDB; ending the debug session stops the simulator. Its tasks are in
+  // .vscode/tasks.json. It lives here rather than in .vscode/launch.json, which PlatformIO
+  // regenerates with machine-specific paths (and is gitignored). Needs the C/C++ extension
   // (ms-vscode.cpptools), which the PlatformIO extension installs.
   "folders": [{ "path": "." }],
   "launch": {
@@ -19,33 +20,6 @@
         "stopAtConnect": false,
         "preLaunchTask": "Simulator: build and run",
         "postDebugTask": "Simulator: stop"
-      }
-    ]
-  },
-  "tasks": {
-    "version": "2.0.0",
-    "tasks": [
-      {
-        "label": "Simulator: build and run",
-        "type": "shell",
-        "command": "${workspaceFolder}/scripts/debug_sim.sh",
-        "args": ["${command:platformio-ide.activeEnvironment}"],
-        "isBackground": true,
-        "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
-        // Ready once the GDB stub listens; a failed build ends the task (and the launch).
-        "problemMatcher": {
-          "owner": "trmnl-sim",
-          "pattern": { "regexp": "^debug_sim\\.sh: (.*)$", "message": 1 },
-          "background": { "activeBegins": true, "beginsPattern": "^", "endsPattern": "GDB stub on" }
-        }
-      },
-      {
-        "label": "Simulator: stop",
-        "type": "shell",
-        "command": "${workspaceFolder}/scripts/debug_sim.sh",
-        "args": ["--stop"],
-        "presentation": { "reveal": "never" },
-        "problemMatcher": []
       }
     ]
   }

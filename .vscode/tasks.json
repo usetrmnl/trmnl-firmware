@@ -11,6 +11,30 @@
       ],
       "group": "test",
       "problemMatcher": []
+    },
+    // Used by "Debug in simulator" (trmnl.code-workspace): builds PlatformIO's selected env and
+    // runs it in the simulator (scripts/debug_sim.sh, downloads the latest trmnl-sim release).
+    {
+      "label": "Simulator: build and run",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/debug_sim.sh",
+      "args": ["${command:platformio-ide.activeEnvironment}"],
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
+      // Ready once the GDB stub listens; a failed build ends the task (and the launch).
+      "problemMatcher": {
+        "owner": "trmnl-sim",
+        "pattern": { "regexp": "^debug_sim\\.sh: (.*)$", "message": 1 },
+        "background": { "activeBegins": true, "beginsPattern": "^", "endsPattern": "GDB stub on" }
+      }
+    },
+    {
+      "label": "Simulator: stop",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/debug_sim.sh",
+      "args": ["--stop"],
+      "presentation": { "reveal": "never" },
+      "problemMatcher": []
     }
   ]
 }
