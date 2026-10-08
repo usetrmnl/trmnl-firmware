@@ -1,6 +1,8 @@
 //
 // Created by Ronak Gothi on 12/09/26.
 //
+#pragma once
+
 #include <ArduinoLog.h>
 #include <Preferences.h>
 #include <api_types.h>

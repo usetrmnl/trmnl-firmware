@@ -37,6 +37,7 @@ bool otg_message = false;
 RTC_DATA_ATTR int iUpdateCount = 0;
 RTC_DATA_ATTR bool bCanDoPartial = false;
 uint32_t iTempProfile;
+uint32_t panel_rev = 0;
 
 #ifdef BOARD_TRMNL_X
 // --- TRMNL X hardware ---

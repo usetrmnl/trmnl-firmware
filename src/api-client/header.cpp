@@ -1,7 +1,5 @@
 #include <api-client/header.h>
 
-extern TRMNL_DEVICE *pDevice;
-
 ApiDisplayInputs createApiHeaders() {
   ApiDisplayInputs inputs;
   char wakeupReasonString[32] = {0};
@@ -32,12 +30,15 @@ ApiDisplayInputs createApiHeaders() {
   WiFiStatus wifi = getWiFiStatus();
   inputs.rssi = wifi.rssi;
   inputs.wifiBand = wifi.band;
-  inputs.batteryVoltage = battery().readVoltage(pDevice);
+  // Not re-read here: the voltage is measured early in boot, before the display and WiFi draw
+  // current (bl.cpp's vBatt), and /api/display fills that reading in (loadApiDisplayInputs).
+  inputs.batteryVoltage = 0.0f;
   inputs.firmwareVersion = String(FW_VERSION_STRING);
   inputs.firmwareCommit = String(FW_COMMIT);
   inputs.displayWidth = display_width();
   inputs.displayHeight = display_height();
   inputs.model = DEVICE_MODEL;
+  inputs.panelId = display_panel_rev_string();
   inputs.specialFunction = special_function;
   inputs.imageCached = bUsedCachedImage;
   inputs.prevWakeTime = iPrevWakeTime;
