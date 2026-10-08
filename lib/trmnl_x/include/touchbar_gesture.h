@@ -30,10 +30,15 @@ typedef touchbar_intent_t (*touchbar_resolve_confirmation_fn)(void);
 // any polling cadence - poll() just timestamps via millis().
 class TouchbarHoldTracker {
 public:
-    // start_reference_ms: 0 = time from first active poll ("live"); or pass
-    // a fixed reference (e.g. startup_time) for boot-relative timing.
-    TouchbarHoldTracker(uint8_t channel_mask, uint32_t threshold_ms, uint32_t start_reference_ms = 0)
-        : channel_mask_(channel_mask), threshold_ms_(threshold_ms), start_reference_ms_(start_reference_ms) {}
+    // Times the hold from the first active poll ("live").
+    TouchbarHoldTracker(uint8_t channel_mask, uint32_t threshold_ms)
+        : channel_mask_(channel_mask), threshold_ms_(threshold_ms) {}
+
+    // Times the hold from a fixed millis() reference instead, e.g. startup_time for
+    // boot-relative timing of a touch that woke the device (startup_time can be 0).
+    TouchbarHoldTracker(uint8_t channel_mask, uint32_t threshold_ms, uint32_t start_reference_ms)
+        : channel_mask_(channel_mask), threshold_ms_(threshold_ms), has_reference_(true),
+          start_reference_ms_(start_reference_ms) {}
 
     // Returns true exactly once, when all tracked channels have been held
     // continuously for >= threshold_ms. Releasing any channel resets it.
@@ -50,7 +55,8 @@ public:
 private:
     uint8_t channel_mask_;
     uint32_t threshold_ms_;
-    uint32_t start_reference_ms_;
+    bool has_reference_ = false;
+    uint32_t start_reference_ms_ = 0;
     bool active_ = false;
     bool fired_ = false;
     uint32_t start_ms_ = 0;
