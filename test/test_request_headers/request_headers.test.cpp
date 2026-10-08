@@ -63,6 +63,20 @@ void test_setup_headers_names_and_order(void) {
   TEST_ASSERT_EQUAL_STRING("og", valueOf(headers, "Model").c_str());
 }
 
+void test_setup_headers_include_panel_id_when_set(void) {
+  ApiSetupInputs inputs;
+  inputs.macAddress = "AA:BB:CC:DD:EE:FF";
+  inputs.firmwareVersion = "1.8.5";
+  inputs.model = "og";
+  inputs.panelId = "0012ab34";
+
+  auto headers = buildSetupHeaders(inputs);
+
+  TEST_ASSERT_EQUAL_UINT32(5, headers.size());
+  TEST_ASSERT_EQUAL_STRING("Panel-Rev", headers[4].first.c_str());
+  TEST_ASSERT_EQUAL_STRING("0012ab34", valueOf(headers, "Panel-Rev").c_str());
+}
+
 // --- buildLogHeaders -------------------------------------------------------
 
 void test_log_headers_names_and_values(void) {
@@ -134,6 +148,18 @@ void test_display_headers_special_function_present_when_set(void) {
   auto headers = buildDisplayHeaders(inputs);
   TEST_ASSERT_TRUE(has(headers, "special_function"));
   TEST_ASSERT_EQUAL_STRING("true", valueOf(headers, "special_function").c_str());
+}
+
+void test_display_headers_panel_id_omitted_when_empty(void) {
+  auto headers = buildDisplayHeaders(makeDisplayInputs());
+  TEST_ASSERT_EQUAL_INT(-1, indexOf(headers, "Panel-Rev"));
+}
+
+void test_display_headers_panel_id_present_when_set(void) {
+  ApiDisplayInputs inputs = makeDisplayInputs();
+  inputs.panelId = "0012ab34";
+  auto headers = buildDisplayHeaders(inputs);
+  TEST_ASSERT_EQUAL_STRING("0012ab34", valueOf(headers, "Panel-Rev").c_str());
 }
 
 void test_display_headers_wifi_band_2_4(void) {
@@ -209,12 +235,15 @@ void tearDown(void) {}
 void process() {
   UNITY_BEGIN();
   RUN_TEST(test_setup_headers_names_and_order);
+  RUN_TEST(test_setup_headers_include_panel_id_when_set);
   RUN_TEST(test_log_headers_names_and_values);
   RUN_TEST(test_display_headers_core_values);
   RUN_TEST(test_display_headers_include_update_source_and_temperature_profile);
   RUN_TEST(test_display_headers_image_cached_reflects_input);
   RUN_TEST(test_display_headers_special_function_omitted_when_none);
   RUN_TEST(test_display_headers_special_function_present_when_set);
+  RUN_TEST(test_display_headers_panel_id_omitted_when_empty);
+  RUN_TEST(test_display_headers_panel_id_present_when_set);
   RUN_TEST(test_display_headers_wifi_band_2_4);
   RUN_TEST(test_display_headers_wifi_band_5);
   RUN_TEST(test_display_headers_wifi_band_omitted_when_empty);

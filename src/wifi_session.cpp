@@ -61,7 +61,7 @@ static void wifiSessionPrepareModem(void) {
     std::vector<ExternalNetwork> nets;
     for (auto &n : modemNets) {
       if (n.ssid == ownApSsid) continue;
-      nets.push_back({n.ssid, n.rssi, n.open, n.is5GHz});
+      nets.push_back({n.ssid, n.rssi, n.open, n.is5GHz, n.enterprise});
     }
     WifiCaptivePortal.setNetworks(nets);
 
@@ -77,7 +77,7 @@ static void wifiSessionPrepareModem(void) {
       std::vector<ExternalNetwork> nets;
       for (auto &n : modemNets) {
         if (n.ssid == ownApSsid) continue;
-        nets.push_back({n.ssid, n.rssi, n.open, n.is5GHz});
+        nets.push_back({n.ssid, n.rssi, n.open, n.is5GHz, n.enterprise});
       }
       return nets;
     });
@@ -90,14 +90,12 @@ static void wifiSessionPrepareModem(void) {
 }
 #endif // BOARD_TRMNL_X
 
-void wifiSessionConnect(void) {
+void wifiSessionConnect(bool should_show_error_now) {
 #ifdef BOARD_TRMNL_X
   wifiSessionPrepareModem();
 #endif
 
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
-
-  MSG current_msg = NONE;
 
 // uncomment this to hardcode WiFi credentials (useful for testing wifi errors, etc.)
 // #define HARDCODED_WIFI
@@ -105,7 +103,7 @@ void wifiSessionConnect(void) {
   WifiCredentials hardcodedCreds = {.ssid = "ssid-goes-here", .pswd = "password-goes-here"};
   Log_info("Hardcoded WiFi: connecting to SSID '%s'", hardcodedCreds.ssid.c_str());
   auto connectResult = WifiCaptivePortal.connect(hardcodedCreds);
-  Log_info("Hardcoded WiFi: connect result '%s'", wifiStatusStr(connectResult.status));
+  Log_info("Hardcoded WiFi: connect result '%s'", wifiStatusStr(connectResult));
 // goToSleep();
 #else
 
@@ -122,9 +120,8 @@ void wifiSessionConnect(void) {
       Log.info("%s [%d]:wifi_connection [DEBUG]: Connected: %s\r\n", __FILE__, __LINE__, ip.c_str());
       preferences.putInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT, 1);
     } else {
-      if (current_msg != WIFI_FAILED) {
+      if (should_show_error_now) {
         showMessageWithLogo(WIFI_FAILED);
-        current_msg = WIFI_FAILED;
       }
 
       Log_fatal_submit("Connection failed! WL Status: %d", WiFi.status());
