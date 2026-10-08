@@ -24,6 +24,7 @@
 // --- Helpers / state still owned by bl.cpp ---
 void submitStoredLogs(void);
 extern unsigned long startup_time;
+extern TRMNL_DEVICE *pDevice;
 
 /**
  * @brief Function to sleep preparing and go to sleep
@@ -35,7 +36,7 @@ void goToSleep(void) {
   submitStoredLogs();
 
 // DEBUG - workaround to prevent crash in the WiFi stack of unknown origin
-#ifndef BOARD_X_CLASS
+#ifndef PARALLEL_EPD
   if (WiFi.status() == WL_CONNECTED) {
     WiFi.disconnect();
   }
@@ -73,16 +74,20 @@ void goToSleep(void) {
   // Configure GPIO pin for wakeup
 #if CONFIG_IDF_TARGET_ESP32
 #define BUTTON_PIN_BITMASK(GPIO) (1ULL << GPIO)  // 2 ^ GPIO_NUMBER in hex
-  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK(PIN_INTERRUPT), ESP_EXT1_WAKEUP_ALL_LOW);
+  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK(pDevice->interrupt_pin), ESP_EXT1_WAKEUP_ALL_LOW);
 #elif defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C5)
-  pinMode(PIN_INTERRUPT, INPUT); // needed to not immediately wake up
-  esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
+  pinMode(pDevice->interrupt_pin, INPUT); // needed to not immediately wake up
+  esp_deep_sleep_enable_gpio_wakeup(1 << pDevice->interrupt_pin, ESP_GPIO_WAKEUP_GPIO_LOW);
 #elif defined(CONFIG_IDF_TARGET_ESP32S3)
+#ifdef BOARD_TRMNL_X
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
+#else
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)pDevice->interrupt_pin, 0);
+#endif
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
 #endif
-#ifdef BOARD_XTEINK_X4
+#if defined(BOARD_XTEINK_X4) || defined(BOARD_XTEINK_X3)
 // The Xteink X4 has a high current draw in deep sleep (3-4mA), so allow the user to select
 // if they want to completely shut down the power and only update with a physical button press
 // or have short battery life (5-7 days) in the normal TRMNL wakeup mode
@@ -108,11 +113,15 @@ void goToSleepButtonOnly(void) {
   preferences.end();
 #if CONFIG_IDF_TARGET_ESP32
 #define BUTTON_PIN_BITMASK_BTN(GPIO) (1ULL << GPIO)
-  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK_BTN(PIN_INTERRUPT), ESP_EXT1_WAKEUP_ALL_LOW);
+  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK_BTN(pDevice->interrupt_pin), ESP_EXT1_WAKEUP_ALL_LOW);
 #elif defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C5)
-  esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
+  esp_deep_sleep_enable_gpio_wakeup(1 << pDevice->interrupt_pin, ESP_GPIO_WAKEUP_GPIO_LOW);
 #elif CONFIG_IDF_TARGET_ESP32S3
+#ifdef BOARD_TRMNL_X
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
+#else
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)pDevice->interrupt_pin, 0);
+#endif
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
 #endif
@@ -189,18 +198,13 @@ void wifiErrorDeepSleep(void) {
 
   Log_info("WIFI connection failed! Retry count: %d \n", retry_count);
 
-  switch (retry_count) {
-  case 1:
-  case 2:
-  case 3:
-    refreshInterval.applyWifiRetry(retry_count);
-    break;
+  refreshInterval.applyWifiRetry(retry_count);
 
-  default:
+  if (retry_count >= MAX_QUIET_SLOW_RETRIES) {
     preferences.putInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT, 1);
-    showMessageWithLogo(WIFI_RETRY_LIMIT);
+    showMessageWithLogo(WIFI_FAILED);
     display_sleep();
-    goToSleepButtonOnly();
+    goToSleep();
     return;
   }
   retry_count++;

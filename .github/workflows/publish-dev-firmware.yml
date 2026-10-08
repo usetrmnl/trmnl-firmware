@@ -8,7 +8,7 @@ on:
 
 jobs:
   publish:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -34,7 +34,7 @@ jobs:
           python-version: "3.x"
 
       - name: Install PlatformIO Core
-        run: pip install --upgrade platformio esptool
+        run: pip install --upgrade platformio==6.1.19 esptool
 
       - name: Build dev firmware (${{ matrix.env }})
         env:

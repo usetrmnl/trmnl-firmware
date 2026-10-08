@@ -12,14 +12,15 @@
 /** Prepare peripherals, enable timer + GPIO wake, enter deep sleep. */
 void goToSleep(void);
 
-/** Deep sleep until button only (no timer); used after Wi-Fi retry limit. */
+/** Deep sleep until button only (no timer). Currently has no callers (wifiErrorDeepSleep now
+ * sleeps on the slow-retry timer at the limit). */
 void goToSleepButtonOnly(void);
 
 /** Float/tristate GPIOs for low power (TRMNL X panel/I2C pins). */
 void config_gpio_for_lp(void);
 
 /**
- * Wi-Fi connect failure: apply retry backoff sleeps, or button-only sleep at the
- * limit (with WIFI_RETRY_LIMIT UI). Does not return on sleep paths.
+ * Wi-Fi connect failure: sleep on the Wi-Fi retry backoff; at MAX_QUIET_SLOW_RETRIES show
+ * WIFI_FAILED and reset the count (still a timed sleep). Does not return.
  */
 void wifiErrorDeepSleep(void);
