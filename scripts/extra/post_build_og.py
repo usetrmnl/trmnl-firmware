@@ -11,7 +11,8 @@ def post_build(source, target, env):
     output = build_dir / "merged_firmware.bin"
 
     subprocess.run([
-        "pio", "pkg", "exec", "-p", "tool-esptoolpy", "esptool.py", "--",
+        # The build's Python: pioarduino installs esptool's dependencies only in its penv.
+        env.subst("$PYTHONEXE"), str(Path(env.PioPlatform().get_package_dir("tool-esptoolpy")) / "esptool.py"),
         "--chip", "ESP32C3",
         "merge_bin",
         "-o", str(output),
