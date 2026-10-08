@@ -56,6 +56,7 @@ extern bool otg_message;
 extern int iUpdateCount;   // RTC: partial updates since the last full refresh
 extern RTC_DATA_ATTR bool bCanDoPartial; // RTC
 extern uint32_t iTempProfile;
+extern uint32_t panel_rev; // EPD revision read by get_panel_rev(); 0 = unknown/not read
 
 #ifdef BOARD_TRMNL_X
 // --- TRMNL X hardware ---
