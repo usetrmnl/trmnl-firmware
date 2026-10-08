@@ -63,12 +63,10 @@ const TRMNL_DEVICE device_list[] =
   "reterminal_e1001", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     1,    21,      BATT_ADC,  EPD_75,
   "reterminal_e1002", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     1,    21,      BATT_ADC,  EPD_75_6CLR,
   "crowpanel42",   0,    0,     0,   0,    0,   0,    0xff, 0xff, 2,     0xff, 0xff,    BATT_NONE, EPD_CROWPANEL, 
-#ifdef CMD_CS1_CS2
   "m5_paper_mono", 0,    0,     0,   0,    0,   0,    47,   48,   2,     0xff, 0xff,    BATT_NONE, EPD_PAPER_MONO, 
   "m5_paper_color", 0,   0,     0,   0,    0,   0,    3,    2,    1,     0xff, 0xff,    BATT_NONE, EPD_PAPER_COLOR, 
   "reterminal_e1004", 0, 0,     0,   0,    0,   0,    0xff, 0xff, 4,     1,    21,      BATT_ADC,  EPD_133_COLOR,
   "trmnl_steam",   7,    8,     6,   10,   5,   4,    21,   20,   2,     3,    0xff,    BATT_ADC,  EPD_583,
-#endif
   NULL,            0,    0,     0,   0,    0,   0,    0,    0,    0,     0,    0,       0,         0,
 }; // device_list
 
@@ -82,13 +80,11 @@ const DISPLAY_PROFILE dpList[12][3] = { // 1-bit and 2-bit display types for eac
     {{EP75YR_800x480, EP75YR_800x480}, {EP75YR_800x480, EP75YR_800x480}, {EP75YR_800x480, EP75YR_800x480}}, 
     {{EP73_SPECTRA_800x480, EP73_SPECTRA_800x480}, {EP73_SPECTRA_800x480, EP73_SPECTRA_800x480}, {EP73_SPECTRA_800x480, EP73_SPECTRA_800x480}},
     {{EPD_CROWPANEL42, EPD_CROWPANEL42_4GRAY},{EPD_CROWPANEL42, EPD_CROWPANEL42_4GRAY},{EPD_CROWPANEL42, EPD_CROWPANEL42_4GRAY}},
-#ifdef CMD_CS1_CS2
     {{EP583_648x480, EP583_648x480_4GRAY}, {EP583_648x480, EP583_648x480_4GRAY}, {EP583_648x480, EP583_648x480_4GRAY}},
     {{EPD_M5_PAPER_MONO, EPD_M5_PAPER_MONO_4GRAY},{EPD_M5_PAPER_MONO, EPD_M5_PAPER_MONO_4GRAY},{EPD_M5_PAPER_MONO, EPD_M5_PAPER_MONO_4GRAY}},
     {{EPD_M5_PAPER_COLOR, EPD_M5_PAPER_COLOR},{EPD_M5_PAPER_COLOR, EPD_M5_PAPER_COLOR},{EPD_M5_PAPER_COLOR, EPD_M5_PAPER_COLOR}},
     {{EPD_SEEED_E1004, EPD_SEEED_E1004},{EPD_SEEED_E1004, EPD_SEEED_E1004},{EPD_SEEED_E1004, EPD_SEEED_E1004}},
     {{EP368_792x528, EP368_792x528_4GRAY}, {EP368_792x528, EP368_792x528_4GRAY}, {EP368_792x528, EP368_792x528_4GRAY}},
-#endif
 };
 uint8_t u8SpectraPal[512]; // RGB333 mapped to closest Spectra6 color
 #endif // !PARALLEL_EPD
@@ -1921,6 +1917,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
             // G5 compressed image
             BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
 #ifdef BB_EPAPER
+            bbep.setMemoryMode(BB_MODE_1BPP); // use 1-bit mode to save memory
             if (bbep.allocBuffer(false) != BBEP_SUCCESS) {
                 Log_info("Error allocating bb_epaper frame buffer");
                 return;
@@ -1966,13 +1963,12 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
             bmpNormalizePolarity(image_buffer, image_buffer+62, (iBmpWidth / 8) * iBmpHeight); // palette may be [white, black]
             flip_image(image_buffer+62, iBmpWidth, iBmpHeight, false); // fix bottom-up bitmap images
 #ifdef BB_EPAPER
+            bbep.setMemoryMode(BB_MODE_1BPP);
             bbep.setBuffer(image_buffer+62); // uncompressed 1-bpp bitmap
 #endif // BB_EPAPER
         }
 #ifdef BB_EPAPER
-#ifndef BOARD_SEEED_RETERMINAL_E1002
-        bbep.writePlane(); // send image data to the EPD
-#endif // !BOARD_SEEED_RETERMINAL_E1002
+        bbep.writePlane(); // send image data to the EPD (converting it if needed to 4/6-clr)
         iRefreshMode = REFRESH_PARTIAL;
 #endif // BB_EPAPER
         iUpdateCount = 1; // use partial update
@@ -2011,7 +2007,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
         // Seeed Sticky: fast refresh on this panel isn't working and full refresh = fast
         iRefreshMode = REFRESH_FULL;
     }
-    if (!display_update_epaper(iRefreshMode, bWait)) {
+    if (!display_update_epaper(iRefreshMode, bWait, bAlloc)) {
         Log_error("display_show_image: e-paper update failed");
         if (bAlloc) {
             bbep.freeBuffer();
@@ -2104,6 +2100,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
     Log_info("display_show_msg start");
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef BB_EPAPER
+    bbep.setMemoryMode(BB_MODE_1BPP); // use 1-bit mode to save memory
     bbep.allocBuffer(false);
 #else
     bbep.setMode(BB_MODE_1BPP); // message screens are 1-bit
@@ -2623,6 +2620,7 @@ void display_show_msg_qa(const float *voltage, const float *temperature, bool qa
     Log_info("display_show_msg start");
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef BB_EPAPER
+    bbep.setMemoryMode(BB_MODE_1BPP); // use 1-bit mode to save memory
     bbep.allocBuffer(false);
     bbep.fillScreen(BBEP_WHITE); // the results go on a blank screen
 #else
@@ -2714,6 +2712,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     Log_info("Free heap in display_show_msg - %" PRIu32, ESP.getMaxAllocHeap());
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef BB_EPAPER
+    bbep.setMemoryMode(BB_MODE_1BPP); // use 1-bit mode to save memory
     bbep.allocBuffer(false);
     Log_info("Free heap after bbep.allocBuffer() - %" PRIu32, ESP.getMaxAllocHeap());
 #else
