@@ -8,14 +8,9 @@ on:
   workflow_dispatch:
 
 jobs:
+  # The firmware itself is built by the integration jobs, one env each, before they test it.
   build-test:
-    strategy:
-      fail-fast: false
-      max-parallel: 3
-      matrix:
-        os: [ubuntu-latest, macos-15, windows-latest]
-
-    runs-on: ${{ matrix.os }}
+    runs-on: blacksmith-4vcpu-ubuntu-2404
 
     timeout-minutes: 30
 
@@ -42,23 +37,12 @@ jobs:
         with:
           python-version: "3.13"
 
-      - uses: maxim-lobanov/setup-xcode@v1
-        if: matrix.os == 'macos-15'
-        with:
-          xcode-version: latest-stable
-
       - name: Install PlatformIO Core
-        run: pip install --upgrade platformio
+        run: pip install --upgrade platformio==6.1.19
 
-      - name: Configure ccache for PlatformIO (Unix)
-        if: runner.os != 'Windows'
+      - name: Configure ccache for PlatformIO
         run: |
           echo "PLATFORMIO_BUILD_CACHE_DIR=$HOME/.buildcache" >> $GITHUB_ENV
-          
-      - name: Configure ccache for PlatformIO (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          echo "PLATFORMIO_BUILD_CACHE_DIR=$env:USERPROFILE\.buildcache" >> $env:GITHUB_ENV
 
       - name: Display PlatformIO Information
         run: |
@@ -66,25 +50,17 @@ jobs:
           g++ --version
           gcc --version
 
-      - name: build (trmnl)
-        run: pio run -j ${{ runner.os == 'Windows' && '1' || '4' }} -v
-
-      #- name: build (TRMNL_X)
-      #  run: pio run -e TRMNL_X -j ${{ runner.os == 'Windows' && '1' || '4' }} -v
-
       - name: test
-        if: matrix.os != 'windows-latest'
         run: pio test -e native -v
-
-      - name: test (windows)
-        if: matrix.os == 'windows-latest'
-        run: pio test -e native-windows -v
 
       - name: static analysis
         run: pio check --skip-packages --fail-on-defect high
 
+  integration:
+    uses: ./.github/workflows/integration.yml
+
   publish-engineering-build:
-    needs: build-test
+    needs: [build-test, integration]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     uses: ./.github/workflows/publish-firmware.yml
     with:
@@ -92,7 +68,7 @@ jobs:
       filename_suffix_type: git_short_hash
 
   publish-tagged-build:
-    needs: build-test
+    needs: [build-test, integration]
     if: startsWith(github.ref, 'refs/tags/')
     uses: ./.github/workflows/publish-firmware.yml
     with:
@@ -100,7 +76,7 @@ jobs:
       filename_suffix_type: git_tag
 
   publish-dev-builds:
-    needs: build-test
+    needs: [build-test, integration]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     uses: ./.github/workflows/publish-dev-firmware.yml
     secrets: inherit

@@ -12,7 +12,8 @@
 /** Prepare peripherals, enable timer + GPIO wake, enter deep sleep. */
 void goToSleep(void);
 
-/** Deep sleep until button only (no timer); used after Wi-Fi retry limit. */
+/** Deep sleep until button only (no timer). Currently has no callers (wifiErrorDeepSleep now
+ * sleeps on the slow-retry timer at the limit). */
 void goToSleepButtonOnly(void);
 
 /** Float/tristate GPIOs for low power (TRMNL X panel/I2C pins). */
