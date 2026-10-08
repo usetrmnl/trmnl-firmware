@@ -43,17 +43,19 @@ RSpec.describe "TRMNL X touch bar: slide mode", env: "TRMNL_X" do
       end
     end
 
-    # The IQS323 reports a tap on release, when the slider coordinate is already 0xFFFF and no
-    # channel is touched, so slide mode also wakes on the touch: the firmware notes the touched
-    # channels, then waits for the gesture (slide_mode_await_gesture in src/bl.cpp).
-    it "taps" do
-      boot_two_images("slide") do |s|
-        { "left" => "Back button pressed", "center" => "Middle button pressed",
-          "right" => "Next button pressed" }.each do |zone, line|
+    # Slide mode wakes only on gesture events, and the IQS323 reports a tap on release, when
+    # the slider coordinate is already 0xFFFF and no channel is touched: the wake can't tell
+    # which zone was tapped (resolve_intent_slide_mode in lib/trmnl_x/src/touchbar_gesture.cpp
+    # needs a touched channel), so a tap anywhere is an ordinary wake that refreshes.
+    it "a tap anywhere refreshes" do
+      boot_two_images("slide") do |s, _one, two|
+        %w[left center right].each do |zone|
           c = s.status["console_total"]
-          s.touch(zone, ms: 150)
-          s.wait(console: line, since: c, timeout: 15)
+          dev.mock.next_request("/api/display", timeout: 15) { s.touch(zone, ms: 150) }
+          s.wait(console: /SLIDER: Tap/, since: c, timeout: 1)
           s.wait(state: "deep_sleep", timeout: 15, settle_ms: 300)
+          expect(s.console(c).grep(/button (tapped|hold)/)).to be_empty
+          expect(s).to show_image(two, tolerance: 64, max_ratio: 0)
         end
       end
     end
