@@ -206,6 +206,20 @@ module TrmnlX
 
     def restore(path, **, &) = TrmnlX.sim(restore: path, host_ports:, **, &)
 
+    # A save point of this X asleep after the block ran on it (booted from the onboarded flash,
+    # served by `mock`), for `restore`. Cached like the onboarding: `inputs` names everything
+    # the block depends on (e.g. the hash of the file it is in).
+    def cached_state(name, inputs = {})
+      dir, = SetupCache.entry("x-state-#{name}", { provisioned: File.basename(cache), **inputs }) do |d|
+        boot do |s|
+          yield s
+          s.save_point(File.join(d, "state.trmnlsave"), label: name)
+        end
+        {}
+      end
+      File.join(dir, "state.trmnlsave")
+    end
+
     def close = mock.close
 
     private
