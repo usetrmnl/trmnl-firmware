@@ -21,7 +21,9 @@ module Golden
       # "Can't establish WiFi connection. Will keep trying." (the X's font has the apostrophe)
       "wifi_failed_message.png" => [480, 1160, 912, 48],
       # "WiFi connected, unable connect to API." and how to retry (tap the touch bar)
-      "api_unable_to_connect.png" => [580, 306, 712, 136]
+      "api_unable_to_connect.png" => [580, 306, 712, 136],
+      # "The image format is incorrect"
+      "format_error.png" => [640, 1184, 592, 64]
     },
     # the 960x540 FastEPD panels: Inter_18 at the OG's rows (the centred logo runs into them)
     "TRMNL_X_PAPERS3" => { "api_unable_to_connect.png" => [0, 304, 960, 144] },

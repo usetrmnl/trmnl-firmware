@@ -1562,7 +1562,11 @@ static https_request_err_e downloadAndShow()
   Log.info("%s [%d]: Received successfully; WiFi off.\r\n", __FILE__, __LINE__);
 
   bool image_reverse = false;
-  if (isPNG || isJPEG)
+  if (isPNG)
+    png_res = parsePNGHeader(buffer, content_size); // the decoder reports nothing back
+  else if (isJPEG)
+    png_res = PNG_NO_ERR;
+  if (png_res == PNG_NO_ERR && (isPNG || isJPEG))
   {
     char szTemp[36];
     filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
@@ -1572,7 +1576,6 @@ static https_request_err_e downloadAndShow()
     filesystem_purge_old_file(szTemp); // try to delete the old version or older than 24h
     writeImageToFile(szTemp, buffer, content_size);
     DisplayedImage::remember(szTemp); // current image becomes the previous image
-    png_res = PNG_NO_ERR; // DEBUG
     String _curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
     String _lastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
     if (!_curPath.isEmpty() && (_curPath != String(szTemp) || _lastPath.isEmpty()))
@@ -1583,13 +1586,14 @@ static https_request_err_e downloadAndShow()
     #endif
     preferences.putString(PREFERENCES_BROWSE_PATH_KEY, String(szTemp));
   }
-  else
+  else if (!isPNG && !isJPEG)
   {
     bmp_res = parseBMPHeader(buffer, image_reverse);
     Log.info("%s [%d]: BMP Parsing result: %d\r\n", __FILE__, __LINE__, bmp_res);
   }
   Serial.println();
   String error = "";
+  String png_error = ""; // its own string: the bmp switch below always runs too and would overwrite it
 
   switch (png_res)
   {
@@ -1607,22 +1611,22 @@ static https_request_err_e downloadAndShow()
   break;
   case PNG_WRONG_FORMAT:
   {
-    error = "Wrong image format. Did not pass signature check";
+    png_error = "Wrong image format. Did not pass signature check";
   }
   break;
   case PNG_BAD_SIZE:
   {
-    error = "IMAGE width, height or size are invalid";
+    png_error = "IMAGE width, height or size are invalid";
   }
   break;
   case PNG_DECODE_ERR:
   {
-    error = "could not decode png image";
+    png_error = "could not decode png image";
   }
   break;
   case PNG_MALLOC_FAILED:
   {
-    error = "could not allocate memory for png image decoder";
+    png_error = "could not allocate memory for png image decoder";
   }
   break;
   default:
@@ -1684,7 +1688,7 @@ static https_request_err_e downloadAndShow()
     char szTemp[36];
     filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
     filesystem_file_delete(szTemp);
-    Log_error_submit("error parsing image file - %s", error.c_str());
+    Log_error_submit("error parsing image file - %s", png_error.c_str());
 
     return HTTPS_WRONG_IMAGE_FORMAT;
   }

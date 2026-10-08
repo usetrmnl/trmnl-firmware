@@ -314,6 +314,14 @@ General.describe "Images" do
   end
 
   describe "Refused" do
+    # A body that isn't a PNG served as image/png (an error page from a proxy or CDN):
+    # parsePNGHeader() refuses it before it is drawn or written to SPIFFS under the plugin's
+    # filename (downloadAndShow, bl.cpp), so it is fetched again next time, and the refusal is
+    # logged. A timer wake keeps the current image and quietly retries; a power-on shows the
+    # format error.
+    let(:html) { "<!DOCTYPE html><html><head><title>502 Bad Gateway</title></head><body>bad gateway</body></html>".b }
+    let(:refusal) { "error parsing image file - Wrong image format. Did not pass signature check" }
+
     it "image too large to download" do
       boot_and_fetch(serve("huge.png", zeros(device.max_image + 5000), "image/png"))
     end
@@ -325,6 +333,43 @@ General.describe "Images" do
       # reads nothing and finishBody() says "No data received".
       log = dev.mock.wait_for_request("/api/log", timeout: 10)
       expect(log.body).to match(/No data received|connection closed mid-download/)
+    end
+
+    it "html served as png keeps the current image and isn't cached" do
+      level = digit(0, 1)
+      show("current.png", png(level), "image/png") do |s|
+        refreshes = s.status["display_refreshes"]
+        path = serve("error.png", html, "image/png")
+        dev.mock.next_request(path, timeout: 90) { s.wake }
+        s.wait(state: "deep_sleep", display_idle: true, timeout: 90, settle_ms: 200)
+        expect(s.status["display_refreshes"]).to eq(refreshes)
+        expect(s).to show_image(expected(level, 1), tolerance: 64, max_ratio: 0)
+
+        # same filename next time: downloaded again (nothing was cached), and the stored refusal
+        # goes up with this wake's logs
+        n = dev.mock.cursor
+        dev.mock.next_request(path, timeout: 90) { s.wake }
+        log = dev.mock.wait_for_request("/api/log", after: n, timeout: 30)
+        expect(log.body).to include(refusal)
+        s.wait(state: "deep_sleep", display_idle: true, timeout: 90, settle_ms: 200)
+        expect(s.status["display_refreshes"]).to eq(refreshes)
+        expect(s).to show_image(expected(level, 1), tolerance: 64, max_ratio: 0)
+      end
+    end
+
+    it "html served as png shows the format error on power-on" do
+      path = serve("error.png", html, "image/png")
+      boot_and_fetch(path) do |s|
+        # "The image format is incorrect"
+        expect(s).to show_message("format_error.png", [240, 380, 320, 32])
+
+        # WiFi is already off when the body is checked: the refusal goes up on the next wake,
+        # which downloads the image again
+        n = dev.mock.cursor
+        dev.mock.next_request(path, timeout: 90) { s.wake }
+        log = dev.mock.wait_for_request("/api/log", after: n, timeout: 30)
+        expect(log.body).to include(refusal)
+      end
     end
 
     it "missing image" do
