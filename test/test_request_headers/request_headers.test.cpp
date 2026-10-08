@@ -233,8 +233,9 @@ void test_format_setup_headers_round_trip(void) {
   // baseUrl intentionally unused by the header builder
 
   String formatted = formatHeaders(buildSetupHeaders(inputs));
-  TEST_ASSERT_EQUAL_STRING("ID: MAC\nContent-Type: application/json\nFW-Version: 9.9.9\nModel: x\nWidth: 0\nHeight: 0\nRSSI: 0",
-                           formatted.c_str());
+  TEST_ASSERT_EQUAL_STRING(
+    "ID: MAC\nContent-Type: application/json\nFW-Version: 9.9.9\nModel: x\nWidth: 0\nHeight: 0\nRSSI: 0",
+    formatted.c_str());
 }
 
 // --- runner ----------------------------------------------------------------

@@ -187,7 +187,9 @@ void DeviceSetup::downloadSetupImage() {
     if (counter == DISPLAY_BMP_IMAGE_SIZE) {
       Log.info("%s [%d]: Received successfully\r\n", __FILE__, __LINE__);
 
-      writeImageToFile("/logo.bmp", imageBuffer, DEFAULT_IMAGE_SIZE);
+      // the whole BMP (header and bitmap): it can be drawn from flash for an unregistered device
+      writeImageToFile("/logo.bmp", imageBuffer, DISPLAY_BMP_IMAGE_SIZE);
+      _result.imagePath = "/logo.bmp";
       free(imageBuffer);
 
       _result.friendlyId = _persistence.readString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
@@ -197,6 +199,7 @@ void DeviceSetup::downloadSetupImage() {
                imageBuffer[2] == 'N' && imageBuffer[3] == 'G') {
       Log.info("%s [%d]: Received PNG setup logo (%d bytes)\r\n", __FILE__, __LINE__, counter);
       writeImageToFile("/logo.png", imageBuffer, counter);
+      _result.imagePath = "/logo.png";
       free(imageBuffer);
 
       _result.friendlyId = _persistence.readString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);

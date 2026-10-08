@@ -1155,10 +1155,15 @@ void bl_init(void)
 
     if (setup.outcome == DeviceSetupOutcome::MacNotRegistered)
     {
+      // The server's image for an unregistered device when it sent one and this run saved it
+      // (not a logo left on flash by an earlier setup), else the server's message under the logo.
       int image_size = 0;
-      uint8_t *image = display_read_file("/logo.png", &image_size);
+      uint8_t *image = setup.imagePath.length() > 0 ? display_read_file(setup.imagePath.c_str(), &image_size) : nullptr;
       if (image)
+      {
         display_show_image(image, image_size, true);
+        free(image);
+      }
       else
         showMessageWithLogo(MAC_NOT_REGISTERED, setup.apiResponse);
       preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
