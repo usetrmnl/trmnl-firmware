@@ -6,6 +6,7 @@
 #include <config.h>
 #include <globals.h>
 #include <messages.h>
+#include <sleep_session.h>
 #include <trmnl_log.h>
 #include <wifi-helpers.h>
 #include <wifi_network.h>
@@ -16,9 +17,6 @@
 #include <touchbar_actions.h>
 #include <vector>
 #endif
-
-// --- Helpers still owned by bl.cpp ---
-void wifiErrorDeepSleep(void);
 
 void wifiSessionInit(void) { WifiCaptivePortal.setHostname(getWifiClientHostname()); }
 
