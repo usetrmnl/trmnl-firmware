@@ -56,7 +56,8 @@ bool connectWithSavedCredentials(void) {
 #ifdef BOARD_TRMNL_X
   if (g_modem) {
     WifiCredentials creds = WifiCaptivePortal.getLastCredentials();
-    if (creds.is5GHz) return g_modem->connectToNetwork(creds.ssid, creds.pswd, getWifiClientHostname());
+    if (creds.is5GHz && !creds.isEnterprise)
+      return g_modem->connectToNetwork(creds.ssid, creds.pswd, getWifiClientHostname());
   }
 #endif
 

@@ -23,6 +23,7 @@ struct ApiSetupInputs {
   String macAddress;
   String firmwareVersion;
   String model;
+  String panelId; // EPD revision as hex; empty = unknown (header omitted)
 };
 
 enum class ApiDisplayOutcome {
@@ -65,10 +66,17 @@ struct ApiDisplayInputs {
   float batteryTemperature;
   int stateOfCharge;
   int stateOfHealth;
+  // Real gas-gauge (Impedance Track) readings, gathered for comparison even
+  // when BYPASS_BQ27427_SOC makes stateOfCharge/etc. above an approximation.
+  int gaugeSoc;
+  int gaugeHealth;
+  int gaugeCapacityRemain;
+  int gaugeCapacityFull;
 #endif
   String firmwareVersion;
   String firmwareCommit;
   String model;
+  String panelId; // EPD revision as hex; empty = unknown (header omitted)
   int rssi;
   String wifiBand;
   int displayWidth;

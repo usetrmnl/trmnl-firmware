@@ -19,7 +19,6 @@
 // --- Helpers / tables still owned by bl.cpp ---
 void writeSpecialFunction(SPECIAL_FUNCTION function);
 void showMessageWithLogo(MSG message_type);
-extern const char *szHTTPErrors[];
 
 https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse) {
   https_request_err_e result = HTTPS_NO_ERR;
@@ -119,7 +118,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse) {
       if (apiResponse.update_firmware && apiResponse.firmware_url.length() > 0) result = HTTPS_SUCCESS;
       if (reset_firmware) result = HTTPS_RESET;
       if (sleep_5_seconds) result = HTTPS_PLUGIN_NOT_ATTACHED;
-      Log.info("%s [%d]: result - %s\r\n", __FILE__, __LINE__, szHTTPErrors[result]);
+      Log.info("%s [%d]: result - %s\r\n", __FILE__, __LINE__, https_request_err_str(result));
     } break;
     case 202: {
       result = HTTPS_NO_REGISTER;
@@ -282,7 +281,6 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse) {
           image_err_e image_proccess_response = PNG_WRONG_FORMAT;
           bmp_err_e bmp_proccess_response = BMP_NOT_BMP;
 
-          // showMessageWithLogo(MSG_FORMAT_ERROR);
           String last_dot_file = filesystem_file_exists("/last.bmp") ? "/last.bmp" : "/last.png";
           if (last_dot_file == "/last.bmp") {
             Log.info("Rewind BMP\n\r");
@@ -292,7 +290,8 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse) {
           } else if (last_dot_file == "/last.png") {
             Log.info("Rewind PNG\n\r");
             buffer = display_read_file(last_dot_file.c_str(), &file_size);
-            image_proccess_response = PNG_NO_ERR; // DEBUG
+            // NULL without a previous image: nothing to show
+            image_proccess_response = buffer ? PNG_NO_ERR : PNG_WRONG_FORMAT;
           }
 
           if (file_check_bmp) {
@@ -366,11 +365,6 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse) {
             Log.info("%s [%d]: send_to_me PNG\r\n", __FILE__, __LINE__);
             image_err_e png_parse_result = PNG_NO_ERR; // DEBUG
             buffer = display_read_file("/current.png", &file_size);
-// Disable partial update for now
-//            if (filesystem_file_exists("/last.png")) {
-//                buffer_old = display_read_file("/last.png", &file_size_old);
-//                Log.info("%s [%d]: loading last PNG for partial update\r\n", __FILE__, __LINE__);
-//            }
             if (png_parse_result != PNG_NO_ERR) {
               Log_error_submit("Error parsing PNG header, code: %d", png_parse_result);
               if (buffer) {
