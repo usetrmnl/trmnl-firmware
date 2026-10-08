@@ -266,7 +266,7 @@ bool TouchbarHoldTracker::poll(uint8_t current_channel_mask)
     if (!active_) {
         active_ = true;
         fired_ = false;
-        start_ms_ = start_reference_ms_ ? start_reference_ms_ : millis();
+        start_ms_ = has_reference_ ? start_reference_ms_ : millis();
     }
 
     if (!fired_ && (millis() - start_ms_ >= threshold_ms_)) {
