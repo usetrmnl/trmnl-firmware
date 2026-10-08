@@ -92,11 +92,16 @@ RSpec.describe "TRMNL X", env: "TRMNL_X" do
     end
 
     # The S3 radio never starts on the modem path, and the server matches devices by this MAC.
-    it "onboarding on 5 GHz sends the device's own MAC to /api/setup" do
+    # /api/setup goes through the modem (DeviceSetupX::callSetupApi) with the same headers.
+    it "onboarding on 5 GHz sends the device's own MAC, panel size and signal to /api/setup" do
       TrmnlSim::MockTrmnl.open do |mock|
         shipped.boot do |s|
           TrmnlX.onboard(s, mock, TrmnlX::SSID_5)
-          expect(mock.wait_for_request("/api/setup")).to have_header("ID", TrmnlX::MAC)
+          req = mock.wait_for_request("/api/setup")
+          expect(req).to have_header("ID", TrmnlX::MAC)
+          expect(req).to have_header("Width", "1872")
+          expect(req).to have_header("Height", "1404")
+          expect(req).to have_header("RSSI", "-48") # the 5 GHz AP, seen by the modem
         end
       end
     end
