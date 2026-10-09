@@ -85,5 +85,19 @@ General.describe "Setup mode" do
         end
       end
     end
+
+    it "onboarding reports the panel size and signal" do
+      # the same Width, Height and RSSI /api/display sends (createApiHeaders, src/api-client/header.cpp)
+      device_mock do |mock|
+        fresh_device do |s|
+          s.portal_connect("TRMNL-Sim", "any-password", server: mock.device_url)
+          setup = mock.wait_for_request("/api/setup", timeout: 60)
+          expect(setup).to have_header("Width", device.width.to_s)
+          expect(setup).to have_header("Height", device.height.to_s)
+          expect(setup).to have_header("RSSI", "-54")
+          s.wait_for_deep_sleep
+        end
+      end
+    end
   end
 end

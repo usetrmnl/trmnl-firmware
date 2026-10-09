@@ -49,6 +49,8 @@ void DeviceSetupX::downloadSetupImage() {
                      DISPLAY_BMP_IMAGE_SIZE);
     filesystem_file_delete("/logo.bmp");
     _result.outcome = DeviceSetupOutcome::ImageDownloadError;
+  } else {
+    _result.imagePath = "/logo.bmp";
   }
   // Show the FRIENDLY_ID screen even when the download failed, matching the
   // original modem-path behavior.

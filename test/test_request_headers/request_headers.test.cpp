@@ -43,28 +43,37 @@ static ApiDisplayInputs makeDisplayInputs() {
 // --- buildSetupHeaders -----------------------------------------------------
 
 void test_setup_headers_names_and_order(void) {
-  ApiSetupInputs inputs;
+  ApiSetupInputs inputs{};
   inputs.baseUrl = "https://example.com";
   inputs.macAddress = "AA:BB:CC:DD:EE:FF";
   inputs.firmwareVersion = "1.8.5";
   inputs.model = "og";
+  inputs.displayWidth = 800;
+  inputs.displayHeight = 480;
+  inputs.rssi = -55;
 
   auto headers = buildSetupHeaders(inputs);
 
-  TEST_ASSERT_EQUAL_UINT32(4, headers.size());
+  TEST_ASSERT_EQUAL_UINT32(7, headers.size());
   TEST_ASSERT_EQUAL_STRING("ID", headers[0].first.c_str());
   TEST_ASSERT_EQUAL_STRING("Content-Type", headers[1].first.c_str());
   TEST_ASSERT_EQUAL_STRING("FW-Version", headers[2].first.c_str());
   TEST_ASSERT_EQUAL_STRING("Model", headers[3].first.c_str());
+  TEST_ASSERT_EQUAL_STRING("Width", headers[4].first.c_str());
+  TEST_ASSERT_EQUAL_STRING("Height", headers[5].first.c_str());
+  TEST_ASSERT_EQUAL_STRING("RSSI", headers[6].first.c_str());
 
   TEST_ASSERT_EQUAL_STRING("AA:BB:CC:DD:EE:FF", valueOf(headers, "ID").c_str());
   TEST_ASSERT_EQUAL_STRING("application/json", valueOf(headers, "Content-Type").c_str());
   TEST_ASSERT_EQUAL_STRING("1.8.5", valueOf(headers, "FW-Version").c_str());
   TEST_ASSERT_EQUAL_STRING("og", valueOf(headers, "Model").c_str());
+  TEST_ASSERT_EQUAL_STRING("800", valueOf(headers, "Width").c_str());
+  TEST_ASSERT_EQUAL_STRING("480", valueOf(headers, "Height").c_str());
+  TEST_ASSERT_EQUAL_STRING("-55", valueOf(headers, "RSSI").c_str());
 }
 
 void test_setup_headers_include_panel_id_when_set(void) {
-  ApiSetupInputs inputs;
+  ApiSetupInputs inputs{};
   inputs.macAddress = "AA:BB:CC:DD:EE:FF";
   inputs.firmwareVersion = "1.8.5";
   inputs.model = "og";
@@ -72,7 +81,7 @@ void test_setup_headers_include_panel_id_when_set(void) {
 
   auto headers = buildSetupHeaders(inputs);
 
-  TEST_ASSERT_EQUAL_UINT32(5, headers.size());
+  TEST_ASSERT_EQUAL_UINT32(8, headers.size());
   TEST_ASSERT_EQUAL_STRING("Panel-Rev", headers[4].first.c_str());
   TEST_ASSERT_EQUAL_STRING("0012ab34", valueOf(headers, "Panel-Rev").c_str());
 }
@@ -217,14 +226,16 @@ void test_format_headers_empty_list_is_empty_string(void) {
 }
 
 void test_format_setup_headers_round_trip(void) {
-  ApiSetupInputs inputs;
+  ApiSetupInputs inputs{};
   inputs.macAddress = "MAC";
   inputs.firmwareVersion = "9.9.9";
   inputs.model = "x";
   // baseUrl intentionally unused by the header builder
 
   String formatted = formatHeaders(buildSetupHeaders(inputs));
-  TEST_ASSERT_EQUAL_STRING("ID: MAC\nContent-Type: application/json\nFW-Version: 9.9.9\nModel: x", formatted.c_str());
+  TEST_ASSERT_EQUAL_STRING(
+    "ID: MAC\nContent-Type: application/json\nFW-Version: 9.9.9\nModel: x\nWidth: 0\nHeight: 0\nRSSI: 0",
+    formatted.c_str());
 }
 
 // --- runner ----------------------------------------------------------------

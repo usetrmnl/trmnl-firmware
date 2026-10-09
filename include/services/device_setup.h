@@ -29,6 +29,7 @@ enum class DeviceSetupOutcome {
 struct DeviceSetupResult {
   DeviceSetupOutcome outcome = DeviceSetupOutcome::RequestError;
   String imageUrl;               // setup image URL from /api/setup
+  String imagePath;              // file the setup image was saved to this run ("": none)
   String message;                // user-facing message from /api/setup
   String friendlyId;             // for the FRIENDLY_ID screen
   ApiSetupResponse apiResponse;  // for the MAC_NOT_REGISTERED screen (404)

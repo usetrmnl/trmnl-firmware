@@ -289,6 +289,19 @@ RSpec.describe "TRMNL X", env: "TRMNL_X" do
         end
       end
     end
+
+    it "onboarding on 5 GHz reports the panel size and signal through the modem" do
+      # /api/setup goes through the modem (DeviceSetupX::callSetupApi) with the same headers
+      TrmnlSim::MockTrmnl.open do |mock|
+        shipped.boot do |s|
+          TrmnlX.onboard(s, mock, TrmnlX::SSID_5)
+          req = mock.wait_for_request("/api/setup")
+          expect(req).to have_header("Width", "1872")
+          expect(req).to have_header("Height", "1404")
+          expect(req).to have_header("RSSI", "-48") # the 5 GHz AP, seen by the modem
+        end
+      end
+    end
   end
 
   # A join that fails leaves the portal up, so the password can be corrected.
