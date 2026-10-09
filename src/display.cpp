@@ -152,6 +152,30 @@ static bool display_update_epaper(int refreshMode, bool wait, bool writePlane = 
     return true;
 }
 
+static void display_select_one_bit_panel(bool only_if_changed = false)
+{
+    bool custom_pins = pDevice->epd_mosi_pin != 0 || pDevice->epd_sck_pin != 0;
+    int one_bit = dpList[pDevice->panel_set][custom_pins ? iTempProfile : 0].OneBit;
+    if (only_if_changed && bbep.getPanelType() == one_bit) {
+        return;
+    }
+    if (custom_pins) {
+        bbep.setPanelType(one_bit);
+        bbep.initIO(pDevice->epd_dc_pin, pDevice->epd_rst_pin, pDevice->epd_busy_pin, pDevice->epd_cs_pin,
+            pDevice->epd_mosi_pin, pDevice->epd_sck_pin, 8000000);
+    } else {
+        bbep.begin(one_bit);
+    }
+}
+
+// Message screens are 1-bit
+static void display_prepare_message(void)
+{
+    display_select_one_bit_panel(true);
+    bbep.setMemoryMode(BB_MODE_1BPP); // use 1-bit mode to save memory
+    bbep.allocBuffer(false);
+}
+
 static void WriteSPIByte(uint8_t data)
 {
   for (int i=0; i<8; i++) {
@@ -1893,13 +1917,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
     }
 #endif
 #ifdef BB_EPAPER
-    if (pDevice->epd_mosi_pin != 0 || pDevice->epd_sck_pin != 0) {
-        bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit);
-        bbep.initIO(pDevice->epd_dc_pin, pDevice->epd_rst_pin, pDevice->epd_busy_pin, pDevice->epd_cs_pin,
-            pDevice->epd_mosi_pin, pDevice->epd_sck_pin, 8000000);
-    } else {
-        bbep.begin(dpList[pDevice->panel_set][0].OneBit);
-    }
+    display_select_one_bit_panel();
 #endif // BB_EPAPER
     if (isPNG == true && data_size < MAX_IMAGE_SIZE)
     {
@@ -2100,8 +2118,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
     Log_info("display_show_msg start");
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef BB_EPAPER
-    bbep.setMemoryMode(BB_MODE_1BPP); // use 1-bit mode to save memory
-    bbep.allocBuffer(false);
+    display_prepare_message();
 #else
     bbep.setMode(BB_MODE_1BPP); // message screens are 1-bit
 #endif
@@ -2620,8 +2637,7 @@ void display_show_msg_qa(const float *voltage, const float *temperature, bool qa
     Log_info("display_show_msg start");
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef BB_EPAPER
-    bbep.setMemoryMode(BB_MODE_1BPP); // use 1-bit mode to save memory
-    bbep.allocBuffer(false);
+    display_prepare_message();
     bbep.fillScreen(BBEP_WHITE); // the results go on a blank screen
 #else
     bbep.setMode(BB_MODE_1BPP);
@@ -2712,8 +2728,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     Log_info("Free heap in display_show_msg - %" PRIu32, ESP.getMaxAllocHeap());
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef BB_EPAPER
-    bbep.setMemoryMode(BB_MODE_1BPP); // use 1-bit mode to save memory
-    bbep.allocBuffer(false);
+    display_prepare_message();
     Log_info("Free heap after bbep.allocBuffer() - %" PRIu32, ESP.getMaxAllocHeap());
 #else
     bbep.setMode(BB_MODE_1BPP); // message screens are 1-bit
