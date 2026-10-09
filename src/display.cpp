@@ -1612,7 +1612,7 @@ int rc = -1; // invalid mode
         int iPitch;
         uint8_t fill=0;
 
-        #ifdef BB_EPAPER
+#ifdef BB_EPAPER
             //bbep.setPanelType(TWO_BIT_PANEL);
             if (!(bbep.capabilities() & (BBEP_3COLOR | BBEP_4COLOR | BBEP_7COLOR))) {
                 Log_info("%s [%d]: Decoding jpeg as 1-bpp dithered\r\n", __FILE__, __LINE__);
@@ -1621,6 +1621,7 @@ int rc = -1; // invalid mode
             }
 #else
             bbep.setMode(BB_MODE_4BPP);
+            bbep.fillScreen(0xf); // fill with white
             Log_info("%s [%d]: Decoding jpeg as 4-bpp dithered\r\n", __FILE__, __LINE__);
             jpg->setPixelType(FOUR_BIT_DITHERED); // request 4-bit dithered output
             bDithered = true;
@@ -1637,7 +1638,9 @@ int rc = -1; // invalid mode
                 fill = 0xff;
                 jpg->setUserPointer((void *)NULL);
                 jpg->decodeDither(pDither, 0);
-            } else { // Do color matching in jpeg_draw()
+            }
+#ifdef BB_EPAPER
+             else { // Do color matching in jpeg_draw()
                 if (bbep.capabilities() & BBEP_4COLOR) {
                     iPitch = (bbep.width() + 3)/4;
                     fill = 0x55; // 2-bit white = 01
@@ -1676,6 +1679,7 @@ int rc = -1; // invalid mode
                     bbep.writeData(d, iPitch);
                 }
             }
+#endif // BB_EPAPER
             jpg->close();
             free(pDither);
 #ifdef BB_EPAPER
