@@ -13,7 +13,6 @@
 #include <stored_logs.h>
 
 #ifdef BOARD_TRMNL_X
-#include "IQS323.h"
 class Modem;
 #endif
 
@@ -48,21 +47,15 @@ extern bool bUsedCachedImage;           // RTC: last image displayed was read fr
 extern uint8_t need_to_refresh_display; // RTC
 extern bool otg_state;                  // RTC: OTG state across deep sleep
 
-// --- UI / input ---
-extern bool touchbar_tap_mode; // false = "slide", true = "tap" (default)
-extern bool otg_message;
-
 // --- Display refresh bookkeeping ---
 extern int iUpdateCount;   // RTC: partial updates since the last full refresh
 extern RTC_DATA_ATTR bool bCanDoPartial; // RTC
 extern uint32_t iTempProfile;
+extern uint32_t panel_rev; // EPD revision read by get_panel_rev(); 0 = unknown/not read
 
 #ifdef BOARD_TRMNL_X
 // --- TRMNL X hardware ---
 extern Modem *g_modem;
 extern battery_count_t battery_count;
 extern bool battery_charging;
-extern IQS323 iqs323;
-extern uint16_t slider_position;
-extern iqs323_gesture_events slider_event;
 #endif // BOARD_TRMNL_X

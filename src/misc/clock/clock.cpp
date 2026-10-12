@@ -44,7 +44,11 @@ bool Clock::sync(Preferences &prefs, const String &ntpServer) {
   bool sync_status = false;
   struct tm timeinfo;
 
-  configTime(0, 0, ntpServer.c_str(), "pool.ntp.org");
+  // SNTP keeps the pointer it is given and resolves the name again on every retry, after this
+  // function (and the caller's String) is gone: hand it storage that stays.
+  static char server[256];
+  strlcpy(server, ntpServer.c_str(), sizeof(server));
+  configTime(0, 0, server, "pool.ntp.org");
 
   waitForSync();
 

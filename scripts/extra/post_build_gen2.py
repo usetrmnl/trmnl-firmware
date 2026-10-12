@@ -1,13 +1,18 @@
 Import("env")
 import subprocess
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(env.subst("$PROJECT_DIR")) / "scripts" / "extra"))
+from versioned_copy import copy_versioned
 
 def post_build(source, target, env):
     build_dir = Path(env.subst("$BUILD_DIR"))
     output = build_dir / "merged_firmware.bin"
 
     subprocess.run([
-        "pio", "pkg", "exec", "-p", "tool-esptoolpy", "esptool.py", "--",
+        # The build's Python: pioarduino installs esptool's dependencies only in its penv.
+        env.subst("$PYTHONEXE"), str(Path(env.PioPlatform().get_package_dir("tool-esptoolpy")) / "esptool.py"),
         "--chip", "ESP32C5",
         "merge_bin",
         "-o", str(output),
@@ -23,3 +28,4 @@ def post_build(source, target, env):
 
 
 env.AddPostAction("$BUILD_DIR/${PROGNAME}.bin", post_build)
+env.AddPostAction("buildprog", lambda source, target, env: copy_versioned(env))

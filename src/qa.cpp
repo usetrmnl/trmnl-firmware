@@ -11,6 +11,7 @@
 #include "logo_small.h"
 #include "pins.h"
 extern TRMNL_DEVICE *pDevice;
+void hw_config_init(void);
 
 extern "C" {
 #include "esp_timer.h"   // esp_timer_get_time()
@@ -213,8 +214,6 @@ bool startQA() {
     Log.info("QA Test started\n");
     attachInterrupt(digitalPinToInterrupt(PIN_INTERRUPT), onBtnPress, FALLING);
 
-    uint8_t *buffer = (uint8_t *)malloc(48000);
-    memset(buffer, 255, 48000);
     display_init();
 
     display_show_msg(const_cast<uint8_t *>(logo_small), QA_START);
@@ -248,7 +247,7 @@ bool startQA() {
 
     Log.info("Displaying results\n");
     display_init();
-    display_show_msg_qa(buffer, voltage, temperature, result);
+    display_show_msg_qa(voltage, temperature, result);
     break;
   }
 
@@ -288,14 +287,14 @@ bool startQA() {
   Serial.begin(115200);
 
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
+  // QA runs before bl_init(), which is where pDevice is normally set up.
+  if (pDevice == NULL) hw_config_init();
   pins_init();
   Log.info("QA Test started\n");
   attachInterrupt(digitalPinToInterrupt(pDevice->interrupt_pin), onBtnPress, FALLING);
 
   while (!stopRequested) {
 
-    uint8_t *buffer = (uint8_t *)malloc(48000);
-    memset(buffer, 255, 48000);
     display_init();
 
   // Disable light sleep before display operation to prevent workflow interruption
@@ -316,7 +315,6 @@ bool startQA() {
 
     if (stopRequested) {
       Log.info("QA test stopped by user\n");
-      free(buffer);
       savePassedTest();
       return true;
     }
@@ -324,7 +322,6 @@ bool startQA() {
     float last_temp = measureTemperatureAverage();
     if (stopRequested) {
       Log.info("QA test stopped by user\n");
-      free(buffer);
       savePassedTest();
       return true;
     }
@@ -332,7 +329,6 @@ bool startQA() {
     float last_voltage = measureVoltageAverage();
     if (stopRequested) {
       Log.info("QA test stopped by user\n");
-      free(buffer);
       savePassedTest();
       return true;
     }
@@ -349,8 +345,7 @@ bool startQA() {
 
     Log.info("Displaying results\n");
     display_init();
-    display_show_msg_qa(buffer, voltage, temperature, result);
-    free(buffer);
+    display_show_msg_qa(voltage, temperature, result);
     break;
   }
 
@@ -377,18 +372,12 @@ bool startQA() {
 
 void testLoadScreen() {
   display_init();
-  uint8_t *buffer = (uint8_t *)malloc(48000);
-  memset(buffer, 255, 48000);
   display_show_msg(const_cast<uint8_t *>(logo_small), QA_START);
-  free(buffer);
 }
 
 void testResultScreen(bool result) {
   display_init();
-  uint8_t *buffer = (uint8_t *)malloc(48000);
-  memset(buffer, 255, 48000);
   float temperature[3] = {0, 0, 0};
   float voltage[3] = {0, 0, 0};
-  display_show_msg_qa(buffer, voltage, temperature, result);
-  free(buffer);
+  display_show_msg_qa(voltage, temperature, result);
 }
