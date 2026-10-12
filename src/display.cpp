@@ -718,13 +718,13 @@ void display_draw_touchbar_indicator(touchbar_side_t side, bool filled)
 // first - tracked here so both the single- and dual-side entry points share
 // one seeded/not-yet-seeded record per side.
 static bool touchbar_side_seeded[3] = { false, false, false };
-#endif // BOARD_X_CLASS
+#endif // PARALLEL_EPD
 
 // Outline is always black with a white ring inset from it; the content area inside the ring
 // fills left-to-right in black as progress goes 0.0 -> 1.0. Only TRMNL X has a touchbar.
 void display_draw_touchbar_progress(touchbar_side_t side, float progress)
 {
-#ifdef BOARD_X_CLASS
+#ifdef BOARD_TRMNL_X
     const int radius = 24;
     const int margin_bottom = 52;
     int w = bbep.width();
@@ -777,7 +777,7 @@ void display_draw_touchbar_progress(touchbar_side_t side, float progress)
         bbep.fillRect(rx, ry, fill_w, rect_h, BBEP_BLACK);
     }
     bbep.partialUpdate(true); // avoid the costly power-cycle each call
-#endif // BOARD_X_CLASS
+#endif // BOARD_TRMNL_X
 }
 
 // Draws two touchbar pills (both corners during a corner-hold gesture) in a
@@ -788,7 +788,7 @@ void display_draw_touchbar_progress(touchbar_side_t side, float progress)
 // visible stagger between them. Only TRMNL X has a touchbar.
 void display_draw_touchbar_progress_pair(touchbar_side_t side_a, float progress_a, touchbar_side_t side_b, float progress_b)
 {
-#ifdef BOARD_X_CLASS
+#ifdef BOARD_TRMNL_X
     const int radius = 24;
     const int margin_bottom = 52;
     int w = bbep.width();
@@ -870,7 +870,7 @@ void display_draw_touchbar_progress_pair(touchbar_side_t side_a, float progress_
         bbep.fillRect(rx_b, ry, fill_w_b, rect_h, BBEP_BLACK);
     }
     bbep.partialUpdate(true); // avoid the costly power-cycle each call
-#endif // BOARD_X_CLASS
+#endif // BOARD_TRMNL_X
 }
 
 /**
