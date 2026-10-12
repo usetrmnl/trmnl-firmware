@@ -4,6 +4,7 @@
 #include <PNGdec.h>
 #include <JPEGDEC.h>
 #include <Preferences.h>
+#include <WiFi.h>
 #include <preferences_persistence.h>
 #include <refresh_interval.h>
 #include "battery_small.h"
@@ -135,8 +136,27 @@ extern BQ27427 lipo; // Use lipo.[] to interact with the library in an Arduino
 static uint8_t *pDither;
 
 #ifdef BB_EPAPER
+static uint8_t bLightSleepWanted = 0;
+
+static void display_apply_light_sleep(uint8_t enabled)
+{
+#ifdef CMD_CS1_CS2
+    bbep.setLightSleep(enabled, pDevice->epd_en_pin);
+#else
+    bbep.setLightSleep(enabled);
+#endif
+}
+
 static bool display_update_epaper(int refreshMode, bool wait, bool writePlane = false, uint8_t plane = PLANE_0)
 {
+#if defined(BOARD_SEEED_RETERMINAL_E1002) || defined(BOARD_SEEED_RETERMINAL_E1004)
+    // Light sleep with the WiFi radio running is unsupported
+    if (bLightSleepWanted && WiFi.getMode() != WIFI_MODE_NULL) {
+        display_apply_light_sleep(false);
+    } else {
+        display_apply_light_sleep(bLightSleepWanted);
+    }
+#endif
     if (writePlane) {
         bbep.writePlane(plane);
     }
@@ -513,11 +533,8 @@ void modem_reset_target(void) {
 void display_set_light_sleep(uint8_t enabled)
 {
 #ifdef BB_EPAPER
-#ifdef CMD_CS1_CS2
-    bbep.setLightSleep(enabled, pDevice->epd_en_pin);
-#else
-    bbep.setLightSleep(enabled);
-#endif
+    bLightSleepWanted = enabled;
+    display_apply_light_sleep(enabled);
 #endif
 }
 
@@ -579,7 +596,7 @@ void display_reset(void)
     Log_info("e-Paper Clear start");
     bbep.fillScreen(BBEP_WHITE);
 #ifdef BB_EPAPER
-    bbep.setLightSleep(true);
+    display_set_light_sleep(true);
     if (!display_update_epaper(apiDisplayResult.response.maximum_compatibility ? REFRESH_FULL : REFRESH_FAST, true)) {
         Log_error("display_reset: e-paper update failed");
     }
@@ -1886,13 +1903,9 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
     }
     Log_info("%s [%d]: EPD refresh mode: %d\r\n", __FILE__, __LINE__, iRefreshMode);
 #ifdef DO_NOT_LIGHT_SLEEP
-    bbep.setLightSleep(false);
+    display_set_light_sleep(false);
 #else
-#ifdef CMD_CS1_CS2
-    bbep.setLightSleep(true, pDevice->epd_en_pin);
-#else
-    bbep.setLightSleep(true);
-#endif
+    display_set_light_sleep(true);
 #endif // DO_NOT_LIGHT_SLEEP
     if (bbep.getPanelType() == EP397_800x480 && iRefreshMode == REFRESH_FAST) {
         // Seeed Sticky: fast refresh on this panel isn't working and full refresh = fast
