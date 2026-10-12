@@ -63,12 +63,12 @@ const TRMNL_DEVICE device_list[] =
   "reterminal_e1001", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     1,    21,      BATT_ADC,  EPD_75,
   "reterminal_e1002", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     1,    21,      BATT_ADC,  EPD_75_6CLR,
   "crowpanel42",   0,    0,     0,   0,    0,   0,    0xff, 0xff, 2,     0xff, 0xff,    BATT_NONE, EPD_CROWPANEL, 
-  "zectrix_note4c", 12,  13,    11,  9,    10,  8,    0xff, 0xff, 0,     3,    0xff,    BATT_ADC,  EPD_42_4CLR,
+  "zectrix_note4c", 12,  13,    11,  9,    10,  8,    0xff, 0xff, 0,     4,    0xff,    BATT_ADC,  EPD_42_4CLR,
   "m5_paper_mono", 0,    0,     0,   0,    0,   0,    47,   48,   2,     0xff, 0xff,    BATT_NONE, EPD_PAPER_MONO, 
   "m5_paper_color", 0,   0,     0,   0,    0,   0,    3,    2,    1,     0xff, 0xff,    BATT_NONE, EPD_PAPER_COLOR, 
   "reterminal_e1004", 0, 0,     0,   0,    0,   0,    0xff, 0xff, 4,     1,    21,      BATT_ADC,  EPD_133_COLOR,
   "trmnl_steam",   7,    8,     6,   10,   5,   4,    21,   20,   2,     3,    0xff,    BATT_ADC,  EPD_583,
-  "zectrix_note4", 12,   13,    11,  9,    10,  8,    0xff, 0xff, 0,     3,    0xff,    BATT_NONE,  EPD_42C,
+  "zectrix_note4", 12,   13,    11,  9,    10,  8,    0xff, 0xff, 0,     4,    0xff,    BATT_ADC,  EPD_42C,
   NULL,            0,    0,     0,   0,    0,   0,    0,    0,    0,     0,    0,       0,         0,
 }; // device_list
 
@@ -1161,8 +1161,20 @@ uint16_t rgb333;
 int png_draw_6clr(PNGDRAW *pDraw)
 {
     uint8_t r=0, g=0, b=0, *s, *pPal, *pPalette = pDraw->pPalette;
-    int x, y, iDelta, iBpp = pDraw->iBpp;
+    int x, y, iWidth, iDelta, iBpp = pDraw->iBpp;
+    bool bRotated = (pDraw->iWidth == bbep.height() && bbep.width() != bbep.height());
+
     y = pDraw->y;
+    if (bRotated) {
+        iWidth = pDraw->iWidth;
+        if (iWidth > bbep.height()) iWidth = bbep.height(); // crop to width of EPD
+        if (y >= bbep.width()) return 0; // past the bottom of the EPD; stop decoding
+    } else {
+        iWidth = pDraw->iWidth;
+        if (iWidth > bbep.width()) iWidth = bbep.width(); // crop to width of EPD
+        if (y >= bbep.height()) return 0;
+    }
+
     switch (pDraw->iPixelType) {
         case PNG_PIXEL_INDEXED:
             break;
@@ -1184,7 +1196,7 @@ int png_draw_6clr(PNGDRAW *pDraw)
     } // switch on pixel type
     iDelta = iBpp/8;
     s = pDraw->pPixels;
-    for (x=0; x<pDraw->iWidth; x++) { // slower code, but less code :)
+    for (x=0; x<iWidth; x++) { // slower code, but less code :)
         switch (iBpp) {
             case 24:
             case 32:
@@ -1249,7 +1261,11 @@ int png_draw_6clr(PNGDRAW *pDraw)
                     if ((x & 7) == 7) s++;
                     break;
             } // switch on bpp
-            bbep.drawPixel(x, y, GetSpectraPixel(r, g, b));
+            if (bRotated) {
+                bbep.drawPixel(bbep.width()-1-y, x, GetSpectraPixel(r, g, b));
+            } else {
+                bbep.drawPixel(x, y, GetSpectraPixel(r, g, b));
+            }
         } // for x
     return 1; // continue decoding
 } /* png_draw_6clr() */
@@ -1263,9 +1279,14 @@ int png_draw_4clr(PNGDRAW *pDraw)
 {
     uint8_t r=0, g=0, b=0, *s, *pPal, *pPalette = pDraw->pPalette;
     int x, iDelta, iBpp = pDraw->iBpp;
+    int iWidth;
     uint8_t uc=0, *d, *pTemp = bbep.getCache(); // get some scratch memory (not from the stack)
 
     d = pTemp;
+    iWidth = pDraw->iWidth;
+    if (iWidth > bbep.width()) iWidth = bbep.width(); // Crop to EPD width if larger
+    if (pDraw->y >= bbep.height()) return 0; // Past the bottom of the EPD; stop decoding
+
     switch (pDraw->iPixelType) {
         case PNG_PIXEL_INDEXED:
             break;
@@ -1287,7 +1308,7 @@ int png_draw_4clr(PNGDRAW *pDraw)
     } // switch on pixel type
     iDelta = iBpp/8;
     s = pDraw->pPixels;
-    for (x=0; x<pDraw->iWidth; x++) { // slower code, but less code :)
+    for (x=0; x<iWidth; x++) { // slower code, but less code :)
         switch (iBpp) {
             case 24:
             case 32:
@@ -1358,7 +1379,14 @@ int png_draw_4clr(PNGDRAW *pDraw)
                 *d++ = uc;
             }
         } // for x
-    bbep.writeData(pTemp, (pDraw->iWidth+3)/4);
+    bbep.writeData(pTemp, (iWidth+3)/4);
+    if (iWidth < bbep.width()) {
+        // fill the unused area of the display with white
+        x = ((bbep.width()+3)/4) - ((iWidth+3)/4); // number of missing bytes
+        d = bbep.getCache();
+        memset(d, 0x55, x); // 0x55 = 4 pixels of white (01)
+        bbep.writeData(d, x);
+    }
     return 1; // continue decoding
 } /* png_draw4clr() */
 #endif // BOARD_TRMNL_4CLR (4 color only)
@@ -1821,6 +1849,7 @@ PNG *png = new PNG();
                     Log_error("%s [%d]: bbep.AllocBuffer failed!\n\r", __FILE__, __LINE__);
                     return -1;
                 }
+                bbep.fillScreen(BBEP_WHITE); // in case the image is too small - undrawn areas will be white
                 Log_info("%s [%d]: decoding for 6-color EPD\r\n", __FILE__, __LINE__);
                 png->openRAM((uint8_t *)pPNG, iDataSize, png_draw_6clr);
                 png->decode(NULL, 0);
@@ -1845,6 +1874,15 @@ PNG *png = new PNG();
             bbep.startWrite(PLANE_1); // start writing image data
             png->decode(NULL, 0);
             png->close();
+            if (png->getHeight() < bbep.height()) {
+                // fill in missing lines with white
+                uint8_t *d = bbep.getCache();
+                int y, iLen = (bbep.width()+3)/4;
+                memset(d, 0x55, iLen); // 4 pixels of white (01) per byte
+                for (y=png->getHeight(); y<bbep.height(); y++) {
+                    bbep.writeData(d, iLen);
+                }
+            }
             delete(png); // free the decoder instance
             return REFRESH_FULL;
 #endif // BOARD_TRMNL_4CLR
