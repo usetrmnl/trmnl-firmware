@@ -45,19 +45,18 @@ module Touchbar
 
     before { dev.reset }
 
-    # The provisioned X asleep showing "2", with "1" before it in its image cache (in touch bar
-    # `mode`, or the default); yields the simulator and their expected screens. Showing them
-    # (a boot and two downloads, decodes and refreshes) is done once and kept as a save point
-    # in the setup cache, keyed by the day too: the X purges cached images over 24 h old.
-    def boot_two_images(mode = nil)
+    # The provisioned X asleep showing "2", with "1" before it in its image cache; yields the
+    # simulator and their expected screens. Showing them (a boot and two downloads, decodes and
+    # refreshes) is done once and kept as a save point in the setup cache, keyed by the day too:
+    # the X purges cached images over 24 h old.
+    def boot_two_images
       m = dev.mock
-      extra = mode ? { touchbar_mode: mode } : {}
       inputs = { day: Date.today.iso8601, support: SetupCache.file_hash(__FILE__) }
       one = set_digits(m, "one", "1")
       two = set_digits(m, "two", "2")
-      m.display_queue << { image: "one", refresh_rate: 300, **extra } # when the state is made
-      m.display = { image: "two", refresh_rate: 300, **extra }
-      state = dev.cached_state("two-images-#{mode || 'default'}", inputs) do |s|
+      m.display_queue << { image: "one", refresh_rate: 300 } # when the state is made
+      m.display = { image: "two", refresh_rate: 300 }
+      state = dev.cached_state("two-images", inputs) do |s|
         m.wait_for_request("/images/one.png", timeout: 15)
         s.wait(state: "deep_sleep", timeout: 15)
         s.wake

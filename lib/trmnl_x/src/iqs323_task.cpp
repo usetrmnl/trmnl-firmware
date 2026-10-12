@@ -50,12 +50,12 @@ static iqs323_data_callback_t data_callback = NULL;  // Callback for new data no
 
 // Snapshot published under iqs323_mutex, see iqs323_publish_snapshot().
 static touchbar_snapshot_t g_touchbar_snapshot = {
-    false, false, false, IQS323_GESTURE_NONE, 65535, 0
+    false, false, false, 0
 };
 
 // One-time copy taken at wake-stub validation; never updated again.
 static touchbar_snapshot_t g_wake_stub_snapshot = {
-    false, false, false, IQS323_GESTURE_NONE, 65535, 0
+    false, false, false, 0
 };
 static bool g_wake_stub_snapshot_valid = false;
 
@@ -311,15 +311,6 @@ static void iqs323_publish_snapshot(void)
         (unsigned long)millis(), g_touchbar_snapshot.ch0_touch, g_touchbar_snapshot.ch1_touch, g_touchbar_snapshot.ch2_touch,
         iqs323.IQSMemoryMap.SYSTEM_STATUS[0], iqs323.IQSMemoryMap.SYSTEM_STATUS[1]);
 
-    g_touchbar_snapshot.slider_position = iqs323.sliderCoordinate();
-
-    if (iqs323.getSliderEvent()) {
-        iqs323_gesture_events gesture = iqs323.getGestureType();
-        if (gesture != IQS323_GESTURE_NONE) {
-            g_touchbar_snapshot.slider_event = gesture;
-        }
-    }
-
     g_touchbar_snapshot.last_updated_ms = millis();
 }
 
@@ -369,28 +360,17 @@ bool iqs323_task_set_streaming_mode(bool enable)
     return true;
 }
 
-bool iqs323_task_set_gesture_config(bool tap_mode)
+bool iqs323_task_set_gesture_config(void)
 {
     if (iqs323_mutex == NULL || xSemaphoreTake(iqs323_mutex, pdMS_TO_TICKS(200)) != pdTRUE) {
         Serial.println("IQS323 Task: Failed to acquire mutex for gesture config write");
         return false;
     }
 
-    iqs323.setGestureConfig(tap_mode, STOP);
+    iqs323.setGestureConfig(true, STOP); // tap gestures, touch events only
 
     xSemaphoreGive(iqs323_mutex);
     return true;
-}
-
-void iqs323_task_clear_slider_event(void)
-{
-    if (iqs323_mutex == NULL || xSemaphoreTake(iqs323_mutex, pdMS_TO_TICKS(200)) != pdTRUE) {
-        return;
-    }
-
-    g_touchbar_snapshot.slider_event = IQS323_GESTURE_NONE;
-
-    xSemaphoreGive(iqs323_mutex);
 }
 
 /**

@@ -186,8 +186,6 @@ typedef struct {
     bool ch0_touch;
     bool ch1_touch;
     bool ch2_touch;
-    iqs323_gesture_events slider_event;
-    uint16_t slider_position;
     uint32_t last_updated_ms;   // millis() at last publish
 } touchbar_snapshot_t;
 
@@ -209,14 +207,9 @@ bool iqs323_task_read_wake_stub_snapshot(touchbar_snapshot_t *out);
 bool iqs323_task_set_streaming_mode(bool enable);
 
 /**
- * @brief Writes the gesture-mode config register (tap vs slide).
+ * @brief Writes the gesture config registers for tap gestures (touch events only).
  */
-bool iqs323_task_set_gesture_config(bool tap_mode);
-
-/**
- * @brief Clears the snapshot's slider_event back to IQS323_GESTURE_NONE.
- */
-void iqs323_task_clear_slider_event(void);
+bool iqs323_task_set_gesture_config(void);
 
 #ifdef __cplusplus
 }

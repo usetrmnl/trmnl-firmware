@@ -186,12 +186,6 @@ module TrmnlSim
       post("/touch", { zone:, down: false })
     end
 
-    # A slide along the touch bar: "swipe_next", "swipe_back", "flick_next" or "flick_back"
-    # (only reported in slide mode).
-    def gesture(name)
-      post("/gesture", { gesture: name })
-    end
-
     # Put the device on / take it off its magnetic dock (TRMNL X). Returns once applied.
     def dock(docked = true)
       post("/dock", { docked: })

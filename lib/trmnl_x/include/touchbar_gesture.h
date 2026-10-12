@@ -17,14 +17,11 @@ enum class touchbar_intent_t {
     CONFIRM,
 };
 
-// Resolved intent plus whether it was a hold (vs. a plain tap/swipe).
+// Resolved intent plus whether it was a hold (vs. a plain tap).
 struct touchbar_resolution_t {
     touchbar_intent_t intent;
     bool held;
 };
-
-typedef touchbar_resolution_t (*touchbar_resolve_intent_fn)(void);
-typedef touchbar_intent_t (*touchbar_resolve_confirmation_fn)(void);
 
 // "N channels held continuously for >= threshold_ms" detector. Not tied to
 // any polling cadence - poll() just timestamps via millis().
@@ -62,24 +59,18 @@ private:
     uint32_t start_ms_ = 0;
 };
 
-// Pure gesture-resolution layer: decides tap/hold/swipe/corner outcomes from
+// Pure gesture-resolution layer: decides tap/hold/corner outcomes from
 // the IQS323 task's published snapshot. See touchbar_actions.h for the
 // confirmation-flow orchestration and dispatch built on top of this.
 
 extern bool otg_message;
-extern bool touchbar_tap_mode; // false = "slide", true = "tap" (default)
-
-void log_slider_gesture(iqs323_gesture_events event);
 
 touchbar_resolution_t touchbar_resolve_intent(void);
 
 touchbar_intent_t resolve_confirmation_tap_mode(void);
-touchbar_intent_t resolve_confirmation_slide_mode(void);
 void reset_confirmation_resolvers(void);
 
-void set_touchbar_mode(bool tap_mode);
-
-// Configures the IQS323's gesture mode for touchbar_tap_mode before deep sleep.
+// Configures the IQS323 for tap gestures before deep sleep.
 void touchbar_prepare_for_sleep(void);
 
 #endif // TOUCHBAR_GESTURE_H

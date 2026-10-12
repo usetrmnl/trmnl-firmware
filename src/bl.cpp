@@ -246,9 +246,6 @@ void bl_init(void)
 #endif // BOARD_TRMNL_X
 
 #ifdef BOARD_TRMNL_X
-  set_touchbar_mode(preferences.getBool(PREFERENCES_TOUCHBAR_MODE_KEY, true));
-  Log_info("Touchbar mode from preferences: %s", touchbar_tap_mode ? "Tap" : "Slide");
-
   // Start IQS323 task manager
   if (!iqs323_task_init(NULL)) {
     Log_error("IQS323 Task: Failed to start - rebooting");

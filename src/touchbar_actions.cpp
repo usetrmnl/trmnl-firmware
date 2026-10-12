@@ -23,7 +23,7 @@ extern Preferences preferences;
 extern uint8_t *buffer;
 
 #define WIFI_RESET_CONFIRMATION_TIMEOUT_MS 15000
-#define WIFI_RESET_POLL_INTERVAL_MS        100
+#define WIFI_RESET_POLL_INTERVAL_MS        20
 
 // Touchbar indicator to redraw after a full-refresh (e.g. logo screen)
 static touchbar_side_t pending_indicator_side = TOUCHBAR_LEFT;
@@ -57,34 +57,23 @@ static bool handle_confirmation_flow(bool &in_flag, MSG message, void (*on_confi
       delay(200);
       iqs323_task_read_snapshot(&snap);
     } while ((snap.ch0_touch || snap.ch1_touch || snap.ch2_touch) && millis() - release_start < RELEASE_TIMEOUT_MS);
-    iqs323_task_clear_slider_event();
   }
 
   reset_confirmation_resolvers();
-  touchbar_resolve_confirmation_fn resolve_confirmation =
-    touchbar_tap_mode ? resolve_confirmation_tap_mode : resolve_confirmation_slide_mode;
-  const uint32_t poll_ms = touchbar_tap_mode ? 20 : WIFI_RESET_POLL_INTERVAL_MS;
-
-  // Streaming mode only benefits tap mode's RDY-gated reads; slide mode reads
-  // its gesture register directly every tick regardless, so skip it there.
-  if (touchbar_tap_mode) {
-    iqs323_task_set_streaming_mode(true);
-  }
+  iqs323_task_set_streaming_mode(true);
 
   touchbar_intent_t outcome = touchbar_intent_t::NONE;
   unsigned long start_time = millis();
   while (millis() - start_time < WIFI_RESET_CONFIRMATION_TIMEOUT_MS) {
-    delay(poll_ms);
-    touchbar_intent_t intent = resolve_confirmation();
+    delay(WIFI_RESET_POLL_INTERVAL_MS);
+    touchbar_intent_t intent = resolve_confirmation_tap_mode();
     if (intent == touchbar_intent_t::CONFIRM || intent == touchbar_intent_t::CANCEL) {
       outcome = intent;
       break;
     }
   }
 
-  if (touchbar_tap_mode) {
-    iqs323_task_set_streaming_mode(false);
-  }
+  iqs323_task_set_streaming_mode(false);
 
   if (outcome == touchbar_intent_t::NONE) {
     Log_info("Confirmation timeout - cancelling");
@@ -230,11 +219,6 @@ static void dispatch_touchbar_intent(const touchbar_resolution_t &resolved) {
 }
 
 void process_iqs323_data(void) {
-  touchbar_snapshot_t snap;
-  iqs323_task_read_snapshot(&snap);
-  Log_info("Slider position: %d", snap.slider_position);
-  log_slider_gesture(snap.slider_event);
-
   touchbar_resolution_t resolved = touchbar_resolve_intent();
 
   if (resolved.intent == touchbar_intent_t::CORNER_HOLD_CONFIRMED) {
@@ -255,9 +239,7 @@ void touchbar_redraw_pending_indicator(void) {
 }
 
 void touchbar_init_captive_portal_power_off_hook(void) {
-  // set TAP mode as default
-  iqs323_task_set_gesture_config(true);
-  set_touchbar_mode(true);
+  iqs323_task_set_gesture_config();
 
   static const uint8_t CORNER_MASK = (1 << IQS323_CH0) | (1 << IQS323_CH2);
   static TouchbarHoldTracker corner_hold_tracker(CORNER_MASK, 600);

@@ -11,7 +11,6 @@
 extern unsigned long startup_time; // set in bl_init()
 
 bool otg_message = false;
-bool touchbar_tap_mode = true; // false = "slide", true = "tap" (default)
 
 static bool snapshot_channel_touched(const touchbar_snapshot_t &snap, uint8_t channel_index)
 {
@@ -85,36 +84,6 @@ static bool corner_hold_confirmed(uint32_t hold_threshold_ms = 600)
   return snapshot_channel_touched(snap, 0) && snapshot_channel_touched(snap, 2);
 }
 
-void log_slider_gesture(iqs323_gesture_events event)
-{
-  switch (event) {
-    case IQS323_GESTURE_UNKNOWN:
-      Log_info("SLIDER: UNKNOWN (something went wrong?)");
-      break;
-    case IQS323_GESTURE_TAP:
-      Log_info("SLIDER: Tap");
-      break;
-    case IQS323_GESTURE_SWIPE_NEGATIVE:
-      Log_info("SLIDER: Swipe <-");
-      break;
-    case IQS323_GESTURE_SWIPE_POSITIVE:
-      Log_info("SLIDER: Swipe ->");
-      break;
-    case IQS323_GESTURE_FLICK_NEGATIVE:
-      Log_info("SLIDER: Flick <-");
-      break;
-    case IQS323_GESTURE_FLICK_POSITIVE:
-      Log_info("SLIDER: Flick ->");
-      break;
-    case IQS323_GESTURE_HOLD:
-      Log_info("SLIDER: Hold");
-      break;
-    case IQS323_GESTURE_NONE:
-      Log_info("SLIDER: None");
-      break;
-  }
-}
-
 static TouchbarHoldTracker g_confirmation_middle_hold_tracker(1 << IQS323_CH1, 600);
 static bool g_confirmation_middle_was_touched = false;
 
@@ -155,26 +124,6 @@ touchbar_intent_t resolve_confirmation_tap_mode(void)
   return touchbar_intent_t::NONE;
 }
 
-touchbar_intent_t resolve_confirmation_slide_mode(void)
-{
-  touchbar_snapshot_t snap;
-  iqs323_task_read_snapshot(&snap);
-
-  if (snap.slider_event == IQS323_GESTURE_HOLD && snap.ch1_touch) {
-    Log_info("WiFi reset confirmed by user - holding middle button");
-    display_draw_touchbar_indicator(TOUCHBAR_MIDDLE, true);
-    return touchbar_intent_t::CONFIRM;
-  }
-
-  if (snap.slider_event == IQS323_GESTURE_TAP) {
-    Log_info("WiFi reset cancelled by user - tap detected");
-    display_draw_touchbar_indicator(TOUCHBAR_MIDDLE, false);
-    return touchbar_intent_t::CANCEL;
-  }
-
-  return touchbar_intent_t::NONE;
-}
-
 static touchbar_resolution_t resolve_intent_tap_mode(void)
 {
   iqs323_task_set_streaming_mode(true);
@@ -206,52 +155,14 @@ static touchbar_resolution_t resolve_intent_tap_mode(void)
   return result;
 }
 
-static touchbar_resolution_t resolve_intent_slide_mode(void)
-{
-  touchbar_snapshot_t snap;
-  iqs323_task_read_snapshot(&snap);
-
-  if (snap.slider_event == IQS323_GESTURE_HOLD && snap.ch0_touch && snap.ch2_touch) {
-    return { touchbar_intent_t::CORNER_HOLD_CONFIRMED, false };
-  }
-
-  if (snap.slider_event == IQS323_GESTURE_SWIPE_NEGATIVE) {
-    return { touchbar_intent_t::BACK, false };
-  }
-  if (snap.slider_event == IQS323_GESTURE_SWIPE_POSITIVE) {
-    return { touchbar_intent_t::NEXT, false };
-  }
-
-  if (snap.slider_event == IQS323_GESTURE_TAP || snap.slider_event == IQS323_GESTURE_HOLD) {
-    bool held = (snap.slider_event == IQS323_GESTURE_HOLD);
-    for (uint8_t i = 0; i < 3; i++) {
-      if (!snapshot_channel_touched(snap, i)) continue;
-      switch (i) {
-        case 0: return { touchbar_intent_t::BACK, held };
-        case 2: return { touchbar_intent_t::NEXT, held };
-        case 1: return { touchbar_intent_t::MIDDLE, held };
-      }
-    }
-  }
-  return { touchbar_intent_t::NONE, false };
-}
-
-static touchbar_resolve_intent_fn g_intent_resolver = resolve_intent_tap_mode;
-
 touchbar_resolution_t touchbar_resolve_intent(void)
 {
-  return g_intent_resolver();
-}
-
-void set_touchbar_mode(bool tap_mode)
-{
-  touchbar_tap_mode = tap_mode;
-  g_intent_resolver = tap_mode ? resolve_intent_tap_mode : resolve_intent_slide_mode;
+  return resolve_intent_tap_mode();
 }
 
 void touchbar_prepare_for_sleep(void)
 {
-  iqs323_task_set_gesture_config(touchbar_tap_mode);
+  iqs323_task_set_gesture_config();
 }
 
 bool TouchbarHoldTracker::poll(uint8_t current_channel_mask)
