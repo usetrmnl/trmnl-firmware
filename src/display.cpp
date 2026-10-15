@@ -2208,7 +2208,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         bbep.setCursor((bbep.width() - rect.w)/2, 430);
         bbep.println(string1);
 
-        const char string2[] = "Unplug the USB-C to enter shipping mode.";
+        const char string2[] = "Unplug the USB-C to complete shutdown.";
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w)/2, 500);
         bbep.print(string2);
@@ -2227,19 +2227,6 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         bbep.print(string2);
     break;
     }
-    case POWER_OFF_CONFIRM:
-    {
-        const char string1[] = "Turn off device?";
-        bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - rect.w)/2, 430);
-        bbep.println(string1);
-        const char string2[] = "Hold middle of touch bar to confirm, tap to cancel.";
-        bbep.getStringBox(string2, &rect);
-        bbep.setCursor((bbep.width() - rect.w)/2, -1);
-        bbep.print(string2);
-    break;
-    }
-
     case WIFI_CONNECT:
     {
         const char string1[] = "Connect to TRMNL WiFi";

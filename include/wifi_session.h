@@ -11,8 +11,6 @@
  * On connection failure, wifiSessionConnect shows WIFI_FAILED (saved credentials: only
  * when should_show_error_now) and deep-sleeps
  * via wifiErrorDeepSleep (does not return on that path).
- *
- * X captive portal keeps a single call to touchbar_init_captive_portal_power_off_hook (#508).
  */
 
 /** Set captive-portal hostname from preferences / friendly ID. */

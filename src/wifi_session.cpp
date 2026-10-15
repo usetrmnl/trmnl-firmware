@@ -14,7 +14,6 @@
 
 #ifdef BOARD_TRMNL_X
 #include <modem.h>
-#include <touchbar_actions.h>
 #include <vector>
 #endif
 
@@ -133,9 +132,6 @@ void wifiSessionConnect(bool should_show_error_now) {
     Log_info("FW version %s", Messages::firmware_version().c_str());
 
     showMessageWithLogo(WIFI_CONNECT, "", false, Messages::firmware_version().c_str(), WifiCaptivePortal.getAPSSID());
-#ifdef BOARD_TRMNL_X
-    touchbar_init_captive_portal_power_off_hook();
-#endif
     WifiCaptivePortal.setResetSettingsCallback(resetDeviceCredentials);
     bool portal_ok = WifiCaptivePortal.startPortal();
     if (!portal_ok) {

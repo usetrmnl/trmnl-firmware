@@ -54,46 +54,6 @@ static bool tap_mode_is_hold(uint8_t channel_index, uint32_t hold_threshold_ms =
   }
 }
 
-static TouchbarHoldTracker g_confirmation_middle_hold_tracker(1 << IQS323_CH1, 600);
-static bool g_confirmation_middle_was_touched = false;
-
-void reset_confirmation_resolvers(void)
-{
-  g_confirmation_middle_hold_tracker.reset();
-  g_confirmation_middle_was_touched = false;
-}
-
-touchbar_intent_t resolve_confirmation_tap_mode(void)
-{
-  touchbar_snapshot_t snap;
-  iqs323_task_read_snapshot(&snap);
-
-  if (snap.ch0_touch || snap.ch2_touch) {
-    Log_info("Confirmation cancelled - outer button in tap mode, status: left=%d right=%d", snap.ch0_touch, snap.ch2_touch);
-    display_draw_touchbar_indicator(snap.ch0_touch ? TOUCHBAR_LEFT : TOUCHBAR_RIGHT, false);
-    return touchbar_intent_t::CANCEL;
-  }
-
-  if (g_confirmation_middle_was_touched && !snap.ch1_touch) {
-    Log_info("Confirmation cancelled - tap on middle button in tap mode");
-    g_confirmation_middle_hold_tracker.reset();
-    g_confirmation_middle_was_touched = false;
-    display_draw_touchbar_indicator(TOUCHBAR_MIDDLE, false);
-    return touchbar_intent_t::CANCEL;
-  }
-  g_confirmation_middle_was_touched = snap.ch1_touch;
-
-  if (g_confirmation_middle_hold_tracker.poll(snap.ch1_touch ? (1 << IQS323_CH1) : 0)) {
-    Log_info("Confirmed - holding middle button in tap mode");
-    display_draw_touchbar_indicator(TOUCHBAR_MIDDLE, true);
-    return touchbar_intent_t::CONFIRM;
-  }
-  if (snap.ch1_touch) {
-    display_draw_touchbar_progress(TOUCHBAR_MIDDLE, g_confirmation_middle_hold_tracker.progress());
-  }
-  return touchbar_intent_t::NONE;
-}
-
 static touchbar_resolution_t resolve_intent_tap_mode(void)
 {
   iqs323_task_set_streaming_mode(true);

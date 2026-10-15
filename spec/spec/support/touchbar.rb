@@ -5,13 +5,6 @@ require "date"
 # What the TRMNL X touch bar specs (spec/core/trmnl_x/touchbar_*_spec.rb) share: touch helpers
 # and the provisioned X they browse cached images on.
 module Touchbar
-  # Put fingers on several zones at the same instant (and leave them there).
-  def hold_edges(s, *zones)
-    s.pause { zones.each { s.touch_down(_1) } }
-  end
-
-  def lift(s, *zones) = zones.each { s.touch_up(_1) }
-
   # Touch the zone for `ms`, wait for the firmware's console `line` about it, and for the
   # device to be back asleep.
   def touch_and_sleep(s, zone, ms, line)

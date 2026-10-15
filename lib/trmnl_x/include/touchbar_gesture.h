@@ -4,16 +4,12 @@
 #include <stdint.h>
 #include "IQS323.h"
 
-// User-level intent derived from touch bar state. CANCEL/CONFIRM only come
-// from the confirmation-flow resolvers; the rest come from the normal
-// per-wake navigation resolvers.
+// User-level intent derived from touch bar state when a touch wakes the device.
 enum class touchbar_intent_t {
     NONE,
     BACK,
     NEXT,
     MIDDLE,
-    CANCEL,
-    CONFIRM,
 };
 
 // Resolved intent plus whether it was a hold (vs. a plain tap).
@@ -58,16 +54,13 @@ private:
     uint32_t start_ms_ = 0;
 };
 
-// Pure gesture-resolution layer: decides tap/hold/corner outcomes from
-// the IQS323 task's published snapshot. See touchbar_actions.h for the
-// confirmation-flow orchestration and dispatch built on top of this.
+// Pure gesture-resolution layer: decides tap/hold outcomes from the IQS323
+// task's published snapshot. See touchbar_actions.h for the touch menu and
+// dispatch built on top of this.
 
 extern bool otg_message;
 
 touchbar_resolution_t touchbar_resolve_intent(void);
-
-touchbar_intent_t resolve_confirmation_tap_mode(void);
-void reset_confirmation_resolvers(void);
 
 // Configures the IQS323 for tap gestures before deep sleep.
 void touchbar_prepare_for_sleep(void);

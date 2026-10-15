@@ -84,4 +84,45 @@ RSpec.describe "TRMNL X touch bar: tap mode", env: "TRMNL_X" do
       end
     end
   end
+
+  describe "ShutDown" do
+    include_context "provisioned X"
+
+    # Open Settings, then Shut Down..., leaving its confirmation on the screen
+    def ask(s)
+      TrmnlX.open_settings_menu(s)
+      TrmnlX.menu_tap(s, "right", /Reset Wi-Fi\.\.\. -> Shut Down/)
+      TrmnlX.menu_tap(s, "center", /chose Shut Down/, screen: true)
+    end
+
+    it "confirming goes back to shipment mode" do
+      boot_two_images do |s|
+        ask(s)
+        TrmnlX.menu_tap(s, "left", /Back -> Confirm Shut Down/)
+        boots = s.status["boot_count"]
+        c = s.status["console_total"]
+        s.touch("center", ms: 150)
+        s.wait(console: /Shutting down from the menu/, since: c, timeout: 15)
+        deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 30
+        while s.status["boot_count"] == boots
+          expect(Process.clock_gettime(Process::CLOCK_MONOTONIC)).to be < deadline, "did not restart"
+          sleep 0.2
+        end
+        # shipment status cleared: back to shipment mode until the charger is connected
+        c = s.status["console_total"]
+        s.wait(console: /Entering shipment mode light sleep loop/, since: c, timeout: 60)
+      end
+    end
+
+    it "Back goes back to Settings" do
+      boot_two_images do |s|
+        c = s.status["console_total"]
+        ask(s)
+        # the arrow starts on Back
+        TrmnlX.menu_tap(s, "center", /chose Back/, screen: true)
+        TrmnlX.menu_tap(s, "right", /Reset Wi-Fi\.\.\. -> Shut Down/)
+        expect(s.console(c).join("\n")).not_to match(/Shutting down/)
+      end
+    end
+  end
 end

@@ -2,7 +2,7 @@
 
 // The TRMNL X is the only board with a control scheme for the menu so far. Another board needs one
 // (menu_controls_t), and a look at the X-only parts here: the drawing (FastEPD, sized for the X's
-// panel).
+// panel), Shut Down (shipment mode).
 #ifdef BOARD_TRMNL_X
 
 #include <Preferences.h>
@@ -271,16 +271,18 @@ static const special_menu_item_t special_menu_items[] = {
 // The Settings submenu; Back goes to the main menu
 enum settings_menu_item_t {
   SETTINGS_MENU_RESET_WIFI,
+  SETTINGS_MENU_SHUT_DOWN,
   SETTINGS_MENU_BACK,
   SETTINGS_MENU_COUNT,
 };
 
 static const char *const settings_menu_labels[SETTINGS_MENU_COUNT] = {
     "Reset Wi-Fi...",
+    "Shut Down...",
     "Back",
 };
 
-// The confirmation of Reset Wi-Fi; Back goes to Settings
+// The confirmations of Reset Wi-Fi and Shut Down; Back goes to Settings
 #define CONFIRM_MENU_CONFIRM 0
 #define CONFIRM_MENU_BACK    1 // where the arrow starts, so a stray input doesn't confirm
 #define CONFIRM_MENU_COUNT   2
@@ -290,11 +292,18 @@ static const char *const reset_wifi_menu_body[] = {
     "Forget the saved Wi-Fi network and open the setup portal?",
 };
 
+static const char *const shut_down_menu_labels[CONFIRM_MENU_COUNT] = {"Confirm Shut Down", "Back"};
+static const char *const shut_down_menu_body[] = {
+    "Shut down the device?",
+    "Reconnect USB-C to power to wake it up.",
+};
+
 enum menu_screen_t {
   MENU_SCREEN_MAIN,
   MENU_SCREEN_SPECIAL,
   MENU_SCREEN_SETTINGS,
   MENU_SCREEN_RESET_WIFI,
+  MENU_SCREEN_SHUT_DOWN,
 };
 
 enum menu_outcome_t {
@@ -302,6 +311,7 @@ enum menu_outcome_t {
   MENU_OUTCOME_PREVIOUS_SCREEN,
   MENU_OUTCOME_SPECIAL_FUNCTION,
   MENU_OUTCOME_RESET_WIFI,
+  MENU_OUTCOME_SHUT_DOWN,
   MENU_OUTCOME_CLOSE, // Close on the main menu, or a timeout on any screen
 };
 
@@ -351,6 +361,9 @@ static menu_outcome_t run_menu_screens(SPECIAL_FUNCTION *function) {
       case SETTINGS_MENU_RESET_WIFI:
         screen = MENU_SCREEN_RESET_WIFI;
         break;
+      case SETTINGS_MENU_SHUT_DOWN:
+        screen = MENU_SCREEN_SHUT_DOWN;
+        break;
       case SETTINGS_MENU_BACK:
         screen = MENU_SCREEN_MAIN;
         break;
@@ -365,6 +378,15 @@ static menu_outcome_t run_menu_screens(SPECIAL_FUNCTION *function) {
                                    CONFIRM_MENU_BACK);
       if (choice < 0) return MENU_OUTCOME_CLOSE;
       if (choice == CONFIRM_MENU_CONFIRM) return MENU_OUTCOME_RESET_WIFI;
+      screen = MENU_SCREEN_SETTINGS;
+      break;
+    }
+    case MENU_SCREEN_SHUT_DOWN: {
+      int choice = run_menu_screen(shut_down_menu_labels, CONFIRM_MENU_COUNT, true, shut_down_menu_body,
+                                   sizeof(shut_down_menu_body) / sizeof(shut_down_menu_body[0]), MENU_TIMEOUT_MS,
+                                   CONFIRM_MENU_BACK);
+      if (choice < 0) return MENU_OUTCOME_CLOSE;
+      if (choice == CONFIRM_MENU_CONFIRM) return MENU_OUTCOME_SHUT_DOWN;
       screen = MENU_SCREEN_SETTINGS;
       break;
     }
@@ -400,6 +422,12 @@ void menu_open(const menu_controls_t &controls) {
   case MENU_OUTCOME_RESET_WIFI:
     Log_info("Resetting WiFi from the menu");
     resetDeviceCredentials();
+    break;
+  case MENU_OUTCOME_SHUT_DOWN:
+    // With the shipment status cleared, the restart goes back to shipment mode: off until USB-C power
+    Log_info("Shutting down from the menu");
+    clearShipmentStatus();
+    ESP.restart();
     break;
   case MENU_OUTCOME_CLOSE:
     // Re-show the current image and go back to sleep
