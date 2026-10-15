@@ -39,7 +39,12 @@ module TrmnlX
     s.portal_connect(ssid, "password", server: mock.device_url)
     mock.wait_for_request("/api/display", timeout: 240)
     s.wait(state: "deep_sleep", timeout: 240)
+    skip_touchbar_tutorial(s)
   end
+
+  # Mark the touch bar tutorial (src/menu.cpp, run_tutorial) done on an X in deep sleep: until it is,
+  # any touch shows it instead of doing what it does. touchbar_tutorial_spec.rb is about it.
+  def skip_touchbar_tutorial(s) = s.set_preference("touch_tutorial", "u8", 1)
 
   # Wake the X and refresh, as a middle tap did before the touch menu: a middle tap opens the
   # menu (src/menu.cpp, menu_open) and a second one chooses its first item,
@@ -72,7 +77,8 @@ module TrmnlX
     s.touch("center", ms: 150)
     s.wait(console: /menu_show_screen end/, since: c, timeout: 30)
     menu_tap(s, "right", /Next Screen -> Previous Screen/)
-    menu_tap(s, "right", /Previous Screen -> Special/)
+    menu_tap(s, "right", /Previous Screen -> Touchbar Tutorial/)
+    menu_tap(s, "right", /Touchbar Tutorial -> Special/)
     menu_tap(s, "right", /Special\.\.\. -> Settings/)
     menu_tap(s, "center", /chose Settings/, screen: true)
   end
@@ -140,6 +146,7 @@ module TrmnlX
     end
 
     def press(ms = 100)
+      skip_tutorial
       if ms >= 15_000
         skip!("the TRMNL X has no soft-reset gesture (the OG's 15 s press)")
       elsif ms > 5000
@@ -163,6 +170,7 @@ module TrmnlX
     # it wakes, so it waits for the device to be asleep first.
     def reset_wifi_gesture
       wait(state: "deep_sleep", timeout: 120, settle_ms: 200) unless status["state"] == "deep_sleep"
+      skip_tutorial
       TrmnlX.ask_to_reset_wifi(self)
       TrmnlX.menu_tap(self, "left", /Back -> Confirm Reset Wi-Fi/)
       touch("center", ms: 150)
@@ -174,6 +182,14 @@ module TrmnlX
     end
 
     private
+
+    # The general tests' touches are the OG's button presses, not a first touch of the touch bar:
+    # mark its tutorial done (only while asleep, when the X reads its touches).
+    def skip_tutorial
+      return if status["state"] != "deep_sleep" || preferences["touch_tutorial"] == "1"
+
+      TrmnlX.skip_touchbar_tutorial(self)
+    end
 
     def skip!(why) = raise(RSpec::Core::Pending::SkipDeclaredInExample, why)
   end

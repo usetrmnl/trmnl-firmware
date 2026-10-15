@@ -1,10 +1,10 @@
 #ifndef MENU_H
 #define MENU_H
 
-// The device menu: next/previous screen, Special (the special functions), Settings (diagnostics,
-// Wi-Fi reset, shut down). It knows nothing of how it is driven: a control scheme (menu_controls_t)
-// turns a board's inputs into up/down/select, and says what to draw as hints for them. The TRMNL X
-// touch bar's is in touchbar_actions.cpp.
+// The device menu: next/previous screen, the control scheme's tutorial, Special (the special functions), Settings
+// (diagnostics, Wi-Fi reset, shut down). It knows nothing of how it is driven: a control scheme (menu_controls_t) turns
+// a board's inputs into up/down/select, and says what to draw as hints for them. The TRMNL X touch bar's is in
+// touchbar_actions.cpp.
 
 // The icon left of a menu hint's label
 typedef enum {
@@ -25,10 +25,31 @@ typedef struct {
 // An input from a control scheme
 enum class menu_input_t {
   NONE,
-  UP,     // move the arrow up (it wraps around)
-  DOWN,   // move the arrow down
+  UP, // move the arrow up (it wraps around)
+  DOWN, // move the arrow down
   SELECT, // choose the item the arrow points at
 };
+
+// What one of the controls does, for the tutorial. The tutorial's controls are in hint slot order: the
+// ones that read UP, SELECT and DOWN in the menu.
+typedef struct {
+  const char *title; // e.g. "Left Tap"
+  const char *action; // what it does, e.g. "Previous screen"
+  const char *label; // its pill, filled once it is tried, e.g. "Previous"
+} menu_tutorial_control_t;
+
+// A control scheme's tutorial: a screen that explains the controls, then has the user try each one,
+// in hint slot order. Using all of them, then any one once more, closes it and marks it done (in
+// NVS, `done_key`).
+typedef struct {
+  const char *item; // its item in the main menu
+  const char *title;
+  const char *subtitle;
+  menu_tutorial_control_t controls[MENU_HINT_SLOTS];
+  const char *practice; // asks the user to try each control, in order
+  const char *finish; // once they have: how to close it (any control)
+  const char *done_key; // the NVS (Preferences) key for its being done
+} menu_tutorial_t;
 
 // How a board's inputs drive the menu
 struct menu_controls_t {
@@ -42,11 +63,19 @@ struct menu_controls_t {
   // The menu draws its response (moves the arrow, shows the next screen) before polling again, so
   // an input that starts (and ends) during a display update should still be reported after it.
   menu_input_t (*read)(void);
+  // The controls' tutorial, or nullptr
+  const menu_tutorial_t *tutorial;
 };
 
 // Opens the menu with `controls` and does what is chosen. Next Screen and the special functions
 // return, for the wake to go on and fetch the next screen (with the special function, if chosen);
 // everything else sleeps or restarts and does not return.
 void menu_open(const menu_controls_t &controls);
+
+// Whether the user finished the tutorial of `controls` (true without one)
+bool menu_tutorial_done(const menu_controls_t &controls);
+
+// Shows the tutorial of `controls`, then the current image again, and sleeps: does not return
+void menu_open_tutorial(const menu_controls_t &controls);
 
 #endif // MENU_H

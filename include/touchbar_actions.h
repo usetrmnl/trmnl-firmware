@@ -3,7 +3,8 @@
 
 // What the TRMNL X touch bar does on a wake - the app-level side effects built on top of
 // touchbar_gesture.h: left and right taps browse the cached images (cached_images.h), a middle tap
-// opens the menu (menu.h) with the touch bar's control scheme.
+// opens the menu (menu.h) with the touch bar's control scheme. Until the user finishes the touch bar
+// tutorial, any touch shows it instead.
 
 // Resolves the current navigation intent and dispatches it. Called once per wake.
 void process_iqs323_data(void);

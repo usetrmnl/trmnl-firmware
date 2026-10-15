@@ -2,6 +2,7 @@
 
 #ifdef BOARD_TRMNL_X
 
+#include <config.h>
 #include <display.h>
 #include <trmnl_log.h>
 
@@ -52,15 +53,32 @@ static menu_input_t touchbar_menu_read(void) {
   return menu_input_t::NONE;
 }
 
+// Shown on the first touch, since the touch bar used to work differently, and from the main menu
+static const menu_tutorial_t touchbar_tutorial = {
+    "Touchbar Tutorial",
+    "Learn how to use the touchbar",
+    "Touch controls have recently been improved. Here's how it works.",
+    {
+        {"Left Tap", "Previous screen", "Previous"},
+        {"Center Tap", "Open the menu", "Menu"},
+        {"Right Tap", "Next screen", "Next"},
+    },
+    "Try it: tap left, then center, then right.",
+    "Nailed it! Tap anywhere to finish.",
+    PREFERENCES_TOUCHBAR_TUTORIAL_KEY,
+};
+
 static const menu_controls_t touchbar_menu_controls = {
-    touchbar_menu_hints,
-    touchbar_menu_begin,
-    touchbar_menu_end,
-    touchbar_menu_read,
+    touchbar_menu_hints, touchbar_menu_begin, touchbar_menu_end, touchbar_menu_read, &touchbar_tutorial,
 };
 
 // Single dispatch point for the resolved navigation intent.
 static void dispatch_touchbar_intent(const touchbar_resolution_t &resolved) {
+  if (resolved.intent != touchbar_intent_t::NONE && !menu_tutorial_done(touchbar_menu_controls)) {
+    Log_info("Touch bar used before its tutorial - showing it");
+    menu_open_tutorial(touchbar_menu_controls);
+    return;
+  }
   switch (resolved.intent) {
   case touchbar_intent_t::BACK:
     display_draw_touchbar_indicator(TOUCHBAR_LEFT);

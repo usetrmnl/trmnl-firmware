@@ -134,11 +134,28 @@ static void menu_draw_arrow(int count, int index, uint8_t color) {
   }
 }
 
-// One of the control scheme's hints along the bottom edge, at the same x positions as the TRMNL X's
-// touchbar pills: an up/down triangle, if any, then the label, in an outlined pill
-static void menu_draw_hint(const menu_hint_t &hint, int slot) {
+// Center of a hint slot: the same x positions as the TRMNL X's touchbar pills
+static int menu_hint_x(int slot) { return bbep.width() * (2 * slot + 1) / 6; }
+
+// Draws text centered on cx in the current font
+static void menu_draw_centered(const char *text, int cx, int baseline) {
+  BB_RECT rect;
+  bbep.setCursor(0, baseline);
+  bbep.getStringBox(text, &rect);
+  bbep.drawString(text, cx - rect.w / 2, baseline);
+}
+
+// How a hint is drawn
+enum menu_hint_style_t {
+  MENU_HINT_PLAIN,    // its content alone
+  MENU_HINT_OUTLINED, // in an outlined pill
+  MENU_HINT_FILLED,   // white in a black pill
+};
+
+// One of the control scheme's hints along the bottom edge: an up/down triangle, if any, then the
+// label, drawn in `style`
+static void menu_draw_hint(const menu_hint_t &hint, int slot, menu_hint_style_t style = MENU_HINT_OUTLINED) {
   if (!hint.label) return;
-  const int xs[MENU_HINT_SLOTS] = {bbep.width() / 6, bbep.width() / 2, bbep.width() * 5 / 6};
   const int y = bbep.height() - MENU_HINT_MARGIN;
   BB_RECT rect, line;
   bbep.setFont(Inter_18);
@@ -147,16 +164,22 @@ static void menu_draw_hint(const menu_hint_t &hint, int slot) {
   bbep.getStringBox("Ag", &line); // the same height for every hint's pill
   const int tri = hint.icon != MENU_HINT_ICON_NONE ? line.h * 2 / 3 : 0;
   const int content_w = rect.w + (tri ? tri + MENU_HINT_ICON_GAP : 0);
-  const int left = xs[slot] - content_w / 2;
+  const int left = menu_hint_x(slot) - content_w / 2;
   const int px = left - MENU_HINT_PAD_X, py = line.y - MENU_HINT_PAD_Y;
   const int pw = content_w + 2 * MENU_HINT_PAD_X, ph = line.h + 2 * MENU_HINT_PAD_Y;
   const int b = MENU_HINT_BORDER;
-  display_fill_pill(px, py, pw, ph, BBEP_BLACK);
-  display_fill_pill(px + b, py + b, pw - 2 * b, ph - 2 * b, BBEP_WHITE);
-  if (tri) {
-    menu_fill_triangle(left + tri / 2, line.y + line.h / 2, tri, hint.icon == MENU_HINT_ICON_UP ? 1 : 2, BBEP_BLACK);
+  const bool filled = style == MENU_HINT_FILLED;
+  const uint8_t fg = filled ? BBEP_WHITE : BBEP_BLACK, bg = filled ? BBEP_BLACK : BBEP_WHITE;
+  if (style != MENU_HINT_PLAIN) {
+    display_fill_pill(px, py, pw, ph, BBEP_BLACK);
+    display_fill_pill(px + b, py + b, pw - 2 * b, ph - 2 * b, bg);
   }
+  if (tri) {
+    menu_fill_triangle(left + tri / 2, line.y + line.h / 2, tri, hint.icon == MENU_HINT_ICON_UP ? 1 : 2, fg);
+  }
+  bbep.setTextColor(fg, bg);
   bbep.drawString(hint.label, left + content_w - rect.w, y);
+  bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
 }
 
 static void menu_draw_hints(const menu_hint_t *hints) {
@@ -239,6 +262,7 @@ static int run_menu_screen(const char *const *labels, int count, bool replace, c
 enum main_menu_item_t {
   MAIN_MENU_NEXT_SCREEN,
   MAIN_MENU_PREVIOUS_SCREEN,
+  MAIN_MENU_TUTORIAL, // only with a control scheme that has a tutorial
   MAIN_MENU_SPECIAL,
   MAIN_MENU_SETTINGS,
   MAIN_MENU_CLOSE,
@@ -246,11 +270,9 @@ enum main_menu_item_t {
 };
 
 static const char *const main_menu_labels[MAIN_MENU_COUNT] = {
-    "Next Screen",
-    "Previous Screen",
-    "Special...",
-    "Settings...",
-    "Close",
+    "Next Screen", "Previous Screen",
+    nullptr, // the tutorial's own item
+    "Special...",  "Settings...",     "Close",
 };
 
 // The Special submenu: the special functions, then Back, to the main menu
@@ -369,6 +391,86 @@ static int diagnostics_lines(String *lines) {
   return n;
 }
 
+// The tutorial screen layout: the title and subtitle, a column above each control's hint slot,
+// the prompt to try them in order (then the one to close it, below it), and each control's label in
+// its hint slot: plain, outlined when it is the one to tap next, filled once tapped. The partial
+// updates only add black: white over black leaves a ghost.
+#define TUTORIAL_TIMEOUT_MS   60000
+#define TUTORIAL_TITLE_Y      240 // baselines
+#define TUTORIAL_SUBTITLE_Y   330
+#define TUTORIAL_CONTROLS_Y   580
+#define TUTORIAL_LINE_SPACING 80
+#define TUTORIAL_PRACTICE_Y   1000
+#define TUTORIAL_FINISH_Y     1100
+
+// The label of a tutorial control, in its hint slot
+static void tutorial_draw_pill(const menu_tutorial_t &tutorial, int slot, menu_hint_style_t style) {
+  menu_hint_t pill = {tutorial.controls[slot].label, MENU_HINT_ICON_NONE};
+  menu_draw_hint(pill, slot, style);
+}
+
+static void tutorial_show_screen(const menu_tutorial_t &tutorial, bool replace) {
+  Log_info("tutorial_show_screen start");
+  bbep.setMode(BB_MODE_1BPP);
+  bbep.fillScreen(BBEP_WHITE);
+  bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
+  bbep.setFont(Roboto_Black_24);
+  menu_draw_centered(tutorial.title, bbep.width() / 2, TUTORIAL_TITLE_Y);
+  bbep.setFont(Inter_18);
+  menu_draw_centered(tutorial.subtitle, bbep.width() / 2, TUTORIAL_SUBTITLE_Y);
+  for (int slot = 0; slot < MENU_HINT_SLOTS; slot++) {
+    const menu_tutorial_control_t &control = tutorial.controls[slot];
+    const int x = menu_hint_x(slot);
+    bbep.setFont(Roboto_Black_24);
+    menu_draw_centered(control.title, x, TUTORIAL_CONTROLS_Y);
+    bbep.setFont(Inter_18);
+    menu_draw_centered(control.action, x, TUTORIAL_CONTROLS_Y + TUTORIAL_LINE_SPACING);
+    tutorial_draw_pill(tutorial, slot, slot == 0 ? MENU_HINT_OUTLINED : MENU_HINT_PLAIN);
+  }
+  bbep.setFont(Roboto_Black_24);
+  menu_draw_centered(tutorial.practice, bbep.width() / 2, TUTORIAL_PRACTICE_Y);
+  bbep.fullUpdate(replace ? CLEAR_FAST : CLEAR_NONE, false);
+  Log_info("tutorial_show_screen end");
+}
+
+// Shows the tutorial of the menu's control scheme and runs it until the user closes it (true; it is
+// marked done) or timeout (false). `replace`: replace a menu on the screen instead of the image.
+static bool run_tutorial(bool replace) {
+  const menu_tutorial_t &tutorial = *menu_controls->tutorial;
+  tutorial_show_screen(tutorial, replace);
+
+  int next = 0; // the hint slot of the control to tap next; MENU_HINT_SLOTS once all are
+  unsigned long last_input = millis();
+  while (millis() - last_input < TUTORIAL_TIMEOUT_MS) {
+    delay(MENU_POLL_INTERVAL_MS);
+    menu_input_t input = menu_controls->read();
+    if (input == menu_input_t::NONE) continue;
+
+    last_input = millis();
+    const int slot = input == menu_input_t::UP ? 0 : input == menu_input_t::SELECT ? 1 : 2;
+    if (next == MENU_HINT_SLOTS) {
+      Log_info("Tutorial: done");
+      preferences.putBool(tutorial.done_key, true);
+      return true;
+    }
+    if (slot != next) {
+      Log_info("Tutorial: tapped %s, waiting for %s", tutorial.controls[slot].label, tutorial.controls[next].label);
+      continue;
+    }
+    Log_info("Tutorial: tried %s", tutorial.controls[slot].label);
+    tutorial_draw_pill(tutorial, slot, MENU_HINT_FILLED);
+    if (++next < MENU_HINT_SLOTS) {
+      tutorial_draw_pill(tutorial, next, MENU_HINT_OUTLINED);
+    } else {
+      bbep.setFont(Roboto_Black_24);
+      menu_draw_centered(tutorial.finish, bbep.width() / 2, TUTORIAL_FINISH_Y);
+    }
+    bbep.partialUpdate(false);
+  }
+  Log_info("Tutorial: timeout - closing");
+  return false;
+}
+
 enum menu_screen_t {
   MENU_SCREEN_MAIN,
   MENU_SCREEN_SPECIAL,
@@ -394,18 +496,31 @@ static menu_outcome_t run_menu_screens(SPECIAL_FUNCTION *function) {
     special_labels[i] = special_menu_items[i].label;
   }
 
+  // The main menu's items: the tutorial's only if the control scheme has one
+  const char *main_labels[MAIN_MENU_COUNT];
+  main_menu_item_t main_items[MAIN_MENU_COUNT];
+  int main_count = 0;
+  for (int i = 0; i < MAIN_MENU_COUNT; i++) {
+    if (i == MAIN_MENU_TUTORIAL && !menu_controls->tutorial) continue;
+    main_labels[main_count] = i == MAIN_MENU_TUTORIAL ? menu_controls->tutorial->item : main_menu_labels[i];
+    main_items[main_count++] = (main_menu_item_t)i;
+  }
+
   menu_screen_t screen = MENU_SCREEN_MAIN;
   bool replace = false; // the first menu goes over the image, like the loading screen
   while (true) {
     switch (screen) {
     case MENU_SCREEN_MAIN: {
-      int choice = run_menu_screen(main_menu_labels, MAIN_MENU_COUNT, replace, nullptr, 0, MENU_TIMEOUT_MS, 0, true);
+      int index = run_menu_screen(main_labels, main_count, replace, nullptr, 0, MENU_TIMEOUT_MS, 0, true);
       replace = true;
-      switch (choice) {
+      switch (index < 0 ? MAIN_MENU_CLOSE : main_items[index]) {
       case MAIN_MENU_NEXT_SCREEN:
         return MENU_OUTCOME_NEXT_SCREEN;
       case MAIN_MENU_PREVIOUS_SCREEN:
         return MENU_OUTCOME_PREVIOUS_SCREEN;
+      case MAIN_MENU_TUTORIAL:
+        run_tutorial(true);
+        return MENU_OUTCOME_CLOSE; // closing the tutorial closes the menu, as does its timeout
       case MAIN_MENU_SPECIAL:
         screen = MENU_SCREEN_SPECIAL;
         break;
@@ -523,6 +638,20 @@ void menu_open(const menu_controls_t &controls) {
     show_last_image_and_sleep();
     break;
   }
+}
+
+bool menu_tutorial_done(const menu_controls_t &controls) {
+  return !controls.tutorial || preferences.getBool(controls.tutorial->done_key, false);
+}
+
+void menu_open_tutorial(const menu_controls_t &controls) {
+  Log_info("Opening the tutorial");
+  menu_controls = &controls;
+  if (controls.begin) controls.begin();
+  run_tutorial(false);
+  if (controls.end) controls.end();
+  menu_controls = nullptr;
+  show_last_image_and_sleep();
 }
 
 #endif // BOARD_TRMNL_X
