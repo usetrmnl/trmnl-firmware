@@ -61,6 +61,7 @@ static ApiDisplayInputs make_display_inputs(float battery_voltage) {
   inputs.displayWidth = display_width();
   inputs.displayHeight = display_height();
   inputs.specialFunction = SF_NONE;
+  inputs.specialFunctionChosen = false;
   return inputs;
 }
 

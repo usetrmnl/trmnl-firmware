@@ -127,9 +127,9 @@ module TrmnlX
   #   edges, then confirm the prompt with a 1.5 s hold in the middle (check_corners_gesture,
   #   handle_wifi_reset_confirmation);
   # - the OG's double click or 1-5 s press (run the special function) and 15 s press (soft reset:
-  #   forget the device too) have no touch bar equivalent: the X never reads the saved special
-  #   function (bl_init's double_click branch is OG-only). An example using them is skipped
-  #   (give it `needs: :double_click` / `needs: :soft_reset_press`).
+  #   forget the device too) aren't mapped: the X runs the saved special function from its touch
+  #   menu, but nothing drives that here yet, and it has no soft reset. An example using them is
+  #   skipped (give it `needs: :double_click` / `needs: :soft_reset_press`).
   class XSim < TrmnlSim::Simulator
     def initialize(*, own_flash: nil, **)
       super(*, **)

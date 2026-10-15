@@ -81,6 +81,7 @@ struct ApiDisplayInputs {
   int displayWidth;
   int displayHeight;
   SPECIAL_FUNCTION specialFunction;
+  bool specialFunctionChosen; // picked on the device: the header names it instead of saying "true"
   UsbStatus usbStatus;
   bool imageCached;
   int prevWakeTime;

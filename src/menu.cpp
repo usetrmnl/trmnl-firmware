@@ -239,6 +239,7 @@ static int run_menu_screen(const char *const *labels, int count, bool replace, c
 enum main_menu_item_t {
   MAIN_MENU_NEXT_SCREEN,
   MAIN_MENU_PREVIOUS_SCREEN,
+  MAIN_MENU_SPECIAL,
   MAIN_MENU_CLOSE,
   MAIN_MENU_COUNT,
 };
@@ -246,21 +247,44 @@ enum main_menu_item_t {
 static const char *const main_menu_labels[MAIN_MENU_COUNT] = {
     "Next Screen",
     "Previous Screen",
+    "Special...",
     "Close",
 };
 
+// The Special submenu: the special functions, then Back, to the main menu
+struct special_menu_item_t {
+  const char *label;
+  SPECIAL_FUNCTION function; // SF_NONE for Back
+};
+
+static const special_menu_item_t special_menu_items[] = {
+    {"Identify", SF_IDENTIFY},
+    {"Restart Playlist", SF_RESTART_PLAYLIST},
+    {"Send to Me", SF_SEND_TO_ME},
+    {"Guest Mode", SF_GUEST_MODE},
+    {"Back", SF_NONE},
+};
+#define SPECIAL_MENU_COUNT ((int)(sizeof(special_menu_items) / sizeof(special_menu_items[0])))
+
 enum menu_screen_t {
   MENU_SCREEN_MAIN,
+  MENU_SCREEN_SPECIAL,
 };
 
 enum menu_outcome_t {
   MENU_OUTCOME_NEXT_SCREEN,
   MENU_OUTCOME_PREVIOUS_SCREEN,
+  MENU_OUTCOME_SPECIAL_FUNCTION,
   MENU_OUTCOME_CLOSE, // Close on the main menu, or a timeout on any screen
 };
 
-// Runs the menu screens until one ends the menu.
-static menu_outcome_t run_menu_screens(void) {
+// Runs the menu screens until one ends the menu. Sets *function for MENU_OUTCOME_SPECIAL_FUNCTION.
+static menu_outcome_t run_menu_screens(SPECIAL_FUNCTION *function) {
+  const char *special_labels[SPECIAL_MENU_COUNT];
+  for (int i = 0; i < SPECIAL_MENU_COUNT; i++) {
+    special_labels[i] = special_menu_items[i].label;
+  }
+
   menu_screen_t screen = MENU_SCREEN_MAIN;
   bool replace = false; // the first menu goes over the image, like the loading screen
   while (true) {
@@ -273,10 +297,23 @@ static menu_outcome_t run_menu_screens(void) {
         return MENU_OUTCOME_NEXT_SCREEN;
       case MAIN_MENU_PREVIOUS_SCREEN:
         return MENU_OUTCOME_PREVIOUS_SCREEN;
+      case MAIN_MENU_SPECIAL:
+        screen = MENU_SCREEN_SPECIAL;
+        break;
       default: // Close, or timeout
         return MENU_OUTCOME_CLOSE;
       }
       break;
+    }
+    case MENU_SCREEN_SPECIAL: {
+      int item = run_menu_screen(special_labels, SPECIAL_MENU_COUNT, true);
+      if (item < 0) return MENU_OUTCOME_CLOSE;
+      if (special_menu_items[item].function == SF_NONE) { // Back
+        screen = MENU_SCREEN_MAIN;
+        break;
+      }
+      *function = special_menu_items[item].function;
+      return MENU_OUTCOME_SPECIAL_FUNCTION;
     }
     }
   }
@@ -284,13 +321,14 @@ static menu_outcome_t run_menu_screens(void) {
 
 void menu_open(const menu_controls_t &controls) {
   Log_info("Opening menu");
+  SPECIAL_FUNCTION function = SF_NONE;
   menu_controls = &controls;
   // For the battery icon: the wake detects the battery and reads the gauge after the
   // menu, and the gauge isn't read without a battery detected
   battery_count = detect_battery_count();
   battery().gaugeInit();
   if (controls.begin) controls.begin();
-  menu_outcome_t outcome = run_menu_screens();
+  menu_outcome_t outcome = run_menu_screens(&function);
   if (controls.end) controls.end();
   menu_controls = nullptr;
 
@@ -300,6 +338,11 @@ void menu_open(const menu_controls_t &controls) {
     break;
   case MENU_OUTCOME_PREVIOUS_SCREEN:
     show_cached_image_by_offset(-1);
+    break;
+  case MENU_OUTCOME_SPECIAL_FUNCTION:
+    // The API request names this function, so the server runs it rather than the saved one
+    special_function = function;
+    special_function_chosen = true;
     break;
   case MENU_OUTCOME_CLOSE:
     // Re-show the current image and go back to sleep
