@@ -41,6 +41,30 @@ module TrmnlX
     s.wait(state: "deep_sleep", timeout: 240)
   end
 
+  # Wake the X and refresh, as a middle tap did before the touch menu: a middle tap opens the
+  # menu (src/menu.cpp, menu_open) and a second one chooses its first item,
+  # Next Screen, after which the wake goes on to fetch the next screen.
+  def next_screen(s)
+    c = s.status["console_total"]
+    s.touch("center", ms: 150)
+    s.wait(console: /menu_show_screen end/, since: c, timeout: 30)
+    s.touch("center", ms: 150)
+  end
+
+  # Tap the touch bar in the touch menu, wait for the firmware to log `log`, then for the screen to
+  # be redrawn: a new menu screen (`screen: true`) or the arrow's move. The firmware draws before it
+  # reads the touch bar again, so a tap during a refresh is missed.
+  def menu_tap(s, zone, log, screen: false)
+    c = s.status["console_total"]
+    s.touch(zone, ms: 150)
+    s.wait(console: log, since: c, timeout: 15)
+    if screen
+      s.wait(console: /menu_show_screen end/, since: c, timeout: 15)
+    else
+      s.wait(display_idle: true, settle_ms: 100, timeout: 15)
+    end
+  end
+
   # Hold both edges of the touch bar, let go as the WiFi reset confirmation prompt appears, and
   # wait until it is on the screen: the firmware draws the prompt (a few seconds on the X panel)
   # before it reads the touch bar again, so an answer given during the refresh is missed.
@@ -97,7 +121,8 @@ module TrmnlX
   # touch bar, the X's equivalent in the firmware (bl.cpp, process_iqs323_data):
   #
   # - a short press (up to 1 s, which wakes the OG and refreshes) is a tap in the middle, which
-  #   wakes the X (Update-Source: EXT0) and refreshes;
+  #   wakes the X (Update-Source: EXT0) into the touch menu, then a second one choosing Next
+  #   Screen, which refreshes (TrmnlX.next_screen);
   # - a long press (5-15 s: forget WiFi, open the setup portal) is the X's WiFi reset: hold both
   #   edges, then confirm the prompt with a 1.5 s hold in the middle (check_corners_gesture,
   #   handle_wifi_reset_confirmation);
@@ -119,7 +144,7 @@ module TrmnlX
       elsif ms > 1000
         skip!("the TRMNL X has no gesture that runs the special function (the OG's 1-5 s press)")
       else
-        touch("center", ms:)
+        TrmnlX.next_screen(self)
       end
     end
 

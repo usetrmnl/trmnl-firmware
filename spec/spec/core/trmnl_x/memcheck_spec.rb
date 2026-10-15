@@ -44,7 +44,7 @@ RSpec.describe "TRMNL X memcheck", env: "TRMNL_X" do
           mock.set_png("dots", ->(x, y) { ((x / 8) + (y / 8)) & 1 })
           mock.display = { image: "dots", refresh_rate: 300 }
           TrmnlX.onboard(s, mock, TrmnlX::SSID_24)
-          mock.next_request("/api/display", timeout: 120) { s.touch("center", ms: 150) }
+          mock.next_request("/api/display", timeout: 120) { TrmnlX.next_screen(s) }
           s.wait_for_deep_sleep(timeout: 120)
 
           report = s.memcheck

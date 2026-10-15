@@ -196,6 +196,17 @@ void display_draw_touchbar_progress(touchbar_side_t side, float progress);
 void display_draw_touchbar_progress_pair(touchbar_side_t side_a, float progress_a, touchbar_side_t side_b,
                                          float progress_b);
 
+// Fills a pill (a rectangle whose left and right ends are half circles) in the image buffer
+void display_fill_pill(int x, int y, int w, int h, uint8_t color);
+
+// The battery icon (TRMNL X), DISPLAY_BATTERY_ICON_W x DISPLAY_BATTERY_ICON_H, drawn in the image
+// buffer with its top left at (x, y): charging while on USB power, otherwise the charge level from
+// the fuel gauge's last reading (battery().gaugeInit()), or a cross when there is none
+#define DISPLAY_BATTERY_ICON_W      124
+#define DISPLAY_BATTERY_ICON_H      74
+#define DISPLAY_BATTERY_ICON_MARGIN 40 // from the top and right edges, where the screens put it
+void display_draw_battery_icon(int x, int y);
+
 void display_set_light_sleep(uint8_t enabled);
 
 /**

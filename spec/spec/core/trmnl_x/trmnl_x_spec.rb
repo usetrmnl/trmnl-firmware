@@ -124,7 +124,7 @@ RSpec.describe "TRMNL X", env: "TRMNL_X" do
           expect(s).to show_image(screen, tolerance: 0, max_ratio: 0)
           expect(s).to show_image(seven, tolerance: 64, max_ratio: 0)
           # Touch wake needs the IQS323 configuration and RTC state from before the save.
-          s.touch("center", ms: 150)
+          TrmnlX.next_screen(s)
           req = dev.mock.wait_for_request("/api/display", timeout: 120)
           expect(req).to have_header("Update-Source", "EXT0")
           expect(req).to have_header("RSSI", "-48") # still on 5 GHz, through the modem
@@ -141,10 +141,10 @@ RSpec.describe "TRMNL X", env: "TRMNL_X" do
   describe "TouchAndDock" do
     before { dev.reset }
 
-    it "center tap wakes and refreshes" do
+    it "center tap wakes into the menu, and Next Screen refreshes" do
       dev.boot_asleep do |s|
         s.wait(state: "deep_sleep", timeout: 120)
-        req = dev.mock.next_request("/api/display", timeout: 120) { s.touch("center", ms: 150) }
+        req = dev.mock.next_request("/api/display", timeout: 120) { TrmnlX.next_screen(s) }
         expect(req).to have_header("Update-Source", "EXT0")
         s.wait(state: "deep_sleep", timeout: 120)
       end

@@ -718,6 +718,48 @@ void display_draw_touchbar_indicator(touchbar_side_t side, bool filled)
 static bool touchbar_side_seeded[3] = { false, false, false };
 #endif // PARALLEL_EPD
 
+void display_fill_pill(int x, int y, int w, int h, uint8_t color)
+{
+    float r = h / 2.0f;
+    for (int row = 0; row < h; row++) {
+        float dy = row + 0.5f - r;
+        int inset = (int)lroundf(r - sqrtf(r * r - dy * dy));
+        if (w - 2 * inset > 0) {
+            bbep.fillRect(x + inset, y + row, w - 2 * inset, 1, color);
+        }
+    }
+}
+
+void display_draw_battery_icon(int x, int y)
+{
+#ifdef BOARD_TRMNL_X
+    // The charging icon while on USB power (whether actually charging or not)
+    if (power().usbStatus() == UsbStatus::CONNECTED) {
+        Log_info("Displaying 'battery is charging' icon");
+        bbep.loadG5Image(battery_small, x, y, BBEP_WHITE, BBEP_BLACK);
+        return;
+    }
+    bbep.loadG5Image(battery_hollow, x, y, BBEP_WHITE, BBEP_BLACK);
+    Log_info("Displaying 'battery charge level' icon");
+    int batt_percent = battery().readSoc(); // -1 if no battery or the gauge reading failed
+    if (batt_percent >= 0) {
+        if (batt_percent >= 97) batt_percent = 100; // can sometimes report 98% when full
+        // Draw a black rectangle to represent the battery charge level
+        bbep.fillRect(x + 10, y + 18, (97 * batt_percent) / 100, 39, BBEP_BLACK);
+    } else { // a cross over the empty battery: each diagonal a band 6 px tall, column by column
+        const int left = x + 10, top = y + 18, w = 97, h = 39, half = 3;
+        for (int i = 0; i < w; i++) {
+            int down = top + i * h / w;     // top left to bottom right
+            int up = top + h - i * h / w;   // bottom left to top right
+            for (int c : {down, up}) {
+                int y0 = max(c - half, top), y1 = min(c + half, top + h);
+                bbep.fillRect(left + i, y0, 1, y1 - y0, BBEP_BLACK);
+            }
+        }
+    }
+#endif // BOARD_TRMNL_X
+}
+
 // Outline is always black with a white ring inset from it; the content area inside the ring
 // fills left-to-right in black as progress goes 0.0 -> 1.0. Only TRMNL X has a touchbar.
 void display_draw_touchbar_progress(touchbar_side_t side, float progress)
@@ -1933,24 +1975,8 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
             }
             bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
 #ifdef BOARD_TRMNL_X
-            // Show charging indicator if the USB power is connected (whether actually charging or not)
-            if (power().usbStatus() == UsbStatus::CONNECTED) {
-                Log_info("Displaying 'battery is charging' icon");
-                bbep.loadG5Image(battery_small, 40, bbep.height() - 120, BBEP_WHITE, BBEP_BLACK);
-            } else { // show battery level
-                y = bbep.height() - 120;
-                bbep.loadG5Image(battery_hollow, 40, y, BBEP_WHITE, BBEP_BLACK);
-                Log_info("Displaying 'battery charge level' icon");
-                int batt_percent = battery().readSoc(); // -1 if no battery or the gauge reading failed
-                if (batt_percent >= 0) {
-                    if (batt_percent >= 97) batt_percent = 100; // can sometimes report 98% when full
-                    // Draw a black rectangle to represent the battery charge level
-                    bbep.fillRect(40+10, y+18, (97 * batt_percent)/100, 39, BBEP_BLACK);
-                } else {
-                    bbep.drawLine(40+10, y+18, 10+97, y+18+39, BBEP_BLACK);
-                    bbep.drawLine(40+10+97, y+18, 10, y+18+39, BBEP_BLACK);
-                }
-            }
+            display_draw_battery_icon(bbep.width() - DISPLAY_BATTERY_ICON_W - DISPLAY_BATTERY_ICON_MARGIN,
+                                      DISPLAY_BATTERY_ICON_MARGIN);
 #endif // BOARD_TRMNL_X
         }
         else

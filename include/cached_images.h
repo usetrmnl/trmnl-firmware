@@ -1,8 +1,9 @@
 #ifndef CACHED_IMAGES_H
 #define CACHED_IMAGES_H
 
-// Browsing the images cached on the filesystem: the TRMNL X touch bar's left and right taps.
-// Playlist order NVS lives in filesystem.h (update_playlist_order).
+// Browsing the images cached on the filesystem: the TRMNL X touch bar's left and right taps,
+// and the menu's Previous Screen and Close. Playlist order NVS lives in filesystem.h
+// (update_playlist_order).
 
 // Shows the cached image `offset` places from the one being browsed (the playlist order wraps
 // around), then sleeps. Returns without sleeping when there is no cached image to show.

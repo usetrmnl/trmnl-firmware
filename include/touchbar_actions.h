@@ -2,7 +2,8 @@
 #define TOUCHBAR_ACTIONS_H
 
 // Confirmation-flow orchestration and intent dispatch - the app-level side effects built on top
-// of touchbar_gesture.h. Left and right taps browse the cached images (cached_images.h).
+// of touchbar_gesture.h. Left and right taps browse the cached images (cached_images.h), a middle
+// tap opens the menu (menu.h) with the touch bar's control scheme.
 
 // Resolves the current navigation intent and dispatches it. Called once per wake.
 void process_iqs323_data(void);
