@@ -58,6 +58,8 @@ static touchbar_snapshot_t g_wake_stub_snapshot = {
     false, false, false, 0
 };
 static bool g_wake_stub_snapshot_valid = false;
+// Channels (bit n: channel n) whose touch started since iqs323_task_take_touch_starts(), under iqs323_mutex
+static uint8_t g_touch_starts = 0;
 
 // Sole accessor of the IQS323 object; other files use the snapshot/request API below.
 IQS323 iqs323;
@@ -303,9 +305,13 @@ void iqs323_task_set_data_callback(iqs323_data_callback_t callback)
 // Decodes current IQS323 state into g_touchbar_snapshot. Caller must hold iqs323_mutex.
 static void iqs323_publish_snapshot(void)
 {
+    const touchbar_snapshot_t before = g_touchbar_snapshot;
     g_touchbar_snapshot.ch0_touch = iqs323.channel_touchState(IQS323_CH0);
     g_touchbar_snapshot.ch1_touch = iqs323.channel_touchState(IQS323_CH1);
     g_touchbar_snapshot.ch2_touch = iqs323.channel_touchState(IQS323_CH2);
+    if (g_touchbar_snapshot.ch0_touch && !before.ch0_touch) g_touch_starts |= 1 << 0;
+    if (g_touchbar_snapshot.ch1_touch && !before.ch1_touch) g_touch_starts |= 1 << 1;
+    if (g_touchbar_snapshot.ch2_touch && !before.ch2_touch) g_touch_starts |= 1 << 2;
 
     Serial.printf("IQS323 Task: publish snapshot at t=%lu ch0=%d ch1=%d ch2=%d STATUS=0x%02X 0x%02X\n",
         (unsigned long)millis(), g_touchbar_snapshot.ch0_touch, g_touchbar_snapshot.ch1_touch, g_touchbar_snapshot.ch2_touch,
@@ -325,6 +331,19 @@ void iqs323_task_read_snapshot(touchbar_snapshot_t *out)
     } else {
         *out = g_touchbar_snapshot; // mutex unavailable, best-effort stale copy
     }
+}
+
+uint8_t iqs323_task_take_touch_starts(void)
+{
+    uint8_t starts;
+    if (iqs323_mutex != NULL && xSemaphoreTake(iqs323_mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+        starts = g_touch_starts;
+        g_touch_starts = 0;
+        xSemaphoreGive(iqs323_mutex);
+    } else {
+        starts = 0; // left for the next call
+    }
+    return starts;
 }
 
 bool iqs323_task_read_wake_stub_snapshot(touchbar_snapshot_t *out)

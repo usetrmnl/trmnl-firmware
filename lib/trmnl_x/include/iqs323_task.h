@@ -195,6 +195,12 @@ typedef struct {
 void iqs323_task_read_snapshot(touchbar_snapshot_t *out);
 
 /**
+ * @brief The channels (bit n: channel n) whose touch started since the last call, and clears
+ * them: unlike the snapshot, a touch that starts and ends between two reads still shows.
+ */
+uint8_t iqs323_task_take_touch_starts(void);
+
+/**
  * @brief Copies out the snapshot as it was at wake-stub validation time, not live
  * state. Returns false (all-clear) if this boot wasn't a GPIO wakeup.
  */
