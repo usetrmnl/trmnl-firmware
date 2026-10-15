@@ -53,7 +53,7 @@ RSpec.describe "TRMNL X playlist order", env: "TRMNL_X" do
     end
 
     # Browsing shows cached images without asking the server, then sleeps
-    # (show_cached_image_by_offset in src/touchbar_actions.cpp).
+    # (show_cached_image_by_offset in src/cached_images.cpp).
     it "browsing walks the playlist order" do
       three_images do |s, one, two, three|
         n = dev.mock.cursor

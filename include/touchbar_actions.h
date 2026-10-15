@@ -1,9 +1,8 @@
 #ifndef TOUCHBAR_ACTIONS_H
 #define TOUCHBAR_ACTIONS_H
 
-// Confirmation-flow orchestration, cached-image cycling, and intent dispatch
-// - the app-level side effects built on top of touchbar_gesture.h.
-// Playlist order NVS lives in filesystem.h (update_playlist_order).
+// Confirmation-flow orchestration and intent dispatch - the app-level side effects built on top
+// of touchbar_gesture.h. Left and right taps browse the cached images (cached_images.h).
 
 // Resolves the current navigation intent and dispatches it. Called once per wake.
 void process_iqs323_data(void);

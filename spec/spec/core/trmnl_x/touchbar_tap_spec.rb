@@ -47,7 +47,7 @@ RSpec.describe "TRMNL X touch bar: tap mode", env: "TRMNL_X" do
 
     # Ask the X showing "2" (boot_two_images) to reset WiFi; yields the simulator, the console
     # index before and the expected screen of "2". A cancel (or no answer) redraws the image the
-    # prompt covered, then sleeps (showLastImageAndSleep, src/touchbar_actions.cpp:100).
+    # prompt covered, then sleeps (show_last_image_and_sleep, src/cached_images.cpp).
     def ask
       boot_two_images do |s, _one, two|
         c = s.status["console_total"]
