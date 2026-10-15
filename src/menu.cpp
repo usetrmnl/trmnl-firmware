@@ -240,6 +240,7 @@ enum main_menu_item_t {
   MAIN_MENU_NEXT_SCREEN,
   MAIN_MENU_PREVIOUS_SCREEN,
   MAIN_MENU_SPECIAL,
+  MAIN_MENU_SETTINGS,
   MAIN_MENU_CLOSE,
   MAIN_MENU_COUNT,
 };
@@ -248,6 +249,7 @@ static const char *const main_menu_labels[MAIN_MENU_COUNT] = {
     "Next Screen",
     "Previous Screen",
     "Special...",
+    "Settings...",
     "Close",
 };
 
@@ -266,15 +268,40 @@ static const special_menu_item_t special_menu_items[] = {
 };
 #define SPECIAL_MENU_COUNT ((int)(sizeof(special_menu_items) / sizeof(special_menu_items[0])))
 
+// The Settings submenu; Back goes to the main menu
+enum settings_menu_item_t {
+  SETTINGS_MENU_RESET_WIFI,
+  SETTINGS_MENU_BACK,
+  SETTINGS_MENU_COUNT,
+};
+
+static const char *const settings_menu_labels[SETTINGS_MENU_COUNT] = {
+    "Reset Wi-Fi...",
+    "Back",
+};
+
+// The confirmation of Reset Wi-Fi; Back goes to Settings
+#define CONFIRM_MENU_CONFIRM 0
+#define CONFIRM_MENU_BACK    1 // where the arrow starts, so a stray input doesn't confirm
+#define CONFIRM_MENU_COUNT   2
+
+static const char *const reset_wifi_menu_labels[CONFIRM_MENU_COUNT] = {"Confirm Reset Wi-Fi", "Back"};
+static const char *const reset_wifi_menu_body[] = {
+    "Forget the saved Wi-Fi network and open the setup portal?",
+};
+
 enum menu_screen_t {
   MENU_SCREEN_MAIN,
   MENU_SCREEN_SPECIAL,
+  MENU_SCREEN_SETTINGS,
+  MENU_SCREEN_RESET_WIFI,
 };
 
 enum menu_outcome_t {
   MENU_OUTCOME_NEXT_SCREEN,
   MENU_OUTCOME_PREVIOUS_SCREEN,
   MENU_OUTCOME_SPECIAL_FUNCTION,
+  MENU_OUTCOME_RESET_WIFI,
   MENU_OUTCOME_CLOSE, // Close on the main menu, or a timeout on any screen
 };
 
@@ -300,6 +327,9 @@ static menu_outcome_t run_menu_screens(SPECIAL_FUNCTION *function) {
       case MAIN_MENU_SPECIAL:
         screen = MENU_SCREEN_SPECIAL;
         break;
+      case MAIN_MENU_SETTINGS:
+        screen = MENU_SCREEN_SETTINGS;
+        break;
       default: // Close, or timeout
         return MENU_OUTCOME_CLOSE;
       }
@@ -314,6 +344,29 @@ static menu_outcome_t run_menu_screens(SPECIAL_FUNCTION *function) {
       }
       *function = special_menu_items[item].function;
       return MENU_OUTCOME_SPECIAL_FUNCTION;
+    }
+    case MENU_SCREEN_SETTINGS: {
+      int item = run_menu_screen(settings_menu_labels, SETTINGS_MENU_COUNT, true);
+      switch (item) {
+      case SETTINGS_MENU_RESET_WIFI:
+        screen = MENU_SCREEN_RESET_WIFI;
+        break;
+      case SETTINGS_MENU_BACK:
+        screen = MENU_SCREEN_MAIN;
+        break;
+      default: // timeout
+        return MENU_OUTCOME_CLOSE;
+      }
+      break;
+    }
+    case MENU_SCREEN_RESET_WIFI: {
+      int choice = run_menu_screen(reset_wifi_menu_labels, CONFIRM_MENU_COUNT, true, reset_wifi_menu_body,
+                                   sizeof(reset_wifi_menu_body) / sizeof(reset_wifi_menu_body[0]), MENU_TIMEOUT_MS,
+                                   CONFIRM_MENU_BACK);
+      if (choice < 0) return MENU_OUTCOME_CLOSE;
+      if (choice == CONFIRM_MENU_CONFIRM) return MENU_OUTCOME_RESET_WIFI;
+      screen = MENU_SCREEN_SETTINGS;
+      break;
     }
     }
   }
@@ -343,6 +396,10 @@ void menu_open(const menu_controls_t &controls) {
     // The API request names this function, so the server runs it rather than the saved one
     special_function = function;
     special_function_chosen = true;
+    break;
+  case MENU_OUTCOME_RESET_WIFI:
+    Log_info("Resetting WiFi from the menu");
+    resetDeviceCredentials();
     break;
   case MENU_OUTCOME_CLOSE:
     // Re-show the current image and go back to sleep

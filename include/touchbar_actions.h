@@ -8,7 +8,6 @@
 // Resolves the current navigation intent and dispatches it. Called once per wake.
 void process_iqs323_data(void);
 
-void handle_wifi_reset_confirmation();
 void handle_power_off_confirmation();
 
 // Redraws the touchbar indicator if a full-screen refresh would have erased it.

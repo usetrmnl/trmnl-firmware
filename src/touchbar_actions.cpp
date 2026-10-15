@@ -71,14 +71,10 @@ static const menu_controls_t touchbar_menu_controls = {
     touchbar_menu_read,
 };
 
-// Static flag to prevent re-entry during WiFi reset confirmation
-static bool in_wifi_reset_confirmation = false;
 // Static flag to prevent re-entry during power-off confirmation
 static bool in_power_off_confirmation = false;
 // Cooldown timestamp after cancel to prevent immediate re-trigger
 static uint32_t s_power_off_cooldown_until = 0;
-
-static void confirm_wifi_reset() { resetDeviceCredentials(); }
 
 static void confirm_power_off() {
   clearShipmentStatus();
@@ -127,16 +123,6 @@ static bool handle_confirmation_flow(bool &in_flag, MSG message, void (*on_confi
   return false;
 }
 
-void handle_wifi_reset_confirmation() {
-  Log_info("Entering WiFi reset confirmation mode");
-  bool confirmed = handle_confirmation_flow(in_wifi_reset_confirmation, WIFI_RESET_CONFIRM, confirm_wifi_reset);
-
-  if (!confirmed) {
-    Log_info("WiFi reset cancelled - redrawing last image and sleeping");
-    show_last_image_and_sleep();
-  }
-}
-
 void handle_power_off_confirmation() {
   Log_info("Entering power-off confirmation mode");
   handle_confirmation_flow(in_power_off_confirmation, POWER_OFF_CONFIRM, confirm_power_off);
@@ -169,7 +155,6 @@ static void dispatch_touchbar_intent(const touchbar_resolution_t &resolved) {
       // TODO: CH1 hold was previously reserved for an OTG toggle feature -
       // not implemented yet. See otg_state/otg_turn_on()/otg_turn_off().
     break;
-  case touchbar_intent_t::CORNER_HOLD_CONFIRMED:
   case touchbar_intent_t::NONE:
   case touchbar_intent_t::CANCEL:
   case touchbar_intent_t::CONFIRM:
@@ -178,18 +163,7 @@ static void dispatch_touchbar_intent(const touchbar_resolution_t &resolved) {
   }
 }
 
-void process_iqs323_data(void) {
-  touchbar_resolution_t resolved = touchbar_resolve_intent();
-
-  if (resolved.intent == touchbar_intent_t::CORNER_HOLD_CONFIRMED) {
-    if (!in_wifi_reset_confirmation) {
-      handle_wifi_reset_confirmation();
-    }
-    return;
-  }
-
-  dispatch_touchbar_intent(resolved);
-}
+void process_iqs323_data(void) { dispatch_touchbar_intent(touchbar_resolve_intent()); }
 
 void touchbar_redraw_pending_indicator(void) {
   if (has_pending_indicator) {

@@ -1,9 +1,10 @@
 #ifndef MENU_H
 #define MENU_H
 
-// The device menu: next/previous screen, Special (the special functions). It knows nothing of how
-// it is driven: a control scheme (menu_controls_t) turns a board's inputs into up/down/select, and
-// says what to draw as hints for them. The TRMNL X touch bar's is in touchbar_actions.cpp.
+// The device menu: next/previous screen, Special (the special functions), Settings (Wi-Fi reset).
+// It knows nothing of how it is driven: a control scheme (menu_controls_t) turns a board's inputs
+// into up/down/select, and says what to draw as hints for them. The TRMNL X touch bar's is in
+// touchbar_actions.cpp.
 
 // The icon left of a menu hint's label
 typedef enum {
@@ -45,7 +46,7 @@ struct menu_controls_t {
 
 // Opens the menu with `controls` and does what is chosen. Next Screen and the special functions
 // return, for the wake to go on and fetch the next screen (with the special function, if chosen);
-// everything else sleeps and does not return.
+// everything else sleeps or restarts and does not return.
 void menu_open(const menu_controls_t &controls);
 
 #endif // MENU_H

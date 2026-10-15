@@ -54,40 +54,6 @@ static bool tap_mode_is_hold(uint8_t channel_index, uint32_t hold_threshold_ms =
   }
 }
 
-// Polls both corners together so one finger landing slightly after the other
-// doesn't fail the gesture; a corner that releases before the threshold still cancels it.
-static bool corner_hold_confirmed(uint32_t hold_threshold_ms = 600)
-{
-  const uint32_t POLL_INTERVAL_MS = 20;
-  touchbar_snapshot_t snap;
-  bool ch0_was_touched = false;
-  bool ch2_was_touched = false;
-
-  while (millis() - startup_time < hold_threshold_ms) {
-    iqs323_task_read_snapshot(&snap);
-    bool ch0_touched = snapshot_channel_touched(snap, 0);
-    bool ch2_touched = snapshot_channel_touched(snap, 2);
-
-    if ((ch0_was_touched && !ch0_touched) || (ch2_was_touched && !ch2_touched)) {
-      return false;
-    }
-    ch0_was_touched = ch0_touched;
-    ch2_was_touched = ch2_touched;
-
-    // Only draw once both corners are actually down together, so a lone
-    // corner (a plain BACK/NEXT hold) doesn't animate here at all.
-    if (ch0_touched && ch2_touched) {
-      uint32_t elapsed = millis() - startup_time;
-      float progress = (float)elapsed / (float)hold_threshold_ms;
-      display_draw_touchbar_progress_pair(TOUCHBAR_LEFT, progress, TOUCHBAR_RIGHT, progress);
-    }
-    delay(POLL_INTERVAL_MS);
-  }
-
-  iqs323_task_read_snapshot(&snap);
-  return snapshot_channel_touched(snap, 0) && snapshot_channel_touched(snap, 2);
-}
-
 static TouchbarHoldTracker g_confirmation_middle_hold_tracker(1 << IQS323_CH1, 600);
 static bool g_confirmation_middle_was_touched = false;
 
@@ -134,25 +100,21 @@ static touchbar_resolution_t resolve_intent_tap_mode(void)
 
   touchbar_resolution_t result = { touchbar_intent_t::NONE, false };
 
-  if (corner_hold_confirmed()) {
-    result = { touchbar_intent_t::CORNER_HOLD_CONFIRMED, false };
-  } else {
-    // A quick tap may have already released by boot; also check the
-    // wake-stub-time snapshot for which channel was touched.
-    touchbar_snapshot_t snap;
-    iqs323_task_read_snapshot(&snap);
-    touchbar_snapshot_t wake_snap;
-    iqs323_task_read_wake_stub_snapshot(&wake_snap);
-    for (uint8_t i = 0; i < 3; i++) {
-      if (!snapshot_channel_touched(snap, i) && !snapshot_channel_touched(wake_snap, i)) continue;
-      bool hold = tap_mode_is_hold(i, 2000);
-      switch (i) {
-        case 0: result = { touchbar_intent_t::BACK, hold }; break;
-        case 2: result = { touchbar_intent_t::NEXT, hold }; break;
-        case 1: result = { touchbar_intent_t::MIDDLE, hold }; break;
-      }
-      break; // only the first touched channel is handled per resolve
+  // A quick tap may have already released by boot; also check the
+  // wake-stub-time snapshot for which channel was touched.
+  touchbar_snapshot_t snap;
+  iqs323_task_read_snapshot(&snap);
+  touchbar_snapshot_t wake_snap;
+  iqs323_task_read_wake_stub_snapshot(&wake_snap);
+  for (uint8_t i = 0; i < 3; i++) {
+    if (!snapshot_channel_touched(snap, i) && !snapshot_channel_touched(wake_snap, i)) continue;
+    bool hold = tap_mode_is_hold(i, 2000);
+    switch (i) {
+      case 0: result = { touchbar_intent_t::BACK, hold }; break;
+      case 2: result = { touchbar_intent_t::NEXT, hold }; break;
+      case 1: result = { touchbar_intent_t::MIDDLE, hold }; break;
     }
+    break; // only the first touched channel is handled per resolve
   }
 
   iqs323_task_set_streaming_mode(false);

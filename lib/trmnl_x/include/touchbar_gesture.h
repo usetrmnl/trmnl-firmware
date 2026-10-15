@@ -12,7 +12,6 @@ enum class touchbar_intent_t {
     BACK,
     NEXT,
     MIDDLE,
-    CORNER_HOLD_CONFIRMED,
     CANCEL,
     CONFIRM,
 };

@@ -65,20 +65,23 @@ module TrmnlX
     end
   end
 
-  # Hold both edges of the touch bar, let go as the WiFi reset confirmation prompt appears, and
-  # wait until it is on the screen: the firmware draws the prompt (a few seconds on the X panel)
-  # before it reads the touch bar again, so an answer given during the refresh is missed.
-  def ask_to_reset_wifi(s, since)
-    s.pause do # both fingers down at the same instant
-      s.touch_down("left")
-      s.touch_down("right")
-    end
-    s.wait(console: /Entering WiFi reset confirmation mode/, since:, timeout: 15)
-    s.touch_up("left")
-    s.touch_up("right")
-    # The display is still idle right after that line; wait for the prompt to be drawn.
-    s.wait(console: /display_show_msg end/, since:, timeout: 15)
-    s.wait(display_idle: true, settle_ms: 100, timeout: 15)
+  # Wake a sleeping X into the touch menu and go to Settings..., leaving it on the screen with the
+  # arrow on its first item, Reset Wi-Fi...
+  def open_settings_menu(s)
+    c = s.status["console_total"]
+    s.touch("center", ms: 150)
+    s.wait(console: /menu_show_screen end/, since: c, timeout: 30)
+    menu_tap(s, "right", /Next Screen -> Previous Screen/)
+    menu_tap(s, "right", /Previous Screen -> Special/)
+    menu_tap(s, "right", /Special\.\.\. -> Settings/)
+    menu_tap(s, "center", /chose Settings/, screen: true)
+  end
+
+  # Open Settings..., then Reset Wi-Fi..., leaving its confirmation (Confirm Reset Wi-Fi, Back)
+  # on the screen with the arrow on Back.
+  def ask_to_reset_wifi(s)
+    open_settings_menu(s)
+    menu_tap(s, "center", /chose Reset Wi-Fi/, screen: true)
   end
 
   # The flash of an X a customer just unboxed: a shipped X (see ShippedX) taken out of shipment
@@ -123,9 +126,8 @@ module TrmnlX
   # - a short press (up to 1 s, which wakes the OG and refreshes) is a tap in the middle, which
   #   wakes the X (Update-Source: EXT0) into the touch menu, then a second one choosing Next
   #   Screen, which refreshes (TrmnlX.next_screen);
-  # - a long press (5-15 s: forget WiFi, open the setup portal) is the X's WiFi reset: hold both
-  #   edges, then confirm the prompt with a 1.5 s hold in the middle (check_corners_gesture,
-  #   handle_wifi_reset_confirmation);
+  # - a long press (5-15 s: forget WiFi, open the setup portal) is the X's WiFi reset: Settings,
+  #   Reset Wi-Fi... and its confirmation in the touch menu (TrmnlX.ask_to_reset_wifi);
   # - the OG's double click or 1-5 s press (run the special function) and 15 s press (soft reset:
   #   forget the device too) aren't mapped: the X runs the saved special function from its touch
   #   menu, but nothing drives that here yet, and it has no soft reset. An example using them is
@@ -156,12 +158,13 @@ module TrmnlX
       down ? touch_down("center") : touch_up("center")
     end
 
-    # Forget WiFi and open the setup portal: both edges, then a middle hold. The X reads the
-    # gesture when it wakes, so it waits for the device to be asleep first.
+    # Forget WiFi and open the setup portal from the touch menu. The X reads the touch bar when
+    # it wakes, so it waits for the device to be asleep first.
     def reset_wifi_gesture
       wait(state: "deep_sleep", timeout: 120, settle_ms: 200) unless status["state"] == "deep_sleep"
-      TrmnlX.ask_to_reset_wifi(self, status["console_total"])
-      touch("center", ms: 1500)
+      TrmnlX.ask_to_reset_wifi(self)
+      TrmnlX.menu_tap(self, "left", /Back -> Confirm Reset Wi-Fi/)
+      touch("center", ms: 150)
     end
 
     def close
