@@ -72,6 +72,23 @@ static const menu_controls_t touchbar_menu_controls = {
     touchbar_menu_hints, touchbar_menu_begin, touchbar_menu_end, touchbar_menu_read, &touchbar_tutorial,
 };
 
+// The factory's check that each zone works before the device ships, from the setup portal
+static const menu_tutorial_t touchbar_ship_check = {
+    nullptr,
+    "Prepare for Shipping",
+    "Test the touchbar, then the device shuts down for shipment.",
+    {
+        {"Left Tap", nullptr, "Left"},
+        {"Center Tap", nullptr, "Center"},
+        {"Right Tap", nullptr, "Right"},
+    },
+    "Tap left, then center, then right.",
+    "Touchbar OK! Shutting down for shipment.",
+    nullptr,
+};
+
+#define TOUCHBAR_SHIP_CHECK_HOLD_MS 2000
+
 // Single dispatch point for the resolved navigation intent.
 static void dispatch_touchbar_intent(const touchbar_resolution_t &resolved) {
   if (resolved.intent != touchbar_intent_t::NONE && !menu_tutorial_done(touchbar_menu_controls)) {
@@ -110,6 +127,17 @@ static void dispatch_touchbar_intent(const touchbar_resolution_t &resolved) {
 }
 
 void process_iqs323_data(void) { dispatch_touchbar_intent(touchbar_resolve_intent()); }
+
+bool touchbar_poll_ship_check(void) {
+  static TouchbarHoldTracker middle_hold(1 << 1, TOUCHBAR_SHIP_CHECK_HOLD_MS);
+  touchbar_snapshot_t snap;
+  iqs323_task_read_snapshot(&snap);
+  if (!middle_hold.poll(snap.ch1_touch ? 1 << 1 : 0)) return false;
+  Log_info("Middle button held in the setup portal - opening the ship check");
+  menu_run_ship_check(touchbar_menu_controls, touchbar_ship_check);
+  Log_info("Ship check: timeout - back to the setup portal");
+  return true;
+}
 
 void touchbar_redraw_pending_indicator(void) {
   if (has_pending_indicator) {

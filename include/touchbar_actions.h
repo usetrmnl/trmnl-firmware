@@ -12,4 +12,9 @@ void process_iqs323_data(void);
 // Redraws the touchbar indicator if a full-screen refresh would have erased it.
 void touchbar_redraw_pending_indicator(void);
 
+// Polled while the setup portal is up: a 2 s middle press opens the factory's ship check (menu.h,
+// menu_run_ship_check), which shuts the device down once each zone has been tapped. Returns true if
+// the check timed out instead, leaving its screen up for the caller to replace.
+bool touchbar_poll_ship_check(void);
+
 #endif // TOUCHBAR_ACTIONS_H

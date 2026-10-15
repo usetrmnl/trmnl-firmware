@@ -424,7 +424,7 @@ static void tutorial_show_screen(const menu_tutorial_t &tutorial, bool replace) 
     bbep.setFont(Roboto_Black_24);
     menu_draw_centered(control.title, x, TUTORIAL_CONTROLS_Y);
     bbep.setFont(Inter_18);
-    menu_draw_centered(control.action, x, TUTORIAL_CONTROLS_Y + TUTORIAL_LINE_SPACING);
+    if (control.action) menu_draw_centered(control.action, x, TUTORIAL_CONTROLS_Y + TUTORIAL_LINE_SPACING);
     tutorial_draw_pill(tutorial, slot, slot == 0 ? MENU_HINT_OUTLINED : MENU_HINT_PLAIN);
   }
   bbep.setFont(Roboto_Black_24);
@@ -433,10 +433,10 @@ static void tutorial_show_screen(const menu_tutorial_t &tutorial, bool replace) 
   Log_info("tutorial_show_screen end");
 }
 
-// Shows the tutorial of the menu's control scheme and runs it until the user closes it (true; it is
-// marked done) or timeout (false). `replace`: replace a menu on the screen instead of the image.
-static bool run_tutorial(bool replace) {
-  const menu_tutorial_t &tutorial = *menu_controls->tutorial;
+// Shows `tutorial` and has the user try its controls in order. Returns true once they have and, with
+// `confirm`, then used any control to close it; false after a timeout. `replace`: replace a screen on
+// the display instead of the image.
+static bool run_tutorial_screen(const menu_tutorial_t &tutorial, bool replace, bool confirm) {
   tutorial_show_screen(tutorial, replace);
 
   int next = 0; // the hint slot of the control to tap next; MENU_HINT_SLOTS once all are
@@ -450,7 +450,6 @@ static bool run_tutorial(bool replace) {
     const int slot = input == menu_input_t::UP ? 0 : input == menu_input_t::SELECT ? 1 : 2;
     if (next == MENU_HINT_SLOTS) {
       Log_info("Tutorial: done");
-      preferences.putBool(tutorial.done_key, true);
       return true;
     }
     if (slot != next) {
@@ -466,9 +465,29 @@ static bool run_tutorial(bool replace) {
       menu_draw_centered(tutorial.finish, bbep.width() / 2, TUTORIAL_FINISH_Y);
     }
     bbep.partialUpdate(false);
+    if (next == MENU_HINT_SLOTS && !confirm) {
+      Log_info("Tutorial: done");
+      return true;
+    }
   }
   Log_info("Tutorial: timeout - closing");
   return false;
+}
+
+// Shows the tutorial of the menu's control scheme and runs it until the user closes it (true; it is
+// marked done) or timeout (false). `replace`: replace a menu on the screen instead of the image.
+static bool run_tutorial(bool replace) {
+  const menu_tutorial_t &tutorial = *menu_controls->tutorial;
+  if (!run_tutorial_screen(tutorial, replace, true)) return false;
+  preferences.putBool(tutorial.done_key, true);
+  return true;
+}
+
+// With the shipment status cleared, the restart goes back to shipment mode: off until USB-C power.
+// Does not return.
+static void menu_shut_down(void) {
+  clearShipmentStatus();
+  ESP.restart();
 }
 
 enum menu_screen_t {
@@ -628,10 +647,8 @@ void menu_open(const menu_controls_t &controls) {
     resetDeviceCredentials();
     break;
   case MENU_OUTCOME_SHUT_DOWN:
-    // With the shipment status cleared, the restart goes back to shipment mode: off until USB-C power
     Log_info("Shutting down from the menu");
-    clearShipmentStatus();
-    ESP.restart();
+    menu_shut_down();
     break;
   case MENU_OUTCOME_CLOSE:
     // Re-show the current image and go back to sleep
@@ -652,6 +669,18 @@ void menu_open_tutorial(const menu_controls_t &controls) {
   if (controls.end) controls.end();
   menu_controls = nullptr;
   show_last_image_and_sleep();
+}
+
+void menu_run_ship_check(const menu_controls_t &controls, const menu_tutorial_t &check) {
+  Log_info("Opening the ship check");
+  menu_controls = &controls;
+  if (controls.begin) controls.begin();
+  bool passed = run_tutorial_screen(check, true, false);
+  if (controls.end) controls.end();
+  menu_controls = nullptr;
+  if (!passed) return;
+  Log_info("Ship check passed - shutting down");
+  menu_shut_down();
 }
 
 #endif // BOARD_TRMNL_X

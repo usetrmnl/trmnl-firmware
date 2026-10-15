@@ -14,6 +14,7 @@
 
 #ifdef BOARD_TRMNL_X
 #include <modem.h>
+#include <touchbar_actions.h>
 #include <vector>
 #endif
 
@@ -133,6 +134,15 @@ void wifiSessionConnect(bool should_show_error_now) {
 
     showMessageWithLogo(WIFI_CONNECT, "", false, Messages::firmware_version().c_str(), WifiCaptivePortal.getAPSSID());
     WifiCaptivePortal.setResetSettingsCallback(resetDeviceCredentials);
+#ifdef BOARD_TRMNL_X
+    // Device builders hold the middle of the touch bar to check it and ship the device
+    WifiCaptivePortal.setPortalTickCallback([]() {
+      if (touchbar_poll_ship_check()) {
+        showMessageWithLogo(WIFI_CONNECT, "", false, Messages::firmware_version().c_str(),
+                            WifiCaptivePortal.getAPSSID());
+      }
+    });
+#endif
     bool portal_ok = WifiCaptivePortal.startPortal();
     if (!portal_ok) {
       WiFi.disconnect(true);

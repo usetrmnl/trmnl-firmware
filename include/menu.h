@@ -34,7 +34,7 @@ enum class menu_input_t {
 // ones that read UP, SELECT and DOWN in the menu.
 typedef struct {
   const char *title; // e.g. "Left Tap"
-  const char *action; // what it does, e.g. "Previous screen"
+  const char *action; // what it does, e.g. "Previous screen", or nullptr
   const char *label; // its pill, filled once it is tried, e.g. "Previous"
 } menu_tutorial_control_t;
 
@@ -77,5 +77,11 @@ bool menu_tutorial_done(const menu_controls_t &controls);
 
 // Shows the tutorial of `controls`, then the current image again, and sleeps: does not return
 void menu_open_tutorial(const menu_controls_t &controls);
+
+// The factory's last check before shipping: has the user try each control of `controls` in order, on
+// a screen laid out like a tutorial with `check`'s text (its item and done_key unused), then shuts
+// down for shipment like Settings' Shut Down (does not return). Returns after a timeout without
+// them, with the check still on the screen.
+void menu_run_ship_check(const menu_controls_t &controls, const menu_tutorial_t &check);
 
 #endif // MENU_H
