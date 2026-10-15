@@ -29,7 +29,7 @@ $ESPTOOL_CMD write_flash 0x10000 "$FIRMWARE_FILE"
 if [ $? -eq 0 ]; then
     echo ""
     echo "✅ Application flash completed successfully!"
-    echo "🔄 Device will reboot automatically"
+    echo "If the device does not restart, reset it manually."
     echo ""
 else
     echo ""
