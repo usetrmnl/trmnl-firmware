@@ -66,7 +66,7 @@ module TrmnlX
   end
 
   # Wake a sleeping X into the touch menu and go to Settings..., leaving it on the screen with the
-  # arrow on its first item, Reset Wi-Fi...
+  # arrow on its first item, Diagnostics...
   def open_settings_menu(s)
     c = s.status["console_total"]
     s.touch("center", ms: 150)
@@ -81,6 +81,7 @@ module TrmnlX
   # on the screen with the arrow on Back.
   def ask_to_reset_wifi(s)
     open_settings_menu(s)
+    menu_tap(s, "right", /Diagnostics\.\.\. -> Reset Wi-Fi/)
     menu_tap(s, "center", /chose Reset Wi-Fi/, screen: true)
   end
 

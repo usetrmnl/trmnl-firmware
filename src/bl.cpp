@@ -651,6 +651,7 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   inputs.macAddress = device_mac_address();
   WiFiStatus wifi = getWiFiStatus();
   inputs.rssi = wifi.rssi;
+  last_wifi_rssi = wifi.rssi;
   inputs.wifiBand = wifi.band;
   inputs.batteryVoltage = vBatt;
   inputs.firmwareVersion = String(FW_VERSION_STRING);

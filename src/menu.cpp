@@ -2,7 +2,7 @@
 
 // The TRMNL X is the only board with a control scheme for the menu so far. Another board needs one
 // (menu_controls_t), and a look at the X-only parts here: the drawing (FastEPD, sized for the X's
-// panel), Shut Down (shipment mode).
+// panel), Shut Down (shipment mode) and the fuel gauge in Diagnostics.
 #ifdef BOARD_TRMNL_X
 
 #include <Preferences.h>
@@ -270,6 +270,7 @@ static const special_menu_item_t special_menu_items[] = {
 
 // The Settings submenu; Back goes to the main menu
 enum settings_menu_item_t {
+  SETTINGS_MENU_DIAGNOSTICS,
   SETTINGS_MENU_RESET_WIFI,
   SETTINGS_MENU_SHUT_DOWN,
   SETTINGS_MENU_BACK,
@@ -277,6 +278,7 @@ enum settings_menu_item_t {
 };
 
 static const char *const settings_menu_labels[SETTINGS_MENU_COUNT] = {
+    "Diagnostics...",
     "Reset Wi-Fi...",
     "Shut Down...",
     "Back",
@@ -298,10 +300,80 @@ static const char *const shut_down_menu_body[] = {
     "Reconnect USB-C to power to wake it up.",
 };
 
+#define DIAGNOSTICS_TIMEOUT_MS 60000 // time to read them
+#define DIAGNOSTICS_MAX_LINES  16
+
+static const char *const diagnostics_menu_labels[] = {"Back"};
+
+// Fills lines with the Diagnostics screen's "label\tvalue" lines; returns how many
+static int diagnostics_lines(String *lines) {
+  int n = 0;
+  auto add = [&](const char *label, const String &value) {
+    if (n < DIAGNOSTICS_MAX_LINES) lines[n++] = String(label) + "\t" + value;
+  };
+  char buf[64];
+
+  add("Firmware", Messages::firmware_version());
+  String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
+  add("Friendly ID", friendly_id.isEmpty() ? String("not set up") : friendly_id);
+
+  float volts = battery().readVoltage();
+  int soc = battery().readSoc();
+  if (volts < 0) {
+    add("Battery", "unknown");
+  } else if (soc < 0) {
+    snprintf(buf, sizeof(buf), "%.2f V", volts);
+    add("Battery", buf);
+  } else {
+    snprintf(buf, sizeof(buf), "%.2f V, %d%%", volts, soc);
+    add("Battery", buf);
+  }
+  float temperature = battery().readTemperature();
+  if (volts >= 0) {
+    snprintf(buf, sizeof(buf), "%.1f C", temperature);
+    add("Battery Temperature", buf);
+  }
+  UsbStatus usb = power().usbStatus();
+  ChargingStatus charging = power().chargingStatus();
+  add("Power", usb == UsbStatus::CONNECTED      ? (charging == ChargingStatus::CHARGING ? "USB-C, charging" : "USB-C")
+               : usb == UsbStatus::DISCONNECTED ? "Battery"
+                                                : "unknown");
+
+  if (WifiCaptivePortal.isSaved()) {
+    WifiCredentials creds = WifiCaptivePortal.getLastCredentials();
+    add("Wi-Fi Network", creds.ssid);
+    add("Wi-Fi Band", creds.is5GHz ? "5 GHz" : "2.4 GHz");
+  } else {
+    add("Wi-Fi Network", "not set up");
+  }
+  if (last_wifi_rssi != 0) {
+    snprintf(buf, sizeof(buf), "%d dBm (last connection)", last_wifi_rssi);
+    add("Wi-Fi Signal", buf);
+  } else {
+    add("Wi-Fi Signal", "unknown");
+  }
+
+  uint32_t refresh = refreshInterval.seconds();
+  if (refresh % 60 == 0) {
+    snprintf(buf, sizeof(buf), "every %lu min", (unsigned long)(refresh / 60));
+  } else {
+    snprintf(buf, sizeof(buf), "every %lu s", (unsigned long)refresh);
+  }
+  add("Refresh", buf);
+  add("Server", preferences.getString(PREFERENCES_API_URL, API_BASE_URL));
+  String panel = display_panel_rev_string();
+  add("Panel", panel.isEmpty() ? String("unknown") : panel);
+  snprintf(buf, sizeof(buf), "%lu KB heap, %lu KB PSRAM", (unsigned long)(ESP.getFreeHeap() / 1024),
+           (unsigned long)(ESP.getFreePsram() / 1024));
+  add("Free Memory", buf);
+  return n;
+}
+
 enum menu_screen_t {
   MENU_SCREEN_MAIN,
   MENU_SCREEN_SPECIAL,
   MENU_SCREEN_SETTINGS,
+  MENU_SCREEN_DIAGNOSTICS,
   MENU_SCREEN_RESET_WIFI,
   MENU_SCREEN_SHUT_DOWN,
 };
@@ -358,6 +430,9 @@ static menu_outcome_t run_menu_screens(SPECIAL_FUNCTION *function) {
     case MENU_SCREEN_SETTINGS: {
       int item = run_menu_screen(settings_menu_labels, SETTINGS_MENU_COUNT, true);
       switch (item) {
+      case SETTINGS_MENU_DIAGNOSTICS:
+        screen = MENU_SCREEN_DIAGNOSTICS;
+        break;
       case SETTINGS_MENU_RESET_WIFI:
         screen = MENU_SCREEN_RESET_WIFI;
         break;
@@ -370,6 +445,20 @@ static menu_outcome_t run_menu_screens(SPECIAL_FUNCTION *function) {
       default: // timeout
         return MENU_OUTCOME_CLOSE;
       }
+      break;
+    }
+    case MENU_SCREEN_DIAGNOSTICS: {
+      String lines[DIAGNOSTICS_MAX_LINES];
+      const char *body[DIAGNOSTICS_MAX_LINES];
+      int n = diagnostics_lines(lines);
+      for (int i = 0; i < n; i++) {
+        Log_info("Diagnostics: %s", lines[i].c_str());
+        body[i] = lines[i].c_str();
+      }
+      if (run_menu_screen(diagnostics_menu_labels, 1, true, body, n, DIAGNOSTICS_TIMEOUT_MS) < 0) {
+        return MENU_OUTCOME_CLOSE;
+      }
+      screen = MENU_SCREEN_SETTINGS;
       break;
     }
     case MENU_SCREEN_RESET_WIFI: {
@@ -398,7 +487,7 @@ void menu_open(const menu_controls_t &controls) {
   Log_info("Opening menu");
   SPECIAL_FUNCTION function = SF_NONE;
   menu_controls = &controls;
-  // For the battery icon: the wake detects the battery and reads the gauge after the
+  // For the battery icon and Diagnostics: the wake detects the battery and reads the gauge after the
   // menu, and the gauge isn't read without a battery detected
   battery_count = detect_battery_count();
   battery().gaugeInit();

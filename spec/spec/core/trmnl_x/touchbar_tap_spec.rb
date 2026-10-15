@@ -69,6 +69,7 @@ RSpec.describe "TRMNL X touch bar: tap mode", env: "TRMNL_X" do
         # the arrow starts on Back
         TrmnlX.menu_tap(s, "center", /chose Back/, screen: true)
         # Settings again, with the arrow on its first item
+        TrmnlX.menu_tap(s, "right", /Diagnostics\.\.\. -> Reset Wi-Fi/)
         TrmnlX.menu_tap(s, "center", /chose Reset Wi-Fi/, screen: true)
         expect(s.console(c).join("\n")).not_to match(/Resetting WiFi/)
         expect(s.status["portal_url"]).to be_nil
@@ -91,6 +92,7 @@ RSpec.describe "TRMNL X touch bar: tap mode", env: "TRMNL_X" do
     # Open Settings, then Shut Down..., leaving its confirmation on the screen
     def ask(s)
       TrmnlX.open_settings_menu(s)
+      TrmnlX.menu_tap(s, "right", /Diagnostics\.\.\. -> Reset Wi-Fi/)
       TrmnlX.menu_tap(s, "right", /Reset Wi-Fi\.\.\. -> Shut Down/)
       TrmnlX.menu_tap(s, "center", /chose Shut Down/, screen: true)
     end
@@ -120,8 +122,26 @@ RSpec.describe "TRMNL X touch bar: tap mode", env: "TRMNL_X" do
         ask(s)
         # the arrow starts on Back
         TrmnlX.menu_tap(s, "center", /chose Back/, screen: true)
-        TrmnlX.menu_tap(s, "right", /Reset Wi-Fi\.\.\. -> Shut Down/)
+        TrmnlX.menu_tap(s, "right", /Diagnostics\.\.\. -> Reset Wi-Fi/)
         expect(s.console(c).join("\n")).not_to match(/Shutting down/)
+      end
+    end
+  end
+
+  describe "Diagnostics" do
+    include_context "provisioned X"
+
+    it "shows the device's values, and Back goes back to Settings" do
+      boot_two_images do |s|
+        TrmnlX.open_settings_menu(s)
+        c = s.status["console_total"]
+        TrmnlX.menu_tap(s, "center", /chose Diagnostics/, screen: true)
+        log = s.console(c).join("\n")
+        expect(log).to match(/Diagnostics: Firmware\t\d+\.\d+\.\d+/)
+        expect(log).to match(/Diagnostics: Wi-Fi Network\tTRMNL-Sim/)
+        expect(log).to match(/Diagnostics: Wi-Fi Signal\t-\d+ dBm/)
+        TrmnlX.menu_tap(s, "center", /chose Back/, screen: true)
+        TrmnlX.menu_tap(s, "right", /Diagnostics\.\.\. -> Reset Wi-Fi/)
       end
     end
   end

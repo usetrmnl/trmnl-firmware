@@ -1,10 +1,10 @@
 #ifndef MENU_H
 #define MENU_H
 
-// The device menu: next/previous screen, Special (the special functions), Settings (Wi-Fi reset,
-// shut down). It knows nothing of how it is driven: a control scheme (menu_controls_t) turns a
-// board's inputs into up/down/select, and says what to draw as hints for them. The TRMNL X touch
-// bar's is in touchbar_actions.cpp.
+// The device menu: next/previous screen, Special (the special functions), Settings (diagnostics,
+// Wi-Fi reset, shut down). It knows nothing of how it is driven: a control scheme (menu_controls_t)
+// turns a board's inputs into up/down/select, and says what to draw as hints for them. The TRMNL X
+// touch bar's is in touchbar_actions.cpp.
 
 // The icon left of a menu hint's label
 typedef enum {
