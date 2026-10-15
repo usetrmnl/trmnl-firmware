@@ -33,13 +33,14 @@ static touchbar_side_t channel_touchbar_side(uint8_t channel_index)
 
 // True if channel i has been held since boot (not since first observed) for
 // hold_threshold_ms, to account for wake-stub touches that started before boot.
-// Shows the hold's progress while the channel is touched, except the middle's: a middle tap opens
+// Shows a left or right touch's indicator while the channel is still touched. A middle tap opens
 // the menu, which is drawn over the screen without clearing it, so its pill would show through.
 static bool tap_mode_is_hold(uint8_t channel_index, uint32_t hold_threshold_ms = 600)
 {
   const uint32_t POLL_INTERVAL_MS = 20;
   touchbar_snapshot_t snap;
   TouchbarHoldTracker tracker(1 << channel_index, hold_threshold_ms, startup_time);
+  bool indicator_drawn = channel_index == 1;
 
   while (true) {
     iqs323_task_read_snapshot(&snap);
@@ -47,8 +48,9 @@ static bool tap_mode_is_hold(uint8_t channel_index, uint32_t hold_threshold_ms =
     uint8_t mask = touched ? (1 << channel_index) : 0;
     if (tracker.poll(mask)) return true;
     if (!touched) return false;
-    if (channel_index != 1) {
-      display_draw_touchbar_progress(channel_touchbar_side(channel_index), tracker.progress());
+    if (!indicator_drawn) {
+      display_draw_touchbar_indicator(channel_touchbar_side(channel_index));
+      indicator_drawn = true;
     }
     delay(POLL_INTERVAL_MS);
   }

@@ -13,7 +13,6 @@
 
 // Touchbar indicator to redraw after a full-refresh (e.g. logo screen)
 static touchbar_side_t pending_indicator_side = TOUCHBAR_LEFT;
-static bool pending_indicator_filled = false;
 static bool has_pending_indicator = false;
 
 // The touch bar's control scheme for the menu (menu.h): left is up, right is down, the middle selects
@@ -60,16 +59,16 @@ static const menu_controls_t touchbar_menu_controls = {
     touchbar_menu_read,
 };
 
-// Single dispatch point for both modes' resolved navigation intent.
+// Single dispatch point for the resolved navigation intent.
 static void dispatch_touchbar_intent(const touchbar_resolution_t &resolved) {
   switch (resolved.intent) {
   case touchbar_intent_t::BACK:
-    display_draw_touchbar_indicator(TOUCHBAR_LEFT, resolved.held);
+    display_draw_touchbar_indicator(TOUCHBAR_LEFT);
     Log_info(resolved.held ? "Back button hold" : "Back button tapped");
     show_cached_image_by_offset(-1);
     break;
   case touchbar_intent_t::NEXT:
-    display_draw_touchbar_indicator(TOUCHBAR_RIGHT, resolved.held);
+    display_draw_touchbar_indicator(TOUCHBAR_RIGHT);
     Log_info(resolved.held ? "Next button hold" : "Next button tapped");
     show_cached_image_by_offset(+1);
     break;
@@ -79,13 +78,12 @@ static void dispatch_touchbar_intent(const touchbar_resolution_t &resolved) {
       menu_open(touchbar_menu_controls);
       break;
     }
-    display_draw_touchbar_indicator(TOUCHBAR_MIDDLE, true);
+    display_draw_touchbar_indicator(TOUCHBAR_MIDDLE);
     Log_info("Middle button hold");
     pending_indicator_side = TOUCHBAR_MIDDLE;
-    pending_indicator_filled = true;
     has_pending_indicator = true;
-      // TODO: CH1 hold was previously reserved for an OTG toggle feature -
-      // not implemented yet. See otg_state/otg_turn_on()/otg_turn_off().
+    // TODO: CH1 hold was previously reserved for an OTG toggle feature -
+    // not implemented yet. See otg_state/otg_turn_on()/otg_turn_off().
     break;
   case touchbar_intent_t::NONE:
   default:
@@ -97,7 +95,7 @@ void process_iqs323_data(void) { dispatch_touchbar_intent(touchbar_resolve_inten
 
 void touchbar_redraw_pending_indicator(void) {
   if (has_pending_indicator) {
-    display_draw_touchbar_indicator(pending_indicator_side, pending_indicator_filled);
+    display_draw_touchbar_indicator(pending_indicator_side);
     has_pending_indicator = false;
   }
 }

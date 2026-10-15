@@ -180,19 +180,9 @@ void display_show_msg_api(uint8_t *image_buffer, String message);
 
 void display_show_msg_qa(const float *voltage, const float *temperature, bool qa_result);
 
-/**
- * @brief Enable or disable light sleep at runtime
- * @param enabled true to enable light sleep, false to disable
- * @return none
- */
-void display_draw_touchbar_indicator(touchbar_side_t side, bool filled);
-// progress: 0.0 = empty (border only), 1.0 = fully filled; draws a growing left-to-right bar
-void display_draw_touchbar_progress(touchbar_side_t side, float progress);
-
-// Draws two touchbar pills in a single hardware refresh pass, so they update
-// simultaneously instead of one after another.
-void display_draw_touchbar_progress_pair(touchbar_side_t side_a, float progress_a, touchbar_side_t side_b,
-                                         float progress_b);
+// Draws a black indicator in a white border above the touched region of the touch bar (TRMNL X):
+// an arrow pointing left or right at the sides, a pill in the middle
+void display_draw_touchbar_indicator(touchbar_side_t side);
 
 // Fills a pill (a rectangle whose left and right ends are half circles) in the image buffer
 void display_fill_pill(int x, int y, int w, int h, uint8_t color);
@@ -205,6 +195,11 @@ void display_fill_pill(int x, int y, int w, int h, uint8_t color);
 #define DISPLAY_BATTERY_ICON_MARGIN 40 // from the top and right edges, where the screens put it
 void display_draw_battery_icon(int x, int y);
 
+/**
+ * @brief Enable or disable light sleep at runtime
+ * @param enabled true to enable light sleep, false to disable
+ * @return none
+ */
 void display_set_light_sleep(uint8_t enabled);
 
 /**

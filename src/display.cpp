@@ -696,11 +696,6 @@ uint16_t display_width()
 }
 
 #ifdef PARALLEL_EPD
-void display_draw_touchbar_indicator(touchbar_side_t side, bool filled)
-{
-    display_draw_touchbar_progress(side, filled ? 1.0f : 0.0f);
-}
-
 // partialUpdate() only sends hardware refresh commands where the software
 // previousBuffer/currentBuffer actually differ - it has no idea the physical
 // panel still shows a stale full-color/grayscale image underneath (e-paper
@@ -713,8 +708,7 @@ void display_draw_touchbar_indicator(touchbar_side_t side, bool filled)
 // and never get a hardware command for its own region at all, leaving the
 // old image showing through. So every side gets this same forced-diff
 // treatment on its own first draw, not just whichever side happens to draw
-// first - tracked here so both the single- and dual-side entry points share
-// one seeded/not-yet-seeded record per side.
+// first.
 static bool touchbar_side_seeded[3] = { false, false, false };
 #endif // PARALLEL_EPD
 
@@ -760,35 +754,91 @@ void display_draw_battery_icon(int x, int y)
 #endif // BOARD_TRMNL_X
 }
 
-// Outline is always black with a white ring inset from it; the content area inside the ring
-// fills left-to-right in black as progress goes 0.0 -> 1.0. Only TRMNL X has a touchbar.
-void display_draw_touchbar_progress(touchbar_side_t side, float progress)
+#ifdef BOARD_TRMNL_X
+#define TOUCHBAR_INDICATOR_MARGIN_BOTTOM 52 // from the bottom of the screen to the indicators' bottom edge
+#define TOUCHBAR_INDICATOR_BORDER 6         // white border around the black indicator
+// The middle indicator: a pill
+#define TOUCHBAR_PILL_H 48
+#define TOUCHBAR_PILL_W (TOUCHBAR_PILL_H * 4)
+// The left and right indicators: arrows pointing that way
+#define TOUCHBAR_ARROW_W 160      // tail to tip
+#define TOUCHBAR_ARROW_HEAD_H 64  // the head's base
+#define TOUCHBAR_ARROW_HEAD_W 56  // the head's base to the tip
+#define TOUCHBAR_ARROW_SHAFT_H 24
+
+static int touchbar_indicator_center_x(touchbar_side_t side)
+{
+    int w = bbep.width();
+    switch (side) {
+        case TOUCHBAR_LEFT:   return w / 6;
+        case TOUCHBAR_MIDDLE: return w / 2;
+        case TOUCHBAR_RIGHT:  return w * 5 / 6;
+        default:              return -1;
+    }
+}
+
+// The span [*x0, *x1) of a right-pointing arrow, from its center, on the row dy from its center line
+static bool touchbar_arrow_span(float dy, int *x0, int *x1)
+{
+    const float head_half = TOUCHBAR_ARROW_HEAD_H / 2.0f;
+    const float ady = fabsf(dy);
+    if (ady >= head_half) return false;
+    const int base = TOUCHBAR_ARROW_W / 2 - TOUCHBAR_ARROW_HEAD_W; // the head's base
+    *x1 = base + (int)lroundf(TOUCHBAR_ARROW_HEAD_W * (1.0f - ady / head_half));
+    *x0 = ady < TOUCHBAR_ARROW_SHAFT_H / 2.0f ? -TOUCHBAR_ARROW_W / 2 : base;
+    return true;
+}
+
+// Fills an arrow centered on (cx, cy) pointing left (dir < 0) or right, grown by `grow` pixels all
+// round: each row takes in the rows within `grow` of it, widened by as much as a circle would be.
+static void touchbar_fill_arrow(int cx, int cy, int dir, int grow, uint8_t color)
+{
+    const int h = TOUCHBAR_ARROW_HEAD_H;
+    for (int row = -grow; row < h + grow; row++) {
+        int lo = INT_MAX, hi = INT_MIN;
+        for (int k = -grow; k <= grow; k++) {
+            int src = row + k;
+            int x0, x1;
+            if (src < 0 || src >= h || !touchbar_arrow_span(src + 0.5f - h / 2.0f, &x0, &x1)) continue;
+            int e = (int)lroundf(sqrtf((float)(grow * grow - k * k)));
+            lo = min(lo, x0 - e);
+            hi = max(hi, x1 + e);
+        }
+        if (lo >= hi) continue;
+        bbep.fillRect(dir < 0 ? cx - hi : cx + lo, cy - h / 2 + row, hi - lo, 1, color);
+    }
+}
+
+// Draws a side's indicator centered on (cx, cy): black, in a white border. inverse swaps black and
+// white, for the seed.
+static void touchbar_draw_indicator(touchbar_side_t side, int cx, int cy, bool inverse)
+{
+    const uint8_t fg = inverse ? BBEP_WHITE : BBEP_BLACK;
+    const uint8_t bg = inverse ? BBEP_BLACK : BBEP_WHITE;
+    const int b = TOUCHBAR_INDICATOR_BORDER;
+    if (side == TOUCHBAR_MIDDLE) {
+        int rx = cx - TOUCHBAR_PILL_W / 2;
+        int ry = cy - TOUCHBAR_PILL_H / 2;
+        display_fill_pill(rx - b, ry - b, TOUCHBAR_PILL_W + 2 * b, TOUCHBAR_PILL_H + 2 * b, bg);
+        display_fill_pill(rx, ry, TOUCHBAR_PILL_W, TOUCHBAR_PILL_H, fg);
+    } else {
+        int dir = side == TOUCHBAR_LEFT ? -1 : 1;
+        touchbar_fill_arrow(cx, cy, dir, b, bg);
+        touchbar_fill_arrow(cx, cy, dir, 0, fg);
+    }
+}
+#endif // BOARD_TRMNL_X
+
+// Black, in a white border, above the touched region: an arrow pointing left or right at the sides,
+// a pill in the middle. Only TRMNL X has a touchbar.
+void display_draw_touchbar_indicator(touchbar_side_t side)
 {
 #ifdef BOARD_TRMNL_X
-    const int radius = 24;
-    const int margin_bottom = 52;
-    int w = bbep.width();
-    int h = bbep.height();
-    int x;
-    Log_info("Drawing touchbar indicator %d, progress %d%%\n", (int)side, (int)(progress * 100));
-    switch (side) {
-        case TOUCHBAR_LEFT:   x = w / 6;     break;
-        case TOUCHBAR_MIDDLE: x = w / 2;     break;
-        case TOUCHBAR_RIGHT:  x = w * 5 / 6; break;
-        default: return;
-    }
-    if (progress < 0.0f) progress = 0.0f;
-    if (progress > 1.0f) progress = 1.0f;
-    int y = h - margin_bottom - radius;
-    int prev_mode = bbep.getPreviousMode();
-    const int rect_h = radius * 2;
-    const int rect_w = rect_h * 4;
-    const int ring = 3;   // white ring inset from the outline
-    const int border = 3; // black outline thickness
-    int rx = x - rect_w / 2;
-    int ry = y - rect_h / 2;
-    int fill_w = (int)(rect_w * progress);
-    if (prev_mode == BB_MODE_NONE) {
+    Log_info("Drawing touchbar indicator %d\n", (int)side);
+    int cx = touchbar_indicator_center_x(side);
+    if (cx < 0) return;
+    int cy = bbep.height() - TOUCHBAR_INDICATOR_MARGIN_BOTTOM - TOUCHBAR_PILL_H / 2;
+    if (bbep.getPreviousMode() == BB_MODE_NONE) {
         bbep.setMode(BB_MODE_1BPP);
         bbep.fillScreen(BBEP_WHITE);
         int sz = bbep.width() * bbep.height() / 8; // 1-bit per pixel
@@ -797,118 +847,13 @@ void display_draw_touchbar_progress(touchbar_side_t side, float progress)
     }
     if (!touchbar_side_seeded[side]) {
         touchbar_side_seeded[side] = true;
-        // Seed with the exact per-pixel inverse of what we're about to draw
-        // (border, ring, and the fill boundary all flipped) so the real draw
-        // right after always produces a full diff for partialUpdate() to
-        // push, no matter what progress this first draw for this side uses.
-        bbep.fillRect(rx - ring - border, ry - ring - border, rect_w + 2*(ring+border), rect_h + 2*(ring+border), BBEP_WHITE);
-        bbep.fillRect(rx - ring, ry - ring, rect_w + (2*ring), rect_h + (2*ring), BBEP_BLACK);
-        bbep.fillRect(rx, ry, rect_w, rect_h, BBEP_WHITE);
-        if (fill_w < rect_w) {
-            bbep.fillRect(rx + fill_w, ry, rect_w - fill_w, rect_h, BBEP_BLACK);
-        }
+        // Seed with the exact per-pixel inverse of what we're about to draw so the real draw
+        // right after always produces a full diff for partialUpdate() to push.
+        touchbar_draw_indicator(side, cx, cy, true);
         int sz = bbep.width() * bbep.height() / 8;
         memcpy(bbep.previousBuffer(), bbep.currentBuffer(), sz);
     }
-    // Outline stays black, ring stays white; content area is white with a black progress bar growing from the left
-    bbep.fillRect(rx - ring - border, ry - ring - border, rect_w + 2*(ring+border), rect_h + 2*(ring+border), BBEP_BLACK);
-    bbep.fillRect(rx - ring, ry - ring, rect_w + (2*ring), rect_h + (2*ring), BBEP_WHITE);
-    if (fill_w > 0) {
-        bbep.fillRect(rx, ry, fill_w, rect_h, BBEP_BLACK);
-    }
-    bbep.partialUpdate(true); // avoid the costly power-cycle each call
-#endif // BOARD_TRMNL_X
-}
-
-// Draws two touchbar pills (both corners during a corner-hold gesture) in a
-// single partialUpdate() pass, so they visibly update simultaneously instead
-// of one after another - display_draw_touchbar_progress() calls
-// partialUpdate() internally on every call, so calling it twice in a row for
-// two different sides produces two separate physical refresh passes with a
-// visible stagger between them. Only TRMNL X has a touchbar.
-void display_draw_touchbar_progress_pair(touchbar_side_t side_a, float progress_a, touchbar_side_t side_b, float progress_b)
-{
-#ifdef BOARD_TRMNL_X
-    const int radius = 24;
-    const int margin_bottom = 52;
-    int w = bbep.width();
-    int h = bbep.height();
-    Log_info("Drawing touchbar indicator pair %d/%d, progress %d%%\n", (int)side_a, (int)side_b, (int)(progress_a * 100));
-    if (progress_a < 0.0f) progress_a = 0.0f;
-    if (progress_a > 1.0f) progress_a = 1.0f;
-    if (progress_b < 0.0f) progress_b = 0.0f;
-    if (progress_b > 1.0f) progress_b = 1.0f;
-    int y = h - margin_bottom - radius;
-    const int rect_h = radius * 2;
-    const int rect_w = rect_h * 4;
-    const int ring = 3;   // white ring inset from the outline
-    const int border = 3; // black outline thickness
-    int ry = y - rect_h / 2;
-
-    int x_a, x_b;
-    switch (side_a) {
-        case TOUCHBAR_LEFT:   x_a = w / 6;     break;
-        case TOUCHBAR_MIDDLE: x_a = w / 2;     break;
-        case TOUCHBAR_RIGHT:  x_a = w * 5 / 6; break;
-        default: return;
-    }
-    switch (side_b) {
-        case TOUCHBAR_LEFT:   x_b = w / 6;     break;
-        case TOUCHBAR_MIDDLE: x_b = w / 2;     break;
-        case TOUCHBAR_RIGHT:  x_b = w * 5 / 6; break;
-        default: return;
-    }
-    int rx_a = x_a - rect_w / 2;
-    int rx_b = x_b - rect_w / 2;
-    int fill_w_a = (int)(rect_w * progress_a);
-    int fill_w_b = (int)(rect_w * progress_b);
-
-    if (bbep.getPreviousMode() == BB_MODE_NONE) {
-        bbep.setMode(BB_MODE_1BPP);
-        bbep.fillScreen(BBEP_WHITE);
-        int sz = bbep.width() * bbep.height() / 8; // 1-bit per pixel
-        memcpy(bbep.previousBuffer(), bbep.currentBuffer(), sz);
-        bbep.setPreviousMode(BB_MODE_1BPP);
-    }
-    // Both sides' seed patterns must land in currentBuffer before the single
-    // shared memcpy() below - seeding one side, syncing previousBuffer, then
-    // seeding the other would sync away the first side's still-pending real
-    // draw before it ever gets pushed. See display_draw_touchbar_progress()
-    // for why this forced-diff seed is needed at all.
-    bool need_seed_a = !touchbar_side_seeded[side_a];
-    bool need_seed_b = !touchbar_side_seeded[side_b];
-    if (need_seed_a || need_seed_b) {
-        if (need_seed_a) {
-            touchbar_side_seeded[side_a] = true;
-            bbep.fillRect(rx_a - ring - border, ry - ring - border, rect_w + 2*(ring+border), rect_h + 2*(ring+border), BBEP_WHITE);
-            bbep.fillRect(rx_a - ring, ry - ring, rect_w + (2*ring), rect_h + (2*ring), BBEP_BLACK);
-            bbep.fillRect(rx_a, ry, rect_w, rect_h, BBEP_WHITE);
-            if (fill_w_a < rect_w) {
-                bbep.fillRect(rx_a + fill_w_a, ry, rect_w - fill_w_a, rect_h, BBEP_BLACK);
-            }
-        }
-        if (need_seed_b) {
-            touchbar_side_seeded[side_b] = true;
-            bbep.fillRect(rx_b - ring - border, ry - ring - border, rect_w + 2*(ring+border), rect_h + 2*(ring+border), BBEP_WHITE);
-            bbep.fillRect(rx_b - ring, ry - ring, rect_w + (2*ring), rect_h + (2*ring), BBEP_BLACK);
-            bbep.fillRect(rx_b, ry, rect_w, rect_h, BBEP_WHITE);
-            if (fill_w_b < rect_w) {
-                bbep.fillRect(rx_b + fill_w_b, ry, rect_w - fill_w_b, rect_h, BBEP_BLACK);
-            }
-        }
-        int sz = bbep.width() * bbep.height() / 8;
-        memcpy(bbep.previousBuffer(), bbep.currentBuffer(), sz);
-    }
-    bbep.fillRect(rx_a - ring - border, ry - ring - border, rect_w + 2*(ring+border), rect_h + 2*(ring+border), BBEP_BLACK);
-    bbep.fillRect(rx_a - ring, ry - ring, rect_w + (2*ring), rect_h + (2*ring), BBEP_WHITE);
-    if (fill_w_a > 0) {
-        bbep.fillRect(rx_a, ry, fill_w_a, rect_h, BBEP_BLACK);
-    }
-    bbep.fillRect(rx_b - ring - border, ry - ring - border, rect_w + 2*(ring+border), rect_h + 2*(ring+border), BBEP_BLACK);
-    bbep.fillRect(rx_b - ring, ry - ring, rect_w + (2*ring), rect_h + (2*ring), BBEP_WHITE);
-    if (fill_w_b > 0) {
-        bbep.fillRect(rx_b, ry, fill_w_b, rect_h, BBEP_BLACK);
-    }
+    touchbar_draw_indicator(side, cx, cy, false);
     bbep.partialUpdate(true); // avoid the costly power-cycle each call
 #endif // BOARD_TRMNL_X
 }

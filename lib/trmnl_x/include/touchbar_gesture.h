@@ -37,13 +37,6 @@ public:
     bool poll(uint8_t current_channel_mask);
     void reset();
 
-    // 0.0-1.0 fraction of threshold_ms elapsed since the hold became active; 0 if not active.
-    float progress() const {
-        if (!active_) return 0.0f;
-        float p = (float)(millis() - start_ms_) / (float)threshold_ms_;
-        return p > 1.0f ? 1.0f : p;
-    }
-
 private:
     uint8_t channel_mask_;
     uint32_t threshold_ms_;
