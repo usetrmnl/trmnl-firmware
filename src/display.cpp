@@ -520,6 +520,12 @@ void enter_shipment_sleep()
 
     // Main sleep loop
     while (true) {
+        // Read the charger before every sleep: one connected before the reads that clear /INT never wakes us.
+        if (bbep.ioRead(0) == 0) {
+            Serial.println("*** CHARGER DETECTED - Exiting shipment mode ***");
+            break;
+        }
+
         sleep_count++;
 
         esp_light_sleep_start();
@@ -543,20 +549,7 @@ void enter_shipment_sleep()
             gpio38_state = digitalRead(TCA9535_INT);
             Serial.printf("GPIO38 state after wakeup: %d\n", gpio38_state);
 
-            // Check if charger connected (TCA9535 pin 0 LOW)
-            bbep.ioPinMode(0, INPUT);
-            delay(10);
-            uint8_t pin0_state = bbep.ioRead(0);
-            Serial.printf("TCA9535 pin 0 (charger detect): %d (0=charger present)\n", pin0_state);
-
-            if (pin0_state == 0) {
-                Serial.println("*** CHARGER DETECTED - Exiting shipment mode ***");
-                Serial.flush();
-                delay(100);
-                break;  // Exit shipment mode
-            }
-
-            // False wakeup - clear interrupt and continue
+            // Clear the interrupt
             for (uint8_t pin = 0; pin < 16; pin++) {
                 bbep.ioPinMode(pin, INPUT);
                 bbep.ioRead(pin);
