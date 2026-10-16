@@ -8,7 +8,7 @@
  * @param reserved variable address to store parsed color schematic
  * @return bmp_err_e error code
  */
-bmp_err_e parseBMPHeader(uint8_t *data, bool &reversed) {
+bmp_err_e parseBMPHeader(uint8_t *data, bool &reversed, uint32_t maxWidth, uint32_t maxHeight, bool smallerAllowed) {
 
   // Check if the file is a BMP image
   if (data[0] != 'B' || data[1] != 'M') {
@@ -25,7 +25,10 @@ bmp_err_e parseBMPHeader(uint8_t *data, bool &reversed) {
 
   if (colorTableEntries == 0) colorTableEntries = (1 << bitsPerPixel);
 
-  if (width != 800 || height != 480 || bitsPerPixel != 1 || imageDataSize != 48000 || colorTableEntries != 2)
+  bool sizeFits = smallerAllowed ? (width > 0 && height > 0 && width <= maxWidth && height <= maxHeight)
+                                 : (width == maxWidth && height == maxHeight);
+  uint32_t rowBytes = ((width + 31) / 32) * 4; // rows are padded to 4 bytes
+  if (!sizeFits || bitsPerPixel != 1 || imageDataSize != rowBytes * height || colorTableEntries != 2)
     return BMP_BAD_SIZE;
   // Get the offset of the pixel data
   uint32_t dataOffset = *(uint32_t *)&data[10];

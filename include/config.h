@@ -47,6 +47,15 @@
 
 #define DISPLAY_BMP_IMAGE_SIZE 48062 // in bytes - 62 bytes - header; 48000 bytes - bitmap (480*800 1bpp) / 8
 #define DEFAULT_IMAGE_SIZE     48000
+#ifdef BOARD_TRMNL_X
+#define BMP_WIDTH           1872
+#define BMP_HEIGHT          1404
+#define BMP_SMALLER_ALLOWED true // drawn centered
+#else
+#define BMP_WIDTH           800
+#define BMP_HEIGHT          480
+#define BMP_SMALLER_ALLOWED false // the BMP is the panel's frame buffer
+#endif
 #if defined(BOARD_HAS_PSRAM)
 #define MAX_IMAGE_SIZE 750000 // Use PSRAM on the ESP32-S3/C5 (all X-class boards have PSRAM)
 #else
