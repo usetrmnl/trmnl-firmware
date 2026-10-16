@@ -85,7 +85,7 @@ module TrmnlSim
       host_ports.each { |guest, host| args += ["--host-port", "#{guest}=#{host}"] }
       @coverage_path = (coverage || default_coverage_path)&.to_s
       args += ["--coverage", @coverage_path] if @coverage_path
-      args += ["--coverage-root", self.class.coverage_root.to_s] if @coverage_path && self.class.coverage_root
+      args += ["--coverage-root", Simulator.coverage_root.to_s] if @coverage_path && Simulator.coverage_root
       args += ["--faults", JSON.generate(faults)] if faults
       args += ["--wifi-networks", JSON.generate(networks)] if networks
       if memcheck
@@ -514,7 +514,7 @@ module TrmnlSim
     end
 
     def default_coverage_path
-      dir = self.class.coverage_dir
+      dir = Simulator.coverage_dir
       return unless dir
 
       # one directory per build (named after its environment), for per-device reports
@@ -527,7 +527,7 @@ module TrmnlSim
     end
 
     def save_artifacts
-      out = self.class.artifacts_dir
+      out = Simulator.artifacts_dir
       return unless out
 
       FileUtils.mkdir_p(out)
