@@ -287,7 +287,6 @@ General.describe "Images" do
 
   describe "Bmp" do
     it "bmp with an inverted palette" do
-      skip "parseBMPHeader takes 800x480 BMPs only" unless [w, h] == [800, 480]
       level = digit(0, 1)
       # index 0 = white, 1 = black
       data = bmp(palette: [255, 255, 255, 0, 0, 0, 0, 0].pack("C*"), black: ->(x, y) { !seven.(x, y) })

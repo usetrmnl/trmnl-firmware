@@ -116,6 +116,9 @@ uint16_t display_height();
  */
 uint16_t display_width();
 
+// True if a BMP smaller than the panel is drawn centered; otherwise a BMP must be the panel's size
+bool display_centers_smaller_bmp();
+
 /**
  * @brief Function to draw multi-line text onto the display
  * @param x_start X coordinate to start drawing

@@ -8,7 +8,9 @@ enum bmp_err_e {
   BMP_INVALID_OFFSET,
 };
 
-bmp_err_e parseBMPHeader(uint8_t *data, bool &reserved);
+// Accepts only a 1-bit BMP the size of the panel, or smaller when smallerAllowed
+bmp_err_e parseBMPHeader(uint8_t *data, bool &reserved, int panelWidth = 800, int panelHeight = 480,
+                         bool smallerAllowed = false);
 
 // True if color table entry 0 is brighter than entry 1 (i.e. 0 bits are white)
 bool bmpIsPaletteReversed(const uint8_t *data);

@@ -29,20 +29,20 @@ module TrmnlSim
 
     # ---- encoders -------------------------------------------------------------------------------
 
-    # 800x480 1-bit BMP in the format TRMNL serves. `pixel.(x, y)` is true for black.
-    def bmp_1bit(pixel)
-      row = WIDTH / 8 # 100 bytes, already 4-byte aligned
-      data = Array.new(row * HEIGHT, 0)
-      HEIGHT.times do |y|
-        base = (HEIGHT - 1 - y) * row # bottom-up
-        WIDTH.times do |x|
+    # 1-bit BMP in the format TRMNL serves (800x480 by default). `pixel.(x, y)` is true for black.
+    def bmp_1bit(pixel, width = WIDTH, height = HEIGHT)
+      row = ((width + 31) / 32) * 4 # rows are padded to 4 bytes
+      data = Array.new(row * height, 0)
+      height.times do |y|
+        base = (height - 1 - y) * row # bottom-up
+        width.times do |x|
           data[base + (x / 8)] |= 0x80 >> (x % 8) unless pixel.(x, y) # palette index 1 = white
         end
       end
       palette = [0, 0, 0, 0, 255, 255, 255, 0].pack("C*")
       offset = 14 + 40 + palette.bytesize
       header = "BM".b + [offset + data.size, 0, 0, offset].pack("VvvV")
-      info = [40, WIDTH, HEIGHT, 1, 1, 0, data.size, 2835, 2835, 2, 2].pack("Vl<l<vvVVl<l<VV")
+      info = [40, width, height, 1, 1, 0, data.size, 2835, 2835, 2, 2].pack("Vl<l<vvVVl<l<VV")
       header + info + palette + data.pack("C*")
     end
 

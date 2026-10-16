@@ -101,6 +101,16 @@ void test_parseBMPHeader_BMP_BAD_SIZE(void) {
   TEST_ASSERT_EQUAL(BMP_BAD_SIZE, parseBMPHeader(bmp_data.data(), image_reverse));
 }
 
+void test_parseBMPHeader_smaller_allowed(void) {
+  auto bmp_data = readBMPFile("./test.bmp"); // 800x480
+  bool image_reverse = false;
+
+  TEST_ASSERT_EQUAL(BMP_NO_ERR, parseBMPHeader(bmp_data.data(), image_reverse, 1872, 1404, true));
+  TEST_ASSERT_EQUAL(BMP_NO_ERR, parseBMPHeader(bmp_data.data(), image_reverse, 800, 480, true));
+  TEST_ASSERT_EQUAL(BMP_BAD_SIZE, parseBMPHeader(bmp_data.data(), image_reverse, 1872, 1404, false));
+  TEST_ASSERT_EQUAL(BMP_BAD_SIZE, parseBMPHeader(bmp_data.data(), image_reverse, 640, 480, true));
+}
+
 void test_parseBMPHeader_BMP_COLOR_SCHEME_FAILED(void) {
   auto bmp_data = readBMPFile("./test.bmp");
   bool image_reverse = false;
@@ -135,6 +145,7 @@ void process() {
   RUN_TEST(test_bmpNormalizePolarity_reversed);
   RUN_TEST(test_parseBMPHeader_NOT_BMP);
   RUN_TEST(test_parseBMPHeader_BMP_BAD_SIZE);
+  RUN_TEST(test_parseBMPHeader_smaller_allowed);
   RUN_TEST(test_parseBMPHeader_BMP_COLOR_SCHEME_FAILED);
   RUN_TEST(test_parseBMPHeader_BMP_INVALID_OFFSET);
   UNITY_END();
