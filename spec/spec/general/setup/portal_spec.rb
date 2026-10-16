@@ -177,11 +177,13 @@ General.describe "Portal" do
     def expect_portal_stays(s)
       t0 = s.status["sim_time_s"]
       deadline = Time.now + 90
+      s.set_portal_client(false) # nobody uses the portal while we watch, so turbo can run
       while (st = s.status)["sim_time_s"] < t0 + 30
         expect(st["state"]).not_to eq("deep_sleep"), "went to sleep instead of keeping the portal"
         expect(Time.now).to be < deadline, "the simulation stalled"
         sleep 0.5
       end
+      s.set_portal_client(true)
       s.wait(portal: true, timeout: 30)
       expect(s.portal_scan["networks"].map { _1["name"] }).to include("TRMNL-Sim")
     end
