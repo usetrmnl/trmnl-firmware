@@ -500,6 +500,9 @@ void enter_shipment_sleep()
     // Check initial GPIO38 state
     int gpio38_state = digitalRead(TCA9535_INT);
 
+    // display_sleep() leaves its light-sleep timer armed, which would wake us every second.
+    esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_TIMER);
+
     // Enable GPIO wakeup for light sleep
     esp_err_t err = esp_sleep_enable_gpio_wakeup();
     if (err != ESP_OK) {
