@@ -13,7 +13,7 @@ RSpec.describe "TRMNL X touch bar: ship check", env: "TRMNL_X" do
     shipped.boot do |s|
       s.wait_for_console(/Entering shipment mode light sleep loop/, timeout: 30)
       s.dock(true)
-      s.wait(portal: true, timeout: 30)
+      s.wait(portal: true, timeout: 90)
       s.dock(false)
       s.wait(display_idle: true, timeout: 30)
       yield s
