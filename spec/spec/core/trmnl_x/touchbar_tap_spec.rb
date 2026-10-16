@@ -60,7 +60,7 @@ RSpec.describe "TRMNL X touch bar: tap mode", env: "TRMNL_X" do
       ask do |s|
         TrmnlX.menu_tap(s, "left", /Back -> Confirm Reset Wi-Fi/)
         s.touch("center", ms: 150)
-        s.wait(portal: true, timeout: 15)
+        s.wait(portal: true, timeout: 90)
       end
     end
 

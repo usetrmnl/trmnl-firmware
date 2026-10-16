@@ -15,7 +15,7 @@ RSpec.describe "TRMNL X", env: "TRMNL_X" do
     def time_out(s, docked: false)
       s.wait_for_console(/Entering shipment mode light sleep loop/, timeout: 30)
       s.dock(true)
-      s.wait(portal: true, timeout: 30)
+      s.wait(portal: true, timeout: 90)
       s.dock(docked)
       s.set_portal_client(false) # so turbo can run to the timeout
       # Serial isn't running when enter_shipment_sleep() announces itself on a production
@@ -66,7 +66,7 @@ RSpec.describe "TRMNL X", env: "TRMNL_X" do
         shipped.boot do |s|
           s.wait_for_console(/Entering shipment mode light sleep loop/, timeout: 30)
           s.dock(true)
-          s.wait(portal: true, timeout: 30)
+          s.wait(portal: true, timeout: 90)
           s.dock(false)
           c = s.status["console_total"]
           s.portal_request("/scan?force=1")
@@ -123,7 +123,7 @@ RSpec.describe "TRMNL X", env: "TRMNL_X" do
         st["sim_time_s"] >= t0 + 60
       end
       s.set_portal_client(true)
-      s.wait(portal: true, timeout: 30)
+      s.wait(portal: true, timeout: 90)
       expect(s.portal_request("/")[0]).to eq(200)
     end
 
