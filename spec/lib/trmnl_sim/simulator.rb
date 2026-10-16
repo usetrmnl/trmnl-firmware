@@ -186,12 +186,6 @@ module TrmnlSim
       post("/touch", { zone:, down: false })
     end
 
-    # A slide along the touch bar: "swipe_next", "swipe_back", "flick_next" or "flick_back"
-    # (only reported in slide mode).
-    def gesture(name)
-      post("/gesture", { gesture: name })
-    end
-
     # Put the device on / take it off its magnetic dock (TRMNL X). Returns once applied.
     def dock(docked = true)
       post("/dock", { docked: })
@@ -278,6 +272,13 @@ module TrmnlSim
     # (strings as-is, integers as decimal strings, blobs as hex).
     def preferences(namespace = "data")
       get_json("/preferences")["entries"].select { _1["namespace"] == namespace }.to_h { [_1["key"], _1["value"]] }
+    end
+
+    # Create or replace the preference `key` in `namespace`: `type` is an NVS type (u8, i32, string,
+    # blob...; Arduino booleans are u8). Only while the device is in deep sleep.
+    def set_preference(key, type, value, namespace: "data")
+      body = { partition: "nvs", namespace:, key:, type:, value: value.to_s }
+      checked(:put, "/preferences", request(:put, "/preferences", body:))
     end
 
     # ---- faults ---------------------------------------------------------------------------------------
