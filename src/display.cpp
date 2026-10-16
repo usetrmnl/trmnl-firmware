@@ -1261,6 +1261,7 @@ int png_draw_4clr(PNGDRAW *pDraw)
     int x, iDelta, iBpp = pDraw->iBpp;
     uint8_t uc=0, *d, *pTemp = bbep.getCache(); // get some scratch memory (not from the stack)
 
+    if (pDraw->y >= bbep.height()) return 0; // image is larger than the display, stop decoding it
     d = pTemp;
     switch (pDraw->iPixelType) {
         case PNG_PIXEL_INDEXED:
@@ -1354,7 +1355,8 @@ int png_draw_4clr(PNGDRAW *pDraw)
                 *d++ = uc;
             }
         } // for x
-    bbep.writeData(pTemp, (pDraw->iWidth+3)/4);
+    int iWidth = (pDraw->iWidth < bbep.width()) ? pDraw->iWidth : bbep.width(); // crop a wider image
+    bbep.writeData(pTemp, (iWidth+3)/4);
     return 1; // continue decoding
 } /* png_draw4clr() */
 #endif // BOARD_TRMNL_4CLR (4 color only)
