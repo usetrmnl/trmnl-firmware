@@ -237,6 +237,25 @@ General.describe "Errors" do
       end
     end
 
+    # The server may register the device without a setup logo (image_url null or ""; both
+    # parse to "", parse_response_api_setup.cpp). DeviceSetup::perform
+    # (src/services/device_setup.cpp) then skips the download and shows "Please visit
+    # trmnl.com/start with Friendly ID <id> to finish setup" over the built-in logo, as it does
+    # after a downloaded one, instead of a failed download's error screen and logged error.
+    { "null" => nil, "empty" => "" }.each do |what, image_url|
+      it "setup without an image url (#{what}) shows the friendly id" do
+        mock.setup = { image_url: }
+        mock.display = { status: 202, refresh_rate: 300 } # not added to an account yet
+        onboard do |s|
+          st = settle(s)
+          expect([st["boot_count"], st["state"]]).to eq([1, "deep_sleep"])
+          # no image request and no error logged: setup, then the usual /api/display
+          expect(mock.requests.map(&:path)).to eq(["/api/setup", "/api/display"])
+          expect(s).to show_message("friendly_id_message.png", [200, 372, 400, 56])
+        end
+      end
+    end
+
     it "setup server error" do
       mock.set_fault("/api/setup", status: 500)
       onboard_and_sleep
