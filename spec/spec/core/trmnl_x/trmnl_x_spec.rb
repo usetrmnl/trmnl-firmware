@@ -313,11 +313,13 @@ RSpec.describe "TRMNL X", env: "TRMNL_X" do
     # or it brought the portal back), and the portal answers.
     def expect_portal_to_stay(s)
       t0 = s.status["sim_time_s"]
+      s.set_portal_client(false) # nobody uses the portal while we watch, so turbo can run
       eventually("the simulation stalled", within: 120) do
         st = s.status
         expect(st["state"]).not_to eq("deep_sleep"), "went to sleep instead of keeping the portal"
         st["sim_time_s"] >= t0 + 60
       end
+      s.set_portal_client(true)
       s.wait(portal: true, timeout: 30)
       expect(s.portal_request("/")[0]).to eq(200)
     end
