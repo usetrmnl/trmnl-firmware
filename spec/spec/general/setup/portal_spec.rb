@@ -96,6 +96,16 @@ General.describe "Portal" do
         expect(scan).not_to include("TRMNL") # another device's setup network
       end
     end
+
+    # The TRMNL X lists what its modem's AT+CWLAP prints, unescaped; parentheses, quotes and
+    # commas in an SSID must not end it early (lib/trmnl/src/modem_scan_parse.cpp).
+    it "ssids keep their punctuation", :smoke do
+      nets = [{ ssid: "Foo (Bar)", rssi: -50 }, { ssid: "Say \"hi\", (5G)", rssi: -60 }]
+      fresh_device(networks: nets) do |s|
+        scan = s.portal_scan["networks"].to_h { [_1["name"], _1["rssi"]] }
+        expect(scan).to eq("Foo (Bar)" => "-50", "Say \"hi\", (5G)" => "-60")
+      end
+    end
   end
 
   describe "JoinOptions" do
