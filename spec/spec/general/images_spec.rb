@@ -176,6 +176,14 @@ General.describe "Images" do
       end
     end
 
+    it "larger gray png is cropped" do
+      px = panel_number("7")
+      level = ->(x, y) { x < w && y < h && px.(x, y) ? 0 : 3 }
+      show("large2.png", png(level, 2, width: w + 200, height: h + 120), "image/png") do |s|
+        expect(s).to show_image(expected(digit(0, 3), 2), tolerance: 64, max_ratio: 0)
+      end
+    end
+
     it "corrupt png is not drawn" do
       data = png(digit(0, 1))
       survives("corrupt.png", data.byteslice(0, 40) + zeros(data.bytesize - 40), "image/png")

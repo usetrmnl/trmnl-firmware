@@ -1261,6 +1261,7 @@ int png_draw_4clr(PNGDRAW *pDraw)
     int x, iDelta, iBpp = pDraw->iBpp;
     uint8_t uc=0, *d, *pTemp = bbep.getCache(); // get some scratch memory (not from the stack)
 
+    if (pDraw->y >= bbep.height()) return 0; // image is larger than the display, stop decoding it
     d = pTemp;
     switch (pDraw->iPixelType) {
         case PNG_PIXEL_INDEXED:
@@ -1354,7 +1355,8 @@ int png_draw_4clr(PNGDRAW *pDraw)
                 *d++ = uc;
             }
         } // for x
-    bbep.writeData(pTemp, (pDraw->iWidth+3)/4);
+    int iWidth = (pDraw->iWidth < bbep.width()) ? pDraw->iWidth : bbep.width(); // crop a wider image
+    bbep.writeData(pTemp, (iWidth+3)/4);
     return 1; // continue decoding
 } /* png_draw4clr() */
 #endif // BOARD_TRMNL_4CLR (4 color only)
@@ -1473,8 +1475,10 @@ int png_draw(PNGDRAW *pDraw)
     uint8_t uc = 0;
     uint8_t ucMask, ucPixel, src, *s, *d;
     int iPitch, iBpp;
+    bool bRotated = (pDraw->iWidth == bbep.height()); // a portrait image, drawn turned
+    int iWidth = (pDraw->iWidth < bbep.width()) ? pDraw->iWidth : bbep.width(); // crop a wider image
 
-    if (y >= bbep.height() && pDraw->iWidth != bbep.height()) return 0; // image is larger than the display (and not rotated), stop decoding it
+    if (y >= bbep.height() && !bRotated) return 0; // image is larger than the display, stop decoding it
     if (pDraw->iPixelType == PNG_PIXEL_INDEXED || pDraw->iBpp > 4) { // need to convert through the palette and/or reduce the bpp
         s = bbep.tempBuffer(); // temp space we can use
         iBpp = (pDraw->iBpp > 4) ? 4 : pDraw->iBpp;
@@ -1499,10 +1503,10 @@ int png_draw(PNGDRAW *pDraw)
     }
     iPitch = bbep.width()/2;
     if (iBpp == 1) {
-        if (bbep.width() >= pDraw->iWidth) { // normal orientation
+        if (!bRotated) {
             iPitch = (bbep.width() + 7)/8;
             d += y * iPitch; // point to the correct line
-            memcpy(d, s, (pDraw->iWidth+7)/8);
+            memcpy(d, s, (iWidth+7)/8);
         } else { // rotated
             uint8_t ucPixel, ucMask, j;
             d += (bbep.height() - 1) * iPitch;
@@ -1524,9 +1528,9 @@ int png_draw(PNGDRAW *pDraw)
             iBpp = 4;
         }
         // 4-bit native format (includes expanded 2-bit)
-        if (bbep.width() == pDraw->iWidth) { // normal orientation
+        if (!bRotated) {
             d += y * iPitch; // point to the correct line
-            memcpy(d, s, (pDraw->iWidth+1)/2);
+            memcpy(d, s, (iWidth+1)/2);
         } else { // rotated
             d += (bbep.height() - 1) * iPitch;
             d += (y / 2);
