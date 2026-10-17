@@ -14,7 +14,9 @@
 
 void show_last_image_and_sleep(void) {
   int file_size = 0;
-  String curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
+  // The image browsed to is the one on screen; the newest image only if it is gone
+  String curPath = preferences.getString(PREFERENCES_BROWSE_PATH_KEY, "");
+  if (curPath.isEmpty() || !filesystem_file_exists(curPath.c_str())) curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
   if (!curPath.isEmpty()) {
     uint8_t *buf = display_read_file(curPath.c_str(), &file_size);
     if (buf && file_size > 0) {

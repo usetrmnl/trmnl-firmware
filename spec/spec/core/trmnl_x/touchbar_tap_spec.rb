@@ -42,6 +42,27 @@ RSpec.describe "TRMNL X touch bar: tap mode", env: "TRMNL_X" do
     end
   end
 
+  describe "MainMenu" do
+    include_context "provisioned X"
+
+    it "Close redraws the image browsed to" do
+      boot_two_images do |s, one, _two|
+        touch_and_sleep(s, "left", 150, /Back button tapped/)
+        c = s.status["console_total"]
+        s.touch("center", ms: 150)
+        s.wait(console: /menu_show_screen end/, since: c, timeout: 30)
+        TrmnlX.menu_tap(s, "right", /Next Screen -> Previous Screen/)
+        TrmnlX.menu_tap(s, "right", /Previous Screen -> Touchbar Tutorial/)
+        TrmnlX.menu_tap(s, "right", /Touchbar Tutorial -> Special/)
+        TrmnlX.menu_tap(s, "right", /Special\.\.\. -> Settings/)
+        TrmnlX.menu_tap(s, "right", /Settings\.\.\. -> Close/)
+        s.touch("center", ms: 150)
+        s.wait(state: "deep_sleep", timeout: 60, settle_ms: 500)
+        expect(s).to show_image(one, tolerance: 64, max_ratio: 0)
+      end
+    end
+  end
+
   describe "WifiResetConfirmation" do
     include_context "provisioned X"
 
