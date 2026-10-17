@@ -276,7 +276,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse) {
             Log.info("Rewind BMP\n\r");
             buffer = (uint8_t *)malloc(DISPLAY_BMP_IMAGE_SIZE);
             file_check_bmp = filesystem_read_from_file(last_dot_file.c_str(), buffer, DISPLAY_BMP_IMAGE_SIZE);
-            bmp_proccess_response = parseBMPHeader(buffer, image_reverse);
+            bmp_proccess_response = parseBMPHeader(buffer, image_reverse, BMP_WIDTH, BMP_HEIGHT, BMP_SMALLER_ALLOWED);
           } else if (last_dot_file == "/last.png") {
             Log.info("Rewind PNG\n\r");
             buffer = display_read_file(last_dot_file.c_str(), &file_size);
@@ -335,16 +335,17 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse) {
 
           if (filesystem_file_exists("/current.bmp")) {
             Log.info("%s [%d]: send_to_me BMP\r\n", __FILE__, __LINE__);
-            buffer = (uint8_t *)malloc(DISPLAY_BMP_IMAGE_SIZE);
-
-            if (!filesystem_read_from_file("/current.bmp", buffer, DISPLAY_BMP_IMAGE_SIZE)) {
+            buffer = nullptr;
+            file_size = filesystem_read_and_allocate("/current.bmp", &buffer);
+            if (!buffer || file_size == 0) {
               free(buffer);
               buffer = nullptr;
               Log_error_submit("Error reading image!");
               return HTTPS_WRONG_IMAGE_FORMAT;
             }
 
-            bmp_err_e bmp_parse_result = parseBMPHeader(buffer, image_reverse);
+            bmp_err_e bmp_parse_result =
+              parseBMPHeader(buffer, image_reverse, BMP_WIDTH, BMP_HEIGHT, BMP_SMALLER_ALLOWED);
             if (bmp_parse_result != BMP_NO_ERR) {
               free(buffer);
               buffer = nullptr;

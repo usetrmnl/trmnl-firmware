@@ -863,7 +863,7 @@ static https_request_err_e downloadAndShow()
   }
   else if (!isPNG && !isJPEG)
   {
-    bmp_res = parseBMPHeader(buffer, image_reverse);
+    bmp_res = parseBMPHeader(buffer, image_reverse, BMP_WIDTH, BMP_HEIGHT, BMP_SMALLER_ALLOWED);
     Log.info("%s [%d]: BMP Parsing result: %d\r\n", __FILE__, __LINE__, bmp_res);
   }
   Serial.println();

@@ -1947,8 +1947,22 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
          // This work-around is due to a lack of RAM; the correct method would be to use loadBMP()
             const int iBmpWidth = image_buffer[18] | (image_buffer[19] << 8);
             const int iBmpHeight = image_buffer[22] | (image_buffer[23] << 8);
+#ifdef BOARD_TRMNL_X
+            const int iPixelBytes = ((iBmpWidth + 31) / 32) * 4 * iBmpHeight; // rows are padded to 4 bytes
+            const int iDataOffset = image_buffer[10] | (image_buffer[11] << 8);
+            if (iDataOffset + iPixelBytes > data_size) { // loadBMP() reads from the header's offset
+                Log_error("BMP pixel data ends past the file (offset %d)", iDataOffset);
+                return;
+            }
+            bmpNormalizePolarity(image_buffer, image_buffer + iDataOffset, iPixelBytes); // palette may be [white, black]
+            bbep.setMode(BB_MODE_1BPP);
+            bbep.fillScreen(BBEP_WHITE);
+            // reads padded, bottom-up rows itself
+            bbep.loadBMP(image_buffer, (bbep.width() - iBmpWidth) / 2, (bbep.height() - iBmpHeight) / 2, BBEP_WHITE, BBEP_BLACK);
+#else
             bmpNormalizePolarity(image_buffer, image_buffer+62, (iBmpWidth / 8) * iBmpHeight); // palette may be [white, black]
             flip_image(image_buffer+62, iBmpWidth, iBmpHeight, false); // fix bottom-up bitmap images
+#endif
 #ifdef BB_EPAPER
             bbep.setMemoryMode(BB_MODE_1BPP);
             bbep.setBuffer(image_buffer+62); // uncompressed 1-bpp bitmap

@@ -96,6 +96,42 @@ RSpec.describe "TRMNL X images", env: "TRMNL_X" do
     end
   end
 
+  describe "XBmp" do
+    it "1bit bmp" do
+      px = TrmnlX.digits("7")
+      show("seven.bmp", TrmnlSim::Images.bmp_1bit(->(x, y) { px.(x, y).zero? }, w, h), "image/bmp") do |s|
+        expect(s).to show_image(TrmnlSim::Images.expected_gray(levels(0, 1), w, h), tolerance: 64, max_ratio: 0)
+      end
+    end
+
+    it "smaller bmp is drawn centered" do
+      bw = 800
+      bh = 480
+      ox = (w - bw) / 2
+      oy = (h - bh) / 2
+      black = ->(x, y) { ((x / 40) + (y / 40)).even? }
+      inside = ->(x, y) { x.between?(ox, ox + bw - 1) && y.between?(oy, oy + bh - 1) }
+      level = ->(x, y) { inside.(x, y) && black.(x - ox, y - oy) ? 0 : 1 }
+      show("small.bmp", TrmnlSim::Images.bmp_1bit(black, bw, bh), "image/bmp") do |s|
+        expect(s).to show_image(TrmnlSim::Images.expected_gray(level, w, h), tolerance: 64, max_ratio: 0)
+      end
+    end
+
+    it "bmp larger than the panel is refused" do
+      m = dev.mock
+      url = m.set_file("/img/large.bmp", "image/bmp", TrmnlSim::Images.bmp_1bit(->(_x, _y) { false }, w + 32, h))
+      m.display = { image_url: url, filename: "plugin-000001-1000", refresh_rate: 300 }
+      dev.boot_asleep do |s|
+        s.wait(state: "deep_sleep", timeout: 15)
+        refreshes = s.status["display_refreshes"]
+        s.wake
+        m.wait_for_request("/img/large.bmp", timeout: 15)
+        s.wait(state: "deep_sleep", timeout: 15, settle_ms: 300)
+        expect(s.status["display_refreshes"]).to eq(refreshes)
+      end
+    end
+  end
+
   describe "XCache" do
     it "same image again is not downloaded or redrawn" do
       m = dev.mock
