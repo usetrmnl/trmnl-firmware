@@ -92,6 +92,16 @@ RSpec.describe "TRMNL X", env: "TRMNL_X" do
         end
       end
     end
+
+    # The S3 radio never starts on the modem path, and the server matches devices by this MAC.
+    it "onboarding on 5 GHz sends the device's own MAC to /api/setup" do
+      TrmnlSim::MockTrmnl.open do |mock|
+        shipped.boot do |s|
+          TrmnlX.onboard(s, mock, TrmnlX::SSID_5)
+          expect(mock.wait_for_request("/api/setup")).to have_header("ID", TrmnlX::MAC)
+        end
+      end
+    end
   end
 
   # A join that fails leaves the portal up, so the password can be corrected.
