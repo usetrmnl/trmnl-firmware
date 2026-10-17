@@ -185,7 +185,7 @@ RSpec.describe "TRMNL X", env: "TRMNL_X" do
     it "reports the fuel gauge next to its voltage estimate" do
       # Production X builds estimate the charge from the voltage (BYPASS_BQ27427_SOC) and
       # send the gauge's own readings in the Gauge-* headers for comparison. At 4.06 V the
-      # estimate sits on its 100 % plateau; the simulated gauge says 88 %.
+      # estimate's curve (lib/trmnl/src/battery_curve.cpp) gives 81 %; the simulated gauge says 88 %.
       req = dev.boot_asleep do |s|
         s.wait(state: "deep_sleep", timeout: 120)
         s.set_battery(4060)
@@ -197,7 +197,7 @@ RSpec.describe "TRMNL X", env: "TRMNL_X" do
       expect(req).to have_header("Battery-Voltage", a_value_within(0.05).of(4.06))
       expect(req).to have_header("Battery-Count", "1")
       # the voltage estimate, with a nominal 6000 mAh per cell and no state of health
-      expect(h.values_at("Percent-Charged", "Battery-Capacity", "Battery-Health")).to eq(%w[100 6000/6000 -1])
+      expect(h.values_at("Percent-Charged", "Battery-Capacity", "Battery-Health")).to eq(%w[81 4860/6000 -1])
       # the gauge's own view
       expect(h.values_at("Gauge-SOC", "Gauge-Capacity", "Gauge-Health")).to eq(%w[88 5280/6000 100])
       expect(h.values_at("Battery-Current", "Battery-Temp")).to eq(%w[-50 25.00]) # discharging
