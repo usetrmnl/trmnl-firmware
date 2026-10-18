@@ -849,6 +849,7 @@ static https_request_err_e downloadAndShow()
     display_show_image(buffer, content_size, true); // PNG and JPEG decoders leave the buffer intact
     Log.info("%s [%d]: Writing %s to SPIFFS\r\n", __FILE__, __LINE__, szTemp);
     filesystem_purge_old_file(szTemp); // try to delete the old version or older than 24h
+    filesystem_purge_if_full(); // create space if storage is full
     writeImageToFile(szTemp, buffer, content_size);
     DisplayedImage::remember(szTemp); // current image becomes the previous image
     String _curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
