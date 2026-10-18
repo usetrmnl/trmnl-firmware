@@ -1,5 +1,4 @@
 #include <api-client/request_headers.h>
-#include <special_function.h>
 #include <trmnl_log.h>
 
 HttpHeaderList buildDisplayHeaders(const ApiDisplayInputs &inputs) {
@@ -42,9 +41,13 @@ HttpHeaderList buildDisplayHeaders(const ApiDisplayInputs &inputs) {
   headers.push_back({"Height", String(inputs.displayHeight)});
 
   if (inputs.specialFunction != SF_NONE) {
-    char name[32] = {};
-    if (parseSpecialFunctionToStr(name, sizeof(name), inputs.specialFunction))
+    // "true" runs the function configured on the server; a name asks for that function
+    char name[32];
+    if (inputs.specialFunctionChosen && parseSpecialFunctionToStr(name, sizeof(name), inputs.specialFunction)) {
       headers.push_back({"special_function", name});
+    } else {
+      headers.push_back({"special_function", "true"});
+    }
   }
 
   return headers;

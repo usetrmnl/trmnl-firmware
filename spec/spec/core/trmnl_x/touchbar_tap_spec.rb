@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-# The TRMNL X touch bar in tap mode (the default): browsing cached images, holds, and the WiFi
-# reset confirmation. Shared helpers: spec/support/touchbar.rb.
+# The TRMNL X touch bar in tap mode (the default): browsing cached images, holds, and the touch
+# menu's Settings. Shared helpers: spec/support/touchbar.rb.
 
 RSpec.describe "TRMNL X touch bar: tap mode", env: "TRMNL_X" do
   fixture(:shipped) { TrmnlX::ShippedX.new }
@@ -45,48 +45,103 @@ RSpec.describe "TRMNL X touch bar: tap mode", env: "TRMNL_X" do
   describe "WifiResetConfirmation" do
     include_context "provisioned X"
 
-    # Ask the X showing "2" (boot_two_images) to reset WiFi; yields the simulator, the console
-    # index before and the expected screen of "2". A cancel (or no answer) redraws the image the
-    # prompt covered, then sleeps (showLastImageAndSleep, src/touchbar_actions.cpp:100).
+    # Open Reset Wi-Fi's confirmation on the X showing "2" (boot_two_images); yields the simulator,
+    # the console index before and the expected screen of "2". A timeout redraws the image the
+    # menu covered, then sleeps (show_last_image_and_sleep, src/cached_images.cpp).
     def ask
       boot_two_images do |s, _one, two|
         c = s.status["console_total"]
-        TrmnlX.ask_to_reset_wifi(s, c)
+        TrmnlX.ask_to_reset_wifi(s)
         yield s, c, two
       end
     end
 
-    it "holding both edges then the middle resets WiFi" do
+    it "choosing Confirm resets WiFi" do
       ask do |s|
-        s.touch("center", ms: 1500)
-        s.wait(portal: true, timeout: 15)
-      end
-    end
-
-    it "tapping an edge cancels" do
-      ask do |s, c, two|
-        s.touch("left", ms: 150)
-        s.wait(console: /Confirmation cancelled - outer button/, since: c, timeout: 15)
-        st = s.wait(state: "deep_sleep", timeout: 15, settle_ms: 500)["status"]
-        expect(st["portal_url"]).to be_nil
-        expect(s).to show_image(two, tolerance: 64, max_ratio: 0)
-      end
-    end
-
-    it "tapping the middle cancels" do
-      ask do |s, c, two|
+        TrmnlX.menu_tap(s, "left", /Back -> Confirm Reset Wi-Fi/)
         s.touch("center", ms: 150)
-        s.wait(console: /Confirmation cancelled - tap on middle/, since: c, timeout: 15)
-        s.wait(state: "deep_sleep", timeout: 15, settle_ms: 500)
-        expect(s).to show_image(two, tolerance: 64, max_ratio: 0)
+        s.wait(portal: true, timeout: 90)
+      end
+    end
+
+    it "Back goes back to Settings" do
+      ask do |s, c|
+        # the arrow starts on Back
+        TrmnlX.menu_tap(s, "center", /chose Back/, screen: true)
+        # Settings again, with the arrow on its first item
+        TrmnlX.menu_tap(s, "right", /Diagnostics\.\.\. -> Reset Wi-Fi/)
+        TrmnlX.menu_tap(s, "center", /chose Reset Wi-Fi/, screen: true)
+        expect(s.console(c).join("\n")).not_to match(/Resetting WiFi/)
+        expect(s.status["portal_url"]).to be_nil
       end
     end
 
     it "no answer cancels after 15 seconds" do
       ask do |s, c, two|
-        s.wait(console: /Confirmation timeout - cancelling/, since: c, timeout: 15)
-        s.wait(state: "deep_sleep", timeout: 15, settle_ms: 500)
+        s.wait(console: /Menu: timeout - closing/, since: c, timeout: 30)
+        st = s.wait(state: "deep_sleep", timeout: 15, settle_ms: 500)["status"]
+        expect(st["portal_url"]).to be_nil
         expect(s).to show_image(two, tolerance: 64, max_ratio: 0)
+      end
+    end
+  end
+
+  describe "ShutDown" do
+    include_context "provisioned X"
+
+    # Open Settings, then Shut Down..., leaving its confirmation on the screen
+    def ask(s)
+      TrmnlX.open_settings_menu(s)
+      TrmnlX.menu_tap(s, "right", /Diagnostics\.\.\. -> Reset Wi-Fi/)
+      TrmnlX.menu_tap(s, "right", /Reset Wi-Fi\.\.\. -> Shut Down/)
+      TrmnlX.menu_tap(s, "center", /chose Shut Down/, screen: true)
+    end
+
+    it "confirming goes back to shipment mode" do
+      boot_two_images do |s|
+        ask(s)
+        TrmnlX.menu_tap(s, "left", /Back -> Confirm Shut Down/)
+        boots = s.status["boot_count"]
+        c = s.status["console_total"]
+        s.touch("center", ms: 150)
+        s.wait(console: /Shutting down from the menu/, since: c, timeout: 15)
+        deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 30
+        while s.status["boot_count"] == boots
+          expect(Process.clock_gettime(Process::CLOCK_MONOTONIC)).to be < deadline, "did not restart"
+          sleep 0.2
+        end
+        # shipment status cleared: back to shipment mode until the charger is connected
+        c = s.status["console_total"]
+        s.wait(console: /Entering shipment mode light sleep loop/, since: c, timeout: 60)
+      end
+    end
+
+    it "Back goes back to Settings" do
+      boot_two_images do |s|
+        c = s.status["console_total"]
+        ask(s)
+        # the arrow starts on Back
+        TrmnlX.menu_tap(s, "center", /chose Back/, screen: true)
+        TrmnlX.menu_tap(s, "right", /Diagnostics\.\.\. -> Reset Wi-Fi/)
+        expect(s.console(c).join("\n")).not_to match(/Shutting down/)
+      end
+    end
+  end
+
+  describe "Diagnostics" do
+    include_context "provisioned X"
+
+    it "shows the device's values, and Back goes back to Settings" do
+      boot_two_images do |s|
+        TrmnlX.open_settings_menu(s)
+        c = s.status["console_total"]
+        TrmnlX.menu_tap(s, "center", /chose Diagnostics/, screen: true)
+        log = s.console(c).join("\n")
+        expect(log).to match(/Diagnostics: Firmware\t\d+\.\d+\.\d+/)
+        expect(log).to match(/Diagnostics: Wi-Fi Network\tTRMNL-Sim/)
+        expect(log).to match(/Diagnostics: Wi-Fi Signal\t-\d+ dBm/)
+        TrmnlX.menu_tap(s, "center", /chose Back/, screen: true)
+        TrmnlX.menu_tap(s, "right", /Diagnostics\.\.\. -> Reset Wi-Fi/)
       end
     end
   end

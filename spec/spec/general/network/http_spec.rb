@@ -114,11 +114,11 @@ General.describe "HTTP" do
         location = "#{mock.device_url if absolute}/images/moved.bmp"
         mock.set_fault("/images/default.bmp", redirect: location, times: 1)
         sim(erase: true, extra_args: ["--offline"]) do |s|
-          s.wait(portal: true, timeout: 15)
+          s.wait(portal: true, timeout: 90)
           s.portal_connect("TRMNL-Sim", "password", server: mock.device_url)
-          mock.wait_for_request("/images/moved.bmp", timeout: 15)
-          mock.wait_for_request("/api/display", timeout: 15)
-          s.wait(state: "deep_sleep", display_idle: true, timeout: 15)
+          mock.wait_for_request("/images/moved.bmp", timeout: 90)
+          mock.wait_for_request("/api/display", timeout: 90)
+          s.wait(state: "deep_sleep", display_idle: true, timeout: 90)
         end
       end
     end

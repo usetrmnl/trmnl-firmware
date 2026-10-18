@@ -2,10 +2,18 @@ name: integration
 
 # Builds the firmware, boots it in trmnl-sim against mock TRMNL servers and checks it with the
 # RSpec suite in spec/ (see spec/README.md): one job per env, each building only its own.
-# Called from build.yml.
+# Called from build.yml, and from trmnl-sim's CI with sim_ref: that commit of the simulator,
+# built from source, on this repository's main.
 
 on:
   workflow_call:
+    inputs:
+      sim_repo:
+        type: string
+        default: usetrmnl/trmnl-sim
+      sim_ref:
+        type: string
+        default: ""
 
 jobs:
   check:
@@ -18,6 +26,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          repository: ${{ inputs.sim_ref && 'usetrmnl/trmnl-firmware' || github.repository }}
 
       - uses: ruby/setup-ruby@v1
         with:
@@ -51,6 +61,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          repository: ${{ inputs.sim_ref && 'usetrmnl/trmnl-firmware' || github.repository }}
 
       # Each env caches its own PlatformIO core: TRMNL_X's platform (pioarduino) and espressif32
       # 6.x install different packages under the same names (see prepare_release.sh).
@@ -90,8 +102,31 @@ jobs:
         if: matrix.also_build
         run: pio run -e ${{ matrix.also_build }} -j 4 -v
 
+      - uses: actions/checkout@v7
+        if: inputs.sim_ref
+        with:
+          repository: ${{ inputs.sim_repo }}
+          ref: ${{ inputs.sim_ref }}
+          path: trmnl-sim
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: inputs.sim_ref
+
+      - uses: Swatinem/rust-cache@v2
+        if: inputs.sim_ref
+        with:
+          workspaces: trmnl-sim
+
+      - name: Build trmnl-sim (${{ inputs.sim_ref }})
+        if: inputs.sim_ref
+        run: |
+          trmnl-sim/scripts/fetch-rom-elfs.sh
+          cargo build --release --locked --no-default-features --manifest-path trmnl-sim/Cargo.toml
+          echo "SIM_BIN=$PWD/trmnl-sim/target/release/trmnl-sim" >> "$GITHUB_ENV"
+
       # The latest headless release; it finds the chips' ROM ELFs in the rom/ next to it.
       - name: Download trmnl-sim
+        if: ${{ !inputs.sim_ref }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

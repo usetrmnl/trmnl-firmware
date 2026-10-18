@@ -23,7 +23,9 @@ module Golden
       # "WiFi connected, unable connect to API." and how to retry (tap the touch bar)
       "api_unable_to_connect.png" => [580, 306, 712, 136],
       # "The image format is incorrect"
-      "format_error.png" => [640, 1184, 592, 64]
+      "format_error.png" => [640, 1184, 592, 64],
+      # "Please visit trmnl.com/start" / "with Friendly ID SIMTST to finish setup"
+      "friendly_id_message.png" => [560, 1156, 752, 112]
     },
     # the 960x540 FastEPD panels: Inter_18 at the OG's rows (the centred logo runs into them)
     "TRMNL_X_PAPERS3" => { "api_unable_to_connect.png" => [0, 304, 960, 144] },

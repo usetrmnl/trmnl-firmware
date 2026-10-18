@@ -42,6 +42,8 @@ extern bool log_retry;           // need to log connection retry
 extern uint32_t time_since_sleep;
 extern esp_sleep_wakeup_cause_t wakeup_reason;
 extern SPECIAL_FUNCTION special_function;
+extern bool special_function_chosen; // picked on the device (TRMNL X touch menu), not the saved one
+extern int last_wifi_rssi;              // RTC: signal strength (dBm) at the last connection, 0 if unknown
 extern int iPrevWakeTime;               // RTC: total wake time of the last cycle (for statistics collection)
 extern bool bUsedCachedImage;           // RTC: last image displayed was read from cache (for statistics collection)
 extern uint8_t need_to_refresh_display; // RTC

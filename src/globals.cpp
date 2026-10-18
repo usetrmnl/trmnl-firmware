@@ -23,7 +23,9 @@ bool log_retry = false;      // need to log connection retry
 uint32_t time_since_sleep;
 esp_sleep_wakeup_cause_t wakeup_reason = ESP_SLEEP_WAKEUP_UNDEFINED;
 SPECIAL_FUNCTION special_function = SF_NONE;
+bool special_function_chosen = false;
 RTC_DATA_ATTR int iPrevWakeTime = 0;
+RTC_DATA_ATTR int last_wifi_rssi = 0;
 RTC_DATA_ATTR bool bUsedCachedImage = false;
 RTC_DATA_ATTR uint8_t need_to_refresh_display = 1;
 RTC_DATA_ATTR bool otg_state = false;
