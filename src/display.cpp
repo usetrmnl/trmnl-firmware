@@ -1554,8 +1554,8 @@ int png_draw(PNGDRAW *pDraw)
     int iCopyWidth = (pDraw->iWidth < bbep.width()) ? pDraw->iWidth : bbep.width();
     iPitch = bbep.width()/2;
     if (iBpp == 1) {
+        iPitch = (bbep.width() + 7)/8; // 1-bit lines, rotated or not
         if (!bRotated) {
-            iPitch = (bbep.width() + 7)/8;
             d += y * iPitch; // point to the correct line
             memcpy(d, s, (iCopyWidth+7)/8);
         } else {

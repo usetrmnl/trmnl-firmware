@@ -55,14 +55,20 @@ RSpec.describe "TRMNL X images", env: "TRMNL_X" do
     { 1 => 1, 4 => 15 }.each do |bits, white|
       it "portrait #{bits}bit png taller than the panel is cropped" do
         px = TrmnlX.digits("7")
-        level = ->(x, y) { y < w && px.(y, w - 1 - x).zero? ? 0 : white }
-        show("tall_portrait#{bits}.png", TrmnlSim::Images.png_image(level, h, w + 128, bits:), "image/png")
+        level = ->(x, y) { y < w && px.(y, h - 1 - x).zero? ? 0 : white }
+        upright = ->(x, y) { px.(x, y).zero? ? 0 : white }
+        show("tall_portrait#{bits}.png", TrmnlSim::Images.png_image(level, h, w + 128, bits:), "image/png") do |s|
+          expect(s).to show_image(TrmnlSim::Images.expected_gray(upright, w, h, bits:), tolerance: 64, max_ratio: 0.001)
+        end
       end
 
       it "portrait #{bits}bit png" do
         px = TrmnlX.digits("7")
-        level = ->(x, y) { px.(y, w - 1 - x).zero? ? 0 : white }
-        show("portrait#{bits}.png", TrmnlSim::Images.png_image(level, h, w, bits:), "image/png")
+        level = ->(x, y) { px.(y, h - 1 - x).zero? ? 0 : white }
+        upright = ->(x, y) { px.(x, y).zero? ? 0 : white }
+        show("portrait#{bits}.png", TrmnlSim::Images.png_image(level, h, w, bits:), "image/png") do |s|
+          expect(s).to show_image(TrmnlSim::Images.expected_gray(upright, w, h, bits:), tolerance: 64, max_ratio: 0.001)
+        end
       end
     end
   end
