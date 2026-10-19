@@ -39,9 +39,8 @@ RSpec.describe "TRMNL X", env: "TRMNL_X" do
           s.status["display_generation"] != g
         end
         s.wait(display_idle: true, timeout: 90)
-        c = s.status["console_total"]
-        s.dock(true) # the charger ends shipment mode
-        s.wait(console: /CHARGER DETECTED - Exiting shipment mode/, since: c, timeout: 90)
+        s.dock(true) # the charger ends shipment mode: it leaves light sleep, tries WiFi and sleeps
+        s.wait(state: "deep_sleep", timeout: 90)
       end
     end
 
