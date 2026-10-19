@@ -125,6 +125,7 @@
 #define BUTTON_MEDIUM_HOLD_TIME            1000
 #define BUTTON_SOFT_RESET_TIME             15000
 #define BUTTON_DOUBLE_CLICK_WINDOW         800
+#define BUTTON_PRESS_WAIT_TIMEOUT          10000
 
 #define API_BASE_URL                       "https://trmnl.app"
 

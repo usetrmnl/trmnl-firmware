@@ -67,6 +67,10 @@ static ButtonPressResult classify_button_presses() {
     } else {
       Log_info("Button: waiting for button press");
       while (digitalRead(pDevice->interrupt_pin) == HIGH) {
+        if (millis() - time_start >= BUTTON_PRESS_WAIT_TIMEOUT) { // never stay awake waiting forever
+          Log_info("Button: no press within %d ms", BUTTON_PRESS_WAIT_TIMEOUT);
+          return NoAction;
+        }
         delay(10);
       }
       time_start = millis();
