@@ -3,6 +3,7 @@
 #include <ESPmDNS.h>
 #include <bl.h>
 #include <sleep_session.h>
+#include <sleep_duration.h>
 #include <wifi_network.h>
 #include <wifi_session.h>
 #include <power.h>
@@ -387,8 +388,8 @@ void bl_init(void)
   // clock synchronization
   if (systemClock().setTimeFromNTP())
   {
-    time_since_sleep = preferences.getUInt(PREFERENCES_LAST_SLEEP_TIME, 0);
-    time_since_sleep = time_since_sleep ? systemClock().getTime() - time_since_sleep : 0; // may be can be used even if no sync
+    const uint32_t last_sleep = preferences.getUInt(PREFERENCES_LAST_SLEEP_TIME, 0);
+    time_since_sleep = sleepDurationSeconds(systemClock().getTime(), last_sleep);
   }
   else
   {
