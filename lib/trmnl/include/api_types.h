@@ -77,6 +77,7 @@ struct ApiDisplayInputs {
   UsbStatus usbStatus;
   bool imageCached;
   int prevWakeTime;
+  int resetReason; // esp_reset_reason_t of this boot, e.g. 4 = panic, 9 = brownout
 };
 
 using ApiSetupInputs = ApiDisplayInputs;

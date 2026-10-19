@@ -55,6 +55,7 @@ ApiDisplayInputs createApiHeaders() {
   inputs.specialFunctionChosen = special_function_chosen;
   inputs.imageCached = bUsedCachedImage;
   inputs.prevWakeTime = iPrevWakeTime;
+  inputs.resetReason = (int)esp_reset_reason();
   inputs.usbStatus = power().usbStatus();
   inputs.chargingStatus = power().chargingStatus();
 
