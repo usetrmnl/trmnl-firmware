@@ -10,7 +10,7 @@ on:
 jobs:
   # The firmware itself is built by the integration jobs, one env each, before they test it.
   build-test:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
 
     timeout-minutes: 30
 
