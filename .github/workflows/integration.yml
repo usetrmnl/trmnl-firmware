@@ -41,21 +41,20 @@ jobs:
   integration:
     strategy:
       fail-fast: false
+      # The OG splits its spec files across two runners: groups 1-4 or 5-8 of parallel_rspec's
+      # eight, four workers each. savepoints_spec needs the BWRY's build (it shares the OG's
+      # platform, so it builds quickly after it) in whichever half has it.
       matrix:
         include:
-          - env: trmnl
-            envs: "trmnl:full"
-            # savepoints_spec checks a save point is refused by another build: the BWRY's (it
-            # shares the OG's platform, so it builds quickly after it).
-            also_build: trmnl_4clr
+          - { env: trmnl, envs: "trmnl:full", also_build: trmnl_4clr, groups: "1,2,3,4" }
+          - { env: trmnl, envs: "trmnl:full", also_build: trmnl_4clr, groups: "5,6,7,8" }
           # The X's own specs and the full general suite take well over half an hour on a 4-vCPU
           # runner, and the load trips wall-clock waits: one example per area instead.
-          - env: TRMNL_X
-            envs: "TRMNL_X:smoke"
-          - env: trmnl_4clr # BWRY
-            envs: "trmnl_4clr"
+          # Splitting gains nothing: both halves redo the X's slow setup flows.
+          - { env: TRMNL_X, envs: "TRMNL_X:smoke" }
+          - { env: trmnl_4clr, envs: "trmnl_4clr" } # BWRY
 
-    name: integration (${{ matrix.env }})
+    name: integration (${{ matrix.env }}${{ matrix.groups && format(' {0}', matrix.groups) || '' }})
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -167,7 +166,8 @@ jobs:
           # The setup cache (spec/tmp/spec-cache) starts empty, so every setup flow still runs in
           # full, but once per run: the workers share it instead of each redoing it (NO_CACHE=1),
           # which on the X (the factory flow and onboarding) costs minutes per example.
-        run: bundle exec rake spec
+          SPEC_GROUPS: ${{ matrix.groups }}
+        run: bundle exec rake "spec[${SPEC_GROUPS:+-n 8 --only-group $SPEC_GROUPS}]"
 
       - name: Collect screen diffs
         if: failure()
@@ -178,14 +178,14 @@ jobs:
       - uses: actions/upload-artifact@v6
         if: always()
         with:
-          name: simulator-logs-and-screens-${{ matrix.env }}
+          name: simulator-logs-and-screens-${{ matrix.env }}${{ matrix.groups && format('-{0}', matrix.groups) || '' }}
           path: spec/out/artifacts/
           if-no-files-found: ignore
 
       - uses: actions/upload-artifact@v6
         if: always()
         with:
-          name: firmware-coverage-${{ matrix.env }}
+          name: firmware-coverage-${{ matrix.env }}${{ matrix.groups && format('-{0}', matrix.groups) || '' }}
           path: |
             spec/out/cov/merged.info
             spec/out/cov/html/
