@@ -45,6 +45,13 @@ RSpec.describe "TRMNL X images", env: "TRMNL_X" do
       end
     end
 
+    it "png one pixel narrower than the panel is drawn, not turned (#724)" do
+      level = levels(0, 255)
+      show("narrow.png", TrmnlSim::Images.png_image(level, w - 1, h, bits: 8), "image/png") do |s|
+        expect(s).to show_image(TrmnlSim::Images.expected_gray(level, w, h, bits: 8), tolerance: 64, max_ratio: 0.001)
+      end
+    end
+
     { 1 => 1, 4 => 15 }.each do |bits, white|
       it "portrait #{bits}bit png" do
         px = TrmnlX.digits("7")
