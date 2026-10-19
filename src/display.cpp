@@ -1524,7 +1524,9 @@ int png_draw(PNGDRAW *pDraw)
     uint8_t ucMask, ucPixel, src, *s, *d;
     int iPitch, iBpp;
 
-    if (y >= bbep.height() && pDraw->iWidth != bbep.height()) return 0; // image is larger than the display (and not rotated), stop decoding it
+    if (pDraw->iWidth == bbep.height()) { // rotated: rows past the panel's width are cropped
+        if (y >= bbep.width()) return 0;
+    } else if (y >= bbep.height()) return 0; // image is larger than the display, stop decoding it
     if (pDraw->iPixelType == PNG_PIXEL_INDEXED || pDraw->iBpp > 4) { // need to convert through the palette and/or reduce the bpp
         s = bbep.tempBuffer(); // temp space we can use
         iBpp = (pDraw->iBpp > 4) ? 4 : pDraw->iBpp;

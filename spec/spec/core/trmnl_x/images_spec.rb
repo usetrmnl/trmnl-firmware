@@ -53,6 +53,12 @@ RSpec.describe "TRMNL X images", env: "TRMNL_X" do
     end
 
     { 1 => 1, 4 => 15 }.each do |bits, white|
+      it "portrait #{bits}bit png taller than the panel is cropped" do
+        px = TrmnlX.digits("7")
+        level = ->(x, y) { y < w && px.(y, w - 1 - x).zero? ? 0 : white }
+        show("tall_portrait#{bits}.png", TrmnlSim::Images.png_image(level, h, w + 128, bits:), "image/png")
+      end
+
       it "portrait #{bits}bit png" do
         px = TrmnlX.digits("7")
         level = ->(x, y) { px.(y, w - 1 - x).zero? ? 0 : white }
