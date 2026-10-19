@@ -81,7 +81,7 @@ unsigned long startup_time = 0;
 void iqs323_task_i2c_lock(void) {}
 void iqs323_task_i2c_unlock(void) {}
 #endif // !BOARD_TRMNL_X
-void hw_config_init(void);
+void hw_config_init(const char *name);
 extern TRMNL_DEVICE *pDevice;
 
 void wait_for_serial() {
@@ -152,7 +152,7 @@ void bl_init(void)
 
   wifiSessionInit();
 
-  hw_config_init();
+  hw_config_init(DEVICE_MODEL);
   pins_init();
   buzzer().init();
   sensor().init(pDevice);

@@ -174,6 +174,7 @@ typedef struct tag_trmnl_device {
 enum {
   EPD_75 = 0,
   EPD_426,
+  EPD_426B,
   EPD_397,
   EPD_75_3CLR,
   EPD_75_4CLR,
