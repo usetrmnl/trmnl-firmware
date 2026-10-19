@@ -60,7 +60,8 @@ module SetupCache
       return [dir, JSON.parse(JSON.generate(made))]
     end
 
-    inputs = { name:, format: FORMAT, sim: sim_id, support: SUPPORT_FILES.map { file_hash(_1) } }.merge(inputs)
+    inputs = { name:, format: FORMAT, sim: sim_id, sim_extra_args: ENV.fetch("SIM_EXTRA_ARGS", ""),
+               support: SUPPORT_FILES.map { file_hash(_1) } }.merge(inputs)
     key = Digest::SHA256.hexdigest(JSON.generate(sort_keys(inputs)))[0, 20]
     FileUtils.mkdir_p(DIR)
     dir = File.join(DIR, "#{name}-#{key}")

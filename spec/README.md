@@ -72,6 +72,7 @@ change is slower. Every simulator's log and final screen are saved in `out/artif
 | `SLOW=1` | Also run examples marked `slow:` |
 | `NO_CACHE=1` | Run every setup flow in full, as CI does |
 | `REALTIME=1` | Run without turbo |
+| `SIM_EXTRA_ARGS` | More simulator options, e.g. `--no-hle-lcd` to run the IDF display driver |
 | `UPDATE_GOLDEN=1` | Rewrite golden screenshots |
 
 ## Code coverage
