@@ -56,8 +56,8 @@ RSpec.describe "TRMNL X touch bar: ship check", env: "TRMNL_X" do
       s.wait(console: /tutorial_show_screen end/, since: c, timeout: 30)
       s.set_portal_client(false) # so turbo can run to the timeout
       s.wait(console: /Ship check: timeout - back to the setup portal/, since: c, timeout: 120)
-      s.wait(display_idle: true, timeout: 30)
-      expect(s.status["portal_url"]).not_to be_nil
+      s.set_portal_client(true) # portal_url is only reported while a client is connected
+      expect(s.wait(portal: true, timeout: 90)["status"]["portal_url"]).not_to be_nil
     end
   end
 end
