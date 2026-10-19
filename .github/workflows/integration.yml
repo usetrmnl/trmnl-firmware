@@ -14,6 +14,9 @@ on:
       sim_ref:
         type: string
         default: ""
+      sim_extra_args:
+        type: string
+        default: ""
 
 jobs:
   check:
@@ -163,6 +166,7 @@ jobs:
         working-directory: spec
         env:
           ENVS: ${{ matrix.envs }}
+          SIM_EXTRA_ARGS: ${{ inputs.sim_extra_args }}
           # The setup cache (spec/tmp/spec-cache) starts empty, so every setup flow still runs in
           # full, but once per run: the workers share it instead of each redoing it (NO_CACHE=1),
           # which on the X (the factory flow and onboarding) costs minutes per example.
@@ -178,14 +182,14 @@ jobs:
       - uses: actions/upload-artifact@v6
         if: always()
         with:
-          name: simulator-logs-and-screens-${{ matrix.env }}${{ matrix.groups && format('-{0}', matrix.groups) || '' }}
+          name: simulator-logs-and-screens-${{ matrix.env }}${{ matrix.groups && format('-{0}', matrix.groups) || '' }}${{ inputs.sim_extra_args && '-sim-extra-args' || '' }}
           path: spec/out/artifacts/
           if-no-files-found: ignore
 
       - uses: actions/upload-artifact@v6
         if: always()
         with:
-          name: firmware-coverage-${{ matrix.env }}${{ matrix.groups && format('-{0}', matrix.groups) || '' }}
+          name: firmware-coverage-${{ matrix.env }}${{ matrix.groups && format('-{0}', matrix.groups) || '' }}${{ inputs.sim_extra_args && '-sim-extra-args' || '' }}
           path: |
             spec/out/cov/merged.info
             spec/out/cov/html/

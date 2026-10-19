@@ -75,6 +75,14 @@ jobs:
   integration:
     uses: ./.github/workflows/integration.yml
 
+  # The simulator sends display transfers natively; on main, also run IDF's display driver
+  # (its interrupt and callback context), without slowing pull requests.
+  integration-idf-lcd-driver:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    uses: ./.github/workflows/integration.yml
+    with:
+      sim_extra_args: --no-hle-lcd
+
   publish-engineering-build:
     needs: [build-test, integration]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
