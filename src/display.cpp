@@ -1500,13 +1500,16 @@ int png_draw(PNGDRAW *pDraw)
     } else {
         d = bbep.currentBuffer();
     }
+    // Only a portrait image of exactly the panel's size is rotated; any other width is cropped.
+    bool bRotated = pDraw->iWidth == bbep.height();
+    int iCopyWidth = (pDraw->iWidth < bbep.width()) ? pDraw->iWidth : bbep.width();
     iPitch = bbep.width()/2;
     if (iBpp == 1) {
-        if (bbep.width() >= pDraw->iWidth) { // normal orientation
+        if (!bRotated) {
             iPitch = (bbep.width() + 7)/8;
             d += y * iPitch; // point to the correct line
-            memcpy(d, s, (pDraw->iWidth+7)/8);
-        } else { // rotated
+            memcpy(d, s, (iCopyWidth+7)/8);
+        } else {
             uint8_t ucPixel, ucMask, j;
             d += (bbep.height() - 1) * iPitch;
             d += (y / 8);
@@ -1527,10 +1530,10 @@ int png_draw(PNGDRAW *pDraw)
             iBpp = 4;
         }
         // 4-bit native format (includes expanded 2-bit)
-        if (bbep.width() == pDraw->iWidth) { // normal orientation
+        if (!bRotated) {
             d += y * iPitch; // point to the correct line
-            memcpy(d, s, (pDraw->iWidth+1)/2);
-        } else { // rotated
+            memcpy(d, s, (iCopyWidth+1)/2);
+        } else {
             d += (bbep.height() - 1) * iPitch;
             d += (y / 2);
             if (y & 1) { // odd line (column)
