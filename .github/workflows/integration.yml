@@ -14,6 +14,10 @@ on:
       sim_ref:
         type: string
         default: ""
+      # Also the X's full suite, in four shards.
+      x_full:
+        type: boolean
+        default: false
 
 jobs:
   check:
@@ -46,11 +50,10 @@ jobs:
       # platform, so it builds quickly after it) in whichever half has it.
       matrix:
         include:
-          - { env: trmnl, envs: "trmnl:full", also_build: trmnl_4clr, groups: "1,2,3,4" }
-          - { env: trmnl, envs: "trmnl:full", also_build: trmnl_4clr, groups: "5,6,7,8" }
-          # The X's own specs and the full general suite take well over half an hour on a 4-vCPU
-          # runner, and the load trips wall-clock waits: one example per area instead.
-          # Splitting gains nothing: both halves redo the X's slow setup flows.
+          - { env: trmnl, envs: "trmnl:full", also_build: trmnl_4clr, groups: "1,2,3,4", split: 8 }
+          - { env: trmnl, envs: "trmnl:full", also_build: trmnl_4clr, groups: "5,6,7,8", split: 8 }
+          # One example per area: the X's full suite takes about 40 runner-minutes, so only
+          # main pushes run it (integration-x-full).
           - { env: TRMNL_X, envs: "TRMNL_X:smoke" }
           - { env: trmnl_4clr, envs: "trmnl_4clr" } # BWRY
 
@@ -58,7 +61,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
-    steps:
+    steps: &integration-steps
       - uses: actions/checkout@v7
         with:
           repository: ${{ inputs.sim_ref && 'usetrmnl/trmnl-firmware' || github.repository }}
@@ -167,7 +170,8 @@ jobs:
           # full, but once per run: the workers share it instead of each redoing it (NO_CACHE=1),
           # which on the X (the factory flow and onboarding) costs minutes per example.
           SPEC_GROUPS: ${{ matrix.groups }}
-        run: bundle exec rake "spec[${SPEC_GROUPS:+-n 8 --only-group $SPEC_GROUPS}]"
+          SPEC_SPLIT: ${{ matrix.split }}
+        run: bundle exec rake "spec[${SPEC_GROUPS:+-n $SPEC_SPLIT --only-group $SPEC_GROUPS}]"
 
       - name: Collect screen diffs
         if: failure()
@@ -190,3 +194,21 @@ jobs:
             spec/out/cov/merged.info
             spec/out/cov/html/
           if-no-files-found: ignore
+
+  # Groups 1-4, 5-8, 9-12 or 13-16 of sixteen: each shard redoes the X's setup flows once.
+  integration-x-full:
+    if: inputs.x_full
+    strategy:
+      fail-fast: false
+      matrix:
+        env: [TRMNL_X]
+        envs: ["TRMNL_X:full"]
+        split: [16]
+        also_build: [""]
+        groups: ["1,2,3,4", "5,6,7,8", "9,10,11,12", "13,14,15,16"]
+
+    name: integration (TRMNL_X full ${{ matrix.groups }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps: *integration-steps
