@@ -27,3 +27,6 @@ void config_gpio_for_lp(void);
  * WIFI_FAILED and reset the count (still a timed sleep). Does not return.
  */
 void wifiErrorDeepSleep(void);
+
+/** Restart the device if this wake has not reached deep sleep within 20 minutes. Not used on the X. */
+void awake_time_limit_start(void);
