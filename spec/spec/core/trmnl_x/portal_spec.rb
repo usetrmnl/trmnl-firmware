@@ -22,8 +22,8 @@ RSpec.describe "TRMNL X", env: "TRMNL_X" do
       # build, so go by the clock: the portal is gone once 15 minutes have passed.
       t0 = s.status["sim_time_s"]
       st = nil
-      # about 40 s alone, longer next to other tests
-      eventually("the portal did not time out", within: 150) { (st = s.status)["sim_time_s"] >= t0 + (15 * 60) + 5 }
+      # about 40 s alone, over 150 s on a 4-vCPU CI runner next to other tests
+      eventually("the portal did not time out", within: 300) { (st = s.status)["sim_time_s"] >= t0 + (15 * 60) + 5 }
       expect(st["portal_url"]).to be_nil
       st["console_total"]
     end
@@ -45,10 +45,8 @@ RSpec.describe "TRMNL X", env: "TRMNL_X" do
       end
     end
 
-    # The setup screen (WIFI_CONNECT) ends with display_sleep(1000), which arms a 1 s
-    # light-sleep timer that is never disarmed. enter_shipment_sleep() only adds the
-    # charger's GPIO wakeup, so the device wakes about every 1.2 s ("Unexpected wakeup
-    # cause: 4") instead of sleeping until it is docked, draining the battery in the box.
+    # The setup screen's display_sleep(1000) leaves a 1 s light-sleep timer wakeup enabled:
+    # shipment mode must disable it, or the device wakes every 1.2 s in the box.
     it "shipment mode after the timeout stays asleep" do
       shipped.boot do |s|
         c = time_out(s)
