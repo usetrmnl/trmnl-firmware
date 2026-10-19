@@ -74,6 +74,8 @@ jobs:
 
   integration:
     uses: ./.github/workflows/integration.yml
+    with:
+      x_full: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
 
   publish-engineering-build:
     needs: [build-test, integration]
