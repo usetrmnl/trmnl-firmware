@@ -186,8 +186,6 @@ typedef struct {
     bool ch0_touch;
     bool ch1_touch;
     bool ch2_touch;
-    iqs323_gesture_events slider_event;
-    uint16_t slider_position;
     uint32_t last_updated_ms;   // millis() at last publish
 } touchbar_snapshot_t;
 
@@ -195,6 +193,12 @@ typedef struct {
  * @brief Copies out the current touchbar snapshot (mutex-protected, cheap to call often).
  */
 void iqs323_task_read_snapshot(touchbar_snapshot_t *out);
+
+/**
+ * @brief The channels (bit n: channel n) whose touch started since the last call, and clears
+ * them: unlike the snapshot, a touch that starts and ends between two reads still shows.
+ */
+uint8_t iqs323_task_take_touch_starts(void);
 
 /**
  * @brief Copies out the snapshot as it was at wake-stub validation time, not live
@@ -209,14 +213,9 @@ bool iqs323_task_read_wake_stub_snapshot(touchbar_snapshot_t *out);
 bool iqs323_task_set_streaming_mode(bool enable);
 
 /**
- * @brief Writes the gesture-mode config register (tap vs slide).
+ * @brief Writes the gesture config registers for tap gestures (touch events only).
  */
-bool iqs323_task_set_gesture_config(bool tap_mode);
-
-/**
- * @brief Clears the snapshot's slider_event back to IQS323_GESTURE_NONE.
- */
-void iqs323_task_clear_slider_event(void);
+bool iqs323_task_set_gesture_config(void);
 
 #ifdef __cplusplus
 }

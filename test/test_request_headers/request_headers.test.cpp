@@ -34,6 +34,7 @@ static ApiDisplayInputs makeDisplayInputs() {
   inputs.displayWidth = 800;
   inputs.displayHeight = 480;
   inputs.specialFunction = SF_NONE;
+  inputs.specialFunctionChosen = false;
   inputs.usbStatus = UsbStatus::UNKNOWN;
   inputs.imageCached = false;
   inputs.prevWakeTime = 42;
@@ -150,6 +151,14 @@ void test_display_headers_special_function_present_when_set(void) {
   TEST_ASSERT_EQUAL_STRING("true", valueOf(headers, "special_function").c_str());
 }
 
+void test_display_headers_special_function_named_when_chosen(void) {
+  auto inputs = makeDisplayInputs();
+  inputs.specialFunction = SF_REWIND;
+  inputs.specialFunctionChosen = true;
+  auto headers = buildDisplayHeaders(inputs);
+  TEST_ASSERT_EQUAL_STRING("rewind", valueOf(headers, "special_function").c_str());
+}
+
 void test_display_headers_panel_id_omitted_when_empty(void) {
   auto headers = buildDisplayHeaders(makeDisplayInputs());
   TEST_ASSERT_EQUAL_INT(-1, indexOf(headers, "Panel-Rev"));
@@ -242,6 +251,7 @@ void process() {
   RUN_TEST(test_display_headers_image_cached_reflects_input);
   RUN_TEST(test_display_headers_special_function_omitted_when_none);
   RUN_TEST(test_display_headers_special_function_present_when_set);
+  RUN_TEST(test_display_headers_special_function_named_when_chosen);
   RUN_TEST(test_display_headers_panel_id_omitted_when_empty);
   RUN_TEST(test_display_headers_panel_id_present_when_set);
   RUN_TEST(test_display_headers_wifi_band_2_4);

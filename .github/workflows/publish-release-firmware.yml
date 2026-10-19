@@ -85,9 +85,42 @@ env:
   S3_BASE_URL: https://trmnl-fw.s3.us-east-2.amazonaws.com
 
 jobs:
+  select:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      envs: ${{ steps.select.outputs.envs }}
+
+    steps:
+      - name: Select environments
+        id: select
+        env:
+          INPUTS: ${{ toJSON(inputs) }}
+        run: |
+          ENVS=$(jq -c '[to_entries[]
+            | select((.key | startswith("build_")) and (.value == true or .value == "true"))
+            | .key | ltrimstr("build_")]' <<<"$INPUTS")
+          if [[ "$ENVS" == "[]" ]]; then
+            echo "::error::No environments selected"
+            exit 1
+          fi
+          echo "Selected environments: ${ENVS}"
+          echo "envs=${ENVS}" >> "$GITHUB_OUTPUT"
+
+  # One job per environment, so they build at the same time.
   publish:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 120
+    needs: select
+    strategy:
+      fail-fast: false
+      matrix:
+        env: ${{ fromJSON(needs.select.outputs.envs) }}
+
+    name: publish (${{ matrix.env }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      ENVS: ${{ matrix.env }}
 
     steps:
       - uses: actions/checkout@v7
@@ -105,20 +138,6 @@ jobs:
             exit 1
           fi
           echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
-
-      - name: Select environments
-        env:
-          INPUTS: ${{ toJSON(inputs) }}
-        run: |
-          ENVS=$(jq -r 'to_entries[]
-            | select((.key | startswith("build_")) and (.value == true or .value == "true"))
-            | .key | ltrimstr("build_")' <<<"$INPUTS" | xargs)
-          if [[ -z "$ENVS" ]]; then
-            echo "::error::No environments selected"
-            exit 1
-          fi
-          echo "Selected environments: ${ENVS}"
-          echo "ENVS=${ENVS}" >> "$GITHUB_ENV"
 
       - uses: actions/cache@v6
         with:

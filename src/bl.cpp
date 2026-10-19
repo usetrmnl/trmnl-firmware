@@ -3,6 +3,7 @@
 #include <ESPmDNS.h>
 #include <bl.h>
 #include <sleep_session.h>
+#include <sleep_duration.h>
 #include <wifi_network.h>
 #include <wifi_session.h>
 #include <power.h>
@@ -246,9 +247,6 @@ void bl_init(void)
 #endif // BOARD_TRMNL_X
 
 #ifdef BOARD_TRMNL_X
-  set_touchbar_mode(preferences.getBool(PREFERENCES_TOUCHBAR_MODE_KEY, true));
-  Log_info("Touchbar mode from preferences: %s", touchbar_tap_mode ? "Tap" : "Slide");
-
   // Start IQS323 task manager
   if (!iqs323_task_init(NULL)) {
     Log_error("IQS323 Task: Failed to start - rebooting");
@@ -390,8 +388,8 @@ void bl_init(void)
   // clock synchronization
   if (systemClock().setTimeFromNTP())
   {
-    time_since_sleep = preferences.getUInt(PREFERENCES_LAST_SLEEP_TIME, 0);
-    time_since_sleep = time_since_sleep ? systemClock().getTime() - time_since_sleep : 0; // may be can be used even if no sync
+    const uint32_t last_sleep = preferences.getUInt(PREFERENCES_LAST_SLEEP_TIME, 0);
+    time_since_sleep = sleepDurationSeconds(systemClock().getTime(), last_sleep);
   }
   else
   {
@@ -654,6 +652,7 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   inputs.macAddress = device_mac_address();
   WiFiStatus wifi = getWiFiStatus();
   inputs.rssi = wifi.rssi;
+  last_wifi_rssi = wifi.rssi;
   inputs.wifiBand = wifi.band;
   inputs.batteryVoltage = vBatt;
   inputs.firmwareVersion = String(FW_VERSION_STRING);
@@ -663,6 +662,7 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   inputs.model = DEVICE_MODEL;
   inputs.panelId = display_panel_rev_string();
   inputs.specialFunction = special_function;
+  inputs.specialFunctionChosen = special_function_chosen;
   inputs.imageCached = bUsedCachedImage;
   inputs.prevWakeTime = iPrevWakeTime;
   inputs.usbStatus = power().usbStatus();

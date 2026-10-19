@@ -13,5 +13,6 @@ struct ParsedModemNetwork {
 
 // Parse a raw `AT+CWLAP` response into deduplicated networks.
 // Dedup keeps the highest RSSI per (SSID, band). Empty SSIDs and the device's
-// own "TRMNL" AP are skipped; malformed entries (no closing ')') are skipped.
+// own "TRMNL" AP are skipped; malformed entries (no closing ')' on the line) are skipped.
+// SSIDs may contain any characters, including ( ) " and , (ESP-AT does not escape them).
 std::vector<ParsedModemNetwork> parseCwlapResponse(const String &raw);

@@ -24,16 +24,6 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse) {
   https_request_err_e result = HTTPS_NO_ERR;
   int file_size = 0;
 
-#ifdef BOARD_TRMNL_X
-  // Set touchbar mode and persist to NVS
-  if (apiResponse.touchbar_mode.length() == 0 || touchbar_tap_mode == (apiResponse.touchbar_mode == "tap")) {
-    Log.info("%s [%d]: No need to update touchbar mode\r\n", __FILE__, __LINE__);
-  } else {
-    set_touchbar_mode(apiResponse.touchbar_mode == "tap");
-    preferences.putBool(PREFERENCES_TOUCHBAR_MODE_KEY, touchbar_tap_mode);
-  }
-#endif // BOARD_TRMNL_X
-
   if (special_function == SF_NONE) {
     uint64_t request_status = apiResponse.status;
     Log.info("%s [%d]: status: %d\r\n", __FILE__, __LINE__, request_status);

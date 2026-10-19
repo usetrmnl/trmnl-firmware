@@ -66,7 +66,7 @@ RSpec.describe "Faults on the TRMNL X", env: "TRMNL_X" do
     end
 
     it "survives a touch controller ati error" do
-      touch_bar_fault("ati_error")
+      touch_bar_fault("ati_error", reads_tap: true)
     end
 
     {
@@ -134,12 +134,16 @@ RSpec.describe "Faults on the TRMNL X", env: "TRMNL_X" do
     private
 
     # Asleep, the touch controller starts misbehaving; wake by a tap, then by the timer (with
-    # the fault cleared). Returns the console.
-    def touch_bar_fault(kind)
+    # the fault cleared). Returns the console. A controller that still `reads_tap` (an ATI
+    # error) opens the touch menu, so the tap chooses Next Screen there; after a lockup or a
+    # reset the tap only wakes the device, which refreshes.
+    def touch_bar_fault(kind, reads_tap: false)
       dev.boot_asleep do |s|
         s.wait(state: "deep_sleep", timeout: 15)
         s.set_faults(touch_bar: kind)
-        dev.mock.next_request("/api/display", timeout: 15) { s.touch("center", ms: 150) }
+        dev.mock.next_request("/api/display", timeout: 15) do
+          reads_tap ? TrmnlX.next_screen(s) : s.touch("center", ms: 150)
+        end
         s.wait(state: "deep_sleep", timeout: 15, settle_ms: 300)
         s.set_faults(touch_bar: nil)
         dev.mock.next_request("/api/display", timeout: 15) { s.wake }
