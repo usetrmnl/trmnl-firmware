@@ -53,6 +53,18 @@ General.describe "Refresh cycle" do
       end
     end
 
+    # createApiHeaders (src/api-client/header.cpp) sends the esp_reset_reason() name as Reset-Reason
+    # (lib/trmnl/src/api-client/request_headers.cpp).
+    it "reports the reset reason of each boot", :smoke do
+      dev.boot do |s|
+        expect(dev.mock.wait_for_request("/api/display", timeout: 90)).to have_header("Reset-Reason", "ESP_RST_POWERON")
+        s.wait_for_deep_sleep
+        req = dev.mock.next_request("/api/display", timeout: 90) { s.wake }
+        expect(req).to have_header("Reset-Reason", "ESP_RST_DEEPSLEEP")
+        s.wait_for_deep_sleep
+      end
+    end
+
     it "wakes and refreshes on a button press", :smoke,
        needs: :button do
       dev.boot_asleep do |s|

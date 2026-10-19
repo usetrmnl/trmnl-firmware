@@ -11,6 +11,29 @@
 
 #include "logging_parcers.h"
 
+#define RESET_REASON_CASE(reason)                                                                                      \
+  case reason:                                                                                                         \
+    return #reason;
+
+// Only the reasons every supported ESP-IDF version defines; a newer one is sent as its number.
+static String resetReasonName(esp_reset_reason_t reason) {
+  switch (reason) {
+    RESET_REASON_CASE(ESP_RST_UNKNOWN)
+    RESET_REASON_CASE(ESP_RST_POWERON)
+    RESET_REASON_CASE(ESP_RST_EXT)
+    RESET_REASON_CASE(ESP_RST_SW)
+    RESET_REASON_CASE(ESP_RST_PANIC)
+    RESET_REASON_CASE(ESP_RST_INT_WDT)
+    RESET_REASON_CASE(ESP_RST_TASK_WDT)
+    RESET_REASON_CASE(ESP_RST_WDT)
+    RESET_REASON_CASE(ESP_RST_DEEPSLEEP)
+    RESET_REASON_CASE(ESP_RST_BROWNOUT)
+    RESET_REASON_CASE(ESP_RST_SDIO)
+  default:
+    return String((int)reason);
+  }
+}
+
 ApiDisplayInputs createApiHeaders() {
   ApiDisplayInputs inputs;
   char wakeupReasonString[32] = {0};
@@ -55,6 +78,7 @@ ApiDisplayInputs createApiHeaders() {
   inputs.specialFunctionChosen = special_function_chosen;
   inputs.imageCached = bUsedCachedImage;
   inputs.prevWakeTime = iPrevWakeTime;
+  inputs.resetReason = resetReasonName(esp_reset_reason());
   inputs.usbStatus = power().usbStatus();
   inputs.chargingStatus = power().chargingStatus();
 
