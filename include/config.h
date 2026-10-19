@@ -10,6 +10,9 @@
 #define STRINGIFY(x)     #x
 #define TOSTRING(x)      STRINGIFY(x)
 
+#if __has_include(<fw_commit.h>)
+#include <fw_commit.h> // written by scripts/extra/git_version.py
+#endif
 #ifndef FW_COMMIT
 #define FW_COMMIT ""
 #endif
