@@ -45,12 +45,17 @@ General.describe "Errors" do
 
     it "api unreachable on weak wifi" do
       dev.mock.set_fault("/api/display", close: true)
-      boot_with_error(networks: weak)
+      # a closed connection is an HTTP client error: WIFI_INTERNAL_ERROR whatever the signal
+      # (requestErrorScreen, src/request_result.cpp:21)
+      boot_with_error(networks: weak) do |s|
+        expect(s).to show_message("wifi_internal_error.png", [200, 320, 400, 96])
+      end
     end
 
     it "image cut short on weak wifi" do
       dev.mock.set_fault("/images/*", truncate: 1000)
-      boot_with_error(networks: weak)
+      # a cut-short image ends as HTTPS_TIMED_OUT, which has no weak wifi variant
+      boot_with_error(networks: weak) { |s| expect(s).to show_message("image_timeout.png", [160, 380, 480, 32]) }
     end
 
     it "image host unreachable" do
@@ -70,6 +75,13 @@ General.describe "Errors" do
       end
       log = dev.mock.wait_for_request("/api/log", timeout: 10)
       expect(log.body).to include("HTTPS_UNABLE_TO_CONNECT - Unable to create WiFiClient")
+    end
+
+    it "image url that can't be fetched on weak wifi" do
+      # HTTPS_UNABLE_TO_CONNECT at or below WIFI_CONNECTION_RSSI blames the signal: WIFI_WEAK
+      # (requestErrorScreen, src/request_result.cpp:25)
+      dev.mock.display = { image_url: "ftp://10.0.2.2/image.bmp", filename: "plugin-bbbbbb-1", refresh_rate: 300 }
+      boot_with_error(networks: weak) { |s| expect(s).to show_message("wifi_weak.png", [250, 380, 300, 32]) }
     end
 
     it "image too large" do

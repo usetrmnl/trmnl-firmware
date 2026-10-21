@@ -371,66 +371,11 @@ void bl_init(void)
       showMessageWithLogo(firmwareUpdateResult.failureMessage);
   }
 
-  // error handling
-  switch (request_result)
-  {
-  case HTTPS_RESPONSE_CODE_INVALID:
-  {
-    showMessageWithLogo(WIFI_INTERNAL_ERROR);
-  }
-  break;
-  case HTTPS_IMAGE_DOWNLOAD_FAILED:
-  {
-    showMessageWithLogo(IMAGE_DOWNLOAD_FAILED);
-  }
-  break;
-  case HTTPS_UNABLE_TO_CONNECT:
-  {
-    if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
-    {
-      showMessageWithLogo(API_UNABLE_TO_CONNECT);
-    }
-    else
-    {
-      showMessageWithLogo(WIFI_WEAK);
-    }
-  }
-  break;
-  case HTTPS_WRONG_IMAGE_FORMAT:
-  {
-    showMessageWithLogo(MSG_FORMAT_ERROR);
-  }
-  break;
-  case HTTPS_WRONG_IMAGE_SIZE:
-  {
-    if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
-    {
-      showMessageWithLogo(API_SIZE_ERROR);
-    }
-    else
-    {
-      showMessageWithLogo(WIFI_WEAK);
-    }
-  }
-  break;
-  case HTTPS_CLIENT_FAILED:
-  {
-    showMessageWithLogo(WIFI_INTERNAL_ERROR);
-  }
-  break;
-  case HTTPS_TIMED_OUT:
-  {
-    showMessageWithLogo(WIFI_IMAGE_TIMEOUT);
-  }
-  break;
-  case HTTPS_PLUGIN_NOT_ATTACHED:
-  {
+  if (request_result == HTTPS_PLUGIN_NOT_ATTACHED)
     refreshInterval.applyFastPoll();
-  }
-  break;
-  default:
-    break;
-  }
+  MSG error_screen = requestErrorScreen(request_result, WiFi.RSSI() <= WIFI_CONNECTION_RSSI);
+  if (error_screen != NONE)
+    showMessageWithLogo(error_screen);
 
   // display go to sleep
   Log_info("%s [%d]: BL done, going to sleep...", __FILE__, __LINE__);
