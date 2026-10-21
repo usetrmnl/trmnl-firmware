@@ -1802,16 +1802,6 @@ PNG *png = new PNG();
                 bbep.writePlane(); // send the pixels to the display panel
                 return REFRESH_FAST;
             }
-            if (bbep.capabilities() & BBEP_2BIT_BW) {
-                // new SSD2683 controller forces 2-bits per pixel for 1-bit content
-                Log_info("%s [%d]: decoding for SSD2683 special case 2/1-bit\r\n", __FILE__, __LINE__);
-                png->openRAM((uint8_t *)pPNG, iDataSize, png_draw_2bit_bw);
-                bbep.startWrite(PLANE_0); // start writing image data
-                png->decode(NULL, 0);
-                png->close();
-                delete(png); // free the decoder instance
-                return REFRESH_FULL;
-            }
 #ifdef BOARD_TRMNL_4CLR
             Log_info("%s [%d]: decoding for 4-color EPD\r\n", __FILE__, __LINE__);
             png->openRAM((uint8_t *)pPNG, iDataSize, png_draw_4clr);
