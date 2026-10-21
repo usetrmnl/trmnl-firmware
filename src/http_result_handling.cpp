@@ -1,6 +1,6 @@
-#include <request_result.h>
+#include <http_result_handling.h>
 
-bool requestFailed(https_request_err_e result) {
+bool requestIsFailure(https_request_err_e result) {
   switch (result) {
   case HTTPS_SUCCESS:
   case HTTPS_NO_ERR:
@@ -12,6 +12,12 @@ bool requestFailed(https_request_err_e result) {
   default:
     return true;
   }
+}
+
+RequestFailureAction requestFailureAction(https_request_err_e result, bool showErrorNow, uint8_t failedWakes) {
+  if (!requestIsFailure(result)) return RequestFailureAction::ResetCount;
+  if (showErrorNow) return RequestFailureAction::ShowNow;
+  return failedWakes <= MAX_QUIET_API_RETRIES ? RequestFailureAction::StayQuiet : RequestFailureAction::ShowError;
 }
 
 MSG requestErrorScreen(https_request_err_e result, bool weakSignal) {

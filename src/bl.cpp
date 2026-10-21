@@ -2,8 +2,7 @@
 #include <WiFi.h>
 #include <ESPmDNS.h>
 #include <bl.h>
-#include <api_retry.h>
-#include <request_result.h>
+#include <http_result_handling.h>
 #include <sleep_session.h>
 #include <wifi_network.h>
 #include <wifi_session.h>
@@ -309,9 +308,9 @@ void bl_init(void)
   }
 
   uint8_t retries = preferences.getInt(PREFERENCES_CONNECT_API_RETRY_COUNT);
-  ApiRetryStep retry_step = apiRetryStep(requestFailed(request_result), should_show_error_now, retries);
+  RequestFailureAction failure_action = requestFailureAction(request_result, should_show_error_now, retries);
 
-  if (retry_step == ApiRetryStep::Reset)
+  if (failure_action == RequestFailureAction::ResetCount)
   {
     if (request_result == HTTPS_IMAGE_DOWNLOAD_FAILED) // API answered, so no backoff
       Log_info("Image download failed; showing error and sleeping for the API refresh interval (%d s)", refreshInterval.seconds());
@@ -319,7 +318,7 @@ void bl_init(void)
       Log_info("Connection done successfully or WiFi failed. Retries counter reset.");
     preferences.putInt(PREFERENCES_CONNECT_API_RETRY_COUNT, 1);
   }
-  else if (retry_step == ApiRetryStep::ShowNow)
+  else if (failure_action == RequestFailureAction::ShowNow)
   {
     Log.info("%s [%d]: Manual wake - showing error now, no retry scheduled\r\n", __FILE__, __LINE__);
   }
@@ -328,7 +327,7 @@ void bl_init(void)
     uint32_t retry_sleep = refreshInterval.applyApiRetry(retries);
     preferences.putInt(PREFERENCES_CONNECT_API_RETRY_COUNT, retries + 1);
 
-    if (retry_step == ApiRetryStep::RetryQuietly)
+    if (failure_action == RequestFailureAction::StayQuiet)
     {
       Log.info("%s [%d]: retry: %d - time to sleep: %d\r\n", __FILE__, __LINE__, retries, retry_sleep);
       iqs323_task_i2c_lock();

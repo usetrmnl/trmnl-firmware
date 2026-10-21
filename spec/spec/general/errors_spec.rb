@@ -46,7 +46,7 @@ General.describe "Errors" do
     it "api unreachable on weak wifi" do
       dev.mock.set_fault("/api/display", close: true)
       # a closed connection is an HTTP client error: WIFI_INTERNAL_ERROR whatever the signal
-      # (requestErrorScreen, src/request_result.cpp:21)
+      # (requestErrorScreen, src/http_result_handling.cpp:27)
       boot_with_error(networks: weak) do |s|
         expect(s).to show_message("wifi_internal_error.png", [200, 320, 400, 96])
       end
@@ -79,7 +79,7 @@ General.describe "Errors" do
 
     it "image url that can't be fetched on weak wifi" do
       # HTTPS_UNABLE_TO_CONNECT at or below WIFI_CONNECTION_RSSI blames the signal: WIFI_WEAK
-      # (requestErrorScreen, src/request_result.cpp:25)
+      # (requestErrorScreen, src/http_result_handling.cpp:31)
       dev.mock.display = { image_url: "ftp://10.0.2.2/image.bmp", filename: "plugin-bbbbbb-1", refresh_rate: 300 }
       boot_with_error(networks: weak) { |s| expect(s).to show_message("wifi_weak.png", [250, 380, 300, 32]) }
     end
@@ -97,7 +97,7 @@ General.describe "Errors" do
 
     def sleep_s(status) = status["wake_at_s"] - status["sim_time_s"]
 
-    # API failures (apiRetryStep, lib/trmnl/src/api_retry.cpp:6, called from src/bl.cpp:464):
+    # API failures (requestFailureAction, src/http_result_handling.cpp:20, called from src/bl.cpp:463):
     # "retry_count" in NVS starts at 1 and a timer wake keeps the screen while it is
     # MAX_QUIET_API_RETRIES (3) or less, sleeping on RefreshInterval::applyApiRetry (300 s), so the
     # 4th failing timer wake shows the error.
