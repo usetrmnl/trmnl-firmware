@@ -1,5 +1,5 @@
 enum ButtonPressResult { LongPress, DoubleClick, ShortPress, SoftReset, NoAction };
-extern const char *ButtonPressResultNames[4];
+extern const char *ButtonPressResultNames[]; // one per ButtonPressResult, sized in button.cpp
 
 ButtonPressResult read_button_presses();
 
