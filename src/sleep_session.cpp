@@ -6,6 +6,7 @@
 #include <display.h>
 #include <filesystem.h>
 #include <globals.h>
+#include <logo_screens.h>
 #include <misc/clock.h>
 #include <pins.h>
 #include <refresh_interval.h>

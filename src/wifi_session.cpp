@@ -5,6 +5,7 @@
 #include <bl.h>
 #include <config.h>
 #include <globals.h>
+#include <logo_screens.h>
 #include <messages.h>
 #include <sleep_session.h>
 #include <trmnl_log.h>
