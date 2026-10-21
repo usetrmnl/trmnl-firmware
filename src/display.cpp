@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <display.h>
 #include <power.h>
+#include <Wire.h>
 #include <PNGdec.h>
 #include <JPEGDEC.h>
 #include <Preferences.h>
@@ -63,6 +64,7 @@ const TRMNL_DEVICE device_list[] =
   "xiao_epaper_6clr", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 5,     1,    6,       0xff,   BATT_ADC,  EPD_75_6CLR,
   "reterminal_e1001", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     1,    21,      0xff,   BATT_ADC,  EPD_75,
   "reterminal_e1002", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     1,    21,      12,     BATT_ADC,  EPD_75_6CLR,
+  "photo_painter", 10,   11,    9,   12,   8,   13,   47,   48,   4,     0xff, 0xff,    12,     BATT_AXP2101,  EPD_75_6CLR,
   "crowpanel42",   0,    0,     0,   0,    0,   0,    0xff, 0xff, 2,     0xff, 0xff,    0xff,   BATT_NONE, EPD_CROWPANEL, 
   "m5_paper_mono", 0,    0,     0,   0,    0,   0,    47,   48,   2,     0xff, 0xff,    0xff,   BATT_NONE, EPD_PAPER_MONO, 
   "m5_paper_color", 0,   0,     0,   0,    0,   0,    3,    2,    1,     0xff, 0xff,    0xff,   BATT_NONE, EPD_PAPER_COLOR, 
@@ -163,6 +165,11 @@ static bool display_update_epaper(int refreshMode, bool wait, bool writePlane = 
         Log_info("Can't do partial refresh, no previous image");
     } else {
         Log_info("Have valid previous image in EPD memory, doing partial refresh");
+    }
+    if (bbep.capabilities() & BBEP_7COLOR) {
+        refreshMode = REFRESH_FULL;
+        wait = true;
+        Log_info("Switching to full refresh for 6-color panel");
     }
     bbep.refresh(refreshMode, wait);
     // The next update can be a partial update because the current is 1-bpp and stays in the EPD RAM
@@ -307,6 +314,18 @@ void display_init(void)
     Log_info("Saved temperature profile: %" PRIu32, iTempProfile);
 #ifdef BB_EPAPER
     Log_info("BB e-Paper init");
+#ifdef WAVESHARE_PHOTOPAINTER
+    Wire.begin(47, 48);
+    Wire.beginTransmission(0x34); // AXP2101
+    Wire.write(0x90); // LDOS ON/OFF control
+    Wire.write(0x8); // turn on ALDO4
+    Wire.endTransmission();
+    Wire.beginTransmission(0x34);
+    // set ALDO4 to 3.3V
+    Wire.write(0x95);
+    Wire.write(0x1c); // 3.3v
+    Wire.endTransmission();
+#endif // WAVESHARE_PHOTOPAINTER
 #ifdef BOARD_SEEED_STICKY
 // Special case for the Sticky - it shares the SPI bus with the uSD card, so the EPD CS line
 // must be the only one active at a time
