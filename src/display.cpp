@@ -1989,10 +1989,12 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
         preferences.putUInt(PREFERENCES_TEMP_PROFILE, iTempProfile);
     }
 #ifdef BB_EPAPER
-    if (panel_rev == 0xfffffe18) {
+    if (panel_rev == 0xfffffe18 && iTempProfile != 1) {
         Log_info("%s [%d]: Panel ID fffffe18 detected - switching to temperature profile A", __FILE__, __LINE__);
         iTempProfile = 1;
         bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit);
+        Log_info("Saving new temperature profile (%" PRIu32 ") to FLASH", iTempProfile);
+        preferences.putUInt(PREFERENCES_TEMP_PROFILE, iTempProfile);
     }
     if ((iUpdateCount & 7) == 0 || apiDisplayResult.response.maximum_compatibility == true) {
         Log_info("%s [%d]: Forcing full refresh; desired refresh mode was: %d\r\n", __FILE__, __LINE__, iRefreshMode);
