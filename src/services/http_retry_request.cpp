@@ -10,6 +10,7 @@
 #include <string.h>
 #include <trmnl_log.h>
 #include <utility>
+#include <wifi_network.h>
 
 #ifdef BOARD_TRMNL_X
 #include <WifiCaptive.h>
@@ -181,6 +182,7 @@ void HttpRetryRequest::applyRequestSettings(HTTPClient &https, const String &hop
 }
 
 https_request_err_e HttpRetryRequest::attemptWiFi() {
+  ensureWifiConnected(); // a long panel refresh in light sleep can drop the connection
   return withHttp(
     _config.url,
     [this](HTTPClient *https, HttpError error) -> https_request_err_e {
