@@ -105,8 +105,9 @@ module Devices
                soft_reset_press: false, shipment: true, app_slot: 0x20000, ota_slot: 0x320000,
                psram_frame_buffers: true),
     Device.new("seeed_reTerminal_E1002", "reterminal_e1002", "reTerminal E1002", inks: "spectra6"),
+    # its boot button (GPIO 9) can't wake it from deep sleep (include/config.h PIN_INTERRUPT)
     Device.new("seeed_xiao_esp32c3", "seeed_esp32c3", "XIAO ESP32-C3 + 7.5\" panel",
-               chip: "esp32c3", battery_v: 0.0, panel_rev: true, battery_tracks: false, psram: false),
+               chip: "esp32c3", battery_v: 0.0, panel_rev: true, battery_tracks: false, psram: false, button: false),
     Device.new("seeed_xiao_esp32s3", "seeed_esp32s3", "XIAO ESP32-S3 + 7.5\" panel",
                battery_v: 0.0, panel_rev: true, battery_tracks: false),
     Device.new("TRMNL_7inch5_OG_DIY_Kit", "xiao_epaper_display", "TRMNL 7.5\" DIY Kit", panel_rev: true),
