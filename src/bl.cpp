@@ -2,6 +2,8 @@
 #include <WiFi.h>
 #include <ESPmDNS.h>
 #include <bl.h>
+#include <api_retry.h>
+#include <request_result.h>
 #include <sleep_session.h>
 #include <wifi_network.h>
 #include <wifi_session.h>
@@ -306,45 +308,34 @@ void bl_init(void)
     preferences.putInt(PREFERENCES_CONNECT_API_RETRY_COUNT, 1);
   }
 
-  if (request_result == HTTPS_IMAGE_DOWNLOAD_FAILED)
+  uint8_t retries = preferences.getInt(PREFERENCES_CONNECT_API_RETRY_COUNT);
+  ApiRetryStep retry_step = apiRetryStep(requestFailed(request_result), should_show_error_now, retries);
+
+  if (retry_step == ApiRetryStep::Reset)
   {
-    // The API answered (and already set the refresh interval); only the image host failed.
-    // Show the error now on every wake and sleep for the server's refresh_rate, no backoff.
-    Log_info("Image download failed; showing error and sleeping for the API refresh interval (%d s)", refreshInterval.seconds());
+    if (request_result == HTTPS_IMAGE_DOWNLOAD_FAILED) // API answered, so no backoff
+      Log_info("Image download failed; showing error and sleeping for the API refresh interval (%d s)", refreshInterval.seconds());
+    else
+      Log_info("Connection done successfully or WiFi failed. Retries counter reset.");
     preferences.putInt(PREFERENCES_CONNECT_API_RETRY_COUNT, 1);
   }
-  // wifiSessionConnect deep-sleeps on Wi-Fi failure, so WIFI_FAILED is never pending here
-  else if (request_result != HTTPS_SUCCESS && request_result != HTTPS_NO_ERR && request_result != HTTPS_NO_REGISTER && request_result != HTTPS_RESET && request_result != HTTPS_PLUGIN_NOT_ATTACHED)
+  else if (retry_step == ApiRetryStep::ShowNow)
   {
-    if (should_show_error_now)
-    {
-      // Someone is looking at the device (button, touch bar, power-on): show the error right
-      // away instead of silently keeping the old image. This wake does not count toward the
-      // timer backoff and does not change the sleep interval.
-      Log.info("%s [%d]: Manual wake - showing error now, no retry scheduled\r\n", __FILE__, __LINE__);
-    }
-    else
-    {
-      uint8_t retries = preferences.getInt(PREFERENCES_CONNECT_API_RETRY_COUNT);
-      uint32_t retry_sleep = refreshInterval.applyApiRetry(retries);
-      preferences.putInt(PREFERENCES_CONNECT_API_RETRY_COUNT, retries + 1);
-
-      if (retries <= 3)
-      {
-        // Keep the current image and quietly retry
-        Log.info("%s [%d]: retry: %d - time to sleep: %d\r\n", __FILE__, __LINE__, retries, retry_sleep);
-        iqs323_task_i2c_lock();
-        display_sleep();
-        goToSleep();
-      }
-      Log.info("%s [%d]: Max retries done. Time to sleep: %d\r\n", __FILE__, __LINE__, retry_sleep);
-    }
+    Log.info("%s [%d]: Manual wake - showing error now, no retry scheduled\r\n", __FILE__, __LINE__);
   }
-
   else
   {
-    Log_info("Connection done successfully or WiFi failed. Retries counter reset.");
-    preferences.putInt(PREFERENCES_CONNECT_API_RETRY_COUNT, 1);
+    uint32_t retry_sleep = refreshInterval.applyApiRetry(retries);
+    preferences.putInt(PREFERENCES_CONNECT_API_RETRY_COUNT, retries + 1);
+
+    if (retry_step == ApiRetryStep::RetryQuietly)
+    {
+      Log.info("%s [%d]: retry: %d - time to sleep: %d\r\n", __FILE__, __LINE__, retries, retry_sleep);
+      iqs323_task_i2c_lock();
+      display_sleep();
+      goToSleep();
+    }
+    Log.info("%s [%d]: Max retries done. Time to sleep: %d\r\n", __FILE__, __LINE__, retry_sleep);
   }
 
   submitStoredLogs();
