@@ -98,9 +98,9 @@ General.describe "Errors" do
     def sleep_s(status) = status["wake_at_s"] - status["sim_time_s"]
 
     # API failures (requestFailureAction, src/http_result_handling.cpp:20, called from src/bl.cpp:463):
-    # "retry_count" in NVS starts at 1 and a timer wake keeps the screen while it is
-    # MAX_QUIET_API_RETRIES (3) or less, sleeping on RefreshInterval::applyApiRetry (300 s), so the
-    # 4th failing timer wake shows the error.
+    # "retry_count" in NVS starts at 1 and a timer wake keeps the screen while it is below
+    # MAX_QUIET_SLOW_RETRIES (12, as for WiFi failures), sleeping on RefreshInterval::applyApiRetry
+    # (300 s), so the 12th failing timer wake, about an hour in, shows the error.
     # A successful request puts it back to 1; a manual wake shows the error and leaves it.
 
     # Wake (on the timer, or with a press) with /api/display failing; returns the status once asleep again.
@@ -117,12 +117,12 @@ General.describe "Errors" do
       end
     end
 
-    it "api failures on timer wakes retry quietly three times then show the error" do
+    it "api failures on timer wakes stay quiet for an hour then show the error" do
       dev.boot_asleep do |s|
         s.wait_for_deep_sleep
         screen = s.screenshot
         dev.mock.set_fault("/api/display", status: 500)
-        quiet_api_failures(s, 3)
+        quiet_api_failures(s, 11)
         api_failure(s)
         expect(s).not_to show_image(screen, tolerance: 0, max_ratio: 0)
       end
@@ -137,8 +137,8 @@ General.describe "Errors" do
         dev.mock.next_request(dev.mock.image_path("default"), timeout: 90) { s.wake }
         s.wait_for_deep_sleep
         dev.mock.set_fault("/api/display", status: 500)
-        # without the reset the count would be 3, leaving only one quiet retry
-        quiet_api_failures(s, 3)
+        # without the reset the count would be 3, leaving only nine quiet retries
+        quiet_api_failures(s, 11)
       end
     end
 
