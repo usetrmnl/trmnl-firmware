@@ -1149,6 +1149,33 @@
         .finally(() => { btn.disabled = false; btn.textContent = 'Run sensor test'; });
     }
 
+    function loadEthernetFromStorage() {
+      fetch('/get-ethernet')
+        .then(r => r.json())
+        .then(data => { document.getElementById('useEthernet').checked = data.enabled; })
+        .catch(_ => {});
+    }
+
+    function displayEthernetMessage(message, isWarn) {
+      var box = document.getElementById('ethernet-message');
+      box.classList.toggle('msg-warn', !!isWarn);
+      box.textContent = message;
+      box.hidden = false;
+    }
+
+    function saveEthernet() {
+      var enabled = document.getElementById('useEthernet').checked;
+      fetch('/set-ethernet?enabled=' + (enabled ? '1' : '0'))
+        .then(r => r.json())
+        .then(_ => displayEthernetMessage(enabled ? 'Ethernet enabled. Reboot to apply.' : 'Ethernet disabled. Reboot to apply.'))
+        .catch(_ => displayEthernetMessage('Failed to save Ethernet setting.', true));
+    }
+
+    function restartDevice() {
+      displayEthernetMessage('Rebooting…');
+      fetch('/restart').catch(_ => {});
+    }
+
     function showView() {
       closeModal();
       var advanced = location.hash === '#advanced';
@@ -1222,6 +1249,7 @@
 
     setTimeout(getInfo, 500);
     setTimeout(loadServerFromDevice, 100);
+    setTimeout(loadEthernetFromStorage, 100);
     setTimeout(restoreConnectionStatus, 100);
     setTimeout(restoreConnectionStatus, 100);
   </script>
@@ -1412,6 +1440,20 @@
           <input class="inp" type="text" id="ntpServer1" placeholder="time.nist.gov">
           <p class="hint">Leave empty to use time.google.com.</p>
         </div>
+      </div>
+
+      <div class="adv-sec">
+        <h3>Ethernet over USB</h3>
+        <label class="switch">
+          <input type="checkbox" id="useEthernet">
+          Enable Ethernet over USB
+        </label>
+        <p class="hint">Takes effect after a reboot.</p>
+        <div class="row2">
+          <button id="btnEthernetSave" class="btn btn-quiet" type="button" onclick="saveEthernet()">Save</button>
+          <button id="btnEthernetRestart" class="btn btn-quiet" type="button" onclick="restartDevice()">Reboot</button>
+        </div>
+        <div class="msg" id="ethernet-message" role="status" hidden></div>
       </div>
 
       <div class="adv-sec">

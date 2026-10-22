@@ -50,6 +50,10 @@
 #include <preferences_persistence.h>
 #include <wifi-helpers.h>
 #include <sys/time.h>
+#ifdef BOARD_TRMNL_X
+#include "ethernet_config.h"
+#include "connection_manager.h"
+#endif // BOARD_TRMNL_X
 #include <misc/buzzer.h>
 #include <misc/sensor.h>
 #include <services/device_setup.h>
@@ -244,7 +248,26 @@ void bl_init(void)
   list_files();
   log_nvs_usage();
 
-  wifiSessionConnect(should_show_error_now);
+#ifdef BOARD_TRMNL_X
+  ESP_ERROR_CHECK(esp_netif_init());
+  ESP_ERROR_CHECK(esp_event_loop_create_default());
+  conn_mgr_init();
+  if (preferences.getBool("eth_enabled", false)) {
+    ethernet_start();
+    Log_info("Waiting for Ethernet DHCP");
+    for (int _eth_s = 1; _eth_s <= 5; _eth_s++) {
+      if ((conn_mgr_wait_any(pdMS_TO_TICKS(1000)) & ETH_READY_BIT) != 0) break;
+      Log_info("No Ethernet yet... (waiting %ds)", _eth_s);
+      if (_eth_s == 5) {
+        Log_info("Ethernet DHCP still not ready after %ds, giving up and trying WiFi", _eth_s);
+      }
+    }
+  }
+
+  // WiFi block — runs when Ethernet is not available.
+  if (!conn_mgr_is_eth())
+#endif // BOARD_TRMNL_X
+    wifiSessionConnect(should_show_error_now);
 
   updateTimeSinceSleep();
 
@@ -388,7 +411,12 @@ void bl_init(void)
 
   if (request_result == HTTPS_PLUGIN_NOT_ATTACHED)
     refreshInterval.applyFastPoll();
-  MSG error_screen = requestErrorScreen(request_result, WiFi.RSSI() <= WIFI_CONNECTION_RSSI);
+#ifdef BOARD_TRMNL_X
+  bool weak_signal = !conn_mgr_is_eth() && WiFi.RSSI() <= WIFI_CONNECTION_RSSI;
+#else
+  bool weak_signal = WiFi.RSSI() <= WIFI_CONNECTION_RSSI;
+#endif
+  MSG error_screen = requestErrorScreen(request_result, weak_signal);
   if (error_screen != NONE)
     showMessageWithLogo(error_screen);
 
@@ -472,11 +500,13 @@ bool storeLogString(const char *log_buffer)
 
 void submitStoredLogs(void)
 {
-  if (WiFi.isConnected() == false)
+#ifdef BOARD_TRMNL_X
+  if (!conn_mgr_is_ready())
   {
-    Log_info("WiFi not connected; not submitting stored logs.");
+    Log_info("Network not connected; not submitting stored logs.");
     return;
   }
+#endif
   String log = storedLogs.gather_stored_logs();
 
   String api_key = "";
@@ -543,8 +573,21 @@ DeviceStatusStamp getDeviceStatusStamp()
 {
   DeviceStatusStamp deviceStatus = {};
 
+#ifdef BOARD_TRMNL_X
+  if (conn_mgr_is_eth()) {
+    deviceStatus.wifi_rssi_level = 0;
+    strncpy(deviceStatus.wifi_status, "ethernet", sizeof(deviceStatus.wifi_status) - 1);
+  } else if (conn_mgr_is_wifi()) {
+    deviceStatus.wifi_rssi_level = WiFi.RSSI();
+    strncpy(deviceStatus.wifi_status, wifiStatusStr(WiFi.status()), sizeof(deviceStatus.wifi_status) - 1);
+  } else {
+    deviceStatus.wifi_rssi_level = 0;
+    strncpy(deviceStatus.wifi_status, "none", sizeof(deviceStatus.wifi_status) - 1);
+  }
+#else
   deviceStatus.wifi_rssi_level = WiFi.RSSI();
   strncpy(deviceStatus.wifi_status, wifiStatusStr(WiFi.status()), sizeof(deviceStatus.wifi_status) - 1);
+#endif
   deviceStatus.refresh_rate = refreshInterval.seconds(0);
   deviceStatus.time_since_last_sleep = time_since_sleep;
   snprintf(deviceStatus.current_fw_version, sizeof(deviceStatus.current_fw_version), "%s", FW_VERSION_STRING);
