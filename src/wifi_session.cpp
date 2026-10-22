@@ -5,9 +5,9 @@
 #include <bl.h>
 #include <config.h>
 #include <globals.h>
-#include <logo_screens.h>
 #include <messages.h>
 #include <sleep_session.h>
+#include <status_screens.h>
 #include <trmnl_log.h>
 #include <wifi-helpers.h>
 #include <wifi_network.h>

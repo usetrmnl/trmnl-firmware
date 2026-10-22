@@ -57,7 +57,7 @@
 #include "messages.h"
 #include "displayed_image.h"
 #include <globals.h>
-#include <logo_screens.h>
+#include <status_screens.h>
 
 static float vBatt;
 static https_request_err_e downloadAndShow(); // download and show the image
