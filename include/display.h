@@ -63,11 +63,6 @@ void display_init(void);
  */
 String display_panel_rev_string(void);
 
-extern "C" {
-  void modem_enter_bootloader();
-  void modem_reset_target();
-}
-
 /**
  * @brief Diagnostic function to continuously show the battery voltage
  * @param none
