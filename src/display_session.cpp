@@ -3,6 +3,7 @@
 #include <WiFi.h>
 #include <api-client/header.h>
 #include <api-client/request_headers.h>
+#include <app_logger.h>
 #include <battery.h>
 #include <bl.h>
 #include <bmp.h>

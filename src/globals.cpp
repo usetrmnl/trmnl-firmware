@@ -21,6 +21,7 @@ bool log_retry = false;      // need to log connection retry
 
 // --- Wake / sleep state ---
 uint32_t time_since_sleep;
+float battery_voltage;
 esp_sleep_wakeup_cause_t wakeup_reason = ESP_SLEEP_WAKEUP_UNDEFINED;
 SPECIAL_FUNCTION special_function = SF_NONE;
 bool special_function_chosen = false;

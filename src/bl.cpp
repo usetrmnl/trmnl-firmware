@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <ESPmDNS.h>
+#include <app_logger.h>
 #include <bl.h>
 #include <http_result_handling.h>
 #include <sleep_session.h>
@@ -58,9 +59,7 @@
 #include <globals.h>
 #include <status_screens.h>
 
-static float vBatt;
 void writeSpecialFunction(SPECIAL_FUNCTION function);
-static DeviceStatusStamp getDeviceStatusStamp();
 
 unsigned long startup_time = 0;
 
@@ -211,7 +210,7 @@ void bl_init(void)
   if (double_click)
     button_wake_run_special_function();
   // Read the battery voltage BEFORE the display or WiFi is turned on
-  vBatt = battery().readVoltage(pDevice);
+  battery_voltage = battery().readVoltage(pDevice);
 
   // EPD init
   // EPD clear
@@ -231,7 +230,7 @@ void bl_init(void)
   Log_info("BATTERY CHARGING: %s", battery_charging ? "YES" : "NO");
 
   battery().gaugeInit();
-  vBatt = battery().readVoltage(); // Read the battery voltage BEFORE WiFi is turned on
+  battery_voltage = battery().readVoltage(); // Read the battery voltage BEFORE WiFi is turned on
 #endif // BOARD_TRMNL_X
 
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
@@ -308,7 +307,7 @@ void bl_init(void)
   log_retry = true;
 
   // OTA checking, image checking and drawing
-  https_request_err_e request_result = downloadAndShow(vBatt);
+  https_request_err_e request_result = downloadAndShow(battery_voltage);
   Log.info("%s [%d]: request result - %s\r\n", __FILE__, __LINE__, https_request_err_str(request_result));
 
   if (request_result == HTTPS_IMAGE_FILE_TOO_BIG)
@@ -427,88 +426,6 @@ void resetDeviceCredentials(void)
   ESP.restart();
 }
 
-/**
- * @brief Function to submit a log string to the API
- * @param log_buffer pointer to the buffer that contains log note
- * @return bool true if successful, false if failed
- */
-bool submitLogString(const char *log_buffer)
-{
-  String api_key = "";
-  if (preferences.isKey(PREFERENCES_API_KEY))
-  {
-    api_key = preferences.getString(PREFERENCES_API_KEY, PREFERENCES_API_KEY_DEFAULT);
-    Log_info("%s key exists. Value - %s", PREFERENCES_API_KEY, api_key.c_str());
-  }
-  else
-  {
-    Log_info("%s key not exists.", PREFERENCES_API_KEY);
-    return false;
-  }
-
-  LogApiInput input{api_key, log_buffer};
-  return submitLogToApi(input, preferences.getString(PREFERENCES_API_URL, API_BASE_URL).c_str());
-}
-
-/**
- * @brief Function to store a log string locally
- * @param log_buffer pointer to the buffer that contains log note
- * @return bool true if successful, false if failed
- */
-bool storeLogString(const char *log_buffer)
-{
-  LogStoreResult store_result = storedLogs.store_log(String(log_buffer));
-  if (store_result.status != LogStoreResult::SUCCESS)
-  {
-    // Use the serial-only variant to avoid infinite recursion: Log_error here
-    // would route back into log_impl → handle_store_submit → logWithAction →
-    // storeLogString → store fails again → ...
-    Log_error_serial("Failed to store log: %s", store_result.message);
-    return false;
-  }
-  return true;
-}
-
-
-void submitStoredLogs(void)
-{
-  if (WiFi.isConnected() == false)
-  {
-    Log_info("WiFi not connected; not submitting stored logs.");
-    return;
-  }
-  String log = storedLogs.gather_stored_logs();
-
-  String api_key = "";
-  if (preferences.isKey(PREFERENCES_API_KEY))
-  {
-    api_key = preferences.getString(PREFERENCES_API_KEY, PREFERENCES_API_KEY_DEFAULT);
-    Log.info("%s [%d]: %s key exists. Value - %s\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY, api_key.c_str());
-  }
-  else
-  {
-    Log.error("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY);
-  }
-
-  bool submitLogToApiResult = false;
-  if (log.length() > 0)
-  {
-    Log.info("%s [%d]: log string - %s\r\n", __FILE__, __LINE__, log.c_str());
-    Log.info("%s [%d]: need to send the log\r\n", __FILE__, __LINE__);
-
-    LogApiInput input{api_key, log.c_str()};
-    submitLogToApiResult = submitLogToApi(input, preferences.getString(PREFERENCES_API_URL, API_BASE_URL).c_str());
-  }
-  else
-  {
-    Log.info("%s [%d]: no needed to send the log\r\n", __FILE__, __LINE__);
-  }
-  if (submitLogToApiResult == true)
-  {
-    storedLogs.clear_stored_logs();
-  }
-}
-
 void writeSpecialFunction(SPECIAL_FUNCTION function)
 {
   if (preferences.isKey(PREFERENCES_SF_KEY))
@@ -537,61 +454,4 @@ void writeSpecialFunction(SPECIAL_FUNCTION function)
     else
       Log.error("%s [%d]: Writing new special function failed\r\n", __FILE__, __LINE__);
   }
-}
-
-DeviceStatusStamp getDeviceStatusStamp()
-{
-  DeviceStatusStamp deviceStatus = {};
-
-  deviceStatus.wifi_rssi_level = WiFi.RSSI();
-  strncpy(deviceStatus.wifi_status, wifiStatusStr(WiFi.status()), sizeof(deviceStatus.wifi_status) - 1);
-  deviceStatus.refresh_rate = refreshInterval.seconds(0);
-  deviceStatus.time_since_last_sleep = time_since_sleep;
-  snprintf(deviceStatus.current_fw_version, sizeof(deviceStatus.current_fw_version), "%s", FW_VERSION_STRING);
-  parseSpecialFunctionToStr(deviceStatus.special_function, sizeof(deviceStatus.special_function), special_function);
-  deviceStatus.battery_voltage = vBatt;
-  parseWakeupReasonToStr(deviceStatus.wakeup_reason, sizeof(deviceStatus.wakeup_reason), esp_sleep_get_wakeup_cause());
-  deviceStatus.free_heap_size = ESP.getFreeHeap();
-  deviceStatus.max_alloc_size = ESP.getMaxAllocHeap();
-
-  return deviceStatus;
-}
-
-void logWithAction(LogAction action, LogLevel level, const char *message, time_t time, int line, const char *file)
-{
-  uint32_t log_id = preferences.getUInt(PREFERENCES_LOG_ID_KEY, 1);
-
-  LogWithDetails input = {
-      .deviceStatusStamp = getDeviceStatusStamp(),
-      .timestamp = time,
-      .codeline = line,
-      .sourceFile = file,
-      .logMessage = message,
-      .logId = log_id,
-      .filenameCurrent = preferences.getString(PREFERENCES_FILENAME_KEY, ""),
-      .filenameNew = new_filename,
-      .logRetry = log_retry,
-      .retryAttempt = log_retry ? preferences.getInt(PREFERENCES_CONNECT_API_RETRY_COUNT) : 0,
-      .level = level};
-
-  String json_string = serialize_log(input);
-
-  switch (action)
-  {
-    case LOG_ACTION_STORE:
-      storeLogString(json_string.c_str());
-      break;
-    case LOG_ACTION_SUBMIT:
-      submitLogString(json_string.c_str());
-      break;
-    case LOG_ACTION_SUBMIT_OR_STORE:
-      if (!submitLogString(json_string.c_str()))
-      {
-        Log_info("Was unable to send log to API; saving locally for later.");
-        storeLogString(json_string.c_str());
-      }
-      break;
-  }
-
-  preferences.putUInt(PREFERENCES_LOG_ID_KEY, ++log_id);
 }
