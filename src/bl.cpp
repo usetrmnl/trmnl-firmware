@@ -62,7 +62,6 @@ static https_request_err_e downloadAndShow(); // download and show the image
 void submitStoredLogs(void);
 void writeSpecialFunction(SPECIAL_FUNCTION function);
 static DeviceStatusStamp getDeviceStatusStamp();
-int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious);
 
 unsigned long startup_time = 0;
 
@@ -606,17 +605,6 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   return inputs;
 }
 
-void load_prev_image(void)
-{
-  uint8_t *buffer;
-  size_t content_size = 0;
-  if (content_size > 0) {
-    // Decode it into the previous buffer
-    Log.info("%s [%d]: Decoding previous image (%s) into the EPD 'old' buffer\r\n", __FILE__, __LINE__, DisplayedImage::get());
-    png_to_epd(buffer, content_size, true);
-  }
-} /* load_prev_image() */
-
 /**
  * @brief Function to ping server and download and show the image if all is OK
  * @param url Server URL address
@@ -654,11 +642,6 @@ static https_request_err_e downloadAndShow()
 
   if (!status && result == HTTPS_SUCCESS) { // this means we already have this image stored in SPIFFS
       char szTemp[36];
-#if PARALLEL_EPD && !defined(BOARD_SEEED_RETERMINAL_E1003)
-      if (DisplayedImage::exists()) {
-        load_prev_image(); // decode the older image into the previous buffer of FastEPD
-      }
-#endif
       filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
       if (DisplayedImage::matches(szTemp)) {
         // We just displayed the same image, don't refresh the display
