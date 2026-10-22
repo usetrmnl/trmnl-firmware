@@ -10,6 +10,7 @@
 #include "cached_images.h"
 #include "iqs323_task.h"
 #include "menu.h"
+#include "rtc_wake_stub_trmnl_x.h"
 #include "touchbar_gesture.h"
 
 // Touchbar indicator to redraw after a full-refresh (e.g. logo screen)
@@ -143,6 +144,49 @@ void touchbar_redraw_pending_indicator(void) {
   if (has_pending_indicator) {
     display_draw_touchbar_indicator(pending_indicator_side);
     has_pending_indicator = false;
+  }
+}
+
+void touchbar_log_wake_stub_status(void) {
+  Log_info("wakeup_stub_iqs_status.status: 0x%02X 0x%02X", wakeup_stub_iqs_status.status[0],
+           wakeup_stub_iqs_status.status[1]);
+  Log_info("wakeup_stub_iqs_status.gestures: 0x%02X 0x%02X", wakeup_stub_iqs_status.gestures[0],
+           wakeup_stub_iqs_status.gestures[1]);
+  Log_info("wakeup_stub_iqs_status.slider_cords: 0x%02X 0x%02X", wakeup_stub_iqs_status.slider_cords[0],
+           wakeup_stub_iqs_status.slider_cords[1]);
+  Log_info("wakeup_stub_iqs_status.ch0_cnts: 0x%02X 0x%02X 0x%02X 0x%02X", wakeup_stub_iqs_status.ch0_cnts[0],
+           wakeup_stub_iqs_status.ch0_cnts[1], wakeup_stub_iqs_status.ch0_cnts[2], wakeup_stub_iqs_status.ch0_cnts[3]);
+  Log_info("wakeup_stub_iqs_status.ch1_cnts: 0x%02X 0x%02X 0x%02X 0x%02X", wakeup_stub_iqs_status.ch1_cnts[0],
+           wakeup_stub_iqs_status.ch1_cnts[1], wakeup_stub_iqs_status.ch1_cnts[2], wakeup_stub_iqs_status.ch1_cnts[3]);
+  Log_info("wakeup_stub_iqs_status.ch2_cnts: 0x%02X 0x%02X 0x%02X 0x%02X", wakeup_stub_iqs_status.ch2_cnts[0],
+           wakeup_stub_iqs_status.ch2_cnts[1], wakeup_stub_iqs_status.ch2_cnts[2], wakeup_stub_iqs_status.ch2_cnts[3]);
+}
+
+void touchbar_start(esp_sleep_wakeup_cause_t wakeup_reason, bool gpio_wakeup) {
+  // Notify IQS323 task about wakeup type BEFORE starting the task
+  if (gpio_wakeup) {
+    Log_info("GPIO wakeup detected (%d) - using wake stub data", wakeup_reason);
+    iqs323_task_notify_gpio_wakeup(true);
+  } else {
+    Log_info("Non-GPIO wakeup (%d)", wakeup_reason);
+  }
+
+  // Start IQS323 task manager
+  if (!iqs323_task_init(NULL)) {
+    Log_error("IQS323 Task: Failed to start - rebooting");
+    delay(1000);
+    ESP.restart();
+  }
+
+  // Wait for IQS323 initialization to complete
+  if (!iqs323_task_wait_ready(5000)) {
+    Log_error("IQS323 Task: Initialization timeout - rebooting");
+    delay(1000);
+    ESP.restart();
+  }
+
+  if (gpio_wakeup) {
+    process_iqs323_data();
   }
 }
 

@@ -158,13 +158,7 @@ void bl_init(void)
   buzzer().init();
   sensor().init(pDevice);
 #ifdef BOARD_TRMNL_X
-  // Debug: Print all wakeup_stub_iqs_status structure fields
-  Log_info("wakeup_stub_iqs_status.status: 0x%02X 0x%02X", wakeup_stub_iqs_status.status[0], wakeup_stub_iqs_status.status[1]);
-  Log_info("wakeup_stub_iqs_status.gestures: 0x%02X 0x%02X", wakeup_stub_iqs_status.gestures[0], wakeup_stub_iqs_status.gestures[1]);
-  Log_info("wakeup_stub_iqs_status.slider_cords: 0x%02X 0x%02X", wakeup_stub_iqs_status.slider_cords[0], wakeup_stub_iqs_status.slider_cords[1]);
-  Log_info("wakeup_stub_iqs_status.ch0_cnts: 0x%02X 0x%02X 0x%02X 0x%02X", wakeup_stub_iqs_status.ch0_cnts[0], wakeup_stub_iqs_status.ch0_cnts[1], wakeup_stub_iqs_status.ch0_cnts[2], wakeup_stub_iqs_status.ch0_cnts[3]);
-  Log_info("wakeup_stub_iqs_status.ch1_cnts: 0x%02X 0x%02X 0x%02X 0x%02X", wakeup_stub_iqs_status.ch1_cnts[0], wakeup_stub_iqs_status.ch1_cnts[1], wakeup_stub_iqs_status.ch1_cnts[2], wakeup_stub_iqs_status.ch1_cnts[3]);
-  Log_info("wakeup_stub_iqs_status.ch2_cnts: 0x%02X 0x%02X 0x%02X 0x%02X", wakeup_stub_iqs_status.ch2_cnts[0], wakeup_stub_iqs_status.ch2_cnts[1], wakeup_stub_iqs_status.ch2_cnts[2], wakeup_stub_iqs_status.ch2_cnts[3]);
+  touchbar_log_wake_stub_status();
 #endif
 
 #if defined(BOARD_SEEED_XIAO_ESP32C3)
@@ -227,8 +221,6 @@ void bl_init(void)
     Log_info("Non-GPIO wakeup (%d) -> didn't read buttons", wakeup_reason);
   }
 #else // BOARD_TRMNL_X
-  // Notify IQS323 task about wakeup type BEFORE starting the task
-
   Log.info("%s [%d]: Display init\r\n", __FILE__, __LINE__);
   iqs323_task_i2c_lock();
   display_init();
@@ -237,33 +229,10 @@ void bl_init(void)
   filesystem_init();
 
   Wire.setClock(100000);
-
-  if (gpio_wakeup) {
-    Log_info("GPIO wakeup detected (%d) - using wake stub data", wakeup_reason);
-    iqs323_task_notify_gpio_wakeup(true);
-  } else {
-    Log_info("Non-GPIO wakeup (%d)", wakeup_reason);
-  }
 #endif // BOARD_TRMNL_X
 
 #ifdef BOARD_TRMNL_X
-  // Start IQS323 task manager
-  if (!iqs323_task_init(NULL)) {
-    Log_error("IQS323 Task: Failed to start - rebooting");
-    delay(1000);
-    ESP.restart();
-  }
-
-  // Wait for IQS323 initialization to complete
-  if (!iqs323_task_wait_ready(5000)) {
-    Log_error("IQS323 Task: Initialization timeout - rebooting");
-    delay(1000);
-    ESP.restart();
-  }
-
-  if (gpio_wakeup) {
-    process_iqs323_data();
-  }
+  touchbar_start(wakeup_reason, gpio_wakeup);
 
   Log_info("init time: %ld us", init_time);
 #else // BOARD_TRMNL_X
