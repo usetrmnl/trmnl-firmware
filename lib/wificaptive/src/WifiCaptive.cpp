@@ -269,6 +269,7 @@ bool WifiCaptive::startPortal() {
     showMessageWithLogo(SHIPPING_MODE);
     saveShipmentStarted();
     enter_shipment_sleep();
+    ESP.restart(); // shipment mode left the I/O expander's pins set for low power
 #else
     showMessageWithLogo(CAPTIVE_WIFI_TIMEOUT);
     goToSleep();
