@@ -380,7 +380,7 @@ void config_tca95535_pins_for_lp()
 {
     bbep.ioPinMode(0, INPUT);
 
-    // Pin 1 (OTG) is configured separately in init_otg()
+    // Pin 1 (OTG) is left as otg_turn_on()/otg_turn_off() set it
 
     bbep.ioPinMode(2, INPUT);
 
