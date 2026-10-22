@@ -14,6 +14,8 @@
 #include <wifi_session.h>
 
 #ifdef BOARD_TRMNL_X
+#include <connection_manager.h>
+#include <ethernet_config.h>
 #include <modem.h>
 #include <touchbar_actions.h>
 #include <vector>
@@ -118,6 +120,10 @@ void wifiSessionConnect(bool should_show_error_now) {
       String ip = String(WiFi.localIP());
       Log.info("%s [%d]:wifi_connection [DEBUG]: Connected: %s\r\n", __FILE__, __LINE__, ip.c_str());
       preferences.putInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT, 1);
+#ifdef BOARD_TRMNL_X
+      conn_mgr_mark_ready(CONNECTION_INTERFACE_WIFI);
+      conn_mgr_update_default_route();
+#endif
     } else {
       if (should_show_error_now) {
         showMessageWithLogo(WIFI_FAILED);
@@ -130,6 +136,17 @@ void wifiSessionConnect(bool should_show_error_now) {
   } else {
     // WiFi credentials are not saved - start captive portal
     Log.info("%s [%d]: WiFi NOT saved\r\n", __FILE__, __LINE__);
+
+#ifdef BOARD_TRMNL_X
+    if (preferences.getBool("eth_enabled", false)) {
+      if (ethernet_is_link_up()) {
+        showMessageWithLogo(ETH_DHCP_FAILED);
+      } else {
+        showMessageWithLogo(ETH_NOT_DETECTED);
+      }
+      wifiErrorDeepSleep(false); // keep the Ethernet screen; don't overlay the Wi-Fi failure message
+    }
+#endif
 
     Log_info("FW version %s", Messages::firmware_version().c_str());
 
@@ -147,6 +164,9 @@ void wifiSessionConnect(bool should_show_error_now) {
     bool portal_ok = WifiCaptivePortal.startPortal();
     if (!portal_ok) {
       WiFi.disconnect(true);
+#ifdef BOARD_TRMNL_X
+      conn_mgr_mark_lost(CONNECTION_INTERFACE_WIFI);
+#endif
 
       showMessageWithLogo(WIFI_FAILED);
 
@@ -155,6 +175,10 @@ void wifiSessionConnect(bool should_show_error_now) {
       // Go to deep sleep
       wifiErrorDeepSleep();
     }
+#ifdef BOARD_TRMNL_X
+    conn_mgr_mark_ready(CONNECTION_INTERFACE_WIFI);
+    conn_mgr_update_default_route();
+#endif
     Log.info("%s [%d]: WiFi connected\r\n", __FILE__, __LINE__);
     preferences.putInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT, 1);
   }

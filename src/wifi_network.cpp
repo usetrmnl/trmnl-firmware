@@ -7,6 +7,7 @@
 #include <wifi_network.h>
 
 #ifdef BOARD_TRMNL_X
+#include <connection_manager.h>
 #include <globals.h>
 
 #include "modem.h"
@@ -75,6 +76,11 @@ bool connectWithSavedCredentials(void) {
 
 bool ensureWifiConnected(void) {
   if (WiFi.status() == WL_CONNECTED) return true;
+
+#ifdef BOARD_TRMNL_X
+  // Ethernet doesn't need Wi-Fi at all; let the caller proceed over the wired link.
+  if (conn_mgr_is_eth()) return true;
+#endif
 
   Log_info("%s [%d]: WiFi disconnected, reconnecting...\r\n", __FILE__, __LINE__);
 

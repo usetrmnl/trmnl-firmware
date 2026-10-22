@@ -318,6 +318,11 @@ void WifiCaptive::resetSettings() {
     _savedWifis[i] = WifiCredentials{};
   }
 
+  // The menu can reset Wi-Fi before the Wi-Fi stack is started; the calls below panic then, and there is
+  // nothing to disconnect or erase anyway.
+  wifi_mode_t wifiMode;
+  if (esp_wifi_get_mode(&wifiMode) != ESP_OK) return;
+
   // Clean up any WPA2 Enterprise state
   disableWpa2Enterprise();
 
