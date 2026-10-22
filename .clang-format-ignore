@@ -2,6 +2,7 @@
 src/bl.cpp
 src/display.cpp
 src/image_decoders.cpp
+src/message_screens.cpp
 
 # vendor
 components/**
