@@ -63,8 +63,6 @@ void display_init(void);
  */
 String display_panel_rev_string(void);
 
-uint8_t tca9535_interrupt_clear();
-void config_bma530_interrupt();
 void config_tca95535_pins_for_lp();
 void enter_shipment_sleep();
 void BQ27427_reset();
@@ -73,8 +71,8 @@ void otg_turn_off();
 
 typedef enum {
   BATTERY_NONE = 0, // no battery — pin stayed HIGH (timeout >6000 µs)
-  BATTERY_ONE = 1,  // one 6K cell — discharge > 1100 µs
-  BATTERY_TWO = 2,  // two 6K cells — discharge ≤ 1100 µs
+  BATTERY_ONE = 1,  // one 6K cell — discharge > 750 µs
+  BATTERY_TWO = 2,  // two 6K cells — discharge ≤ 750 µs
 } battery_count_t;
 
 battery_count_t detect_battery_count();
