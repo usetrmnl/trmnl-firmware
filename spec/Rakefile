@@ -30,6 +30,16 @@ require_relative "spec/support/coverage_report"
 # A task's argument as argv (Rake splits arguments at commas: put them back).
 def task_args(args) = Shellwords.split([args[:args], *args.extras].compact.join(","))
 
+# An OG family build (ESP-IDF 4.4) empties managed_components/, and a cached build of a board that
+# uses them (the X family) never fetches them again: that build starts over.
+def clear_stale_component_build(env)
+  dir = File.join(Builds::DIR, env)
+  description = File.join(dir, "project_description.json")
+  return unless File.exist?(description) && File.read(description).include?("managed_components")
+
+  rm_rf dir if Dir.glob(File.join(Builds::FIRMWARE, "managed_components/*")).empty?
+end
+
 task default: :spec
 
 desc "Run the integration specs in parallel (argument: parallel_rspec's, e.g. -n 4 spec/core)"
@@ -56,7 +66,13 @@ namespace :firmware do
   task :build, [:args] do |_, args|
     envs = task_args(args)
     envs = Devices::CORE.map(&:env) if envs.empty?
-    sh "pio", "run", "-d", Builds::FIRMWARE, *envs.flat_map { ["-e", _1] }
+    envs.each do |env|
+      # The two espressif32 platforms share ~/.platformio/packages: without the install, the first
+      # build after a switch fails with "Missing Arduino framework directory 'None'".
+      sh "pio", "pkg", "install", "-d", Builds::FIRMWARE, "-e", env
+      clear_stale_component_build(env)
+      sh "pio", "run", "-d", Builds::FIRMWARE, "-e", env
+    end
   end
 end
 
