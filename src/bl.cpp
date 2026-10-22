@@ -278,8 +278,13 @@ void bl_init(void)
     {
       // The server's image for an unregistered device when it sent one and this run saved it
       // (not a logo left on flash by an earlier setup), else the server's message under the logo.
+      bool drawable = setup.imagePath.length() > 0;
+#ifdef PARALLEL_EPD
+      // FastEPD's display_show_image draws no uncompressed BMP (the X's 5 GHz modem path saves only those)
+      drawable = drawable && !setup.imagePath.endsWith(".bmp");
+#endif
       int image_size = 0;
-      uint8_t *image = setup.imagePath.length() > 0 ? display_read_file(setup.imagePath.c_str(), &image_size) : nullptr;
+      uint8_t *image = drawable ? display_read_file(setup.imagePath.c_str(), &image_size) : nullptr;
       if (image)
       {
         display_show_image(image, image_size, true);

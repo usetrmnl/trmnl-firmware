@@ -108,8 +108,8 @@ RSpec.describe "TRMNL X", env: "TRMNL_X" do
 
     # On 5 GHz the modem keeps the server's image for an unregistered MAC only as an 800x480 BMP
     # (DeviceSetupX::downloadSetupImage), and the X's FastEPD display_show_image draws no
-    # uncompressed BMP (src/display.cpp: that branch hands the bitmap to bb_epaper only), so the
-    # X shows the "not registered" message instead: the same screen as without an image_url.
+    # uncompressed BMP (src/display.cpp: that branch hands the bitmap to bb_epaper only), so
+    # bl_init shows the "not registered" message instead: the same screen as without an image_url.
     it "unregistered on 5 GHz with an image url shows the message" do
       TrmnlSim::MockTrmnl.open do |mock|
         mock.set_image("unregistered") { true } # all ink
