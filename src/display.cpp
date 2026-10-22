@@ -72,9 +72,8 @@ const TRMNL_DEVICE device_list[] =
 
 // TRMNL SPI ePaper panel types list. The list order is fixed and based on enumerated values
 // N.B. ALWAYS ADD NEW PANELS TO THE END OF THE LIST
-const DISPLAY_PROFILE dpList[14][3] = { // 1-bit and 2-bit display types for each profile
+const DISPLAY_PROFILE dpList[12][3] = { // 1-bit and 2-bit display types for each profile
     {{EP75_800x480, EP75_800x480_4GRAY}, {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, {EP75_800x480, EP75_800x480_4GRAY_V2}},
-    {{EP42YR_400x300, EP42YR_400x300}, {EP42YR_400x300, EP42YR_400x300}, {EP42YR_400x300, EP42YR_400x300}},
     {{EP426_800x480, EP426_800x480_4GRAY}, {EP426_800x480, EP426_800x480_4GRAY}, {EP426_800x480, EP426_800x480_4GRAY}},
     {{EP397_800x480, EP397_800x480_4GRAY}, {EP397_800x480, EP397_800x480_4GRAY}, {EP397_800x480, EP397_800x480_4GRAY}},
     {{EP75R_800x480, EP75R_800x480}, {EP75R_800x480, EP75R_800x480}, {EP75R_800x480, EP75R_800x480}}, 
@@ -141,10 +140,7 @@ static bool display_update_epaper(int refreshMode, bool wait, bool writePlane = 
     if (writePlane) {
         bbep.writePlane(plane);
     }
-    if (bbep.capabilities() & (BBEP_3COLOR | BBEP_4COLOR | BBEP_7COLOR | BBEP_2BIT_BW)) {
-        Log_info("Color EPD, must use full refresh mode");
-        refreshMode = REFRESH_FULL;
-    } else if (refreshMode == REFRESH_PARTIAL && !bCanDoPartial) {
+    if (refreshMode == REFRESH_PARTIAL && !bCanDoPartial) {
         refreshMode = REFRESH_FAST;
         Log_info("Can't do partial refresh, no previous image");
     } else {
