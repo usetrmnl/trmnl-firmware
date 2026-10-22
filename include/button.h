@@ -1,5 +1,9 @@
+#pragma once
+
 enum ButtonPressResult { LongPress, DoubleClick, ShortPress, SoftReset, NoAction };
-extern const char *ButtonPressResultNames[4];
+constexpr const char *ButtonPressResultNames[] = {"LongPress", "DoubleClick", "ShortPress", "SoftReset", "NoAction"};
+static_assert(sizeof(ButtonPressResultNames) / sizeof(ButtonPressResultNames[0]) == NoAction + 1,
+              "one name per ButtonPressResult, in enum order");
 
 ButtonPressResult read_button_presses();
 
