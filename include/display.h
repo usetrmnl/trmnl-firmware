@@ -44,6 +44,8 @@ typedef struct dp_tag {
   uint32_t OneBit, TwoBit; // profiles for 1 and 2-bit modes
 } DISPLAY_PROFILE;
 
+extern const DISPLAY_PROFILE dpList[12][3]; // panel types for each profile, in display.cpp
+
 typedef struct theBrand {
   char name[16];
   char api_url[128];
