@@ -30,8 +30,30 @@
 #endif
 
 // --- Helpers / tables still owned by bl.cpp ---
-void writeSpecialFunction(SPECIAL_FUNCTION function);
 void showMessageWithLogo(MSG message_type);
+
+static void writeSpecialFunction(SPECIAL_FUNCTION function) {
+  if (preferences.isKey(PREFERENCES_SF_KEY)) {
+    Log.info("%s [%d]: SF saved. Reading...\r\n", __FILE__, __LINE__);
+    if ((SPECIAL_FUNCTION)preferences.getUInt(PREFERENCES_SF_KEY, 0) == function) {
+      Log.info("%s [%d]: No need to re-write\r\n", __FILE__, __LINE__);
+    } else {
+      Log.info("%s [%d]: Writing new special function\r\n", __FILE__, __LINE__);
+      bool res = preferences.putUInt(PREFERENCES_SF_KEY, function);
+      if (res)
+        Log.info("%s [%d]: Written new special function successfully\r\n", __FILE__, __LINE__);
+      else
+        Log.error("%s [%d]: Writing new special function failed\r\n", __FILE__, __LINE__);
+    }
+  } else {
+    Log.error("%s [%d]: SF not saved\r\n", __FILE__, __LINE__);
+    bool res = preferences.putUInt(PREFERENCES_SF_KEY, function);
+    if (res)
+      Log.info("%s [%d]: Written new special function successfully\r\n", __FILE__, __LINE__);
+    else
+      Log.error("%s [%d]: Writing new special function failed\r\n", __FILE__, __LINE__);
+  }
+}
 
 https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse) {
   https_request_err_e result = HTTPS_NO_ERR;
