@@ -4,7 +4,11 @@
 extern TRMNL_DEVICE *pDevice;
 
 #include <Arduino.h>
+#include <ArduinoLog.h>
+#include <WifiCaptive.h>
+#include <bl.h>
 #include <config.h>
+#include <globals.h>
 #include <misc/buzzer.h>
 
 #include "trmnl_log.h"
@@ -97,3 +101,66 @@ ButtonPressResult read_button_presses() {
 }
 
 const char *ButtonPressResultNames[] = {"LongPress", "DoubleClick", "ShortPress", "SoftReset"};
+
+// Acts on the press read after a button wake: a long press forgets WiFi, a soft-reset press forgets the
+// device (does not return). Returns true for a double click, which runs the special function.
+bool button_wake_act(ButtonPressResult button) {
+  bool double_click = false;
+  Log_info("GPIO wakeup (%d) -> button was read (%s)", wakeup_reason, ButtonPressResultNames[button]);
+  switch (button) {
+  case LongPress:
+    Log_info("WiFi reset");
+    WifiCaptivePortal.resetSettings();
+    break;
+  case DoubleClick:
+    double_click = true;
+    break;
+  case ShortPress:
+  case NoAction:
+    break;
+  case SoftReset:
+    resetDeviceCredentials();
+  }
+  Log_info("button handling end");
+  return double_click;
+}
+
+// Loads the special function the server assigned into special_function and opens the WiFi portal for
+// SF_ADD_WIFI. The others run with the next /api/display request.
+void button_wake_run_special_function(void) {
+  if (preferences.isKey(PREFERENCES_SF_KEY)) {
+    Log.info("%s [%d]: SF saved. Reading...\r\n", __FILE__, __LINE__);
+    special_function = (SPECIAL_FUNCTION)preferences.getUInt(PREFERENCES_SF_KEY, 0);
+    Log.info("%s [%d]: Read special function - %d\r\n", __FILE__, __LINE__, special_function);
+    switch (special_function) {
+    case SF_IDENTIFY: {
+      Log.info("%s [%d]: Identify special function...It will be handled with API ping...\r\n", __FILE__, __LINE__);
+    } break;
+    case SF_SLEEP: {
+      Log.info("%s [%d]: Sleep special function...\r\n", __FILE__, __LINE__);
+        // still in progress
+    } break;
+    case SF_ADD_WIFI: {
+      Log.info("%s [%d]: Add WiFi function...\r\n", __FILE__, __LINE__);
+      WifiCaptivePortal.startPortal();
+    } break;
+    case SF_RESTART_PLAYLIST: {
+      Log.info("%s [%d]: Restart Playlist special function...It will be handled with API ping...\r\n", __FILE__,
+               __LINE__);
+    } break;
+    case SF_REWIND: {
+      Log.info("%s [%d]: Rewind special function...\r\n", __FILE__, __LINE__);
+    } break;
+    case SF_SEND_TO_ME: {
+      Log.info("%s [%d]: Send to me special function...It will be handled with API ping...\r\n", __FILE__, __LINE__);
+    } break;
+    case SF_GUEST_MODE: {
+      Log.info("%s [%d]: Guest Mode special function...It will be handled with API ping...\r\n", __FILE__, __LINE__);
+    } break;
+    default:
+      break;
+    }
+  } else {
+    Log_error("SF not saved");
+  }
+}
