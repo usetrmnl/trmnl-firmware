@@ -211,6 +211,9 @@ void display_set_light_sleep(uint8_t enabled);
  */
 void display_sleep(void);
 
+// Light sleeps the ESP32 for u32Millis (a plain delay when light sleep is off)
+void display_sleep(uint32_t u32Millis);
+
 /**
  * @brief Function to wipe the display
  * @param none
