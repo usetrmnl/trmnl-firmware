@@ -378,11 +378,6 @@ void bl_init(void)
   list_files();
   log_nvs_usage();
 
-  // DEBUG - test message display
-  // showMessageWithLogo(MSG_FORMAT_ERROR);
-  // display_show_msg(storedLogoOrDefault(1), WIFI_CONNECT, "ABCDEF", true, Messages::firmware_version().c_str(), "Hello World!");
-  // wifiErrorDeepSleep();
-
   wifiSessionConnect(should_show_error_now);
 
   // clock synchronization
