@@ -63,8 +63,6 @@ void display_init(void);
  */
 String display_panel_rev_string(void);
 
-void config_tca95535_pins_for_lp();
-void enter_shipment_sleep();
 void otg_turn_on();
 void otg_turn_off();
 
