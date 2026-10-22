@@ -3,8 +3,6 @@
 #include <stdint.h>
 
 // The TRMNL X drives these through its TCA9535 IO expander, which FastEPD (bbep in display.cpp) owns.
-uint8_t tca9535_interrupt_clear();
-void config_bma530_interrupt();
 void config_tca95535_pins_for_lp();
 void enter_shipment_sleep();
 void BQ27427_reset();
