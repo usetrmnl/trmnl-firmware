@@ -100,10 +100,6 @@ ButtonPressResult read_button_presses() {
   return result;
 }
 
-const char *ButtonPressResultNames[] = {"LongPress", "DoubleClick", "ShortPress", "SoftReset", "NoAction"};
-static_assert(sizeof(ButtonPressResultNames) / sizeof(ButtonPressResultNames[0]) == NoAction + 1,
-              "one name per ButtonPressResult, in enum order");
-
 // Acts on the press read after a button wake: a long press forgets WiFi, a soft-reset press forgets the
 // device (does not return). Returns true for a double click, which runs the special function.
 bool button_wake_act(ButtonPressResult button) {
