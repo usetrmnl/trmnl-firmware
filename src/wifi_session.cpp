@@ -12,6 +12,7 @@
 #include <wifi-helpers.h>
 #include <wifi_network.h>
 #include <wifi_session.h>
+#include <x_io_expander.h>
 
 #ifdef BOARD_TRMNL_X
 #include <modem.h>

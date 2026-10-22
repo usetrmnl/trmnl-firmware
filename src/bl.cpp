@@ -19,6 +19,7 @@
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <display.h>
+#include <x_io_expander.h>
 #include <display_session.h>
 #include <stdlib.h>
 #include <ESPAsyncWebServer.h>

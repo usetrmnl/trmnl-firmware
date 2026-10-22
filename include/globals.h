@@ -11,6 +11,7 @@
 #include <services/firmware_update.h>
 #include <special_function.h>
 #include <stored_logs.h>
+#include <x_io_expander.h>
 
 #ifdef BOARD_TRMNL_X
 class Modem;

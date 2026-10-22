@@ -11,6 +11,7 @@
 #include "filesystem.h"
 #include "logo_medium.h"
 #include "modem.h"
+#include "x_io_expander.h"
 
 // TRMNL X setup (quite different from OG)
 void setup() {

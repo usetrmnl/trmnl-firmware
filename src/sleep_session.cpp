@@ -14,6 +14,7 @@
 #include <sleep_session.h>
 #include <status_screens.h>
 #include <trmnl_log.h>
+#include <x_io_expander.h>
 
 #include "driver/gpio.h"
 

@@ -3,6 +3,7 @@
 #include <Preferences.h>
 #include <display.h>
 #include <power.h>
+#include <x_io_expander.h>
 
 #include "WifiCaptive.h"
 #include "button.h"

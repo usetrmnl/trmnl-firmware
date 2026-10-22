@@ -7,6 +7,7 @@
 
 #include "../../../include/display.h"
 #include "../../../include/power.h"
+#include "../../../include/x_io_expander.h"
 #include "WebServer.h"
 #include "connect.h"
 #include "esp_event.h"

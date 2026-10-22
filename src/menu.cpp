@@ -16,6 +16,7 @@
 #include <qa.h>
 #include <refresh_interval.h>
 #include <trmnl_log.h>
+#include <x_io_expander.h>
 
 #include "FastEPD.h"
 #include "cached_images.h"

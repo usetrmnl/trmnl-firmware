@@ -7,6 +7,7 @@
 #include <display.h>
 #include <globals.h>
 #include <trmnl_log.h>
+#include <x_io_expander.h>
 
 #include "BQ27427.h"
 #include "driver/gpio.h"
