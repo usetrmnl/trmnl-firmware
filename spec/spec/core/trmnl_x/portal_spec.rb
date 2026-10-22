@@ -39,6 +39,13 @@ RSpec.describe "TRMNL X", env: "TRMNL_X" do
           s.status["display_generation"] != g
         end
         s.wait(display_idle: true, timeout: 90)
+        # Dock only once shipment mode sleeps: enter_shipment_sleep() reads the expander's pins
+        # first, which clears the interrupt an earlier dock raised.
+        t0 = s.status["sim_time_s"]
+        eventually("shipment mode did not go to sleep", within: 90, every: 0.2) do
+          st = s.status
+          st["state"] == "light_sleep" && st["sim_time_s"] >= t0 + 2
+        end
         c = s.status["console_total"]
         s.dock(true) # the charger ends shipment mode
         s.wait(console: /CHARGER DETECTED - Exiting shipment mode/, since: c, timeout: 90)
