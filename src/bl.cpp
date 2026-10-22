@@ -93,10 +93,6 @@ void wait_for_serial() {
 }
 #ifdef BOARD_TRMNL_X
 #include <qa.h> // For device turn off feature
-// ############################ WAKEUP STUB #############################
-#include "rtc_wake_stub_trmnl_x.h"
-// ############################ WAKEUP STUB #############################
-
 // ############################ IQS323 TASK #############################
 #include "iqs323_task.h"
 // ############################ IQS323 TASK #############################
