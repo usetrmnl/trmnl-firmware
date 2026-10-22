@@ -417,17 +417,6 @@ void config_tca95535_pins_for_lp()
     bbep.ioPinMode(15, INPUT);
 }
 
-void config_bma530_interrupt()
-{
-    bbep.ioPinMode(3, INPUT);
-    bbep.ioRead(10);
-}
-
-uint8_t tca9535_interrupt_clear()
-{
-    return bbep.ioRead(3);
-}
-
 void otg_turn_on()
 {
     bbep.ioPinMode(1, OUTPUT);
