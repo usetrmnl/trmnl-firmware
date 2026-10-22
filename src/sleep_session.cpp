@@ -10,6 +10,7 @@
 #include <pins.h>
 #include <refresh_interval.h>
 #include <sleep_session.h>
+#include <status_screens.h>
 #include <trmnl_log.h>
 
 #include "driver/gpio.h"
