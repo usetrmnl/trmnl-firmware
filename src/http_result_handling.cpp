@@ -17,7 +17,7 @@ bool requestIsFailure(https_request_err_e result) {
 RequestFailureAction requestFailureAction(https_request_err_e result, bool showErrorNow, uint8_t failedWakes) {
   if (!requestIsFailure(result)) return RequestFailureAction::ResetCount;
   if (showErrorNow) return RequestFailureAction::ShowNow;
-  return failedWakes <= MAX_QUIET_API_RETRIES ? RequestFailureAction::StayQuiet : RequestFailureAction::ShowError;
+  return failedWakes < MAX_QUIET_SLOW_RETRIES ? RequestFailureAction::StayQuiet : RequestFailureAction::ShowError;
 }
 
 MSG requestErrorScreen(https_request_err_e result, bool weakSignal) {

@@ -31,12 +31,12 @@ void test_manual_wake_failure_shows_now(void) {
 
 void test_timer_wake_failure_stays_quiet_up_to_the_limit(void) {
   TEST_ASSERT_TRUE(requestFailureAction(HTTPS_TIMED_OUT, false, 1) == RequestFailureAction::StayQuiet);
-  TEST_ASSERT_TRUE(requestFailureAction(HTTPS_TIMED_OUT, false, MAX_QUIET_API_RETRIES) ==
+  TEST_ASSERT_TRUE(requestFailureAction(HTTPS_TIMED_OUT, false, MAX_QUIET_SLOW_RETRIES - 1) ==
                    RequestFailureAction::StayQuiet);
 }
 
 void test_timer_wake_failure_shows_the_error_after_the_limit(void) {
-  TEST_ASSERT_TRUE(requestFailureAction(HTTPS_TIMED_OUT, false, MAX_QUIET_API_RETRIES + 1) ==
+  TEST_ASSERT_TRUE(requestFailureAction(HTTPS_TIMED_OUT, false, MAX_QUIET_SLOW_RETRIES) ==
                    RequestFailureAction::ShowError);
 }
 
