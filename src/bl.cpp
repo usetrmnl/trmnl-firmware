@@ -3,7 +3,6 @@
 #include <ESPmDNS.h>
 #include <bl.h>
 #include <sleep_session.h>
-#include <sleep_duration.h>
 #include <wifi_network.h>
 #include <wifi_session.h>
 #include <power.h>
@@ -51,7 +50,6 @@
 #include <wifi-helpers.h>
 #include <sys/time.h>
 #include <misc/buzzer.h>
-#include <misc/clock.h>
 #include <misc/sensor.h>
 #include <services/device_setup.h>
 #include "messages.h"
@@ -328,19 +326,7 @@ void bl_init(void)
 
   wifiSessionConnect(should_show_error_now);
 
-  // clock synchronization
-  if (systemClock().setTimeFromNTP())
-  {
-    const uint32_t last_sleep = preferences.getUInt(PREFERENCES_LAST_SLEEP_TIME, 0);
-    time_since_sleep = sleepDurationSeconds(systemClock().getTime(), last_sleep);
-  }
-  else
-  {
-    time_since_sleep = 0;
-    Log.info("%s [%d]: Time wasn't synced.\r\n", __FILE__, __LINE__);
-  }
-
-  Log.info("%s [%d]: Time since last sleep: %d\r\n", __FILE__, __LINE__, time_since_sleep);
+  updateTimeSinceSleep();
 
   if (preferences.isKey(PREFERENCES_API_KEY) && preferences.isKey(PREFERENCES_FRIENDLY_ID))
   {
