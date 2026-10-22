@@ -143,7 +143,6 @@ void bl_init(void)
   hw_config_init();
   pins_init();
   buzzer().init();
-  sensor().init(pDevice);
 #ifdef BOARD_TRMNL_X
   touchbar_log_wake_stub_status();
 #endif
@@ -201,6 +200,9 @@ void bl_init(void)
 
   Wire.setClock(100000);
 #endif // BOARD_TRMNL_X
+
+  // After the button: the SCD41's sample wait is a light sleep, which overwrites the wakeup cause
+  sensor().init(pDevice);
 
 #ifdef BOARD_TRMNL_X
   touchbar_start(wakeup_reason, gpio_wakeup);
@@ -534,7 +536,9 @@ DeviceStatusStamp getDeviceStatusStamp()
   snprintf(deviceStatus.current_fw_version, sizeof(deviceStatus.current_fw_version), "%s", FW_VERSION_STRING);
   parseSpecialFunctionToStr(deviceStatus.special_function, sizeof(deviceStatus.special_function), special_function);
   deviceStatus.battery_voltage = vBatt;
-  parseWakeupReasonToStr(deviceStatus.wakeup_reason, sizeof(deviceStatus.wakeup_reason), esp_sleep_get_wakeup_cause());
+  // bl_init's reading: the SCD41's sample wait is a light sleep, which overwrites the wakeup cause
+  esp_sleep_wakeup_cause_t cause = wakeup_reason != ESP_SLEEP_WAKEUP_UNDEFINED ? wakeup_reason : esp_sleep_get_wakeup_cause();
+  parseWakeupReasonToStr(deviceStatus.wakeup_reason, sizeof(deviceStatus.wakeup_reason), cause);
   deviceStatus.free_heap_size = ESP.getFreeHeap();
   deviceStatus.max_alloc_size = ESP.getMaxAllocHeap();
 
