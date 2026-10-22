@@ -418,7 +418,8 @@ at the faulting instruction. The debug script downloads the latest trmnl-sim rel
    Stopping the debug session stops the simulator.
 
 From a terminal, `scripts/debug_sim.sh <env>` builds and runs the simulator, waiting for GDB on
-127.0.0.1:3333 (`scripts/debug_sim.sh --help`).
+127.0.0.1:3333 (`scripts/debug_sim.sh --help`). To just run a build there, without the debugger,
+use `scripts/sim.sh <env>` (`scripts/sim.sh --help`).
 
 ## Code Formatting
 
