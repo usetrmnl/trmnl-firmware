@@ -42,7 +42,7 @@ ApiDisplayInputs createApiHeaders() {
   inputs.rssi = wifi.rssi;
   inputs.wifiBand = wifi.band;
   // Not re-read here: the voltage is measured early in boot, before the display and WiFi draw
-  // current (bl.cpp's vBatt), and /api/display fills that reading in (display_session.cpp's
+  // current (battery_voltage in globals.h), and /api/display fills that reading in (display_session.cpp's
   // loadApiDisplayInputs).
   inputs.batteryVoltage = 0.0f;
   inputs.firmwareVersion = String(FW_VERSION_STRING);

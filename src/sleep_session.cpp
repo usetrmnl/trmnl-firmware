@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <ArduinoLog.h>
 #include <WiFi.h>
+#include <app_logger.h>
 #include <bl.h>
 #include <config.h>
 #include <display.h>
@@ -24,7 +25,6 @@
 #endif
 
 // --- Helpers / state still owned by bl.cpp ---
-void submitStoredLogs(void);
 extern unsigned long startup_time;
 extern TRMNL_DEVICE *pDevice;
 
