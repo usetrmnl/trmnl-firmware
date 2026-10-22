@@ -365,16 +365,6 @@ void display_init(void)
 
 #define TCA9535_INT 38
 
-void BQ27427_reset()
-{
-    bbep.ioPinMode(10, OUTPUT);
-
-    bbep.ioWrite(10, LOW);
-    delay(10);
-
-    bbep.ioWrite(10, HIGH);
-    Serial.println("BQ27427 reset performed");
-}
 
 void config_tca95535_pins_for_lp()
 {
@@ -431,66 +421,6 @@ void otg_turn_off()
     Log_info("OTG turned off");
 }
 
-#define BAT_DET_PIN       7    // TCA9535 P0_7 in bbep pin numbering
-#define BAT_CHARGE_MS     2    // drive HIGH for 2 ms to charge RC network
-#define BAT_TIMEOUT_US    6000 // no battery if pin is still HIGH after this
-#define BAT_THRESHOLD_US  750 // >750 µs → 1 cell; ≤750 µs → 2 cells
-
-static battery_count_t measure_battery_once()
-{
-    // -- Charge RC network: drive P0_7 HIGH for 2 ms --
-    bbep.ioPinMode(BAT_DET_PIN, OUTPUT);
-    bbep.ioWrite(BAT_DET_PIN, HIGH);
-    delay(BAT_CHARGE_MS);
-
-    // -- Release: switch to input and start timing --
-    bbep.ioPinMode(BAT_DET_PIN, INPUT);
-
-    unsigned long start = micros();
-    unsigned long now   = start;
-    bool timeout = false;
-
-    while (true) {
-        bool still_high = (bbep.ioRead(BAT_DET_PIN) != 0);
-        now = micros();
-
-        if (!still_high) break;               // pin went LOW → discharged
-
-        if ((now - start) >= BAT_TIMEOUT_US) {
-            timeout = true;
-            break;
-        }
-    }
-
-    if (timeout)                         return BATTERY_NONE;
-    if ((now - start) > BAT_THRESHOLD_US) return BATTERY_ONE;
-    return BATTERY_TWO;
-}
-
-battery_count_t detect_battery_count()
-{
-    battery_count_t last = (battery_count_t)-1;
-
-    for (int attempt = 0; attempt < 20; attempt++) {
-        battery_count_t result = measure_battery_once();
-
-        if (result == last) {
-            // Two identical results in a row — confident reading
-            Log_info("Battery detection: %s (confirmed after %d attempt(s))",
-                result == BATTERY_NONE ? "none" :
-                result == BATTERY_ONE  ? "1 cell" : "2 cells",
-                attempt + 1);
-            return result;
-        }
-
-        last = result;
-        delay(10);
-    }
-
-    // Fallback: return last reading if we never got two in a row
-    Log_error("Battery detection: unstable reading — defaulting to last result");
-    return last;
-}
 
 void enter_shipment_sleep()
 {

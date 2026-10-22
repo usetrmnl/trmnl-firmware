@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <Preferences.h>
 #include <api-client/display.h>
+#include <battery.h>
 #include <config.h>
 #include <display.h>
 #include <esp_sleep.h>
