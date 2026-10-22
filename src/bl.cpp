@@ -58,7 +58,6 @@
 #include <status_screens.h>
 
 static float vBatt;
-void submitStoredLogs(void);
 void writeSpecialFunction(SPECIAL_FUNCTION function);
 static DeviceStatusStamp getDeviceStatusStamp();
 
