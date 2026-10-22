@@ -1,5 +1,6 @@
 #include <config.h>     // TCA9535_PG_PIN / TCA9535_STAT_PIN (TRMNL X)
 #include <power.h>
+#include <trmnl_log.h>
 
 #if defined(INCLUDE_TCA9535_POWER)
 #include "FastEPD.h"
@@ -15,3 +16,17 @@ static BasePower powerInstance;
 #endif
 
 BasePower &power() { return powerInstance; }
+
+#if defined(INCLUDE_TCA9535_POWER)
+void otg_turn_on() {
+  bbep.ioPinMode(1, OUTPUT);
+  bbep.ioWrite(1, HIGH);
+  Log_info("OTG turned on");
+}
+
+void otg_turn_off() {
+  bbep.ioPinMode(1, OUTPUT);
+  bbep.ioWrite(1, LOW);
+  Log_info("OTG turned off");
+}
+#endif // INCLUDE_TCA9535_POWER

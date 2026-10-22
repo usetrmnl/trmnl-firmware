@@ -63,9 +63,6 @@ void display_init(void);
  */
 String display_panel_rev_string(void);
 
-void otg_turn_on();
-void otg_turn_off();
-
 extern "C" {
   void modem_enter_bootloader();
   void modem_reset_target();

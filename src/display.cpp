@@ -365,20 +365,6 @@ void display_init(void)
 
 
 
-void otg_turn_on()
-{
-    bbep.ioPinMode(1, OUTPUT);
-    bbep.ioWrite(1, HIGH);
-    Log_info("OTG turned on");
-}
-
-void otg_turn_off()
-{
-    bbep.ioPinMode(1, OUTPUT);
-    bbep.ioWrite(1, LOW);
-    Log_info("OTG turned off");
-}
-
 
 
 #define PIN_ESP32C5_SPI_BOOT 4
