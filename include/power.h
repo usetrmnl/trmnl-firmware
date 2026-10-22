@@ -59,3 +59,7 @@ private:
 
 /// @brief Power status source for the running board, selected at compile time.
 BasePower &power();
+
+// TRMNL X: switch the USB OTG 5 V output.
+void otg_turn_on();
+void otg_turn_off();

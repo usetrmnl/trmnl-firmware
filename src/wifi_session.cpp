@@ -6,6 +6,7 @@
 #include <config.h>
 #include <globals.h>
 #include <messages.h>
+#include <modem_control.h>
 #include <sleep_session.h>
 #include <status_screens.h>
 #include <trmnl_log.h>

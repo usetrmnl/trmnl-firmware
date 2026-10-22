@@ -27,3 +27,9 @@ void config_gpio_for_lp(void);
  * WIFI_FAILED and reset the count (still a timed sleep). Does not return.
  */
 void wifiErrorDeepSleep(void);
+
+// TRMNL X: put the TCA9535 IO expander's pins in their low-power state.
+void config_tca95535_pins_for_lp();
+
+// TRMNL X: light sleep until a charger is connected (shipment mode).
+void enter_shipment_sleep();

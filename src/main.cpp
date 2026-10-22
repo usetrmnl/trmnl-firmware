@@ -11,6 +11,8 @@
 #include "filesystem.h"
 #include "logo_medium.h"
 #include "modem.h"
+#include "modem_control.h"
+#include "sleep_session.h"
 
 // TRMNL X setup (quite different from OG)
 void setup() {

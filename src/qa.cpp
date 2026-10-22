@@ -3,6 +3,7 @@
 #include <Preferences.h>
 #include <display.h>
 #include <power.h>
+#include <sleep_session.h>
 
 #include "WifiCaptive.h"
 #include "button.h"
