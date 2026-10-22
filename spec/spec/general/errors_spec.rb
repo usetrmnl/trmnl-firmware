@@ -45,12 +45,17 @@ General.describe "Errors" do
 
     it "api unreachable on weak wifi" do
       dev.mock.set_fault("/api/display", close: true)
-      boot_with_error(networks: weak)
+      # a closed connection is an HTTP client error: WIFI_INTERNAL_ERROR whatever the signal
+      # (requestErrorScreen, src/http_result_handling.cpp:27)
+      boot_with_error(networks: weak) do |s|
+        expect(s).to show_message("wifi_internal_error.png", [200, 320, 400, 96])
+      end
     end
 
     it "image cut short on weak wifi" do
       dev.mock.set_fault("/images/*", truncate: 1000)
-      boot_with_error(networks: weak)
+      # a cut-short image ends as HTTPS_TIMED_OUT, which has no weak wifi variant
+      boot_with_error(networks: weak) { |s| expect(s).to show_message("image_timeout.png", [160, 380, 480, 32]) }
     end
 
     it "image host unreachable" do
@@ -72,6 +77,13 @@ General.describe "Errors" do
       expect(log.body).to include("HTTPS_UNABLE_TO_CONNECT - Unable to create WiFiClient")
     end
 
+    it "image url that can't be fetched on weak wifi" do
+      # HTTPS_UNABLE_TO_CONNECT at or below WIFI_CONNECTION_RSSI blames the signal: WIFI_WEAK
+      # (requestErrorScreen, src/http_result_handling.cpp:31)
+      dev.mock.display = { image_url: "ftp://10.0.2.2/image.bmp", filename: "plugin-bbbbbb-1", refresh_rate: 300 }
+      boot_with_error(networks: weak) { |s| expect(s).to show_message("wifi_weak.png", [250, 380, 300, 32]) }
+    end
+
     it "image too large" do
       dev.mock.set_file("/huge.bmp", "image/bmp", "\0".b * 100_000)
       dev.mock.display = { image_url: "#{dev.mock.device_url}/huge.bmp", filename: "plugin-aaaaaa-1",
@@ -83,25 +95,60 @@ General.describe "Errors" do
   describe "Retries" do
     before { dev.reset }
 
-    it "timer wakes retry quietly then show the error" do
+    def sleep_s(status) = status["wake_at_s"] - status["sim_time_s"]
+
+    # API failures (requestFailureAction, src/http_result_handling.cpp:20, called from src/bl.cpp:463):
+    # "retry_count" in NVS starts at 1 and a timer wake keeps the screen while it is
+    # MAX_QUIET_API_RETRIES (3) or less, sleeping on RefreshInterval::applyApiRetry (300 s), so the
+    # 4th failing timer wake shows the error.
+    # A successful request puts it back to 1; a manual wake shows the error and leaves it.
+
+    # Wake (on the timer, or with a press) with /api/display failing; returns the status once asleep again.
+    def api_failure(s, press: false)
+      dev.mock.next_request("/api/display", timeout: 90) { press ? s.press(150) : s.wake }
+      s.wait(state: "deep_sleep", timeout: 180, settle_ms: 200)["status"]
+    end
+
+    def quiet_api_failures(s, count)
+      screen = s.screenshot
+      (1..count).each do |retry_number|
+        expect(sleep_s(api_failure(s))).to be_within(15).of(300), "retry #{retry_number}"
+        expect(s).to show_image(screen, tolerance: 0, max_ratio: 0), "retry #{retry_number} redrew the screen"
+      end
+    end
+
+    it "api failures on timer wakes retry quietly three times then show the error" do
       dev.boot_asleep do |s|
         s.wait_for_deep_sleep
         screen = s.screenshot
         dev.mock.set_fault("/api/display", status: 500)
-        quiet = true
-        attempt = 0
-        5.times do |i|
-          attempt = i
-          dev.mock.next_request("/api/display", timeout: 90) { s.wake }
-          s.wait(state: "deep_sleep", timeout: 180, settle_ms: 200)
-          quiet = s.compare_screen(screen, tolerance: 0, max_ratio: 0)["match"]
-          break unless quiet
-        end
-        expect(quiet).to be(false), "the error was never shown"
-        expect(attempt).to be >= 2, "retried quietly first"
+        quiet_api_failures(s, 3)
+        api_failure(s)
+        expect(s).not_to show_image(screen, tolerance: 0, max_ratio: 0)
+      end
+    end
+
+    it "a successful request starts the quiet api retries over" do
+      dev.boot_asleep do |s|
+        s.wait_for_deep_sleep
+        dev.mock.set_fault("/api/display", status: 500)
+        quiet_api_failures(s, 2)
         dev.mock.clear_faults
         dev.mock.next_request(dev.mock.image_path("default"), timeout: 90) { s.wake }
         s.wait_for_deep_sleep
+        dev.mock.set_fault("/api/display", status: 500)
+        # without the reset the count would be 3, leaving only one quiet retry
+        quiet_api_failures(s, 3)
+      end
+    end
+
+    it "an api failure on a button wake shows the error right away", needs: :button do
+      dev.boot_asleep do |s|
+        s.wait_for_deep_sleep
+        screen = s.screenshot
+        dev.mock.set_fault("/api/display", status: 500)
+        api_failure(s, press: true)
+        expect(s).not_to show_image(screen, tolerance: 0, max_ratio: 0)
       end
     end
 
@@ -119,8 +166,6 @@ General.describe "Errors" do
       s.wait(console: /WIFI connection failed! Retry count: #{attempt}\b/, timeout: 240)
       s.wait(state: "deep_sleep", timeout: 240, settle_ms: 200)["status"]
     end
-
-    def sleep_s(status) = status["wake_at_s"] - status["sim_time_s"]
 
     it "wifi failures on timer wakes retry quietly every 5 minutes" do
       dev.boot_asleep do |s|
