@@ -105,6 +105,40 @@ RSpec.describe "TRMNL X", env: "TRMNL_X" do
         end
       end
     end
+
+    # On 5 GHz the modem keeps the server's image for an unregistered MAC only as an 800x480 BMP
+    # (DeviceSetupX::downloadSetupImage), and the X's FastEPD display_show_image draws no
+    # uncompressed BMP (src/display.cpp: that branch hands the bitmap to bb_epaper only), so the
+    # X shows the "not registered" message instead: the same screen as without an image_url.
+    it "unregistered on 5 GHz with an image url shows the message" do
+      TrmnlSim::MockTrmnl.open do |mock|
+        mock.set_image("unregistered") { true } # all ink
+        mock.setup = nil
+        unregistered = lambda do |image_url|
+          mock.set_fault("/api/setup", body: JSON.generate({ status: 404, api_key: nil, friendly_id: nil,
+                                                             image_url:, message: "MAC not registered" }))
+        end
+        unregistered.("#{mock.device_url}/images/unregistered.bmp")
+        shipped.boot do |s|
+          s.wait_for_console(/Entering shipment mode light sleep loop/, timeout: 180)
+          s.dock(true)
+          s.wait(portal: true, timeout: 180)
+          s.dock(false)
+          s.portal_connect(TrmnlX::SSID_5, "password", server: mock.device_url)
+          mock.wait_for_request("/images/unregistered.bmp", timeout: 240)
+          st = s.wait(state: "deep_sleep", display_idle: true, timeout: 240, settle_ms: 200)["status"]
+          with_image = Screen.gray_rows(s.screenshot)
+
+          # the next wake asks /api/setup again; this time the answer has no image_url
+          unregistered.(nil)
+          mock.next_request("/api/setup", timeout: 240) { s.wake }
+          s.wait(state: "deep_sleep", display_idle: true, min_boots: st["boot_count"] + 1, timeout: 240,
+                 settle_ms: 200)
+          expect(mock.count("/api/display")).to eq(0)
+          expect(with_image == Screen.gray_rows(s.screenshot)).to be(true), "the image's screen is not the message"
+        end
+      end
+    end
   end
 
   # A join that fails leaves the portal up, so the password can be corrected.
