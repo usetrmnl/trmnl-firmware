@@ -55,6 +55,21 @@ RSpec.describe "TRMNL X", env: "TRMNL_X" do
         expect(wakes).to eq([])
       end
     end
+
+    # A dock while the shipping screen draws comes before enter_shipment_sleep() reads the
+    # expander's pins, so that read clears its interrupt.
+    it "docking while the shipping screen draws ends shipment mode" do
+      shipped.boot do |s|
+        time_out(s, docked: true)
+        g = s.status["display_generation"]
+        s.dock(false)
+        eventually("the shipping screen was not drawn", within: 90, every: 0.05) do
+          s.status["display_generation"] != g
+        end
+        s.dock(true)
+        s.wait(state: "deep_sleep", timeout: 90) # out of shipment mode, the portal gives up
+      end
+    end
   end
 
   describe "Onboarding" do
