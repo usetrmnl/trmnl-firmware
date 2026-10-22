@@ -276,7 +276,13 @@ void bl_init(void)
 
     if (setup.outcome == DeviceSetupOutcome::MacNotRegistered)
     {
-      showMessageWithLogo(MAC_NOT_REGISTERED, setup.apiResponse);
+      int image_size = 0;
+      uint8_t *image = display_read_file("/logo.png", &image_size);
+      if (image)
+        display_show_image(image, image_size, true);
+      else
+        showMessageWithLogo(MAC_NOT_REGISTERED, setup.apiResponse);
+      preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
       refreshInterval.applyDefault();
     }
 
