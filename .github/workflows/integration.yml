@@ -179,14 +179,14 @@ jobs:
           mkdir -p spec/out/artifacts
           find spec/golden -name '*.actual.png' -exec cp {} spec/out/artifacts/ \; || true
 
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: simulator-logs-and-screens-${{ matrix.env }}${{ matrix.groups && format('-{0}', matrix.groups) || '' }}${{ inputs.sim_extra_args && '-sim-extra-args' || '' }}
           path: spec/out/artifacts/
           if-no-files-found: ignore
 
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: firmware-coverage-${{ matrix.env }}${{ matrix.groups && format('-{0}', matrix.groups) || '' }}${{ inputs.sim_extra_args && '-sim-extra-args' || '' }}
