@@ -34,6 +34,7 @@ HttpHeaderList buildDisplayHeaders(const ApiDisplayInputs &inputs) {
   if (inputs.panelId.length() > 0) headers.push_back({"Panel-Rev", inputs.panelId});
   headers.push_back({"Image-Cached", inputs.imageCached ? "true" : "false"});
   headers.push_back({"Wake-Time", String(inputs.prevWakeTime)});
+  headers.push_back({"Reset-Reason", String(inputs.resetReason)});
   headers.push_back({"RSSI", String(inputs.rssi)});
   if (inputs.wifiBand.length() > 0) headers.push_back({"WiFi-Band", inputs.wifiBand});
   headers.push_back({"Temperature-Profile", "true"});
