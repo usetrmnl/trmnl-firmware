@@ -39,6 +39,19 @@ RSpec.describe "TRMNL X", env: "TRMNL_X" do
       end
     end
 
+    # USB alone powers it back on, and setup() goes straight back to shipment mode with the
+    # charger already present.
+    it "plugging in after the battery died in shipment mode reaches the portal" do
+      shipped.boot do |s|
+        s.wait_for_console(/Entering shipment mode light sleep loop/, timeout: 180)
+        s.pause do
+          s.dock(true)
+          s.power_cycle
+        end
+        s.wait(portal: true, timeout: 90)
+      end
+    end
+
     it "portal soft reset restarts from core 0" do
       # /soft-reset calls ESP.restart() on async_tcp (core 0), which resets the APP core
       # first and must not see it come back before both cores restart.
