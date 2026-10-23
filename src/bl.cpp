@@ -125,6 +125,7 @@ void bl_init(void)
 #ifdef BOARD_TRMNL_X
   uint32_t init_time = esp_cpu_get_cycle_count() / esp_rom_get_cpu_ticks_per_us();
 #else
+  awake_time_limit_start(); // not on the X, which waits on purpose: "ready to ship" and shipment sleep
   uint32_t init_time = micros();
   startup_time = init_time/1000L; // convert to milliseconds
 #endif
