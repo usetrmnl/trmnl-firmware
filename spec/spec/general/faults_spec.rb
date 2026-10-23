@@ -97,6 +97,16 @@ General.describe "Faults" do
       end
     end
 
+    # a body cut after a 200 is HTTPS_TIMED_OUT, which gets the fast retry whatever the code
+    # (HttpRetryRequest::execute, src/services/http_retry_request.cpp:72)
+    it "image cut short once is retried in the same wake" do
+      dev.mock.set_fault("/images/*", truncate: [10_000, size / 4].min, times: 1)
+      dev.boot do |s|
+        s.wait_for_deep_sleep(timeout: 120)
+        expect(s).to show_image(expected, tolerance: 64)
+      end
+    end
+
     it "connection reset mid download" do
       dev.boot(faults: { net: { tcp_cut: { after_bytes: [20_000, size / 2].min } } }) do |s|
         dev.mock.wait_for_request(path, timeout: 120)
