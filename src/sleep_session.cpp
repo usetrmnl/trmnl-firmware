@@ -9,6 +9,9 @@
 #include <globals.h>
 #include <misc/clock.h>
 #include <pins.h>
+#ifdef BOARD_SEEED_RETERMINAL_E1003
+#include <e1003_sleep.h>
+#endif
 #include <refresh_interval.h>
 #include <sleep_duration.h>
 #include <sleep_session.h>
@@ -83,11 +86,18 @@ void goToSleep(void) {
 #elif defined(CONFIG_IDF_TARGET_ESP32S3)
 #ifdef BOARD_TRMNL_X
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
+#elif defined(BOARD_SEEED_RETERMINAL_E1003)
+  e1003_enable_button_wakeup(pDevice->interrupt_pin); // see include/e1003_sleep.h
 #else
   esp_sleep_enable_ext0_wakeup((gpio_num_t)pDevice->interrupt_pin, 0);
 #endif
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
+#endif
+#if defined(BOARD_SEEED_RETERMINAL_E1003)
+  // Hold the E1003 peripheral enables LOW through deep sleep (#572).
+  // Must come after display_sleep(). See include/e1003_sleep.h.
+  e1003_park_pins_for_sleep();
 #endif
 #if defined(BOARD_XTEINK_X4) || defined(BOARD_XTEINK_X3)
 // The Xteink X4 has a high current draw in deep sleep (3-4mA), so allow the user to select
