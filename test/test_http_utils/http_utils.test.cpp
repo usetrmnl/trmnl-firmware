@@ -112,6 +112,8 @@ void test_no_retry_deterministic_client_errors(void) {
 
 void test_no_retry_above_5xx(void) { TEST_ASSERT_FALSE(shouldFastRetryCode(600)); }
 
+void test_retry_body_cut_short_after_ok(void) { TEST_ASSERT_TRUE(shouldFastRetryCode(200, true)); }
+
 // --- runner ----------------------------------------------------------------
 
 void setUp(void) {}
@@ -140,6 +142,7 @@ void process() {
   RUN_TEST(test_no_retry_success_and_redirects);
   RUN_TEST(test_no_retry_deterministic_client_errors);
   RUN_TEST(test_no_retry_above_5xx);
+  RUN_TEST(test_retry_body_cut_short_after_ok);
   UNITY_END();
 }
 
