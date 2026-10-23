@@ -132,7 +132,7 @@
 #define API_BASE_URL                       "https://trmnl.app"
 
 // Abort an image download when the stream goes this long with no data.
-#define IMAGE_STREAM_INACTIVITY_TIMEOUT_MS 15000
+#define IMAGE_STREAM_INACTIVITY_TIMEOUT_MS 30000
 
 // Battery measurement types
 // BATT_NONE = use fake voltage
