@@ -28,7 +28,8 @@ const char *sniffImageContentType(const uint8_t *data, size_t len) {
   return nullptr;
 }
 
-bool shouldFastRetryCode(int code) {
+bool shouldFastRetryCode(int code, bool bodyCutShort) {
+  if (bodyCutShort) return true;
   // <= 0: no HTTP response at all. Negative values are HTTPClient transport errors (connection
   // refused, reset, read timeout); 0 is "no client" on Wi-Fi or a modem ERROR; -1 is a modem timeout.
   if (code <= 0) return true;

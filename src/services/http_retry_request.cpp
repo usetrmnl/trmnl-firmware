@@ -69,7 +69,7 @@ https_request_err_e HttpRetryRequest::execute() {
       return err; // success!
     }
 
-    if (!shouldFastRetryCode(_httpCode)) {
+    if (!shouldFastRetryCode(_httpCode, err == HTTPS_TIMED_OUT)) {
       // Deterministic failure (e.g. 404): another identical request will not help.
       Log_error("HTTP GET failed (code %d, not retried): %s - %s, RSSI %" PRId32, _httpCode, https_request_err_str(err),
                 _errorDetail.c_str(), signalRssi());
