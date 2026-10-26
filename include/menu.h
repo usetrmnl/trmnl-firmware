@@ -48,6 +48,9 @@ typedef struct {
   menu_tutorial_control_t controls[MENU_HINT_SLOTS];
   const char *practice; // asks the user to try each control, in order
   const char *finish; // once they have: how to close it (any control)
+  // Once they have: fireworks replace the screen, then `finish` is shown at the bottom; without
+  // them, `finish` is shown under the practice prompt
+  bool fireworks;
   const char *done_key; // the NVS (Preferences) key for its being done
 } menu_tutorial_t;
 
