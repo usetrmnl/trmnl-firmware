@@ -171,7 +171,7 @@ General.describe "Refresh cycle" do
                            timeout: 300)
         # the new app can't have reached the network yet
         req = dev.mock.next_request("/api/display", timeout: 120)
-        expect(req).to have_header("FW-Version", "1.8.16")
+        expect(req).to have_header("FW-Version", "1.8.18")
         s.wait_for_deep_sleep(timeout: 120)
       end
     end
