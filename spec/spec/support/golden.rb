@@ -18,10 +18,13 @@ module Golden
       "setup_screen_top_right.png" => [640, 0, 1232, 64],
       # 'Connect your phone or computer to "TRMNL-000001" Wi-Fi'
       "setup_ssid_line.png" => [400, 1236, 1072, 48],
-      # "Can't establish WiFi connection. Will keep trying." (the X's font has the apostrophe)
-      "wifi_failed_message.png" => [480, 1160, 912, 48],
-      # "WiFi connected, unable connect to API." and how to retry (tap the touch bar)
-      "api_unable_to_connect.png" => [580, 306, 712, 136],
+      # "Can't establish WiFi connection. Will keep trying." (the X's font has the apostrophe) and
+      # how to reset Wi-Fi from the menu
+      "wifi_failed_message.png" => [240, 1160, 1392, 96],
+      # "WiFi connected, unable connect to API." and how to retry (Next Screen in the menu)
+      "api_unable_to_connect.png" => [544, 304, 784, 136],
+      # "API responded, but image download failed." and how to advance (Next Screen in the menu)
+      "image_download_failed.png" => [544, 304, 784, 136],
       # "The image format is incorrect"
       "format_error.png" => [640, 1184, 592, 64],
       # "Please visit trmnl.com/start" / "with Friendly ID SIMTST to finish setup"

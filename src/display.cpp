@@ -2154,7 +2154,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
 #ifndef BOARD_TRMNL_X
         const char string2[] = "Hold button on the back to reset WiFi, or scan QR Code for help.";
 #else
-        const char string2[] = "Hold left and right corner of touch bar to reset WiFi, or scan QR Code for help.";
+        const char string2[] = "Tap the middle of touch bar for Settings > Reset Wi-Fi, or scan QR Code for help.";
 #endif
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
@@ -2221,7 +2221,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
 #ifndef BOARD_TRMNL_X
         const char string2[] = "Short click the button on back";
 #else
-        const char string2[] = "Tap the middle of touch bar";
+        const char string2[] = "Tap the middle of touch bar for Next Screen";
 #endif
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
@@ -2241,7 +2241,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
 #ifndef BOARD_TRMNL_X
         const char string2[] = "Short click the button on back,";
 #else
-        const char string2[] = "Tap the middle of touch bar,";
+        const char string2[] = "Tap the middle of touch bar for Next Screen,";
 #endif
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
@@ -2265,7 +2265,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
 #ifndef BOARD_TRMNL_X
         const char string2[] = "Short click the button on back,";
 #else
-        const char string2[] = "Tap the middle of touch bar,";
+        const char string2[] = "Tap the middle of touch bar for Next Screen,";
 #endif
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
@@ -2289,7 +2289,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
 #ifndef BOARD_TRMNL_X
         const char string2[] = "Wait or reset by holding button on back.";
 #else
-        const char string2[] = "Wait or reset by holding left and right corner of touch bar.";
+        const char string2[] = "Wait, or tap the middle of touch bar for Settings > Reset Wi-Fi.";
 #endif
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
@@ -2305,7 +2305,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
 #ifndef BOARD_TRMNL_X
         const char string2[] = "Wait or reset by holding button on back.";
 #else
-        const char string2[] = "Wait or reset by holding left and right corner of touch bar.";
+        const char string2[] = "Wait, or tap the middle of touch bar for Settings > Reset Wi-Fi.";
 #endif
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
@@ -2333,7 +2333,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
 #ifndef BOARD_TRMNL_X
         const char string2[] = "Wait or reset by holding button on back.";
 #else
-        const char string2[] = "Wait or reset by holding left and right corner of touch bar.";
+        const char string2[] = "Wait, or tap the middle of touch bar for Settings > Reset Wi-Fi.";
 #endif
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);

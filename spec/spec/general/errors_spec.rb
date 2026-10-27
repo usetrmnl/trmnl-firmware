@@ -60,7 +60,10 @@ General.describe "Errors" do
 
     it "image host unreachable" do
       dev.mock.set_fault("/images/*", close: true)
-      boot_with_error
+      boot_with_error do |s|
+        # "API responded, but image download failed." and how to advance (only the X has a golden of it)
+        expect(s).to match_golden("image_download_failed.png") if Golden.own_region("image_download_failed.png", device)
+      end
     end
 
     it "image url that can't be fetched" do
@@ -200,7 +203,7 @@ General.describe "Errors" do
         expect(st["wake_at_s"]).not_to be_nil, "the timer must still wake it"
         expect(sleep_s(st)).to be_within(15).of(900)
         expect(s).not_to show_image(screen, tolerance: 0, max_ratio: 0)
-        # "Can't establish WiFi connection. Will keep trying." (only the X has a golden of it)
+        # "Can't establish WiFi connection. Will keep trying." and the reset hint (only the X has a golden of it)
         expect(s).to match_golden("wifi_failed_message.png") if Golden.own_region("wifi_failed_message.png", device)
         # the count starts over, back on the 5-minute retries
         expect(sleep_s(wifi_failure(s, 1))).to be_within(15).of(300)
