@@ -26,3 +26,4 @@ src/color_reduce.cpp
 src/png_render.cpp
 src/jpeg_render.cpp
 src/display_widgets.cpp
+src/message_screens.cpp
