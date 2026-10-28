@@ -26,7 +26,6 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
         .reset_firmware = false,
         .special_function = SF_NONE,
         .action = "",
-        .touchbar_mode = "",
         .verbose_logging = ""};
   }
   String special_function_str = doc["special_function"];
@@ -56,6 +55,5 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
       .reset_firmware = doc["reset_firmware"],
       .special_function = parseSpecialFunction(special_function_str),
       .action = doc["action"] | "",
-      .touchbar_mode = doc["touchbar_mode"] | "",
       .verbose_logging = doc["verbose_logging"] | ""};
 }
