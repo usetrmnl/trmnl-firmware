@@ -10,15 +10,16 @@
 #define LocalIPURL "http://4.3.2.1"
 
 /** These are the things that the captive portal web app needs to interact with */
+struct WifiNetworkList {
+  bool ready;
+  std::vector<WifiNetwork> networks;
+};
 struct WifiOperationCallbacks {
-  std::function<void()> resetSettings;
-  std::function<void(const WifiCredentials, const String, const String)> setConnectionCredentials;
+  std::function<bool()> resetSettings;
+  std::function<bool(const WifiCredentials, const String, const String)> setConnectionCredentials;
   std::function<WifiConnectionState()> getConnectionState;
-  std::function<std::vector<WifiNetwork>(bool)> getAnnotatedNetworks;
-    /// Returns true when the network list is ready to serve (external list populated or WiFi scan complete).
-  std::function<bool()> isNetworkListReady;
-    /// Discards any cached scan results and starts a fresh scan (native WiFi or modem, whichever applies).
-  std::function<void()> forceRescan;
+  /// Copies a published list; force only queues a fresh scan on the main task.
+  std::function<WifiNetworkList(bool force)> getNetworks;
 };
 
 void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperationCallbacks callbacks,

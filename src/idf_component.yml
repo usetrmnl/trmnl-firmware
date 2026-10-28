@@ -1,12 +1,16 @@
-# Pin ESP-IDF Component Registry versions for reproducible TRMNL X (ESP32-S3)
+# Pin ESP-IDF Component Registry versions for reproducible
 # builds across macOS, Linux, and Windows. Without these, the Arduino framework
 # manifest uses caret (^) ranges and the component manager may resolve newer
 # versions when dependencies.lock is re-validated.
 #
-# Scoped to esp32s3 only — OG/BWRY (esp32c3) and other envs use ESP-IDF 4.x and
-# must not inherit these IDF 5.x component requirements.
+# QR encoding is shared by OG and X. The remaining dependencies are scoped to
+# esp32s3; other targets must not inherit these IDF 5.x requirements.
 # Versions match dependencies.lock on main (target: esp32s3).
 dependencies:
+  espressif/qrcode:
+    version: "==0.1.0~2"
+    rules:
+      - if: "target in [esp32c3, esp32s3]"
   espressif/mdns:
     version: "==1.11.1"
     rules:

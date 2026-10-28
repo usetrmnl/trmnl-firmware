@@ -125,7 +125,13 @@ bool FirmwareUpdateService::performFirmwareUpdate() {
       if (Update.begin(contentLength)) {
         Log_info("%s [%d]: Firmware update start\r\n", __FILE__, __LINE__);
 
-        if (Update.writeStream(https->getStream())) {
+        auto &stream = https->getStream();
+        const unsigned long started = millis();
+        // Update.writeStream checks the image header with a nonblocking peek.
+        while (!stream.available() && https->connected() && millis() - started < stream.getTimeout()) {
+          delay(1);
+        }
+        if (Update.writeStream(stream)) {
           if (Update.end(true)) {
             Log_info("%s [%d]: Firmware update successful. Rebooting...\r\n", __FILE__, __LINE__);
             ota_ok = true;

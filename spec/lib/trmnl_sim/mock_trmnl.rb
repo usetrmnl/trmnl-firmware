@@ -45,7 +45,7 @@ module TrmnlSim
   #                  fields (update_firmware, firmware_url, special_function, ...)
   #   display_queue: such hashes consumed first, one per request
   class MockTrmnl
-    FAULT_KEYS = %i[status body content_type delay hang truncate rate close redirect chunked times].freeze
+    FAULT_KEYS = %i[status body content_type delay body_delay hang truncate rate close redirect chunked times].freeze
     REASONS = { 200 => "OK", 301 => "Moved Permanently", 302 => "Found", 307 => "Temporary Redirect",
                 308 => "Permanent Redirect", 404 => "Not Found", 500 => "Internal Server Error" }.freeze
 
@@ -192,6 +192,7 @@ module TrmnlSim
     #   body:         answer with this body instead (e.g. malformed JSON: '{"status": 0, "image_')
     #   content_type: override the Content-Type
     #   delay:        seconds to wait before answering (longer than the device's timeout = a timeout)
+    #   body_delay:   seconds between response headers and the first body byte
     #   hang:         never answer (until the mock is closed)
     #   truncate:     send only this many bytes of the body (Content-Length is still the full
     #                 size), then close the connection
@@ -358,6 +359,8 @@ module TrmnlSim
 
       # A truncated body still announces its full length, like a connection that dies.
       write_head(io, code, "Content-Type" => ctype, "Content-Length" => payload.bytesize.to_s)
+      io.flush
+      pause(fault[:body_delay]) if fault[:body_delay]
       payload = payload.byteslice(0, truncate) if truncate
       if (rate = fault[:rate])
         step = [1, rate / 20].max

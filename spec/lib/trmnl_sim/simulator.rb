@@ -268,6 +268,18 @@ module TrmnlSim
     # The in-memory save points, oldest first.
     def save_points = get_json("/savepoints")["savepoints"]
 
+    # ---- Bluetooth ------------------------------------------------------------------------------------
+
+    def bluetooth_connect = post("/bluetooth/connect").fetch("connection")
+
+    def bluetooth_disconnect(connection)
+      post("/bluetooth/disconnect", { connection: })
+    end
+
+    def bluetooth_att(connection, data)
+      post("/bluetooth/att", { connection:, data: data.bytes }).fetch("data").pack("C*")
+    end
+
     # ---- preferences ----------------------------------------------------------------------------------
 
     # The firmware's NVS preferences in `namespace` as read from flash, as {key => value}
@@ -281,6 +293,11 @@ module TrmnlSim
     def set_preference(key, type, value, namespace: "data")
       body = { partition: "nvs", namespace:, key:, type:, value: value.to_s }
       checked(:put, "/preferences", request(:put, "/preferences", body:))
+    end
+
+    def delete_preference(key, namespace: "data")
+      body = { partition: "nvs", namespace:, key: }
+      checked(:delete, "/preferences", request(:delete, "/preferences", body:))
     end
 
     # ---- faults ---------------------------------------------------------------------------------------

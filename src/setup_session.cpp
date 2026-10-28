@@ -6,6 +6,7 @@
 #include <filesystem.h>
 #include <globals.h>
 #include <message_screens.h>
+#include <pairing_runtime.h>
 #include <services/device_setup.h>
 #include <setup_session.h>
 #include <status_screens.h>
@@ -31,13 +32,22 @@ static void showMacNotRegistered(const DeviceSetupResult &setup) {
 }
 
 void ensureDeviceSetUp(void) {
+  const bool bleSetup = pairingUsesBle();
   if (preferences.isKey(PREFERENCES_API_KEY) && preferences.isKey(PREFERENCES_FRIENDLY_ID)) {
+    pairingCredentialsReady(preferences.getString(PREFERENCES_FRIENDLY_ID, ""));
     Log.info("%s [%d]: API key and friendly ID saved\r\n", __FILE__, __LINE__);
   } else {
     Log.info("%s [%d]: API key or friendly ID not saved\r\n", __FILE__, __LINE__);
 
     // attempt to get the API key and friendly ID
     DeviceSetupResult setup = deviceSetup().perform();
+    pairingSetupFinished();
+    // Retry the server without asking the phone to submit Wi-Fi credentials again.
+    while (pairingUsesBle() && setup.outcome != DeviceSetupOutcome::Success && !validFriendlyCode(setup.friendlyId)) {
+      pairingTick(&setup);
+      if (preferences.isKey(PREFERENCES_API_KEY) && preferences.isKey(PREFERENCES_FRIENDLY_ID)) break;
+      delay(25);
+    }
 
     // copy results into globals
     setup.imageUrl.toCharArray(filename, sizeof(filename));
@@ -45,8 +55,10 @@ void ensureDeviceSetUp(void) {
 
     // perform post-setup actions
     if (setup.showSetupScreen) {
-      display_show_msg(storedLogoOrDefault(0), FRIENDLY_ID, setup.friendlyId, true, "", setup.message);
-      need_to_refresh_display = 0;
+      if (!bleSetup) {
+        display_show_msg(storedLogoOrDefault(0), FRIENDLY_ID, setup.friendlyId, true, "", setup.message);
+        need_to_refresh_display = 0;
+      }
     } else if (setup.errorScreen != NONE) {
       showMessageWithLogo(setup.errorScreen);
     }
@@ -66,6 +78,7 @@ void ensureDeviceSetUp(void) {
  * @return none
  */
 void resetDeviceCredentials(void) {
+  pairingClear();
   Log.info("%s [%d]: The device will be reset now...\r\n", __FILE__, __LINE__);
   Log.info("%s [%d]: WiFi resetting...\r\n", __FILE__, __LINE__);
   WifiCaptivePortal.resetSettings();

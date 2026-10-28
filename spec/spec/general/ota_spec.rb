@@ -71,6 +71,7 @@ General.describe "OTA updates" do
       picture = m.set_file("/img/gray4.png", "image/png", TrmnlSim::Images.png_image(gray, 800, 480, bits: 2))
       firmware = m.set_file("/firmware.bin", "application/octet-stream",
                             File.binread(File.join(dev.build, "firmware.bin")))
+      m.set_fault("/firmware.bin", body_delay: 0.1) # headers may arrive before the first firmware byte
       m.display_queue = [{ image_url: picture, filename: "plugin-a1b2c3-#{Time.now.to_i}", refresh_rate: 300,
                            update_firmware: true, firmware_url: firmware }]
       dev.boot do |s|

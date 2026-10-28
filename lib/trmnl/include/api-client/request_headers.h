@@ -27,5 +27,6 @@ HttpHeaderList buildImageHeaders(const ApiDisplayInputs &inputs);
 // trailing newline, as expected by Modem::httpGet() (TRMNL X 5 GHz path).
 String formatHeaders(const HttpHeaderList &headers);
 
-// Log for debugging
+// Log for debugging, without credentials.
+String formatHeadersForLog(const HttpHeaderList &headers);
 void logHeaders(const HttpHeaderList &headers);

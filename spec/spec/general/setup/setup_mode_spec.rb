@@ -17,7 +17,23 @@ General.describe "Setup mode" do
   end
 
   describe "FreshDevice" do
-    fixture(:setup_sim) { fresh_device(settled: { display_idle: true, min_refreshes: 1, settle_ms: 500 }) }
+    fixture(:setup_sim) do
+      s = fresh_device(settled: { display_idle: true, min_refreshes: 1, settle_ms: 500 })
+      if device.env == "trmnl"
+        # A fixed test identity keeps the credential-bearing QR deterministic in goldens.
+        identity = { v: 1, sid: "c4b031f0-d5ea-4bda-bb15-95a4fa98f915", pop: "0123456789ABCDEF", mac: "000001" }
+        s.set_portal_client(false)
+        s.wait_for_deep_sleep(display_idle: true, timeout: 60)
+        s.set_preference("ble_identity", "string", JSON.generate(identity))
+        s.set_portal_client(true)
+        boots = s.status.fetch("boot_count")
+        refreshes = s.status.fetch("display_refreshes")
+        s.reset
+        eventually("setup did not restart", within: 30) { s.status.fetch("boot_count") > boots }
+        s.wait(portal: true, display_idle: true, min_refreshes: refreshes + 1, settle_ms: 500, timeout: 60)
+      end
+      s
+    end
 
     it "shows the setup screen" do
       # All but the "TRMNL firmware <version> (<git hash>)" line, which changes every commit.
