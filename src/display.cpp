@@ -291,29 +291,20 @@ uint16_t display_width()
     return bbep.width();
 }
 
-/**
- * @brief Function to show the image on the display
- * @param image_buffer pointer to the uint8_t image buffer
- * @param reverse shows if the color scheme is reverse
- * @return none
- */
-void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool bSkipClear)
-
+// Draws a PNG, JPEG, Group5 or BMP image into the panel driver and picks the refresh mode it needs;
+// false when there was no memory to draw it
+static bool draw_image(uint8_t *image_buffer, int data_size, int *pRefreshMode, bool *pAlloc)
 {
     bool isPNG = data_size >= 4 && MOTOLONG(image_buffer) == (int32_t)0x89504e47;
     auto width = display_width();
     auto height = display_height();
     bool bAlloc = false;
-    static int i426Workaround = 0;
 #ifdef BB_EPAPER
     int iRefreshMode = REFRESH_FULL; // assume full (slow) refresh
 #else
     int iRefreshMode = 0;
 #endif
 
-   // Log_info("Paint_NewImage %d", reverse);
-    Log_info("display_show_image start");
-    Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef BB_EPAPER
     display_select_one_bit_panel();
 #endif // BB_EPAPER
@@ -336,7 +327,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
             bbep.setMemoryMode(BB_MODE_1BPP); // use 1-bit mode to save memory
             if (bbep.allocBuffer(false) != BBEP_SUCCESS) {
                 Log_info("Error allocating bb_epaper frame buffer");
-                return;
+                return false;
             }
             bAlloc = true;
 #endif
@@ -373,13 +364,26 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
 #endif // BB_EPAPER
         iUpdateCount = 1; // use partial update
     }
-    Log_info("Display refresh start");
+    *pRefreshMode = iRefreshMode;
+    *pAlloc = bAlloc;
+    return true;
+}
+
+// Saves the temperature profile the server asked for, when it changed
+static void save_temp_profile_from_api(void)
+{
     if (iTempProfile != apiDisplayResult.response.temp_profile) {
         iTempProfile = apiDisplayResult.response.temp_profile;
         Log_info("Saving new temperature profile (%" PRIu32 ") to FLASH", iTempProfile);
         preferences.putUInt(PREFERENCES_TEMP_PROFILE, iTempProfile);
     }
+}
+
 #ifdef BB_EPAPER
+// Adjusts the image's refresh mode for the refresh count, the server's settings and the panel
+static int choose_refresh_mode(int iRefreshMode, bool *pWait)
+{
+    bool bWait = *pWait;
     if ((iUpdateCount & 7) == 0 || apiDisplayResult.response.maximum_compatibility == true) {
         Log_info("%s [%d]: Forcing full refresh; desired refresh mode was: %d\r\n", __FILE__, __LINE__, iRefreshMode);
         iRefreshMode = REFRESH_FULL; // force full refresh every 8 partials
@@ -395,6 +399,14 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
         iRefreshMode = REFRESH_FAST; // fast update when showing loading screen
     }
     Log_info("%s [%d]: EPD refresh mode: %d\r\n", __FILE__, __LINE__, iRefreshMode);
+    *pWait = bWait;
+    return iRefreshMode;
+}
+
+// Refreshes the panel with the drawn image; false when the update failed
+static bool refresh_epaper(int iRefreshMode, bool bWait, bool bAlloc)
+{
+    static int i426Workaround = 0;
 #ifdef DO_NOT_LIGHT_SLEEP
     display_set_light_sleep(false);
 #else
@@ -409,7 +421,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
         if (bAlloc) {
             bbep.freeBuffer();
         }
-        return;
+        return false;
     }
 
     if ((bbep.getPanelType() == EP426_800x480 || bbep.getPanelType() == EP426_800x480_4GRAY || bbep.getPanelType() == EP397_800x480 || bbep.getPanelType() == EP397_800x480_4GRAY) /* && iRefreshMode == REFRESH_PARTIAL*/) {
@@ -418,7 +430,12 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
     if (bAlloc) {
         bbep.freeBuffer();
     }
+    return true;
+}
 #else
+// Pushes the drawn image to the panel with the right clearing passes
+static void refresh_fastepd(bool bSkipClear)
+{
  {
     int rc = bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
     Log_info("%s [%d]: setCustomMatrix returned %d\r\n", __FILE__, __LINE__, rc);
@@ -437,6 +454,34 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
         bbep.fullUpdate(iClearMode, false);
  //   }
  }
+}
+#endif // BB_EPAPER
+
+/**
+ * @brief Function to show the image on the display
+ * @param image_buffer pointer to the uint8_t image buffer
+ * @param reverse shows if the color scheme is reverse
+ * @return none
+ */
+void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool bSkipClear)
+{
+    int iRefreshMode;
+    bool bAlloc;
+
+    Log_info("display_show_image start");
+    Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
+    if (!draw_image(image_buffer, data_size, &iRefreshMode, &bAlloc)) {
+        return;
+    }
+    Log_info("Display refresh start");
+    save_temp_profile_from_api();
+#ifdef BB_EPAPER
+    iRefreshMode = choose_refresh_mode(iRefreshMode, &bWait);
+    if (!refresh_epaper(iRefreshMode, bWait, bAlloc)) {
+        return;
+    }
+#else
+    refresh_fastepd(bSkipClear);
 #endif
     iUpdateCount++;
     Log_info("display_show_image end");
