@@ -129,7 +129,7 @@ void display_prepare_message(void)
 void display_init(void)
 {
     if (pDevice == NULL) {
-        hw_config_init();
+        hw_config_init(DEVICE_MODEL);
     }
     Log_info("dev module start");
     iTempProfile = preferences.getUInt(PREFERENCES_TEMP_PROFILE, TEMP_PROFILE_DEFAULT);
@@ -154,6 +154,11 @@ void display_init(void)
         panel_rev = get_panel_rev();
         panel_rev_read = true;
         Log_info("Panel ID = 0x%08x\n", panel_rev);
+    }
+    if (strcmp(DEVICE_MODEL, "xiao_epaper_mini") == 0 && panel_rev == 0x40000000) {
+        // New 4.26" panel needs a different ePaper configuration
+        Log_info("Detected newer 4.26 inch panel type; switching profiles...");
+        hw_config_init("xiao_epaper_mini_b");
     }
     if (pDevice->epd_mosi_pin != 0 || pDevice->epd_sck_pin != 0) {
         bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit); // must be set BEFORE calling initio

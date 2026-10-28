@@ -40,6 +40,7 @@ const TRMNL_DEVICE device_list[] =
   "seeed_esp32c3", 8,    10,    3,   2,    5,   4,    0xff, 0xff, 9,     0xff, 0xff,    0xff,   BATT_ADC,  EPD_75,
   "seeed_esp32s3", 7,    9,     2,   1,    4,   3,    0xff, 0xff, 0,     0xff, 0xff,    0xff,   BATT_ADC,  EPD_75,
   "xiao_epaper_mini", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 2,     1,    6,       0xff,   BATT_ADC,  EPD_426,
+  "xiao_epaper_mini_b", 7, 9,   44,  38,   10,  4,    0xff, 0xff, 2,     1,    6,       0xff,   BATT_ADC,  EPD_426B,
   "xiao_epaper_display", 7, 9,  44,  38,   10,  4,    0xff, 0xff, 5,     1,    6,       0xff,   BATT_ADC,  EPD_75,
   "xiao_epaper_3clr", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 5,     1,    6,       0xff,   BATT_ADC,  EPD_75_3CLR,
   "xiao_epaper_6clr", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 5,     1,    6,       0xff,   BATT_ADC,  EPD_75_6CLR,
@@ -55,9 +56,10 @@ const TRMNL_DEVICE device_list[] =
 
 // TRMNL SPI ePaper panel types list. The list order is fixed and based on enumerated values
 // N.B. ALWAYS ADD NEW PANELS TO THE END OF THE LIST
-const DISPLAY_PROFILE dpList[12][3] = { // 1-bit and 2-bit display types for each profile
+const DISPLAY_PROFILE dpList[13][3] = { // 1-bit and 2-bit display types for each profile
     {{EP75_800x480, EP75_800x480_4GRAY}, {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, {EP75_800x480, EP75_800x480_4GRAY_V2}},
     {{EP426_800x480, EP426_800x480_4GRAY}, {EP426_800x480, EP426_800x480_4GRAY}, {EP426_800x480, EP426_800x480_4GRAY}},
+    {{EP426B_800x480, EP426B_800x480_4GRAY}, {EP426B_800x480, EP426B_800x480_4GRAY}, {EP426B_800x480, EP426B_800x480_4GRAY}},
     {{EP397_800x480, EP397_800x480_4GRAY}, {EP397_800x480, EP397_800x480_4GRAY}, {EP397_800x480, EP397_800x480_4GRAY}},
     {{EP75R_800x480, EP75R_800x480}, {EP75R_800x480, EP75R_800x480}, {EP75R_800x480, EP75R_800x480}}, 
     {{EP75YR_800x480, EP75YR_800x480}, {EP75YR_800x480, EP75YR_800x480}, {EP75YR_800x480, EP75YR_800x480}}, 
@@ -71,17 +73,17 @@ const DISPLAY_PROFILE dpList[12][3] = { // 1-bit and 2-bit display types for eac
 };
 #endif // !PARALLEL_EPD
 
-void hw_config_init(void)
+void hw_config_init(const char *name)
 {
     int i = 0;
     // Match the device name with the configuration in the list
-    while (device_list[i].device_name && strcmp(device_list[i].device_name, DEVICE_MODEL) != 0) {
+    while (device_list[i].device_name && strcmp(device_list[i].device_name, name) != 0) {
         i++;
     }
     if (device_list[i].device_name) {
         Log_info("Found device model at index %d\n", i);
         pDevice = (TRMNL_DEVICE *)&device_list[i];
     } else {
-        Log_info("Device name (%s) not found in supported list!", DEVICE_MODEL);
+        Log_info("Device name (%s) not found in supported list!", name);
     }
 } /* hw_config_init() */

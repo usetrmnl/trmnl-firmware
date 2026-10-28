@@ -35,14 +35,11 @@ uint32_t get_panel_rev(void)
 {
     uint32_t u32 = 0;
     uint8_t u8;
+    bool bSolomon = false; // assume the panel has an UltraChip controller
 
     if (pDevice->epd_mosi_pin == 0 && pDevice->epd_sck_pin == 0) { // pre-defined PCB+display in bb_epaper; pins unknown
         return 0;
     }
-    if (pDevice->panel_set != EPD_75) { // REV (0x70) is only known to be a harmless read on the 7.5" B/W UC8179
-        return 0;
-    }
-
     // Initialize the SPI bus in 'bit-bang' mode before running the normal init sequence
     // This will allow us to use MOSI as a bidirectional line for reading data from the panel
     pinMode(pDevice->epd_sck_pin, OUTPUT);
@@ -57,13 +54,17 @@ uint32_t get_panel_rev(void)
     delay(20);
     digitalWrite(pDevice->epd_rst_pin, 1);
     delay(20);
-    if (digitalRead(pDevice->epd_busy_pin) == 0) { // it's a SSD16xx; not useful at the moment because our 7.5" B/W is a UC81xx type panel
-        return 0;
+    if (digitalRead(pDevice->epd_busy_pin) == 0) { // it's a SSD16xx; different command and output
+        bSolomon = true;
     }
     digitalWrite(pDevice->epd_dc_pin, 0); // command mode
     digitalWrite(pDevice->epd_cs_pin, 0);
     pinMode(pDevice->epd_mosi_pin, OUTPUT);
-    WriteSPIByte(0x70); // Revision (REV) command
+    if (bSolomon) {
+        WriteSPIByte(0x2e); // Read the "Display Option"
+    } else {
+        WriteSPIByte(0x70); // Revision (REV) command
+    }
     digitalWrite(pDevice->epd_dc_pin, 1); // data mode
     pinMode(pDevice->epd_mosi_pin, INPUT);
     for (int i=0; i<7; i++) {

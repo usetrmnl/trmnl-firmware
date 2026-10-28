@@ -68,7 +68,7 @@ uint32_t bootEarly(void)
 
 void initPeripherals(void)
 {
-  hw_config_init();
+  hw_config_init(DEVICE_MODEL);
   pins_init();
   buzzer().init();
   sensor().init(pDevice);
