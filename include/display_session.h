@@ -1,11 +1,6 @@
 #pragma once
 
-/**
- * Display session helpers for the /api/display refresh path.
- *
- * GME2 G2: handleApiDisplayResponse. downloadAndShow / inputs loading may
- * still live in bl.cpp until follow-up PRs.
- */
+// The /api/display refresh path: ask the server what to show, then draw it.
 
 #include <api-client/display.h>
 #include <types.h>
@@ -16,3 +11,7 @@
  * SF_SEND_TO_ME.
  */
 https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse);
+
+// Asks /api/display what to show and shows it: a screen wipe, the cached image, or a new image
+// downloaded, drawn and cached. Returns the request result bl_init acts on.
+https_request_err_e downloadAndShow(float batteryVoltage);

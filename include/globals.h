@@ -39,7 +39,9 @@ extern bool reset_firmware;      // need to reset credentials
 extern bool log_retry;           // need to log connection retry
 
 // --- Wake / sleep state ---
+extern unsigned long startup_time; // millis() at boot, for the wake time statistics
 extern uint32_t time_since_sleep;
+extern float battery_voltage; // read at wake, before the display and WiFi draw current
 extern esp_sleep_wakeup_cause_t wakeup_reason;
 extern SPECIAL_FUNCTION special_function;
 extern bool special_function_chosen; // picked on the device (TRMNL X touch menu), not the saved one

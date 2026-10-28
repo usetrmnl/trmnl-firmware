@@ -1,24 +1,59 @@
 #include <ArduinoLog.h>
 #include <Preferences.h>
+#include <WiFi.h>
+#include <api-client/header.h>
+#include <api-client/request_headers.h>
+#include <app_logger.h>
+#include <battery.h>
+#include <bl.h>
 #include <bmp.h>
 #include <config.h>
+#include <device_id.h>
 #include <display.h>
 #include <display_session.h>
 #include <filesystem.h>
 #include <globals.h>
+#include <logging_parcers.h>
 #include <png.h>
+#include <power.h>
 #include <refresh_interval.h>
+#include <services/http_retry_request.h>
 #include <special_function.h>
 #include <trmnl_log.h>
 #include <types.h>
+#include <wifi_network.h>
+
+#include "displayed_image.h"
 
 #ifdef BOARD_TRMNL_X
 #include "touchbar_gesture.h"
 #endif
 
 // --- Helpers / tables still owned by bl.cpp ---
-void writeSpecialFunction(SPECIAL_FUNCTION function);
 void showMessageWithLogo(MSG message_type);
+
+static void writeSpecialFunction(SPECIAL_FUNCTION function) {
+  if (preferences.isKey(PREFERENCES_SF_KEY)) {
+    Log.info("%s [%d]: SF saved. Reading...\r\n", __FILE__, __LINE__);
+    if ((SPECIAL_FUNCTION)preferences.getUInt(PREFERENCES_SF_KEY, 0) == function) {
+      Log.info("%s [%d]: No need to re-write\r\n", __FILE__, __LINE__);
+    } else {
+      Log.info("%s [%d]: Writing new special function\r\n", __FILE__, __LINE__);
+      bool res = preferences.putUInt(PREFERENCES_SF_KEY, function);
+      if (res)
+        Log.info("%s [%d]: Written new special function successfully\r\n", __FILE__, __LINE__);
+      else
+        Log.error("%s [%d]: Writing new special function failed\r\n", __FILE__, __LINE__);
+    }
+  } else {
+    Log.error("%s [%d]: SF not saved\r\n", __FILE__, __LINE__);
+    bool res = preferences.putUInt(PREFERENCES_SF_KEY, function);
+    if (res)
+      Log.info("%s [%d]: Written new special function successfully\r\n", __FILE__, __LINE__);
+    else
+      Log.error("%s [%d]: Writing new special function failed\r\n", __FILE__, __LINE__);
+  }
+}
 
 https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse) {
   https_request_err_e result = HTTPS_NO_ERR;
@@ -319,59 +354,19 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse) {
 
         if (action.equals("send_to_me")) {
           status = false;
-          result = HTTPS_SUCCESS;
+          result = HTTPS_NO_ERR; // already drawn: skips downloadAndShow()'s cached image path
           Log.info("%s [%d]: send_to_me success\r\n", __FILE__, __LINE__);
 
-          bool image_reverse = false;
-
-          if (!filesystem_file_exists("/current.bmp") && !filesystem_file_exists("/current.png")) {
-            Log.info("%s [%d]: No current image!\r\n", __FILE__, __LINE__);
-            if (buffer) {
-              free(buffer);
-              buffer = nullptr;
-            }
-            return HTTPS_WRONG_IMAGE_FORMAT;
+          // Redraw the last image, which the loading screen (and the TRMNL X's menu) covers. A PNG or
+          // JPEG is cached under its name, a BMP only as /current.bmp.
+          const char *path = filesystem_file_exists(DisplayedImage::get()) ? DisplayedImage::get() : "/current.bmp";
+          buffer = display_read_file(path, &file_size);
+          if (buffer && file_size > 0) {
+            display_show_image(buffer, file_size, true);
+            need_to_refresh_display = 1;
           }
-
-          if (filesystem_file_exists("/current.bmp")) {
-            Log.info("%s [%d]: send_to_me BMP\r\n", __FILE__, __LINE__);
-            buffer = (uint8_t *)malloc(DISPLAY_BMP_IMAGE_SIZE);
-
-            if (!filesystem_read_from_file("/current.bmp", buffer, DISPLAY_BMP_IMAGE_SIZE)) {
-              free(buffer);
-              buffer = nullptr;
-              Log_error_submit("Error reading image!");
-              return HTTPS_WRONG_IMAGE_FORMAT;
-            }
-
-            bmp_err_e bmp_parse_result = parseBMPHeader(buffer, image_reverse);
-            if (bmp_parse_result != BMP_NO_ERR) {
-              free(buffer);
-              buffer = nullptr;
-              Log_error_submit("Error parsing BMP header, code: %d", bmp_parse_result);
-              return HTTPS_WRONG_IMAGE_FORMAT;
-            }
-          } else if (filesystem_file_exists("/current.png")) {
-            Log.info("%s [%d]: send_to_me PNG\r\n", __FILE__, __LINE__);
-            image_err_e png_parse_result = PNG_NO_ERR; // DEBUG
-            buffer = display_read_file("/current.png", &file_size);
-            if (png_parse_result != PNG_NO_ERR) {
-              Log_error_submit("Error parsing PNG header, code: %d", png_parse_result);
-              if (buffer) {
-                free(buffer);
-                buffer = nullptr;
-              }
-              return HTTPS_WRONG_IMAGE_FORMAT;
-            }
-          }
-
-          Log.info("Showing image\n\r");
-          display_show_image(buffer, file_size, true);
-          need_to_refresh_display = 1;
-          if (buffer) {
-            free(buffer);
-            buffer = nullptr;
-          }
+          free(buffer);
+          buffer = nullptr;
         } else {
           Log.error("%s [%d]: send_to_me failed\r\n", __FILE__, __LINE__);
         }
@@ -450,5 +445,249 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse) {
       break;
     }
   }
+  return result;
+}
+
+static ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences, float batteryVoltage) {
+  ApiDisplayInputs inputs = createApiHeaders();
+  inputs.baseUrl = preferences.getString(PREFERENCES_API_URL, API_BASE_URL);
+  inputs.batteryVoltage = batteryVoltage; // read before the display and WiFi were turned on
+  last_wifi_rssi = inputs.rssi;
+  Log.info("%s [%d]: baseUrl from preferences: %s\r\n", __FILE__, __LINE__, inputs.baseUrl.c_str());
+  return inputs;
+}
+
+https_request_err_e downloadAndShow(float batteryVoltage) {
+  image_err_e png_res = PNG_DECODE_ERR;
+  bmp_err_e bmp_res = BMP_NOT_BMP;
+  auto apiDisplayInputs = loadApiDisplayInputs(preferences, batteryVoltage);
+
+  // Retries, redirects and the transport (Wi-Fi vs. TRMNL X modem) are handled inside
+  // HttpRetryRequest, via fetchApiDisplay(). The result stays in the global for display.cpp
+  // and the OTA check.
+  apiDisplayResult = fetchApiDisplay(apiDisplayInputs);
+  if (apiDisplayResult.error != HTTPS_NO_ERR) return apiDisplayResult.error;
+
+  https_request_err_e result = handleApiDisplayResponse(apiDisplayResult.response);
+  if (apiDisplayResult.response.filename == "screen_wiper.png") {
+      // Guard against re-fetching forever if the wiper is the only playlist item
+    static bool wiped_this_wake = false;
+    if (wiped_this_wake) {
+      Log_info("Screen wiper returned again; not wiping twice in one wake");
+      return result; // leave the wiped (white) screen as-is
+    }
+    wiped_this_wake = true;
+    Log_info("Detected screen wiper filename: %s, clearing display...", apiDisplayResult.response.filename.c_str());
+    display_wipe();
+      // Wiping leaves the screen blank; fetch and show the next playlist item
+      // right away instead of waiting for the next scheduled refresh.
+    Log_info("Screen wipe complete, fetching next playlist item");
+    return downloadAndShow(batteryVoltage);
+  }
+
+  if (!status && result == HTTPS_SUCCESS) { // this means we already have this image stored in SPIFFS
+    char szTemp[36];
+    filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
+    if (DisplayedImage::matches(szTemp)) {
+        // We just displayed the same image, don't refresh the display
+      Log.info("%s [%d]: The image hasn't changed since the last wakeup, don't refresh the display.\r\n", __FILE__,
+               __LINE__);
+      buffer = nullptr;
+      return result;
+    }
+    if (!filesystem_file_exists(szTemp)) {
+        // BMPs aren't cached under their filename (e.g. after a sleep special function); redraw /current.bmp
+      buffer = nullptr;
+      size_t current_size = 0;
+      if (filesystem_file_exists("/current.bmp")) {
+        current_size = filesystem_read_and_allocate("/current.bmp", &buffer);
+      }
+      if (!buffer || current_size == 0) {
+        Log_info("%s isn't cached; keeping the current screen", szTemp);
+        if (buffer) free(buffer);
+        buffer = nullptr;
+        return result;
+      }
+      Log_info("%s isn't cached; showing /current.bmp", szTemp);
+      display_show_image(buffer, current_size, true);
+      free(buffer);
+      buffer = nullptr;
+      DisplayedImage::remember(szTemp);
+      return result;
+    }
+    DisplayedImage::remember(szTemp);
+    Log.info("%s [%d]: Reading %s from SPIFFS\r\n", __FILE__, __LINE__, szTemp);
+    size_t content_size = filesystem_read_and_allocate(szTemp, &buffer);
+    if (!buffer || content_size == 0) {
+      filesystem_file_delete(szTemp);
+      Log_error_submit("Cached image is empty or unreadable: %s", szTemp);
+      return HTTPS_WRONG_IMAGE_SIZE;
+    }
+    Log.info("%s [%d]: Decoding image...\r\n", __FILE__, __LINE__);
+    display_show_image(buffer, content_size, true);
+    free(buffer);
+    buffer = nullptr;
+    DisplayedImage::remember(szTemp); // current image becomes the previous image
+      // Rotate NVS path keys: last ← current ← szTemp
+    String _curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
+    String _lastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
+    if (!_curPath.isEmpty() && (_curPath != String(szTemp) || _lastPath.isEmpty()))
+      preferences.putString(PREFERENCES_LAST_PATH_KEY, _curPath);
+    preferences.putString(PREFERENCES_CURRENT_PATH_KEY, String(szTemp));
+#ifdef BOARD_TRMNL_X
+    update_playlist_order(preferences, szTemp, _curPath.c_str());
+#endif
+    preferences.putString(PREFERENCES_BROWSE_PATH_KEY, String(szTemp));
+    return result;
+  }
+
+  if (!(status && !reset_firmware)) return result; // nothing new to download
+
+  status = false;
+
+  // A 202 carries no image_url, so filename is still empty here. HTTPClient::begin() rejects
+  // that and the fetch below would report it as an API failure over the friendly ID screen.
+  if (filename[0] == '\0') return result;
+
+  HttpRetryRequestConfig imageConfig;
+  imageConfig.url = filename;
+  imageConfig.apiBaseUrl = apiDisplayInputs.baseUrl; // ID / Access-Token only go to the API server
+  imageConfig.headers = buildImageHeaders(apiDisplayInputs);
+  imageConfig.readTimeoutSeconds = apiDisplayResult.response.image_url_timeout;
+
+  HttpRetryRequest imageRequest(imageConfig);
+  https_request_err_e fetchResult = imageRequest.execute();
+  if (fetchResult == HTTPS_RESPONSE_CODE_INVALID)
+    fetchResult = HTTPS_IMAGE_DOWNLOAD_FAILED; // dedicated screen: the API answered, the image host did not
+  if (fetchResult != HTTPS_NO_ERR) {
+    Log_info("Returned result - %s", https_request_err_str(fetchResult));
+    return fetchResult;
+  }
+
+  // imageRequest owns the body; the global `buffer` only borrows it for the decode tail below and
+  // must not outlive this function. The guard nulls it on every exit path.
+  buffer = imageRequest.body();
+  uint32_t content_size = imageRequest.bodySize();
+  struct BufferGuard {
+    ~BufferGuard() { buffer = nullptr; }
+  } bufferGuard;
+
+  bool isPNG = imageRequest.contentType() == "image/png";
+  bool isJPEG = imageRequest.contentType() == "image/jpeg";
+  if (content_size >= 2 && buffer[0] == 'B' && buffer[1] == 'M') {
+    isPNG = false;
+    Log.info("BMP file detected");
+  }
+
+  submitStoredLogs();
+
+  WiFi.disconnect(true); // no need for WiFi, save power starting here
+  Log.info("%s [%d]: Received successfully; WiFi off.\r\n", __FILE__, __LINE__);
+
+  bool image_reverse = false;
+  if (isPNG)
+    png_res = parsePNGHeader(buffer, content_size); // the decoder reports nothing back
+  else if (isJPEG)
+    png_res = PNG_NO_ERR;
+  if (png_res == PNG_NO_ERR && (isPNG || isJPEG)) {
+    char szTemp[36];
+    filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
+    Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
+    display_show_image(buffer, content_size, true); // PNG and JPEG decoders leave the buffer intact
+    Log.info("%s [%d]: Writing %s to SPIFFS\r\n", __FILE__, __LINE__, szTemp);
+    filesystem_purge_old_file(szTemp); // try to delete the old version or older than 24h
+    writeImageToFile(szTemp, buffer, content_size);
+    DisplayedImage::remember(szTemp); // current image becomes the previous image
+    String _curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
+    String _lastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
+    if (!_curPath.isEmpty() && (_curPath != String(szTemp) || _lastPath.isEmpty()))
+      preferences.putString(PREFERENCES_LAST_PATH_KEY, _curPath);
+    preferences.putString(PREFERENCES_CURRENT_PATH_KEY, String(szTemp));
+#ifdef BOARD_TRMNL_X
+    update_playlist_order(preferences, szTemp, _curPath.c_str());
+#endif
+    preferences.putString(PREFERENCES_BROWSE_PATH_KEY, String(szTemp));
+  } else if (!isPNG && !isJPEG) {
+    bmp_res = parseBMPHeader(buffer, image_reverse);
+    Log.info("%s [%d]: BMP Parsing result: %d\r\n", __FILE__, __LINE__, bmp_res);
+  }
+  Serial.println();
+  String error = "";
+  String png_error = ""; // its own string: the bmp switch below always runs too and would overwrite it
+
+  switch (png_res) {
+  case PNG_NO_ERR: {
+    // Using filename from API response
+    new_filename = apiDisplayResult.response.filename;
+
+    // Print the extracted string
+    Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
+
+    if (result != HTTPS_PLUGIN_NOT_ATTACHED) result = HTTPS_SUCCESS;
+  } break;
+  case PNG_WRONG_FORMAT: {
+    png_error = "Wrong image format. Did not pass signature check";
+  } break;
+  case PNG_BAD_SIZE: {
+    png_error = "IMAGE width, height or size are invalid";
+  } break;
+  case PNG_DECODE_ERR: {
+    png_error = "could not decode png image";
+  } break;
+  case PNG_MALLOC_FAILED: {
+    png_error = "could not allocate memory for png image decoder";
+  } break;
+  default:
+    break;
+  }
+
+  switch (bmp_res) {
+  case BMP_NO_ERR: {
+    if (!filesystem_file_exists("/current.png")) {
+      writeImageToFile("/current.bmp", buffer, content_size);
+    }
+    Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
+    display_show_image(buffer, content_size, true);
+    {
+      char szTemp[36];
+      filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
+      DisplayedImage::remember(szTemp);
+    }
+
+    // Using filename from API response
+    new_filename = apiDisplayResult.response.filename;
+
+    // Print the extracted string
+    Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
+
+    if (result != HTTPS_PLUGIN_NOT_ATTACHED) result = HTTPS_SUCCESS;
+  } break;
+  case BMP_NOT_BMP: {
+    error = "First two header bytes are invalid!";
+  } break;
+  case BMP_BAD_SIZE: {
+    error = "BMP width, height or size are invalid";
+  } break;
+  case BMP_COLOR_SCHEME_FAILED: {
+    error = "BMP color scheme is invalid";
+  } break;
+  case BMP_INVALID_OFFSET: {
+    error = "BMP header offset is invalid";
+  } break;
+  default:
+    break;
+  }
+
+  if (isPNG && png_res != PNG_NO_ERR) {
+    char szTemp[36];
+    filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
+    filesystem_file_delete(szTemp);
+    Log_error_submit("error parsing image file - %s", png_error.c_str());
+
+    return HTTPS_WRONG_IMAGE_FORMAT;
+  }
+
+  Log_info("Returned result - %s", https_request_err_str(result));
+
   return result;
 }

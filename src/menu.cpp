@@ -11,18 +11,19 @@
 #include <bl.h>
 #include <config.h>
 #include <display.h>
+#include <display_widgets.h>
+#include <epd_driver.h>
+#include <epd_panel_rev.h>
 #include <globals.h>
 #include <power.h>
 #include <qa.h>
 #include <refresh_interval.h>
 #include <trmnl_log.h>
 
-#include "FastEPD.h"
 #include "cached_images.h"
+#include "fireworks.h"
 #include "fonts.h"
 #include "messages.h"
-
-extern FASTEPD bbep; // display.cpp
 
 #define MENU_TIMEOUT_MS       15000
 #define MENU_POLL_INTERVAL_MS 20
@@ -396,6 +397,7 @@ static int diagnostics_lines(String *lines) {
 // its hint slot: plain, outlined when it is the one to tap next, filled once tapped. The partial
 // updates only add black: white over black leaves a ghost.
 #define TUTORIAL_TIMEOUT_MS   60000
+#define FIREWORKS_TIMEOUT_MS  10000 // the fireworks screen, which closes as if tapped
 #define TUTORIAL_TITLE_Y      240 // baselines
 #define TUTORIAL_SUBTITLE_Y   330
 #define TUTORIAL_CONTROLS_Y   580
@@ -433,15 +435,28 @@ static void tutorial_show_screen(const menu_tutorial_t &tutorial, bool replace) 
   Log_info("tutorial_show_screen end");
 }
 
+// Wipes the finished tutorial, runs the fireworks, then shows `finish` at the bottom
+static void tutorial_celebrate(const menu_tutorial_t &tutorial) {
+  Log_info("Tutorial: fireworks");
+  fireworks_show();
+  bbep.setTextColor(BBEP_WHITE, BBEP_BLACK);
+  bbep.setFont(Roboto_Black_24);
+  menu_draw_centered(tutorial.finish, bbep.width() / 2, bbep.height() - MENU_HINT_MARGIN);
+  bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
+  bbep.partialUpdate(false);
+  Log_info("Tutorial: fireworks end");
+}
+
 // Shows `tutorial` and has the user try its controls in order. Returns true once they have and, with
-// `confirm`, then used any control to close it; false after a timeout. `replace`: replace a screen on
-// the display instead of the image.
+// `confirm`, then used any control to close it (or let its fireworks time out); false after a
+// timeout. `replace`: replace a screen on the display instead of the image.
 static bool run_tutorial_screen(const menu_tutorial_t &tutorial, bool replace, bool confirm) {
   tutorial_show_screen(tutorial, replace);
 
   int next = 0; // the hint slot of the control to tap next; MENU_HINT_SLOTS once all are
   unsigned long last_input = millis();
-  while (millis() - last_input < TUTORIAL_TIMEOUT_MS) {
+  unsigned long timeout = TUTORIAL_TIMEOUT_MS;
+  while (millis() - last_input < timeout) {
     delay(MENU_POLL_INTERVAL_MS);
     menu_input_t input = menu_controls->read();
     if (input == menu_input_t::NONE) continue;
@@ -450,6 +465,7 @@ static bool run_tutorial_screen(const menu_tutorial_t &tutorial, bool replace, b
     const int slot = input == menu_input_t::UP ? 0 : input == menu_input_t::SELECT ? 1 : 2;
     if (next == MENU_HINT_SLOTS) {
       Log_info("Tutorial: done");
+      if (tutorial.fireworks) fireworks_wipe();
       return true;
     }
     if (slot != next) {
@@ -460,15 +476,28 @@ static bool run_tutorial_screen(const menu_tutorial_t &tutorial, bool replace, b
     tutorial_draw_pill(tutorial, slot, MENU_HINT_FILLED);
     if (++next < MENU_HINT_SLOTS) {
       tutorial_draw_pill(tutorial, next, MENU_HINT_OUTLINED);
-    } else {
+    } else if (!tutorial.fireworks) {
       bbep.setFont(Roboto_Black_24);
       menu_draw_centered(tutorial.finish, bbep.width() / 2, TUTORIAL_FINISH_Y);
     }
-    bbep.partialUpdate(false);
+    bbep.partialUpdate(next == MENU_HINT_SLOTS && tutorial.fireworks);
+    if (next == MENU_HINT_SLOTS && tutorial.fireworks) {
+      tutorial_celebrate(tutorial);
+      // Taps during the fireworks do not close them
+      while (menu_controls->read() != menu_input_t::NONE) {
+      }
+      last_input = millis();
+      timeout = FIREWORKS_TIMEOUT_MS;
+    }
     if (next == MENU_HINT_SLOTS && !confirm) {
       Log_info("Tutorial: done");
       return true;
     }
+  }
+  if (next == MENU_HINT_SLOTS && tutorial.fireworks) {
+    Log_info("Tutorial: fireworks timeout - done");
+    fireworks_wipe();
+    return true;
   }
   Log_info("Tutorial: timeout - closing");
   return false;
