@@ -4,6 +4,7 @@
 
 #include <config.h>
 #include <display.h>
+#include <touchbar_indicator.h>
 #include <trmnl_log.h>
 
 #include "IQS323.h"

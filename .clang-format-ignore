@@ -18,3 +18,12 @@ src/logo_medium.h
 src/logo_small.h
 src/wifi_connect_qr.h
 src/wifi_failed_qr.h
+# split out of display.cpp/bl.cpp as-is, so the moves stay reviewable with --color-moved
+src/board_config.cpp
+src/epd_panel_rev.cpp
+src/x_io_expander.cpp
+src/color_reduce.cpp
+src/png_render.cpp
+src/jpeg_render.cpp
+src/display_widgets.cpp
+src/message_screens.cpp

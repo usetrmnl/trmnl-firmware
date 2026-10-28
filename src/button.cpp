@@ -1,12 +1,10 @@
 #include "button.h"
 
-#include "config.h"
-extern TRMNL_DEVICE *pDevice;
-
 #include <Arduino.h>
 #include <ArduinoLog.h>
 #include <WifiCaptive.h>
 #include <bl.h>
+#include <board_config.h>
 #include <config.h>
 #include <globals.h>
 #include <misc/buzzer.h>
