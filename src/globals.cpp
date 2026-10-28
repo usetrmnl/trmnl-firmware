@@ -20,6 +20,7 @@ bool reset_firmware = false; // need to reset credentials
 bool log_retry = false;      // need to log connection retry
 
 // --- Wake / sleep state ---
+unsigned long startup_time = 0;
 uint32_t time_since_sleep;
 float battery_voltage;
 esp_sleep_wakeup_cause_t wakeup_reason = ESP_SLEEP_WAKEUP_UNDEFINED;
