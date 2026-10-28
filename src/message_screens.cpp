@@ -10,80 +10,43 @@
 #include "wifi_connect_qr.h"
 #include "wifi_failed_qr.h"
 
-/**
- * @brief Function to show the image with message on the display
- * @param image_buffer pointer to the uint8_t image buffer
- * @param message_type type of message that will show on the screen
- * @return none
- */
-void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *message_text)
+// The message bodies below keep the indentation they had as cases of the display_show_msg()
+// switches, so open changes to those lines still apply; a formatting pass can re-indent them.
+
+static void draw_otg_turned_on_message(void)
 {
-    auto width = display_width();
-    auto height = display_height();
-    UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
-    BB_RECT rect;
+        BB_RECT rect;
 
-    Log_info("display_show_msg start");
-    Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
-#ifdef BB_EPAPER
-    display_prepare_message();
-#else
-    bbep.setMode(BB_MODE_1BPP); // message screens are 1-bit
-#endif
-    if (image_buffer && *(uint16_t *)image_buffer == BB_BITMAP_MARKER)
-    {
-        // G5 compressed image
-        BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
-        int x = (width - pBBB->width)/2;
-        int y = (height - pBBB->height)/2; // center it
-        if (x > 0 || y > 0) // only clear if the image is smaller than the display
-        {
-            bbep.fillScreen(BBEP_WHITE);
-        }
-        bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
-    }
-    else
-    {
-#ifdef BB_EPAPER
-        if (image_buffer) memcpy(bbep.getBuffer(), image_buffer+62, Imagesize); // uncompressed 1-bpp bitmap
-#endif
-    }
-
-#ifdef PARALLEL_EPD
-    bbep.setFont(Inter_18);
-#else
-    bbep.setFont(nicoclean_8);
-#endif
-    bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
-
-    switch (message_type)
-    {
-    case OTG_TURNED_ON:
-    {
         const char string1[] = "OTG turned on!";
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w)/2, 430);
         bbep.println(string1);
-    break;
-    }
-    case OTG_TURNED_OFF:
-    {
+}
+
+static void draw_otg_turned_off_message(void)
+{
+        BB_RECT rect;
+
         const char string1[] = "OTG turned off!";
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w)/2, 430);
         bbep.println(string1);
-    break;
-    }
-    case MODEM_FLASHING:
-    {
+}
+
+static void draw_modem_flashing_message(void)
+{
+        BB_RECT rect;
+
         const char string1[] = "Flashing modem firmware...";
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w)/2, 430);
         bbep.println(string1);
-    break;
-    }
-    case MODEM_FLASH_FAILED:
-    {
+}
+
+static void draw_modem_flash_failed_message(const char *message_text)
+{
+        BB_RECT rect;
+
         const char string1[] = "Failed to flash modem firmware,";
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w)/2, 430);
@@ -100,10 +63,12 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         } else {
             bbep.print(string2);
         }
-    break;
-    }
-    case READY_TO_SHIP:
-    {
+}
+
+static void draw_ready_to_ship_message(void)
+{
+        BB_RECT rect;
+
         const char string1[] = "Device is ready to ship!";
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w)/2, 430);
@@ -113,10 +78,12 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w)/2, 500);
         bbep.print(string2);
-    break;
-    }
-    case SHIPPING_MODE:
-    {
+}
+
+static void draw_shipping_mode_message(void)
+{
+        BB_RECT rect;
+
         const char string1[] = "Welcome to TRMNL.";
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w)/2, 430);
@@ -126,10 +93,12 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w)/2, 500);
         bbep.print(string2);
-    break;
-    }
-    case WIFI_CONNECT:
-    {
+}
+
+static void draw_wifi_connect_message(void)
+{
+        BB_RECT rect;
+
         const char string1[] = "Connect to TRMNL WiFi";
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w)/2, 430);
@@ -138,10 +107,12 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w)/2, -1);
         bbep.print(string2);
-    }
-    break;
-    case WIFI_FAILED:
-    {
+}
+
+static void draw_wifi_failed_message(void)
+{
+        BB_RECT rect;
+
         String string0 = "TRMNL firmware ";
         string0 += Messages::firmware_version();
 #ifdef __BB_EPAPER__
@@ -167,10 +138,12 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
 #else // bigger for X
         bbep.loadG5Image(wifi_failed_qr, bbep.width() - (66*2) - 80, 80, BBEP_WHITE, BBEP_BLACK, 2.0f);
 #endif
-    }
-    break;
-    case WIFI_INTERNAL_ERROR:
-    {
+}
+
+static void draw_wifi_internal_error_message(void)
+{
+        BB_RECT rect;
+
         const char string1[] = "WiFi connected, but";
 #ifdef __BB_EPAPER__
         int x = 132;
@@ -201,10 +174,12 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
 #else // bigger for X
         bbep.loadG5Image(wifi_failed_qr, bbep.width() - (66*2) - 80, 80, BBEP_WHITE, BBEP_BLACK, 2.0f);
 #endif
-    }
-    break;
-    case WIFI_WEAK:
-    {
+}
+
+static void draw_wifi_weak_message(void)
+{
+        BB_RECT rect;
+
         const char string1[] = "WiFi connected but signal is weak";
         bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
@@ -213,10 +188,12 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - rect.h);
 #endif
         bbep.print(string1);
-    }
-    break;
-    case IMAGE_DOWNLOAD_FAILED:
-    {
+}
+
+static void draw_image_download_failed_message(void)
+{
+        BB_RECT rect;
+
         const char string1[] = "API responded, but image download failed.";
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, 340);
@@ -233,10 +210,12 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         bbep.getStringBox(string3, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.print(string3);
-    }
-    break;
-    case API_UNABLE_TO_CONNECT:
-    {
+}
+
+static void draw_api_unable_to_connect_message(void)
+{
+        BB_RECT rect;
+
         const char string1[] = "WiFi connected, unable connect to API.";
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, 340);
@@ -253,10 +232,12 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         bbep.getStringBox(string3, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.print(string3);
-    }
-    break;
-    case API_SETUP_FAILED:
-    {
+}
+
+static void draw_api_setup_failed_message(void)
+{
+        BB_RECT rect;
+
         const char string1[] = "WiFi connected, /api/setup returned error.";
         bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
@@ -277,10 +258,12 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         bbep.getStringBox(string3, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.print(string3);
-    }
-    break;
-    case API_SIZE_ERROR:
-    {
+}
+
+static void draw_api_size_error_message(void)
+{
+        BB_RECT rect;
+
         const char string1[] = "WiFi connected, TRMNL content malformed.";
         bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
@@ -297,10 +280,12 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.print(string2);
-    }
-    break;
-    case API_FIRMWARE_UPDATE_ERROR:
-    {
+}
+
+static void draw_api_firmware_update_error_message(void)
+{
+        BB_RECT rect;
+
         const char string1[] = "WiFi connected, could not get firmware update from api.";
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, 400);
@@ -313,10 +298,12 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.print(string2);
-    }
-    break;
-    case WIFI_IMAGE_TIMEOUT:
-    {
+}
+
+static void draw_wifi_image_timeout_message(void)
+{
+        BB_RECT rect;
+
         const char string1[] = "Image download timed out; check your network status.";
         bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
@@ -325,10 +312,12 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - rect.h);
 #endif
         bbep.print(string1);
-    }
-    break;
-    case API_IMAGE_DOWNLOAD_ERROR:
-    {
+}
+
+static void draw_api_image_download_error_message(void)
+{
+        BB_RECT rect;
+
         const char string1[] = "WiFi connected, API could not deliver image to device.";
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, 400);
@@ -341,10 +330,12 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.print(string2);
-    }
-    break;
-    case FW_UPDATE:
-    {
+}
+
+static void draw_fw_update_message(void)
+{
+        BB_RECT rect;
+
         const char string1[] = "Firmware update available! Starting now...";
         bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
@@ -353,10 +344,12 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - rect.h);
 #endif
         bbep.print(string1);
-    }
-    break;
-    case FW_UPDATE_FAILED:
-    {
+}
+
+static void draw_fw_update_failed_message(void)
+{
+        BB_RECT rect;
+
         const char string1[] = "Firmware update failed. Device will restart...";
         bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
@@ -365,10 +358,12 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - rect.h);
 #endif
         bbep.print(string1);
-    }
-    break;
-    case FW_UPDATE_SUCCESS:
-    {
+}
+
+static void draw_fw_update_success_message(void)
+{
+        BB_RECT rect;
+
         const char string1[] = "Firmware update success. Device will restart...";
         bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
@@ -377,18 +372,22 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - rect.h);
 #endif
         bbep.print(string1);
-    }
-    break;
-    case QA_START:
-    {
+}
+
+static void draw_qa_start_message(void)
+{
+        BB_RECT rect;
+
         const char string1[] = "Starting QA test";
         bbep.getStringBox(string1, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, 400);
         bbep.print(string1);
-    }
-    break;
-    case MSG_TOO_BIG:
-    {
+}
+
+static void draw_msg_too_big_message(void)
+{
+        BB_RECT rect;
+
         const char string1[] = "The image file from this URL is too large.";
         bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
@@ -417,10 +416,12 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         bbep.getStringBox(string3.c_str(), &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.print(string3);
-    }
-    break;
-    case MSG_FORMAT_ERROR:
-    {
+}
+
+static void draw_msg_format_error_message(void)
+{
+        BB_RECT rect;
+
         const char string1[] = "The image format is incorrect";
         bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
@@ -429,19 +430,19 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - rect.h);
 #endif
         bbep.print(string1);
-    }
-    break;
-    case TEST:
-    {
+}
+
+static void draw_test_message(void)
+{
         bbep.setCursor(0, 40);
         bbep.println("ABCDEFGHIYABCDEFGHIYABCDEFGHIYABCDEFGHIYABCDEFGHIY");
         bbep.println("abcdefghiyabcdefghiyabcdefghiyabcdefghiyabcdefghiy");
         bbep.println("A B C D E F G H I Y A B C D E F G H I Y A B C D E");
         bbep.println("a b c d e f g h i y a b c d e f g h i y a b c d e");
-    }
-    break;
-    case FILL_WHITE:
-    {
+}
+
+static void draw_fill_white_message(void)
+{
         Log_info("Display set to white");
 #ifdef PARALLEL_EPD
         if (bbep.getMode() == BB_MODE_4BPP) {
@@ -452,10 +453,12 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
 #else
         bbep.fillScreen(BBEP_WHITE);
 #endif
-    }
-    break;
-    case WIFI_RETRY_LIMIT:
-    {
+}
+
+static void draw_wifi_retry_limit_message(void)
+{
+        BB_RECT rect;
+
         const char string1[] = "Maximum WiFi retries reached.";
         bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
@@ -472,10 +475,12 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         bbep.getStringBox(string3, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.print(string3);
-    }
-        break;
-    case CAPTIVE_WIFI_TIMEOUT:
-    {
+}
+
+static void draw_captive_wifi_timeout_message(void)
+{
+        BB_RECT rect;
+
         const char string1[] = "Wifi Captive Portal timed out";
         bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
@@ -492,11 +497,58 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w) / 2, -1);
         bbep.println(string2);
+}
+
+// Message screens are 1-bit
+static void begin_message_screen(void)
+{
+#ifdef BB_EPAPER
+    display_prepare_message();
+#else
+    bbep.setMode(BB_MODE_1BPP); // message screens are 1-bit
+#endif
+}
+
+// Draws the logo (Group5, or an uncompressed 1-bpp BMP) in the middle of the screen
+static void draw_centered_logo(uint8_t *image_buffer)
+{
+    auto width = display_width();
+    auto height = display_height();
+    UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
+
+    if (image_buffer && *(uint16_t *)image_buffer == BB_BITMAP_MARKER)
+    {
+        // G5 compressed image
+        BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
+        int x = (width - pBBB->width)/2;
+        int y = (height - pBBB->height)/2; // center it
+        if (x > 0 || y > 0) // only clear if the image is smaller than the display
+        {
+            bbep.fillScreen(BBEP_WHITE);
+        }
+        bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
     }
-        break;
-    default:
-        break;
+    else
+    {
+#ifdef BB_EPAPER
+        if (image_buffer) memcpy(bbep.getBuffer(), image_buffer+62, Imagesize); // uncompressed 1-bpp bitmap
+#endif
     }
+}
+
+static void use_message_font(void)
+{
+#ifdef PARALLEL_EPD
+    bbep.setFont(Inter_18);
+#else
+    bbep.setFont(nicoclean_8);
+#endif
+    bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
+}
+
+// Refreshes the panel with the finished status message
+static void present_status_message(void)
+{
 #ifdef BB_EPAPER
     if (!display_update_epaper(REFRESH_FULL, true, true, PLANE_0)) {
         Log_error("display_show_msg: e-paper update failed");
@@ -509,6 +561,108 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
     bbep.fullUpdate(CLEAR_SLOW, true);
 #endif
     Log_info("display_show_msg end");
+}
+
+/**
+ * @brief Function to show the image with message on the display
+ * @param image_buffer pointer to the uint8_t image buffer
+ * @param message_type type of message that will show on the screen
+ * @return none
+ */
+void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *message_text)
+{
+    Log_info("display_show_msg start");
+    Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
+    begin_message_screen();
+    draw_centered_logo(image_buffer);
+    use_message_font();
+    switch (message_type)
+    {
+    case OTG_TURNED_ON:
+        draw_otg_turned_on_message();
+        break;
+    case OTG_TURNED_OFF:
+        draw_otg_turned_off_message();
+        break;
+    case MODEM_FLASHING:
+        draw_modem_flashing_message();
+        break;
+    case MODEM_FLASH_FAILED:
+        draw_modem_flash_failed_message(message_text);
+        break;
+    case READY_TO_SHIP:
+        draw_ready_to_ship_message();
+        break;
+    case SHIPPING_MODE:
+        draw_shipping_mode_message();
+        break;
+    case WIFI_CONNECT:
+        draw_wifi_connect_message();
+        break;
+    case WIFI_FAILED:
+        draw_wifi_failed_message();
+        break;
+    case WIFI_INTERNAL_ERROR:
+        draw_wifi_internal_error_message();
+        break;
+    case WIFI_WEAK:
+        draw_wifi_weak_message();
+        break;
+    case IMAGE_DOWNLOAD_FAILED:
+        draw_image_download_failed_message();
+        break;
+    case API_UNABLE_TO_CONNECT:
+        draw_api_unable_to_connect_message();
+        break;
+    case API_SETUP_FAILED:
+        draw_api_setup_failed_message();
+        break;
+    case API_SIZE_ERROR:
+        draw_api_size_error_message();
+        break;
+    case API_FIRMWARE_UPDATE_ERROR:
+        draw_api_firmware_update_error_message();
+        break;
+    case WIFI_IMAGE_TIMEOUT:
+        draw_wifi_image_timeout_message();
+        break;
+    case API_IMAGE_DOWNLOAD_ERROR:
+        draw_api_image_download_error_message();
+        break;
+    case FW_UPDATE:
+        draw_fw_update_message();
+        break;
+    case FW_UPDATE_FAILED:
+        draw_fw_update_failed_message();
+        break;
+    case FW_UPDATE_SUCCESS:
+        draw_fw_update_success_message();
+        break;
+    case QA_START:
+        draw_qa_start_message();
+        break;
+    case MSG_TOO_BIG:
+        draw_msg_too_big_message();
+        break;
+    case MSG_FORMAT_ERROR:
+        draw_msg_format_error_message();
+        break;
+    case TEST:
+        draw_test_message();
+        break;
+    case FILL_WHITE:
+        draw_fill_white_message();
+        break;
+    case WIFI_RETRY_LIMIT:
+        draw_wifi_retry_limit_message();
+        break;
+    case CAPTIVE_WIFI_TIMEOUT:
+        draw_captive_wifi_timeout_message();
+        break;
+    default:
+        break;
+    }
+    present_status_message();
 }
 
 
@@ -595,80 +749,28 @@ void display_show_msg_qa(const float *voltage, const float *temperature, bool qa
     */
 }
 
-/**
- * @brief Function to show the image with message on the display
- * @param image_buffer pointer to the uint8_t image buffer
- * @param message_type type of message that will show on the screen
- * @param friendly_id device friendly ID
- * @param id shows if ID exists
- * @param fw_version version of the firmware
- * @param message additional message
- * @return none
- */
-void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_id, bool id, const char *fw_version, String message)
+// Clears the screen to white before the Wi-Fi setup screen; false when the update failed
+static bool clear_for_wifi_connect_setup(void)
 {
-    Log_info("Free heap in display_show_msg - %" PRIu32, ESP.getMaxAllocHeap());
-    Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
-#ifdef BB_EPAPER
-    display_prepare_message();
-    Log_info("Free heap after bbep.allocBuffer() - %" PRIu32, ESP.getMaxAllocHeap());
-#else
-    bbep.setMode(BB_MODE_1BPP); // message screens are 1-bit
-#endif
-
-    if (message_type == WIFI_CONNECT)
-    {
         Log_info("Display set to white");
         bbep.fillScreen(BBEP_WHITE);
 #ifdef BB_EPAPER
         if (!display_update_epaper(apiDisplayResult.response.maximum_compatibility ? REFRESH_FULL : REFRESH_FAST, true, true, PLANE_0)) {
             Log_error("display_show_msg: WiFi connect update failed");
             bbep.freeBuffer();
-            return;
+            return false;
         }
 #else
         bbep.fullUpdate();
 #endif
         display_sleep(1000);
-    }
+        return true;
+}
 
-    auto width = display_width();
-    auto height = display_height();
-    UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
-    BB_RECT rect;
+static void draw_friendly_id_setup_message(String friendly_id, bool id)
+{
+        BB_RECT rect;
 
-    Log_info("display_show_msg2 start");
-
-    // Load the image into the bb_epaper framebuffer
-    if (image_buffer && *(uint16_t *)image_buffer == BB_BITMAP_MARKER)
-    {
-        // G5 compressed image
-        BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
-        int x = (width - pBBB->width)/2;
-        int y = (height - pBBB->height)/2; // center it
-        if (x > 0 || y > 0) // only clear if the image is smaller than the display
-        {
-            bbep.fillScreen(BBEP_WHITE);
-        }
-        bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
-    }
-    else
-    {
-#ifdef BB_EPAPER
-        if (image_buffer) memcpy(bbep.getBuffer(), image_buffer+62, Imagesize); // uncompressed 1-bpp bitmap
-#endif
-    }
-
-#if defined( PARALLEL_EPD )
-    bbep.setFont(Inter_18);
-#else
-    bbep.setFont(nicoclean_8);
-#endif
-    bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
-    switch (message_type)
-    {
-    case FRIENDLY_ID:
-    {
         Log_info("friendly id case");
         const char string1[] = "Please visit trmnl.com/start";
         bbep.getStringBox(string1, &rect);
@@ -688,10 +790,12 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         bbep.getStringBox(string2, &rect);
         bbep.setCursor((bbep.width() - rect.w)/2, -1);
         bbep.print(string2);
-    }
-    break;
-    case WIFI_CONNECT:
-    {
+}
+
+static void draw_wifi_connect_setup_message(const char *fw_version, String message)
+{
+        BB_RECT rect;
+
         Log_info("wifi connect case");
 
         String string1 = "TRMNL firmware ";
@@ -717,10 +821,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 #else // bigger for X
         bbep.loadG5Image(wifi_connect_qr, bbep.width() - (66*2) - 80, 80, BBEP_WHITE, BBEP_BLACK, 2.0f);
 #endif
-    }
-    break;
-    case MAC_NOT_REGISTERED:
-    {
+}
+
+static void draw_mac_not_registered_setup_message(String message)
+{
+        auto width = display_width();
         UWORD y_start = 340;
 #ifdef PARALLEL_EPD
         const uint8_t *pFont = Inter_18;
@@ -728,12 +833,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         const uint8_t *pFont = nicoclean_8;
 #endif
         Paint_DrawMultilineText(0, y_start, message.c_str(), width, BBEP_BLACK, BBEP_WHITE, pFont);
-    }
-    break;
-    default:
-        break;
-    }
-    Log_info("Start drawing...");
+}
+
+// Refreshes the panel with the finished setup message
+static void present_setup_message(void)
+{
 #ifdef BB_EPAPER
     if (!display_update_epaper(REFRESH_FULL, true, true, PLANE_0)) {
         Log_error("display_show_msg2: e-paper update failed");
@@ -745,4 +849,49 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     bbep.fullUpdate();
 #endif
     Log_info("display_show_msg2 end");
+}
+
+/**
+ * @brief Function to show the image with message on the display
+ * @param image_buffer pointer to the uint8_t image buffer
+ * @param message_type type of message that will show on the screen
+ * @param friendly_id device friendly ID
+ * @param id shows if ID exists
+ * @param fw_version version of the firmware
+ * @param message additional message
+ * @return none
+ */
+void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_id, bool id, const char *fw_version, String message)
+{
+    Log_info("Free heap in display_show_msg - %" PRIu32, ESP.getMaxAllocHeap());
+    Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
+    begin_message_screen();
+#ifdef BB_EPAPER
+    Log_info("Free heap after bbep.allocBuffer() - %" PRIu32, ESP.getMaxAllocHeap());
+#endif
+
+    if (message_type == WIFI_CONNECT && !clear_for_wifi_connect_setup())
+    {
+        return;
+    }
+
+    Log_info("display_show_msg2 start");
+    draw_centered_logo(image_buffer);
+    use_message_font();
+    switch (message_type)
+    {
+    case FRIENDLY_ID:
+        draw_friendly_id_setup_message(friendly_id, id);
+        break;
+    case WIFI_CONNECT:
+        draw_wifi_connect_setup_message(fw_version, message);
+        break;
+    case MAC_NOT_REGISTERED:
+        draw_mac_not_registered_setup_message(message);
+        break;
+    default:
+        break;
+    }
+    Log_info("Start drawing...");
+    present_setup_message();
 }
