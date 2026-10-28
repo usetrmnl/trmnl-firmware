@@ -97,21 +97,34 @@ General.describe "Special functions" do
       run_to_image("restart_playlist", { action: "restart_playlist", refresh_rate: 300 }, "one", "1")
     end
 
-    # After showing /current.bmp, send_to_me leaves status=false/HTTPS_SUCCESS, so
-    # downloadAndShow() takes the "image already cached" path with the answer's filename. The OG
-    # doesn't cache BMP images under their filename (only PNG and JPEG), so with a BMP it is
-    # always "empty or unreadable": the device submits an error log and draws an error message
-    # over the image it just showed. Where the image is a PNG, send_to_me doesn't get that far:
-    # it looks for /current.bmp or /current.png (bl.cpp:2073), but PNGs are only saved under
-    # their filename (bl.cpp:1616-1618 writes nothing but /current.bmp), so it finds "No current
-    # image!" and shows an error instead.
+    # The server answers send_to_me with nothing but its status and action.
+    def send_to_me = { action: "send_to_me", image_url: nil, filename: nil, refresh_rate: nil, special_function: nil }
+
     it "send to me keeps the current image" do
       _, two = device_image(dev.mock, "two", device_number("2"))
       dev.boot do |s|
         assign(s, "send_to_me", image: "two")
-        run_function(s, { image: "two", action: "send_to_me", refresh_rate: 300 })
+        run_function(s, send_to_me)
         s.wait_for_deep_sleep(timeout: 90, display_idle: true)
         expect(dev.mock.count("/api/log")).to eq(0)
+        expect(s).to show_image(two, tolerance: 64, max_ratio: 0)
+      end
+    end
+
+    # Downloading an image deletes /current.bmp; showing a cached one again does not.
+    it "send to me keeps a cached image shown again after a BMP" do
+      dev.mock.set_image("one", device_number("1"))
+      _, two = device_image(dev.mock, "two", device_number("2"))
+      dev.mock.display_queue << { image: "two", refresh_rate: 300 } << { image: "one", refresh_rate: 300 }
+      dev.mock.display = { image: "two", refresh_rate: 300, special_function: "send_to_me" }
+      dev.boot do |s|
+        2.times do
+          s.wait_for_deep_sleep(timeout: 120, display_idle: true)
+          dev.mock.next_request("/api/display", timeout: 90) { s.wake }
+        end
+        s.wait_for_deep_sleep(timeout: 120, display_idle: true)
+        run_function(s, send_to_me)
+        s.wait_for_deep_sleep(timeout: 90, display_idle: true)
         expect(s).to show_image(two, tolerance: 64, max_ratio: 0)
       end
     end
