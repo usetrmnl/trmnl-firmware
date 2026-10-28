@@ -104,82 +104,7 @@ graph TB
 
 ## **Web Server Endpoints**
 
-following Wifi connection via the captive portal, device swaps its Mac Address for an API Key and Friendly ID from the server (which get saved on device).
-
-```curl
-GET /api/setup
-
-headers = {
-  'ID' => 'XX:XX:XX:XX:XX' # mac address
-}
-
-response example (success):
-{ "status": 200, "api_key": "2r--SahjsAKCFksVcped2Q", "friendly_id": "917F0B", "image_url": "https://trmnl.com/images/setup/setup-logo.bmp", "filename": "empty_state" }
-
-response example (fail, device with this Mac Address not found)
-{ "status" => 404, "api_key" => nil, "friendly_id" => nil, "image_url" => nil, "filename" => nil }
-```
-
-assuming the Setup endpoint responded successfully, future requests are made solely for image / display content:
-
-```curl
-GET /api/display
-
-headers = {
-  'ID' => 'XX:XX:XX:XX',
-  'Access-Token' => '2r--SahjsAKCFksVcped2Q',
-  'Refresh-Rate' => '1800',
-  'Battery-Voltage' => '4.1',
-  'FW-Version' => '2.1.3',
-  'RSSI' => '-69'
-}
-
-response example (success, device found with this access token):
-{
-  "status"=>0, # will be 202 if no user_id is attached to device
-  "image_url"=>"https://trmnl.s3.us-east-2.amazonaws.com/path-to-img.bmp",
-  "filename"=>"2024-09-20T00:00:00",
-  "update_firmware"=>false,
-  "firmware_url"=>nil,
-  "refresh_rate"=>"1800",
-  "reset_firmware"=>false
-}
-
-response example (success, device found AND needs soft reset):
-{
- "status"=>0,
- "image_url"=>"https://trmnl.s3.us-east-2.amazonaws.com/path-to-img.bmp",
- "filename"=>"name-of-img.bmp",
- "update_firmware"=>false,
- "firmware_url"=>nil,
- "refresh_rate"=>"1800",
- "reset_firmware"=>true
-}
-
-response example (success, device found AND needs firmware update):
-{
- "status"=>0,
- "image_url"=>"https://trmnl.s3.us-east-2.amazonaws.com/path-to-img.bmp",
- "filename"=>"name-of-img.bmp",
- "update_firmware"=>true,
- "firmware_url"=>"https://trmnl.s3.us-east-2.amazonaws.com/path-to-firmware.bin",
- "refresh_rate"=>"1800",
- "reset_firmware"=>false
-}
-
-response example (fail, device not found for this access token):
-{"status"=>500, "error"=>"Device not found"}
-
-if 'FW-Version' header != web server `Setting.firmware_download_url`, server will include absolute URL from which to download firmware.
-```
-
-if device detects an issue with response data from the `api/display` endpoint, logs are sent to server.
-
-```curl
-POST /api/log
-
-# example request tbd
-```
+The device talks to its server through three endpoints: `GET /api/setup`, `GET /api/display` and `POST /api/log`. The [BYOS guide](https://docs.trmnl.com/go/diy/byos#api) documents the request headers, every field the firmware reads, the filename rules and the image size + format for each model.
 
 ## **Power consumption**
 
@@ -418,7 +343,8 @@ at the faulting instruction. The debug script downloads the latest trmnl-sim rel
    Stopping the debug session stops the simulator.
 
 From a terminal, `scripts/debug_sim.sh <env>` builds and runs the simulator, waiting for GDB on
-127.0.0.1:3333 (`scripts/debug_sim.sh --help`).
+127.0.0.1:3333 (`scripts/debug_sim.sh --help`). To just run a build there, without the debugger,
+use `scripts/sim.sh <env>` (`scripts/sim.sh --help`).
 
 ## Code Formatting
 

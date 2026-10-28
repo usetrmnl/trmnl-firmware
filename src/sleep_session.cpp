@@ -1,7 +1,9 @@
 #include <Arduino.h>
 #include <ArduinoLog.h>
 #include <WiFi.h>
+#include <app_logger.h>
 #include <bl.h>
+#include <board_config.h>
 #include <config.h>
 #include <display.h>
 #include <filesystem.h>
@@ -22,11 +24,6 @@
 
 #include "rtc_wake_stub_trmnl_x.h"
 #endif
-
-// --- Helpers / state still owned by bl.cpp ---
-void submitStoredLogs(void);
-extern unsigned long startup_time;
-extern TRMNL_DEVICE *pDevice;
 
 /**
  * @brief Function to sleep preparing and go to sleep

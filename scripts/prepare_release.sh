@@ -18,6 +18,9 @@ BYOD_ENVS=(
     TRMNL_X_E1003
     xteink_x3
     seeed_sticky
+    seeed_reTerminal_E1004
+    TRMNL_X_PAPERS3
+    TRMNL_X_LILYGO_T5PRO
 )
 
 CONFIG="include/config.h"
