@@ -15,10 +15,11 @@ TRMNL_DEVICE *pDevice = NULL;
 #ifdef PARALLEL_EPD
 const TRMNL_DEVICE device_list[] = 
 {
-// name           board_name            panel_type.            sda    scl    intr   batt  batt_en batt_type
-  "x",            BB_PANEL_TRMNL_X,     BB_PANEL_NONE,         0xff,  0xff,  0xff,  0xff, 0xff,   BATT_ADC,
-  "m5_papers3",   BB_PANEL_M5PAPERS3,   BB_PANEL_NONE,         0xff,  0xff,  0xff,  3,    0xff,   BATT_ADC,
-  "sensoria_c5",  BB_PANEL_SENSORIA_C5, BB_PANEL_NONE,         7,     6,     0,     0xff, 0xff,   BATT_ADC,
+// name           board_name            panel_size             sda    scl    intr   batt  batt_en batt_type
+  "x",            BB_PANEL_TRMNL_X,     -1,                    0xff,  0xff,  0xff,  0xff, 0xff,   BATT_ADC,
+  "m5_papers3",   BB_PANEL_M5PAPERS3,   -1,                    0xff,  0xff,  0xff,  3,    0xff,   BATT_ADC,
+  "sensoria_c5",  BB_PANEL_SENSORIA_C5, -1,                    7,     6,     0,     0xff, 0xff,   BATT_ADC,
+  "epdiy_kindle", BB_PANEL_V7_RAW,      BBEP_DISPLAY_EC060TC1, 0xff,  0xff,  0,     0xff, 0xff,   BATT_NONE,
   "lilygo_t5pro", BB_PANEL_EPDIY_V7,    BBEP_DISPLAY_ED047TC1, 39,    40,    0,     0xff, 0xff,   BATT_BQ27220,
   "reterminal_e1003", BB_PANEL_NONE,    BB_PANEL_NONE,         0xff,  0xff,  3,     1,    40,     BATT_ADC, // IT8951 init is in display_init()
   NULL, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -42,6 +43,7 @@ const TRMNL_DEVICE device_list[] =
   "xiao_epaper_mini", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 2,     1,    6,       0xff,   BATT_ADC,  EPD_426,
   "xiao_epaper_display", 7, 9,  44,  38,   10,  4,    0xff, 0xff, 5,     1,    6,       0xff,   BATT_ADC,  EPD_75,
   "xiao_epaper_3clr", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 5,     1,    6,       0xff,   BATT_ADC,  EPD_75_3CLR,
+  "xiao_epaper_4clr", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 5,     1,    6,       0xff,   BATT_ADC,  EPD_75_4CLR,
   "xiao_epaper_6clr", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 5,     1,    6,       0xff,   BATT_ADC,  EPD_75_6CLR,
   "reterminal_e1001", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     1,    21,      0xff,   BATT_ADC,  EPD_75,
   "reterminal_e1002", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     1,    21,      12,     BATT_ADC,  EPD_75_6CLR,

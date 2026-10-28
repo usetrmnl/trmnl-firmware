@@ -31,13 +31,19 @@ void iqs323_task_i2c_unlock(void) {}
 void wait_for_serial() {
 #ifdef WAIT_FOR_SERIAL
   int idx = 0;
-  unsigned long start = millis();
-  while (millis() - start < 2000) {
+  if (ARDUINO_USB_MODE == 0) {
+    // wait for external Serial chip to start
+    delay(1000);
+    idx = 10;
+  } else { // CDC-UART
+    unsigned long start = millis();
+    while (millis() - start < 2000) {
       if (Serial)
         break;
       delay(100);
       idx++;
     }
+  }
   Log_info("## Waited for serial.. %d ms", idx * 100);
 #endif
 }

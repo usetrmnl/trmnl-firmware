@@ -163,13 +163,16 @@ void display_init(void)
         bbep.begin(dpList[pDevice->panel_set][0].OneBit);
     }
 #else // Parallel eink devices
+    Log_info("FastEPD init");
 #if defined (BOARD_SEEED_RETERMINAL_E1003)
     bbep.initIT8951(EPD_MOSI_PIN, EPD_MISO_PIN, EPD_SCK_PIN, EPD_CS_PIN, EPD_BUSY_PIN, EPD_RST_PIN, EPD_EN_PIN, EPD_VCC_EN);
     bbep.setPanelSize(BBEP_DISPLAY_ED103TC2);
 #else // normal parallel eink devices
-    bbep.initPanel(pDevice->iBoardType);
-    if (pDevice->iPanelSize != BB_PANEL_NONE) {
-        bbep.setPanelSize(pDevice->iPanelSize);
+    int rc = bbep.initPanel(pDevice->iBoardType);
+    Log_info("initPanel() of iBoardType %d returned %d\n", pDevice->iBoardType, rc);
+    if (pDevice->iPanelSize >= 0) {
+        rc = bbep.setPanelSize(pDevice->iPanelSize);
+        Log_info("setPanelSize() returned %d\n", rc);
     }
 #endif
 #ifdef BOARD_TRMNL_X
