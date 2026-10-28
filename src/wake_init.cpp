@@ -60,11 +60,10 @@ uint32_t bootEarly(void)
   // Serial logging is on when the portal or the server turned it on (on by default in dev firmware).
   // A read-only handle, since the shared preferences open later in openPreferences().
   Preferences prefs;
-  bool verbose_logging =
 #ifdef DEV_FIRMWARE
-    true;
+  bool verbose_logging = true;
 #else
-    false;
+  bool verbose_logging = false;
 #endif
   if (prefs.begin("data", true)) {
     verbose_logging = prefs.getBool(PREFERENCES_VERBOSE_LOG_KEY, verbose_logging);
