@@ -12,14 +12,12 @@
 #include "messages.h"
 #include "config.h"
 #include "battery.h"
+#include <display_internal.h>
 #define MAX_BIT_DEPTH 8
 TRMNL_DEVICE *pDevice = NULL;
 #ifdef PARALLEL_EPD
-#include "FastEPD.h"
 FASTEPD bbep;
 #else
-#define BB_EPAPER
-#include <bb_epaper.h>
 BBEPAPER bbep;
 #ifndef DEVICE_MODEL
 #error "Must have a device model name defined in platformio.ini!"
@@ -145,7 +143,7 @@ static void display_apply_light_sleep(uint8_t enabled)
 #endif
 }
 
-static bool display_update_epaper(int refreshMode, bool wait, bool writePlane = false, uint8_t plane = PLANE_0)
+bool display_update_epaper(int refreshMode, bool wait, bool writePlane, uint8_t plane)
 {
 #if defined(BOARD_SEEED_RETERMINAL_E1002) || defined(BOARD_SEEED_RETERMINAL_E1004)
     // Light sleep with the WiFi radio running is unsupported
@@ -170,7 +168,7 @@ static bool display_update_epaper(int refreshMode, bool wait, bool writePlane = 
     return true;
 }
 
-static void display_select_one_bit_panel(bool only_if_changed = false)
+void display_select_one_bit_panel(bool only_if_changed)
 {
     bool custom_pins = pDevice->epd_mosi_pin != 0 || pDevice->epd_sck_pin != 0;
     int one_bit = dpList[pDevice->panel_set][custom_pins ? iTempProfile : 0].OneBit;
@@ -187,7 +185,7 @@ static void display_select_one_bit_panel(bool only_if_changed = false)
 }
 
 // Message screens are 1-bit
-static void display_prepare_message(void)
+void display_prepare_message(void)
 {
     display_select_one_bit_panel(true);
     bbep.setMemoryMode(BB_MODE_1BPP); // use 1-bit mode to save memory

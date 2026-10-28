@@ -11,19 +11,17 @@
 #include <bl.h>
 #include <config.h>
 #include <display.h>
+#include <display_internal.h>
 #include <globals.h>
 #include <power.h>
 #include <qa.h>
 #include <refresh_interval.h>
 #include <trmnl_log.h>
 
-#include "FastEPD.h"
 #include "cached_images.h"
 #include "fireworks.h"
 #include "fonts.h"
 #include "messages.h"
-
-extern FASTEPD bbep; // display.cpp
 
 #define MENU_TIMEOUT_MS       15000
 #define MENU_POLL_INTERVAL_MS 20

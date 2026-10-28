@@ -3,9 +3,7 @@
 #include <trmnl_log.h>
 
 #ifdef BOARD_TRMNL_X
-#include <FastEPD.h>
-
-extern FASTEPD bbep; // display.cpp
+#include <display_internal.h>
 #endif // BOARD_TRMNL_X
 
 #ifdef PARALLEL_EPD
