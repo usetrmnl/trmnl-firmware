@@ -94,7 +94,8 @@ static DeviceStatusStamp getDeviceStatusStamp() {
   parseSpecialFunctionToStr(deviceStatus.special_function, sizeof(deviceStatus.special_function), special_function);
   deviceStatus.battery_voltage = battery_voltage;
   // bl_init's reading: the SCD41's sample wait is a light sleep, which overwrites the wakeup cause
-  esp_sleep_wakeup_cause_t cause = wakeup_reason != ESP_SLEEP_WAKEUP_UNDEFINED ? wakeup_reason : esp_sleep_get_wakeup_cause();
+  esp_sleep_wakeup_cause_t cause =
+    wakeup_reason != ESP_SLEEP_WAKEUP_UNDEFINED ? wakeup_reason : esp_sleep_get_wakeup_cause();
   parseWakeupReasonToStr(deviceStatus.wakeup_reason, sizeof(deviceStatus.wakeup_reason), cause);
   deviceStatus.free_heap_size = ESP.getFreeHeap();
   deviceStatus.max_alloc_size = ESP.getMaxAllocHeap();
