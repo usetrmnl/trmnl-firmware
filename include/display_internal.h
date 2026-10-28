@@ -20,6 +20,9 @@ extern BBEPAPER bbep;
 #endif // !PARALLEL_EPD
 
 #ifdef BB_EPAPER
+// 1-bit and 2-bit panel types for each panel set (pDevice->panel_set) and temperature profile
+extern const DISPLAY_PROFILE dpList[12][3];
+
 bool display_update_epaper(int refreshMode, bool wait, bool writePlane = false, uint8_t plane = PLANE_0);
 void display_select_one_bit_panel(bool only_if_changed = false);
 void display_prepare_message(void);

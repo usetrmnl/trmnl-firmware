@@ -3,6 +3,7 @@
 #include <ESPmDNS.h>
 #include <app_logger.h>
 #include <bl.h>
+#include <board_config.h>
 #include <http_result_handling.h>
 #include <sleep_session.h>
 #include <wifi_network.h>
@@ -70,8 +71,6 @@ unsigned long startup_time = 0;
 void iqs323_task_i2c_lock(void) {}
 void iqs323_task_i2c_unlock(void) {}
 #endif // !BOARD_TRMNL_X
-void hw_config_init(void);
-extern TRMNL_DEVICE *pDevice;
 
 void wait_for_serial() {
 #ifdef WAIT_FOR_SERIAL
