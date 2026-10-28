@@ -137,7 +137,7 @@ int png_draw_6clr(PNGDRAW *pDraw)
     return 1; // continue decoding
 } /* png_draw_6clr() */
 
-#ifdef BOARD_TRMNL_4CLR
+#if defined( BOARD_TRMNL_4CLR ) || defined( BOARD_TRMNL_GEN2_4CLR )
 //
 // Draw the PNG image into the local framebuffer memory using the drawPixel() method
 // to do color translation and to properly format the memory layout
@@ -565,7 +565,7 @@ PNG *png = new PNG();
                 bbep.writePlane(); // send the pixels to the display panel
                 return REFRESH_FAST;
             }
-#ifdef BOARD_TRMNL_4CLR
+#if defined( BOARD_TRMNL_4CLR ) || defined( BOARD_TRMNL_GEN2_4CLR )
             Log_info("%s [%d]: decoding for 4-color EPD\r\n", __FILE__, __LINE__);
             png->openRAM((uint8_t *)pPNG, iDataSize, png_draw_4clr);
             bbep.startWrite(PLANE_1); // start writing image data

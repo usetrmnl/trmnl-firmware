@@ -209,7 +209,7 @@ void display_wipe(void)
 {
 #ifdef BB_EPAPER
 
-#ifdef BOARD_TRMNL_4CLR
+#if defined( BOARD_TRMNL_4CLR ) || defined( BOARD_TRMNL_GEN2_4CLR )
     int refreshCount = 2;
 #else
     int refreshCount = 60;
