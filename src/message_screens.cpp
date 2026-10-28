@@ -13,100 +13,71 @@
 // The message bodies below keep the indentation they had as cases of the display_show_msg()
 // switches, so open changes to those lines still apply; a formatting pass can re-indent them.
 
+// Prints text centered across the screen at row y (-1 = the current row), then moves to the next row.
+// A template so it calls the same getStringBox()/println() overload the text's type always did.
+template <typename T>
+static void draw_centered_line(const T &text, int y)
+{
+    BB_RECT rect;
+    bbep.getStringBox(text, &rect);
+    bbep.setCursor((bbep.width() - rect.w) / 2, y);
+    bbep.println(text);
+}
+
 static void draw_otg_turned_on_message(void)
 {
-        BB_RECT rect;
-
         const char string1[] = "OTG turned on!";
-        bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - rect.w)/2, 430);
-        bbep.println(string1);
+        draw_centered_line(string1, 430);
 }
 
 static void draw_otg_turned_off_message(void)
 {
-        BB_RECT rect;
-
         const char string1[] = "OTG turned off!";
-        bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - rect.w)/2, 430);
-        bbep.println(string1);
+        draw_centered_line(string1, 430);
 }
 
 static void draw_modem_flashing_message(void)
 {
-        BB_RECT rect;
-
         const char string1[] = "Flashing modem firmware...";
-        bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - rect.w)/2, 430);
-        bbep.println(string1);
+        draw_centered_line(string1, 430);
 }
 
 static void draw_modem_flash_failed_message(const char *message_text)
 {
-        BB_RECT rect;
-
         const char string1[] = "Failed to flash modem firmware,";
-        bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - rect.w)/2, 430);
-        bbep.println(string1);
+        draw_centered_line(string1, 430);
 
         const char string2[] = "device would only operate with 2.4Ghz WiFi.";
-        bbep.getStringBox(string2, &rect);
-        bbep.setCursor((bbep.width() - rect.w)/2, 500);
+        draw_centered_line(string2, 500);
         if (message_text) {
-            bbep.println(string2);
-            bbep.getStringBox(message_text, &rect);
-            bbep.setCursor((bbep.width() - rect.w)/2, 570);
-            bbep.print(message_text);
-        } else {
-            bbep.print(string2);
+            draw_centered_line(message_text, 570);
         }
 }
 
 static void draw_ready_to_ship_message(void)
 {
-        BB_RECT rect;
-
         const char string1[] = "Device is ready to ship!";
-        bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - rect.w)/2, 430);
-        bbep.println(string1);
+        draw_centered_line(string1, 430);
 
         const char string2[] = "Unplug the USB-C to complete shutdown.";
-        bbep.getStringBox(string2, &rect);
-        bbep.setCursor((bbep.width() - rect.w)/2, 500);
-        bbep.print(string2);
+        draw_centered_line(string2, 500);
 }
 
 static void draw_shipping_mode_message(void)
 {
-        BB_RECT rect;
-
         const char string1[] = "Welcome to TRMNL.";
-        bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - rect.w)/2, 430);
-        bbep.println(string1);
+        draw_centered_line(string1, 430);
 
         const char string2[] = "Attach the dock and a USB-C to get started.";
-        bbep.getStringBox(string2, &rect);
-        bbep.setCursor((bbep.width() - rect.w)/2, 500);
-        bbep.print(string2);
+        draw_centered_line(string2, 500);
 }
 
 static void draw_wifi_connect_message(void)
 {
-        BB_RECT rect;
-
         const char string1[] = "Connect to TRMNL WiFi";
-        bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - rect.w)/2, 430);
-        bbep.println(string1);
+        draw_centered_line(string1, 430);
         const char string2[] = "on your phone or computer";
-        bbep.getStringBox(string2, &rect);
-        bbep.setCursor((bbep.width() - rect.w)/2, -1);
-        bbep.print(string2);
+        draw_centered_line(string2, -1);
 }
 
 static void draw_wifi_failed_message(void)
@@ -130,9 +101,7 @@ static void draw_wifi_failed_message(void)
 #else
         const char string2[] = "Hold left and right corner of touch bar to reset WiFi, or scan QR Code for help.";
 #endif
-        bbep.getStringBox(string2, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
-        bbep.println(string2);
+        draw_centered_line(string2, -1);
 #ifdef __BB_EPAPER__
         bbep.loadG5Image(wifi_failed_qr, bbep.width() - 66 - 40, 40, BBEP_WHITE, BBEP_BLACK);
 #else // bigger for X
@@ -192,46 +161,30 @@ static void draw_wifi_weak_message(void)
 
 static void draw_image_download_failed_message(void)
 {
-        BB_RECT rect;
-
         const char string1[] = "API responded, but image download failed.";
-        bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, 340);
-        bbep.println(string1);
+        draw_centered_line(string1, 340);
 #ifndef BOARD_TRMNL_X
         const char string2[] = "Short click the button on back";
 #else
         const char string2[] = "Tap the middle of touch bar";
 #endif
-        bbep.getStringBox(string2, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
-        bbep.println(string2);
+        draw_centered_line(string2, -1);
         const char string3[] = "to advance to the next screen.";
-        bbep.getStringBox(string3, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
-        bbep.print(string3);
+        draw_centered_line(string3, -1);
 }
 
 static void draw_api_unable_to_connect_message(void)
 {
-        BB_RECT rect;
-
         const char string1[] = "WiFi connected, unable connect to API.";
-        bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, 340);
-        bbep.println(string1);
+        draw_centered_line(string1, 340);
 #ifndef BOARD_TRMNL_X
         const char string2[] = "Short click the button on back,";
 #else
         const char string2[] = "Tap the middle of touch bar,";
 #endif
-        bbep.getStringBox(string2, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
-        bbep.println(string2);
+        draw_centered_line(string2, -1);
         const char string3[] = "otherwise check your internet.";
-        bbep.getStringBox(string3, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
-        bbep.print(string3);
+        draw_centered_line(string3, -1);
 }
 
 static void draw_api_setup_failed_message(void)
@@ -251,13 +204,9 @@ static void draw_api_setup_failed_message(void)
 #else
         const char string2[] = "Tap the middle of touch bar,";
 #endif
-        bbep.getStringBox(string2, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
-        bbep.println(string2);
+        draw_centered_line(string2, -1);
         const char string3[] = "otherwise check your internet.";
-        bbep.getStringBox(string3, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
-        bbep.print(string3);
+        draw_centered_line(string3, -1);
 }
 
 static void draw_api_size_error_message(void)
@@ -277,27 +226,19 @@ static void draw_api_size_error_message(void)
 #else
         const char string2[] = "Wait or reset by holding left and right corner of touch bar.";
 #endif
-        bbep.getStringBox(string2, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
-        bbep.print(string2);
+        draw_centered_line(string2, -1);
 }
 
 static void draw_api_firmware_update_error_message(void)
 {
-        BB_RECT rect;
-
         const char string1[] = "WiFi connected, could not get firmware update from api.";
-        bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, 400);
-        bbep.println(string1);
+        draw_centered_line(string1, 400);
 #ifndef BOARD_TRMNL_X
         const char string2[] = "Wait or reset by holding button on back.";
 #else
         const char string2[] = "Wait or reset by holding left and right corner of touch bar.";
 #endif
-        bbep.getStringBox(string2, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
-        bbep.print(string2);
+        draw_centered_line(string2, -1);
 }
 
 static void draw_wifi_image_timeout_message(void)
@@ -316,20 +257,14 @@ static void draw_wifi_image_timeout_message(void)
 
 static void draw_api_image_download_error_message(void)
 {
-        BB_RECT rect;
-
         const char string1[] = "WiFi connected, API could not deliver image to device.";
-        bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, 400);
-        bbep.println(string1);
+        draw_centered_line(string1, 400);
 #ifndef BOARD_TRMNL_X
         const char string2[] = "Wait or reset by holding button on back.";
 #else
         const char string2[] = "Wait or reset by holding left and right corner of touch bar.";
 #endif
-        bbep.getStringBox(string2, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
-        bbep.print(string2);
+        draw_centered_line(string2, -1);
 }
 
 static void draw_fw_update_message(void)
@@ -376,12 +311,8 @@ static void draw_fw_update_success_message(void)
 
 static void draw_qa_start_message(void)
 {
-        BB_RECT rect;
-
         const char string1[] = "Starting QA test";
-        bbep.getStringBox(string1, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, 400);
-        bbep.print(string1);
+        draw_centered_line(string1, 400);
 }
 
 static void draw_msg_too_big_message(void)
@@ -400,22 +331,16 @@ static void draw_msg_too_big_message(void)
             filename[40] = 0; // truncate and add elipses
             strcat(filename, "...");
         }
-        bbep.getStringBox(filename, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
-        bbep.println(filename);
+        draw_centered_line(filename, -1);
 
         const char string2[] = "PNG images can be a maximum of";
-        bbep.getStringBox(string2, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
-        bbep.println(string2);
+        draw_centered_line(string2, -1);
 #ifdef __BB_EPAPER__
         String string3 = String(MAX_IMAGE_SIZE) + String(" bytes each and 1 or 2-bpp");
 #else
         String string3 = String(MAX_IMAGE_SIZE) + String(" bytes each");
 #endif
-        bbep.getStringBox(string3.c_str(), &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
-        bbep.print(string3);
+        draw_centered_line(string3.c_str(), -1);
 }
 
 static void draw_msg_format_error_message(void)
@@ -468,13 +393,9 @@ static void draw_wifi_retry_limit_message(void)
 #endif
         bbep.println(string1);
         const char string2[] = "Press button to manually refresh.";
-        bbep.getStringBox(string2, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
-        bbep.println(string2);
+        draw_centered_line(string2, -1);
         const char string3[] = "Hold button to reset WiFi and try another network.";
-        bbep.getStringBox(string3, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
-        bbep.print(string3);
+        draw_centered_line(string3, -1);
 }
 
 static void draw_captive_wifi_timeout_message(void)
@@ -494,9 +415,7 @@ static void draw_captive_wifi_timeout_message(void)
 #else
         const char string2[] = "Press button to try again";
 #endif
-        bbep.getStringBox(string2, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
-        bbep.println(string2);
+        draw_centered_line(string2, -1);
 }
 
 // Message screens are 1-bit
@@ -668,8 +587,6 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
 
 void display_show_msg_qa(const float *voltage, const float *temperature, bool qa_result)
 {
-    BB_RECT rect;
-
     Log_info("display_show_msg start");
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
 #ifdef BB_EPAPER
@@ -704,27 +621,19 @@ void display_show_msg_qa(const float *voltage, const float *temperature, bool qa
     + String(" C");
 
 
-    bbep.getStringBox(voltageString.c_str(), &rect);
-    bbep.setCursor((bbep.width() - rect.w) / 2, 340);
-    bbep.print(voltageString);
+    draw_centered_line(voltageString.c_str(), 340);
 
-    bbep.getStringBox(temperatureString.c_str(), &rect);
-    bbep.setCursor((bbep.width() - rect.w) / 2, 370);
-    bbep.print(temperatureString);
+    draw_centered_line(temperatureString.c_str(), 370);
 
     String qaResultInstruction = (qa_result)
     ? "QA passed, press button to clear screen"
     : "QA failed, please use another board and put in failure pile for investigation";
 
-    bbep.getStringBox(qaResultInstruction.c_str(), &rect);
-    bbep.setCursor((bbep.width() - rect.w) / 2, 400);
-    bbep.println(qaResultInstruction);
+    draw_centered_line(qaResultInstruction.c_str(), 400);
 
     String qaResultString = (qa_result) ? "PASS" : "FAIL";
     bbep.setFont(Roboto_Black_24);
-    bbep.getStringBox(qaResultString.c_str(), &rect);
-    bbep.setCursor((bbep.width() - rect.w) / 2, 250);
-    bbep.print(qaResultString);
+    draw_centered_line(qaResultString.c_str(), 250);
 
     #ifdef BB_EPAPER
         if (!display_update_epaper(REFRESH_FULL, true, true, PLANE_0)) {
@@ -739,13 +648,9 @@ void display_show_msg_qa(const float *voltage, const float *temperature, bool qa
         Log_info("display_show_msg end");
     /*
      const char string2[] = "PNG images can be a maximum of";
-        bbep.getStringBox(string2, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
-        bbep.println(string2);
+        draw_centered_line(string2, -1);
         String string3 = String(MAX_IMAGE_SIZE) + String(" bytes each and 1 or 2-bpp");
-        bbep.getStringBox(string3.c_str(), &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
-        bbep.print(string3);
+        draw_centered_line(string3.c_str(), -1);
     */
 }
 
@@ -787,9 +692,7 @@ static void draw_friendly_id_setup_message(String friendly_id, bool id)
             string2 += friendly_id;
         }
         string2 += " to finish setup";
-        bbep.getStringBox(string2, &rect);
-        bbep.setCursor((bbep.width() - rect.w)/2, -1);
-        bbep.print(string2);
+        draw_centered_line(string2, -1);
 }
 
 static void draw_wifi_connect_setup_message(const char *fw_version, String message)
@@ -813,9 +716,7 @@ static void draw_wifi_connect_setup_message(const char *fw_version, String messa
 #endif
         bbep.println(string2);
         const char string3[] = "or scan the QR code for help";
-        bbep.getStringBox(string3, &rect);
-        bbep.setCursor((bbep.width() - rect.w) / 2, -1);
-        bbep.print(string3);
+        draw_centered_line(string3, -1);
 #ifdef __BB_EPAPER__
         bbep.loadG5Image(wifi_connect_qr, bbep.width() - 40 - 66, 40, BBEP_WHITE, BBEP_BLACK); // 66x66 QR code
 #else // bigger for X
