@@ -21,3 +21,4 @@ src/wifi_failed_qr.h
 # split out of display.cpp/bl.cpp as-is, so the moves stay reviewable with --color-moved
 src/board_config.cpp
 src/epd_panel_rev.cpp
+src/x_io_expander.cpp
