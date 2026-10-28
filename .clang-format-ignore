@@ -23,3 +23,4 @@ src/board_config.cpp
 src/epd_panel_rev.cpp
 src/x_io_expander.cpp
 src/color_reduce.cpp
+src/png_render.cpp

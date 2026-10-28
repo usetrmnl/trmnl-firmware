@@ -19,6 +19,10 @@ extern FASTEPD bbep;
 extern BBEPAPER bbep;
 #endif // !PARALLEL_EPD
 
+// Decode an image straight into the panel driver's buffer/RAM; return the refresh mode to use, or an error
+int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious);
+int jpeg_to_epd(const uint8_t *pJPEG, int iDataSize);
+
 #ifdef BB_EPAPER
 // 1-bit and 2-bit panel types for each panel set (pDevice->panel_set) and temperature profile
 extern const DISPLAY_PROFILE dpList[12][3];
