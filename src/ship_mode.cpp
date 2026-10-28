@@ -6,9 +6,11 @@
 #include <WiFi.h>
 #include <Wire.h>
 
+#include "board_config.h"
 #include "display.h"
 #include "esp_sleep.h"
 #include "logo_medium.h"
+#include "message_screens.h"
 #include "qa.h"
 #include "ship_mode.h"
 #include "trmnl_log.h"
@@ -34,7 +36,7 @@ static void charger_bus_begin() {
   if (s_charger_bus_started) {
     return;
   }
-  CHARGER_I2C_BUS.begin(CHARGER_I2C_SDA, CHARGER_I2C_SCL);
+  CHARGER_I2C_BUS.begin(pDevice->charger_sda, pDevice->charger_scl);
   CHARGER_I2C_BUS.setClock(100000);
   s_charger_bus_started = true;
 }
@@ -75,8 +77,8 @@ bool check_usb_power() {
 static void ship_mode_deep_sleep() {
     // Make sure the button is released first, otherwise the active-low ext0 wake
     // would fire immediately and look like a manual exit.
-  pinMode(PIN_INTERRUPT, INPUT);
-  while (digitalRead(PIN_INTERRUPT) == LOW) {
+  pinMode(pDevice->interrupt_pin, INPUT);
+  while (digitalRead(pDevice->interrupt_pin) == LOW) {
     delay(10);
   }
   delay(50);
@@ -86,7 +88,7 @@ static void ship_mode_deep_sleep() {
 
   esp_sleep_enable_timer_wakeup((uint64_t)SHIP_MODE_POLL_INTERVAL_S * 1000000ULL);
     // Green button (active low) as a manual wake / exit fallback.
-  esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)pDevice->interrupt_pin, 0);
 
   esp_deep_sleep_start();
 }
@@ -102,6 +104,7 @@ void ship_mode_boot_check() {
   if (shipped || !started) {
     return; // no shipment in progress — normal boot
   }
+  hw_config_init(); // runs before bl_init(); the charger, button and display pins come from pDevice
 
   esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
   bool woke_by_button = (cause == ESP_SLEEP_WAKEUP_EXT0 || cause == ESP_SLEEP_WAKEUP_GPIO);

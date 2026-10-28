@@ -7,7 +7,7 @@
 #include "wifi-types.h"
 
 WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials credentials);
-wl_status_t waitForConnectResult(uint32_t timeout);
+wl_status_t waitForConnectResult(uint32_t timeout, const WifiEventData &eventData);
 void disableWpa2Enterprise();
 
 // Registers a callback that is invoked repeatedly while waiting for a WiFi
