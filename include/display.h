@@ -122,14 +122,6 @@ void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message, 
 void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool bSkipClear = false);
 
 /**
- * @brief Function to read an image from the file system
- * @param filename
- * @param pointer to file size returned
- * @return pointer to allocated buffer
- */
-uint8_t *display_read_file(const char *filename, int *file_size);
-
-/**
  * @brief Function to show the image with message on the display
  * @param image_buffer pointer to the uint8_t image buffer
  * @param message_type type of message that will show on the screen

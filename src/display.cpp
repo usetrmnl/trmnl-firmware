@@ -18,16 +18,12 @@
 FASTEPD bbep;
 #else
 BBEPAPER bbep;
-#include <SPIFFS.h>
-#define FS SPIFFS
 #endif // !PARALLEL_EPD
 
 #ifdef PARALLEL_EPD
 #include "esp_sleep.h"
 #include "driver/gpio.h"
 #include "driver/rtc_io.h"
-#include "LittleFS.h"
-#define FS LittleFS
 
 const uint8_t u8_graytable[] = {
 /* 0 */  0, 0, 0, 0, 0, 0, 1, 1, 1, 
@@ -461,46 +457,6 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
     iUpdateCount++;
     Log_info("display_show_image end");
 }
-/**
- * @brief Function to read an image from the file system
- * @param filename
- * @param pointer to file size returned
- * @return pointer to allocated buffer
- */
-uint8_t * display_read_file(const char *filename, int *file_size)
-{
-File f = FS.open(filename, "r");
-uint8_t *buffer;
-
-  if (!f) {
-    Serial.println("Failed to open file!");
-    *file_size = 0;
-    return nullptr;
-  }
-  *file_size = f.size();
-  if (*file_size == 0) {
-    Serial.println("File is empty!");
-    f.close();
-    return nullptr;
-  }
-  Serial.printf("File size to allocate: %d bytes\n", *file_size);
-  #ifdef CONFIG_SPIRAM
-  Serial.println("Allocating file buffer in PSRAM");
-  buffer = (uint8_t *)ps_malloc(*file_size);
-  #else
-  Serial.println("Allocating file buffer in regular RAM");
-  buffer = (uint8_t *)malloc(*file_size);
-  #endif
-  if (!buffer) {
-    Serial.println("Memory allocation failed!");
-    *file_size = 0;
-    return nullptr;
-  }
-  f.read(buffer, *file_size);
-  f.close();
-  return buffer;
-} /* display_read_file() */
-
 /**
  * @brief Function to got the display to the sleep
  * @param none
