@@ -2,6 +2,7 @@
 #include <WifiCaptive.h>
 #include <config.h>
 #include <globals.h>
+#include <message_screens.h>
 #include <status_screens.h>
 #include <trmnl_log.h>
 
@@ -91,7 +92,7 @@ void showWakeLogo(void) {
 #endif // BOARD_TRMNL_X
   // Force the display to show the current playlist image after the loading screen
   // (even if it hasn't changed)
-  DisplayedImage::clear();
+  DisplayedImage::cover();
 
   need_to_refresh_display = 1;
   preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);

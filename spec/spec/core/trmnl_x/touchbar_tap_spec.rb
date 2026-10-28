@@ -42,6 +42,29 @@ RSpec.describe "TRMNL X touch bar: tap mode", env: "TRMNL_X" do
     end
   end
 
+  describe "SpecialMenu" do
+    include_context "provisioned X"
+
+    it "Send to Me redraws the image the menu covered" do
+      boot_two_images do |s, _one, two|
+        dev.mock.display = { action: "send_to_me", image_url: nil, filename: nil, refresh_rate: nil,
+                             special_function: nil }
+        c = s.status["console_total"]
+        s.touch("center", ms: 150)
+        s.wait(console: /menu_show_screen end/, since: c, timeout: 30)
+        TrmnlX.menu_tap(s, "right", /Next Screen -> Previous Screen/)
+        TrmnlX.menu_tap(s, "right", /Previous Screen -> Touchbar Tutorial/)
+        TrmnlX.menu_tap(s, "right", /Touchbar Tutorial -> Special/)
+        TrmnlX.menu_tap(s, "center", /chose Special/, screen: true)
+        TrmnlX.menu_tap(s, "right", /Identify -> Restart Playlist/)
+        TrmnlX.menu_tap(s, "right", /Restart Playlist -> Send to Me/)
+        dev.mock.next_request("/api/display", timeout: 30) { s.touch("center", ms: 150) }
+        s.wait(state: "deep_sleep", timeout: 60, settle_ms: 500)
+        expect(s).to show_image(two, tolerance: 64, max_ratio: 0)
+      end
+    end
+  end
+
   describe "WifiResetConfirmation" do
     include_context "provisioned X"
 

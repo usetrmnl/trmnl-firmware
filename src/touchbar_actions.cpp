@@ -4,6 +4,7 @@
 
 #include <config.h>
 #include <display.h>
+#include <touchbar_indicator.h>
 #include <trmnl_log.h>
 
 #include "IQS323.h"
@@ -65,7 +66,8 @@ static const menu_tutorial_t touchbar_tutorial = {
         {"Right Tap", "Next screen", "Next"},
     },
     "Try it: tap left, then center, then right.",
-    "Nailed it! Tap anywhere to finish.",
+    "Tap anywhere to continue",
+    true,
     PREFERENCES_TOUCHBAR_TUTORIAL_KEY,
 };
 
@@ -85,6 +87,7 @@ static const menu_tutorial_t touchbar_ship_check = {
     },
     "Tap left, then center, then right.",
     "Touchbar OK! Shutting down for shipment.",
+    false,
     nullptr,
 };
 
