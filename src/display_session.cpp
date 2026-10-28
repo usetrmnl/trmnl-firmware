@@ -1,7 +1,9 @@
 #include <ArduinoLog.h>
 #include <Preferences.h>
 #include <WiFi.h>
+#include <api-client/header.h>
 #include <api-client/request_headers.h>
+#include <app_logger.h>
 #include <battery.h>
 #include <bl.h>
 #include <bmp.h>
@@ -28,8 +30,30 @@
 #endif
 
 // --- Helpers / tables still owned by bl.cpp ---
-void writeSpecialFunction(SPECIAL_FUNCTION function);
 void showMessageWithLogo(MSG message_type);
+
+static void writeSpecialFunction(SPECIAL_FUNCTION function) {
+  if (preferences.isKey(PREFERENCES_SF_KEY)) {
+    Log.info("%s [%d]: SF saved. Reading...\r\n", __FILE__, __LINE__);
+    if ((SPECIAL_FUNCTION)preferences.getUInt(PREFERENCES_SF_KEY, 0) == function) {
+      Log.info("%s [%d]: No need to re-write\r\n", __FILE__, __LINE__);
+    } else {
+      Log.info("%s [%d]: Writing new special function\r\n", __FILE__, __LINE__);
+      bool res = preferences.putUInt(PREFERENCES_SF_KEY, function);
+      if (res)
+        Log.info("%s [%d]: Written new special function successfully\r\n", __FILE__, __LINE__);
+      else
+        Log.error("%s [%d]: Writing new special function failed\r\n", __FILE__, __LINE__);
+    }
+  } else {
+    Log.error("%s [%d]: SF not saved\r\n", __FILE__, __LINE__);
+    bool res = preferences.putUInt(PREFERENCES_SF_KEY, function);
+    if (res)
+      Log.info("%s [%d]: Written new special function successfully\r\n", __FILE__, __LINE__);
+    else
+      Log.error("%s [%d]: Writing new special function failed\r\n", __FILE__, __LINE__);
+  }
+}
 
 https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse) {
   https_request_err_e result = HTTPS_NO_ERR;
@@ -330,59 +354,19 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse) {
 
         if (action.equals("send_to_me")) {
           status = false;
-          result = HTTPS_SUCCESS;
+          result = HTTPS_NO_ERR; // already drawn: skips downloadAndShow()'s cached image path
           Log.info("%s [%d]: send_to_me success\r\n", __FILE__, __LINE__);
 
-          bool image_reverse = false;
-
-          if (!filesystem_file_exists("/current.bmp") && !filesystem_file_exists("/current.png")) {
-            Log.info("%s [%d]: No current image!\r\n", __FILE__, __LINE__);
-            if (buffer) {
-              free(buffer);
-              buffer = nullptr;
-            }
-            return HTTPS_WRONG_IMAGE_FORMAT;
+          // Redraw the last image, which the loading screen (and the TRMNL X's menu) covers. A PNG or
+          // JPEG is cached under its name, a BMP only as /current.bmp.
+          const char *path = filesystem_file_exists(DisplayedImage::get()) ? DisplayedImage::get() : "/current.bmp";
+          buffer = display_read_file(path, &file_size);
+          if (buffer && file_size > 0) {
+            display_show_image(buffer, file_size, true);
+            need_to_refresh_display = 1;
           }
-
-          if (filesystem_file_exists("/current.bmp")) {
-            Log.info("%s [%d]: send_to_me BMP\r\n", __FILE__, __LINE__);
-            buffer = (uint8_t *)malloc(DISPLAY_BMP_IMAGE_SIZE);
-
-            if (!filesystem_read_from_file("/current.bmp", buffer, DISPLAY_BMP_IMAGE_SIZE)) {
-              free(buffer);
-              buffer = nullptr;
-              Log_error_submit("Error reading image!");
-              return HTTPS_WRONG_IMAGE_FORMAT;
-            }
-
-            bmp_err_e bmp_parse_result = parseBMPHeader(buffer, image_reverse);
-            if (bmp_parse_result != BMP_NO_ERR) {
-              free(buffer);
-              buffer = nullptr;
-              Log_error_submit("Error parsing BMP header, code: %d", bmp_parse_result);
-              return HTTPS_WRONG_IMAGE_FORMAT;
-            }
-          } else if (filesystem_file_exists("/current.png")) {
-            Log.info("%s [%d]: send_to_me PNG\r\n", __FILE__, __LINE__);
-            image_err_e png_parse_result = PNG_NO_ERR; // DEBUG
-            buffer = display_read_file("/current.png", &file_size);
-            if (png_parse_result != PNG_NO_ERR) {
-              Log_error_submit("Error parsing PNG header, code: %d", png_parse_result);
-              if (buffer) {
-                free(buffer);
-                buffer = nullptr;
-              }
-              return HTTPS_WRONG_IMAGE_FORMAT;
-            }
-          }
-
-          Log.info("Showing image\n\r");
-          display_show_image(buffer, file_size, true);
-          need_to_refresh_display = 1;
-          if (buffer) {
-            free(buffer);
-            buffer = nullptr;
-          }
+          free(buffer);
+          buffer = nullptr;
         } else {
           Log.error("%s [%d]: send_to_me failed\r\n", __FILE__, __LINE__);
         }
@@ -465,70 +449,11 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse) {
 }
 
 static ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences, float batteryVoltage) {
-  ApiDisplayInputs inputs;
-
+  ApiDisplayInputs inputs = createApiHeaders();
   inputs.baseUrl = preferences.getString(PREFERENCES_API_URL, API_BASE_URL);
-
+  inputs.batteryVoltage = batteryVoltage; // read before the display and WiFi were turned on
+  last_wifi_rssi = inputs.rssi;
   Log.info("%s [%d]: baseUrl from preferences: %s\r\n", __FILE__, __LINE__, inputs.baseUrl.c_str());
-
-  char wakeupReasonString[32] = {0};
-  if (parseWakeupReasonToStr(wakeupReasonString, sizeof(wakeupReasonString), (esp_sleep_source_t)wakeup_reason)) {
-    inputs.updateSource = String(wakeupReasonString);
-  } else {
-    inputs.updateSource = "unknown";
-  }
-
-  if (preferences.isKey(PREFERENCES_API_KEY)) {
-    inputs.apiKey = preferences.getString(PREFERENCES_API_KEY, PREFERENCES_API_KEY_DEFAULT);
-    Log.info("%s [%d]: %s key exists. Value - %s\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY, inputs.apiKey.c_str());
-  } else {
-    Log.info("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY);
-  }
-
-  if (preferences.isKey(PREFERENCES_FRIENDLY_ID)) {
-    inputs.friendlyId = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
-    Log.info("%s [%d]: %s key exists. Value - %s\r\n", __FILE__, __LINE__, PREFERENCES_FRIENDLY_ID, inputs.friendlyId);
-  } else {
-    Log.info("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_FRIENDLY_ID);
-  }
-
-  inputs.refreshRate = refreshInterval.seconds();
-  Log.info("%s [%d]: refresh rate: %d\r\n", __FILE__, __LINE__, inputs.refreshRate);
-
-  inputs.macAddress = device_mac_address();
-  WiFiStatus wifi = getWiFiStatus();
-  inputs.rssi = wifi.rssi;
-  last_wifi_rssi = wifi.rssi;
-  inputs.wifiBand = wifi.band;
-  inputs.batteryVoltage = batteryVoltage;
-  inputs.firmwareVersion = String(FW_VERSION_STRING);
-  inputs.firmwareCommit = String(FW_COMMIT);
-  inputs.displayWidth = display_width();
-  inputs.displayHeight = display_height();
-  inputs.model = DEVICE_MODEL;
-  inputs.panelId = display_panel_rev_string();
-  inputs.specialFunction = special_function;
-  inputs.specialFunctionChosen = special_function_chosen;
-  inputs.imageCached = bUsedCachedImage;
-  inputs.prevWakeTime = iPrevWakeTime;
-  inputs.usbStatus = power().usbStatus();
-  inputs.chargingStatus = power().chargingStatus();
-
-#ifdef BOARD_TRMNL_X
-  // These getters already return -1 if the last gaugeInit() didn't produce a valid reading.
-  inputs.batteryCount = battery_count;
-  inputs.stateOfCharge = battery().readSoc();
-  inputs.stateOfHealth = battery().readHealth();
-  inputs.batteryCurrent = battery().readCurrent();
-  inputs.batteryTemperature = battery().readTemperature();
-  inputs.currentBatteryCapacity = battery().readCapacityRemain();
-  inputs.maxBatteryCapacity = battery().readCapacityFull();
-  inputs.gaugeSoc = battery().readGaugeSoc();
-  inputs.gaugeHealth = battery().readGaugeHealth();
-  inputs.gaugeCapacityRemain = battery().readGaugeCapacityRemain();
-  inputs.gaugeCapacityFull = battery().readGaugeCapacityFull();
-#endif // BOARD_TRMNL_X
-
   return inputs;
 }
 

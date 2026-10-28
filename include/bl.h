@@ -28,14 +28,4 @@ void goToSleep(void);
  */
 void resetDeviceCredentials(void);
 
-enum LogAction { LOG_ACTION_STORE, LOG_ACTION_SUBMIT, LOG_ACTION_SUBMIT_OR_STORE };
-
-void logWithAction(LogAction action, LogLevel level, const char *message, time_t time, int line, const char *file);
-
-// Uploads the logs stored in NVS to /api/log.
-void submitStoredLogs(void);
-
-bool submitLogString(const char *log_buffer);
-bool storeLogString(const char *log_buffer);
-
 #endif
