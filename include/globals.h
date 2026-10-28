@@ -13,7 +13,6 @@
 #include <stored_logs.h>
 
 #ifdef BOARD_TRMNL_X
-#include "IQS323.h"
 class Modem;
 #endif
 
@@ -40,17 +39,17 @@ extern bool reset_firmware;      // need to reset credentials
 extern bool log_retry;           // need to log connection retry
 
 // --- Wake / sleep state ---
+extern unsigned long startup_time; // millis() at boot, for the wake time statistics
 extern uint32_t time_since_sleep;
+extern float battery_voltage; // read at wake, before the display and WiFi draw current
 extern esp_sleep_wakeup_cause_t wakeup_reason;
 extern SPECIAL_FUNCTION special_function;
+extern bool special_function_chosen; // picked on the device (TRMNL X touch menu), not the saved one
+extern int last_wifi_rssi;              // RTC: signal strength (dBm) at the last connection, 0 if unknown
 extern int iPrevWakeTime;               // RTC: total wake time of the last cycle (for statistics collection)
 extern bool bUsedCachedImage;           // RTC: last image displayed was read from cache (for statistics collection)
 extern uint8_t need_to_refresh_display; // RTC
 extern bool otg_state;                  // RTC: OTG state across deep sleep
-
-// --- UI / input ---
-extern bool touchbar_tap_mode; // false = "slide", true = "tap" (default)
-extern bool otg_message;
 
 // --- Display refresh bookkeeping ---
 extern int iUpdateCount;   // RTC: partial updates since the last full refresh
@@ -63,7 +62,4 @@ extern uint32_t panel_rev; // EPD revision read by get_panel_rev(); 0 = unknown/
 extern Modem *g_modem;
 extern battery_count_t battery_count;
 extern bool battery_charging;
-extern IQS323 iqs323;
-extern uint16_t slider_position;
-extern iqs323_gesture_events slider_event;
 #endif // BOARD_TRMNL_X

@@ -34,9 +34,10 @@ General.describe "Coverage" do
         first_line = bl.functions["bl_init()"][0]
         expect(bl.lines[first_line]).to be > 0
         # Only reached when joining WiFi fails.
-        expect(bl.functions["wifiErrorDeepSleep()"][1]).to eq(0)
-        line = bl.functions["wifiErrorDeepSleep()"][0]
-        expect(bl.lines[line]).to eq(0)
+        sleep = cov["src/sleep_session.cpp"]
+        expect(sleep.functions["wifiErrorDeepSleep()"][1]).to eq(0)
+        line = sleep.functions["wifiErrorDeepSleep()"][0]
+        expect(sleep.lines[line]).to eq(0)
 
         # reset: start over; the portal loop keeps running, the boot code doesn't.
         s.write_coverage(File.join(@dir, "before-reset.info"), reset: true)

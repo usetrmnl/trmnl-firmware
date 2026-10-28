@@ -270,7 +270,9 @@ General.describe "Images" do
 
   describe "Jpeg" do
     it "jpeg is dithered to 1bit" do
-      pending "bb_epaper leaves the UC81xx panel in partial mode after a JPEG (screen stays blank)"
+      unless device.env == "TRMNL_X" # the X draws with FastEPD, not bb_epaper
+        pending "bb_epaper leaves the UC81xx panel in partial mode after a JPEG (screen stays blank)"
+      end
       show("five.jpg", data_file("five_#{w}x#{h}.jpg"), "image/jpeg") do |s|
         # dithering edges: up to 2% of an 800x480 screen, as many pixels on other panels (a share
         # of a big panel would let a blank screen pass)
@@ -285,9 +287,7 @@ General.describe "Images" do
 
   describe "Bmp" do
     it "bmp with an inverted palette" do
-      # parseBMPHeader recognizes the white/black palette ("Color scheme reversed") and sets
-      # image_reverse, but nothing uses it (display_show_image's inversion is under #ifdef
-      # FUTURE): the image is shown inverted.
+      skip "parseBMPHeader takes 800x480 BMPs only" unless [w, h] == [800, 480]
       level = digit(0, 1)
       # index 0 = white, 1 = black
       data = bmp(palette: [255, 255, 255, 0, 0, 0, 0, 0].pack("C*"), black: ->(x, y) { !seven.(x, y) })

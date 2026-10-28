@@ -10,28 +10,29 @@ on:
 jobs:
   # The firmware itself is built by the integration jobs, one env each, before they test it.
   build-test:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
 
     timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/cache@v6
+      - uses: actions/cache/restore@v6
+        id: packages-cache
         with:
           path: |
             ~/.cache/pip
             ~/.platformio
-            ~/.buildcache
           key: ${{ runner.os }}-pio-${{ hashFiles('platformio.ini') }}
           restore-keys: |
             ${{ runner.os }}-pio-
 
-      - name: Setup ccache
-        uses: hendrikmuhs/ccache-action@v1
+      - uses: actions/cache/restore@v6
         with:
-          key: ${{ runner.os }}-ccache-${{ hashFiles('platformio.ini') }}
-          job-summary: "" # disabled
+          path: ~/.buildcache
+          key: ${{ runner.os }}-pio-build-cache-native-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-pio-build-cache-native-
 
       - uses: actions/setup-python@v7
         with:
@@ -40,7 +41,7 @@ jobs:
       - name: Install PlatformIO Core
         run: pip install --upgrade platformio==6.1.19
 
-      - name: Configure ccache for PlatformIO
+      - name: Configure the PlatformIO build cache
         run: |
           echo "PLATFORMIO_BUILD_CACHE_DIR=$HOME/.buildcache" >> $GITHUB_ENV
 
@@ -53,11 +54,34 @@ jobs:
       - name: test
         run: pio test -e native -v
 
+      # Saved on main only, as in integration.yml.
+      - uses: actions/cache/save@v6
+        if: github.ref == 'refs/heads/main' && steps.packages-cache.outputs.cache-hit != 'true'
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio
+          key: ${{ runner.os }}-pio-${{ hashFiles('platformio.ini') }}
+
+      - uses: actions/cache/save@v6
+        if: github.ref == 'refs/heads/main'
+        with:
+          path: ~/.buildcache
+          key: ${{ runner.os }}-pio-build-cache-native-${{ github.sha }}
+
       - name: static analysis
         run: pio check --skip-packages --fail-on-defect high
 
   integration:
     uses: ./.github/workflows/integration.yml
+
+  # The simulator sends display transfers natively; on main, also run IDF's display driver
+  # (its interrupt and callback context), without slowing pull requests.
+  integration-idf-lcd-driver:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    uses: ./.github/workflows/integration.yml
+    with:
+      sim_extra_args: --no-hle-lcd
 
   publish-engineering-build:
     needs: [build-test, integration]

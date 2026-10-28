@@ -45,5 +45,8 @@ def post_build(source, target, env):
     print(f"Merged firmware: {output}")
 
 
-env.AddPostAction("$BUILD_DIR/${PROGNAME}.bin", post_build)
+# On "buildprog", which always runs: a firmware.bin taken from the build cache skips its own post actions
+env.AddPostAction("buildprog", post_build)
 env.AddPostAction("buildprog", lambda source, target, env: copy_versioned(env))
+# "upload" builds only firmware.bin, so it would flash without refreshing the merged image
+env.Depends("upload", "buildprog")
