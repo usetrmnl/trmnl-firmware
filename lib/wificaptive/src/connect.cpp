@@ -99,6 +99,10 @@ static bool configureStaticIP(const WifiCredentials &credentials) {
 }
 
 void disableWpa2Enterprise() {
+  wifi_mode_t mode;
+  // The EAP API lock crashes before esp_wifi_init(), for example on the X 5 GHz modem path.
+  if (esp_wifi_get_mode(&mode) == ESP_ERR_WIFI_NOT_INIT) return;
+
   Log_info("WiFi: Disabling WPA2 Enterprise");
   esp_wifi_sta_wpa2_ent_disable();
 
