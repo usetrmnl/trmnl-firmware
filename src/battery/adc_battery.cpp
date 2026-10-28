@@ -3,6 +3,9 @@
 #include <Wire.h>
 #include <battery.h>
 #include <config.h>
+#if ESP_ARDUINO_VERSION_MAJOR < 3 // IDF 4.4; IDF 5's new ADC driver must not be mixed with the legacy one
+#include <driver/adc.h>
+#endif
 
 static uint16_t readReg16(uint8_t u8Addr, uint8_t u8Reg) {
   uint16_t u16;
@@ -35,9 +38,21 @@ float ADCBattery::readVoltage(TRMNL_DEVICE *pDevice) {
     int32_t adc = 0;
     analogRead(
       pDevice->batt_pin); // This is needed to properly initialize the ADC BEFORE calling analogReadMilliVolts()
+
+#if ESP_ARDUINO_VERSION_MAJOR < 3
+    // Instead of powering up the SAR ADC for each read, acquire the ADC power once and let it settle
+    adc_power_acquire();
+    delay(1);
+#endif
+
     for (uint8_t i = 0; i < 8; i++) {
       adc += analogReadMilliVolts(pDevice->batt_pin);
     }
+
+#if ESP_ARDUINO_VERSION_MAJOR < 3
+    adc_power_release();
+#endif
+
     if (pDevice->batt_en_pin != 0xff) {
       digitalWrite(pDevice->batt_en_pin, LOW);
     }

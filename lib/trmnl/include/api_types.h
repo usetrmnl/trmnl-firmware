@@ -18,13 +18,6 @@ struct ApiSetupResponse {
   String message;
 };
 
-struct ApiSetupInputs {
-  String baseUrl;
-  String macAddress;
-  String firmwareVersion;
-  String model;
-};
-
 enum class ApiDisplayOutcome {
   Ok,
   DeserializationError,
@@ -50,7 +43,6 @@ struct ApiDisplayResponse {
   bool reset_firmware;
   SPECIAL_FUNCTION special_function;
   String action;
-  String touchbar_mode;
   // protocol v1 (defaults keep stock servers working: full via image_url/filename)
   V1Action v1_action;
   String frame_id;
@@ -88,16 +80,20 @@ struct ApiDisplayInputs {
   String firmwareVersion;
   String firmwareCommit;
   String model;
+  String panelId; // EPD revision as hex; empty = unknown (header omitted)
   int rssi;
   String wifiBand;
   int displayWidth;
   int displayHeight;
   SPECIAL_FUNCTION specialFunction;
+  bool specialFunctionChosen; // picked on the device: the header names it instead of saying "true"
   UsbStatus usbStatus;
   bool imageCached;
   int prevWakeTime;
   String frameId;  // protocol v1: frame currently on the panel (empty = unknown)
 };
+
+using ApiSetupInputs = ApiDisplayInputs;
 
 struct ApiLogInputs {
   String macAddress;

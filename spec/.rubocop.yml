@@ -1,0 +1,65 @@
+plugins:
+  - rubocop-rspec
+
+AllCops:
+  TargetRubyVersion: 3.2
+  NewCops: enable
+  SuggestExtensions: false
+  Include:
+    - "**/*.rb"
+    - Rakefile
+
+Layout/LineLength:
+  Max: 120
+
+# Integration examples drive a simulated device through a scenario: long, and checking several
+# things along the way, each against the simulator's state at that moment.
+RSpec/ExampleLength:
+  Enabled: false
+RSpec/MultipleExpectations:
+  Enabled: false
+Metrics:
+  Enabled: false
+# The specs describe devices and behaviour, not classes.
+RSpec/DescribeClass:
+  Enabled: false
+RSpec/SpecFilePathFormat:
+  Enabled: false
+# Groups are named after the scenarios (the old test classes), not "when ..." contexts.
+RSpec/ContextWording:
+  Enabled: false
+RSpec/NestedGroups:
+  Max: 4
+# Helpers in example groups (refresh, serve_test_image...) share state through fixtures.
+RSpec/InstanceVariable:
+  Enabled: false
+Style/Documentation:
+  Enabled: false
+
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+# Pictures are lambdas of (x, y): `pixel.(x, y)`.
+Style/LambdaCall:
+  EnforcedStyle: braces
+Naming/MethodParameterName:
+  AllowedNames: [s, x, y, w, h, r, g, b, a, c, n, io, ms, id, ok, to, kw, "on", op, mv]
+# Many examples assert by waiting: Simulator#wait and MockTrmnl#wait_for_request raise when the
+# device doesn't get there.
+RSpec/NoExpectationExample:
+  Enabled: false
+# Shared examples that use the including group's fixtures and helpers are included in place.
+RSpec/IncludeExamples:
+  Enabled: false
+# Groups share expensive simulated devices (see spec/support/fixtures.rb).
+RSpec/BeforeAfterAll:
+  Enabled: false
+RSpec:
+  Language:
+    Includes:
+      Examples: [byod_board]
+# The simulator client mirrors the control API's verbs (POST /wifi: set_wifi(available), POST
+# /dock: dock(true)).
+Naming/AccessorMethodName:
+  Exclude: [lib/trmnl_sim/simulator.rb]
+Style/OptionalBooleanParameter:
+  Exclude: [lib/trmnl_sim/simulator.rb]
