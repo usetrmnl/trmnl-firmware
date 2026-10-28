@@ -1,7 +1,7 @@
 #include <Arduino.h>
+#include <board_config.h>
 #include <config.h>
 #ifndef BOARD_TRMNL_X
-extern TRMNL_DEVICE *pDevice;
 #endif
 
 void pins_init(void) {
