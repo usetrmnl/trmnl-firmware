@@ -13,7 +13,6 @@
 #include <board_config.h>
 #include <color_reduce.h>
 #include <display_internal.h>
-#define MAX_BIT_DEPTH 8
 #ifdef PARALLEL_EPD
 FASTEPD bbep;
 #else
@@ -43,8 +42,6 @@ const uint8_t u8_graytable[] = {
 /* 14 */  0, 1, 1, 1, 2, 2, 2, 2, 2, 
 /* 15 */  0, 0, 0, 0, 0, 0, 0, 0, 2
 };
-#include "BQ27427.h"
-extern BQ27427 lipo; // Use lipo.[] to interact with the library in an Arduino 
 #endif
 
 #include "Group5.h"
@@ -302,7 +299,6 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
     bool isPNG = data_size >= 4 && MOTOLONG(image_buffer) == (int32_t)0x89504e47;
     auto width = display_width();
     auto height = display_height();
-//    uint32_t *d32;
     bool bAlloc = false;
     static int i426Workaround = 0;
 #ifdef BB_EPAPER
@@ -314,22 +310,6 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
    // Log_info("Paint_NewImage %d", reverse);
     Log_info("display_show_image start");
     Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
-#ifdef FUTURE
-    if (reverse)
-    {
-        d32 = (uint32_t *)image_buffer; // get framebuffer as a 32-bit pointer
-        d32 = (uint32_t *)image_buffer; // get framebuffer as a 32-bit pointer
-        Log_info("inverse the image");
-        for (size_t i = 0; i < buf_size; i+=sizeof(uint32_t))
-        for (size_t i = 0; i < buf_size; i+=sizeof(uint32_t))
-        {
-            d32[0] = ~d32[0];
-            d32++;
-            d32[0] = ~d32[0];
-            d32++;
-        }
-    }
-#endif
 #ifdef BB_EPAPER
     display_select_one_bit_panel();
 #endif // BB_EPAPER
