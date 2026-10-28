@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <display.h>
 #include <power.h>
+#include <Wire.h>
 #include <PNGdec.h>
 #include <JPEGDEC.h>
 #include <Preferences.h>
@@ -89,6 +90,11 @@ bool display_update_epaper(int refreshMode, bool wait, bool writePlane, uint8_t 
     } else {
         Log_info("Have valid previous image in EPD memory, doing partial refresh");
     }
+    if (bbep.capabilities() & BBEP_7COLOR) {
+        refreshMode = REFRESH_FULL;
+        wait = true;
+        Log_info("Switching to full refresh for 6-color panel");
+    }
     bbep.refresh(refreshMode, wait);
     // The next update can be a partial update because the current is 1-bpp and stays in the EPD RAM
     bCanDoPartial = (bbep.getPanelType() == dpList[pDevice->panel_set][iTempProfile].OneBit);
@@ -136,6 +142,18 @@ void display_init(void)
     Log_info("Saved temperature profile: %" PRIu32, iTempProfile);
 #ifdef BB_EPAPER
     Log_info("BB e-Paper init");
+#ifdef WAVESHARE_PHOTOPAINTER
+    Wire.begin(47, 48);
+    Wire.beginTransmission(0x34); // AXP2101
+    Wire.write(0x90); // LDOS ON/OFF control
+    Wire.write(0x8); // turn on ALDO4
+    Wire.endTransmission();
+    Wire.beginTransmission(0x34);
+    // set ALDO4 to 3.3V
+    Wire.write(0x95);
+    Wire.write(0x1c); // 3.3v
+    Wire.endTransmission();
+#endif // WAVESHARE_PHOTOPAINTER
 #ifdef BOARD_SEEED_STICKY
 // Special case for the Sticky - it shares the SPI bus with the uSD card, so the EPD CS line
 // must be the only one active at a time
