@@ -1,7 +1,9 @@
 #include <Arduino.h>
 #include <ArduinoLog.h>
 #include <WiFi.h>
+#include <app_logger.h>
 #include <bl.h>
+#include <board_config.h>
 #include <config.h>
 #include <display.h>
 #include <filesystem.h>
@@ -9,7 +11,9 @@
 #include <misc/clock.h>
 #include <pins.h>
 #include <refresh_interval.h>
+#include <sleep_duration.h>
 #include <sleep_session.h>
+#include <status_screens.h>
 #include <trmnl_log.h>
 
 #include "driver/gpio.h"
@@ -20,11 +24,6 @@
 
 #include "rtc_wake_stub_trmnl_x.h"
 #endif
-
-// --- Helpers / state still owned by bl.cpp ---
-void submitStoredLogs(void);
-extern unsigned long startup_time;
-extern TRMNL_DEVICE *pDevice;
 
 /**
  * @brief Function to sleep preparing and go to sleep
@@ -101,6 +100,18 @@ void goToSleep(void) {
 #endif
 #endif
   esp_deep_sleep_start();
+}
+
+void updateTimeSinceSleep(void) {
+  if (systemClock().setTimeFromNTP()) {
+    const uint32_t last_sleep = preferences.getUInt(PREFERENCES_LAST_SLEEP_TIME, 0);
+    time_since_sleep = sleepDurationSeconds(systemClock().getTime(), last_sleep);
+  } else {
+    time_since_sleep = 0;
+    Log.info("%s [%d]: Time wasn't synced.\r\n", __FILE__, __LINE__);
+  }
+
+  Log.info("%s [%d]: Time since last sleep: %d\r\n", __FILE__, __LINE__, time_since_sleep);
 }
 
 void goToSleepButtonOnly(void) {
