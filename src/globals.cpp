@@ -20,23 +20,25 @@ bool reset_firmware = false; // need to reset credentials
 bool log_retry = false;      // need to log connection retry
 
 // --- Wake / sleep state ---
+unsigned long startup_time = 0;
 uint32_t time_since_sleep;
+float battery_voltage;
 esp_sleep_wakeup_cause_t wakeup_reason = ESP_SLEEP_WAKEUP_UNDEFINED;
+uint64_t ext1_wake_bits = 0;
 SPECIAL_FUNCTION special_function = SF_NONE;
+bool special_function_chosen = false;
 RTC_DATA_ATTR int iPrevWakeTime = 0;
+RTC_DATA_ATTR int last_wifi_rssi = 0;
 RTC_DATA_ATTR bool bUsedCachedImage = false;
 RTC_DATA_ATTR uint8_t need_to_refresh_display = 1;
 RTC_DATA_ATTR bool otg_state = false;
-
-// --- UI / input ---
-bool touchbar_tap_mode = true; // false = "slide", true = "tap" (default)
-bool otg_message = false;
 
 // --- Display refresh bookkeeping ---
 // Counts the number of partial updates to know when to do a full update
 RTC_DATA_ATTR int iUpdateCount = 0;
 RTC_DATA_ATTR bool bCanDoPartial = false;
 uint32_t iTempProfile;
+uint32_t panel_rev = 0;
 
 #ifdef BOARD_TRMNL_X
 // --- TRMNL X hardware ---
@@ -44,7 +46,4 @@ uint32_t iTempProfile;
 Modem *g_modem = nullptr;
 battery_count_t battery_count = BATTERY_NONE;
 bool battery_charging = false;
-IQS323 iqs323;
-uint16_t slider_position = 65535;
-iqs323_gesture_events slider_event = IQS323_GESTURE_NONE;
 #endif // BOARD_TRMNL_X

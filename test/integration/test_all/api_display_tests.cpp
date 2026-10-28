@@ -44,14 +44,14 @@ static void fetch_api_key_or_skip() {
 }
 
 static ApiDisplayInputs make_display_inputs(float battery_voltage) {
-  // Mirrors the inputs production assembles in bl.cpp around line 1400-1475.
+  // Mirrors the inputs production assembles in display_session.cpp (loadApiDisplayInputs()).
   // Anything that's not under test gets a value the real device would send.
   ApiDisplayInputs inputs = {};
   inputs.baseUrl = TEST_BACKEND_URL;
   inputs.apiKey = s_api_key;
   inputs.friendlyId = s_friendly_id;
   inputs.updateSource = "timer";            // matches wake-from-RTC case
-  inputs.refreshRate = RefreshInterval::DEFAULT_SECONDS; // 900s — production default
+  inputs.refreshRate = SHORT_TERM_SLOW_RETRY_INTERVAL; // 900s — production default
   inputs.macAddress = TEST_MAC_ADDRESS;
   inputs.batteryVoltage = battery_voltage;
   inputs.firmwareVersion = FW_VERSION_STRING;
@@ -61,6 +61,7 @@ static ApiDisplayInputs make_display_inputs(float battery_voltage) {
   inputs.displayWidth = display_width();
   inputs.displayHeight = display_height();
   inputs.specialFunction = SF_NONE;
+  inputs.specialFunctionChosen = false;
   return inputs;
 }
 
