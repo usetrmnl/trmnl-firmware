@@ -1,5 +1,6 @@
 #include <battery.h>
-#include <display_internal.h>
+#include <display_widgets.h>
+#include <epd_driver.h>
 #include <math.h>
 #include <power.h>
 #include <trmnl_log.h>

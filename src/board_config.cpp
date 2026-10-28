@@ -1,5 +1,5 @@
 #include <board_config.h>
-#include <display_internal.h>
+#include <epd_driver.h>
 #include <trmnl_log.h>
 
 #ifndef PARALLEL_EPD

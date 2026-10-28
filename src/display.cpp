@@ -13,6 +13,10 @@
 #include <board_config.h>
 #include <color_reduce.h>
 #include <display_internal.h>
+#include <display_widgets.h>
+#include <epd_panel_rev.h>
+#include <jpeg_render.h>
+#include <png_render.h>
 #ifdef PARALLEL_EPD
 FASTEPD bbep;
 #else
@@ -91,7 +95,7 @@ bool display_update_epaper(int refreshMode, bool wait, bool writePlane, uint8_t 
     return true;
 }
 
-void display_select_one_bit_panel(bool only_if_changed)
+static void display_select_one_bit_panel(bool only_if_changed = false)
 {
     bool custom_pins = pDevice->epd_mosi_pin != 0 || pDevice->epd_sck_pin != 0;
     int one_bit = dpList[pDevice->panel_set][custom_pins ? iTempProfile : 0].OneBit;

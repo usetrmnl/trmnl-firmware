@@ -1,6 +1,6 @@
 #include <PNGdec.h>
 #include <color_reduce.h>
-#include <display_internal.h>
+#include <epd_driver.h>
 
 /**
  * @brief Reduce the bit depth of line of pixels using thresholding (aka simple color mapping)

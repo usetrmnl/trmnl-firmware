@@ -3,6 +3,7 @@
 #include <Preferences.h>
 #include <board_config.h>
 #include <display.h>
+#include <message_screens.h>
 #include <power.h>
 
 #include "WifiCaptive.h"

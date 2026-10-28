@@ -1,5 +1,6 @@
 // TRMNL X hardware reached through the TCA9535 IO expander, which the panel driver (bbep) owns
-#include <display_internal.h>
+#include <display.h>
+#include <epd_driver.h>
 #include <trmnl_log.h>
 #include <x_hardware.h>
 

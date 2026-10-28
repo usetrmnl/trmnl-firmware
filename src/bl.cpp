@@ -21,6 +21,7 @@
 #include <WiFiClientSecure.h>
 #include <display.h>
 #include <display_session.h>
+#include <message_screens.h>
 #include <stdlib.h>
 #include <ESPAsyncWebServer.h>
 #include <AsyncTCP.h>

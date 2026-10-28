@@ -41,10 +41,6 @@ enum MSG {
   IMAGE_DOWNLOAD_FAILED,
 };
 
-typedef struct dp_tag {
-  uint32_t OneBit, TwoBit; // profiles for 1 and 2-bit modes
-} DISPLAY_PROFILE;
-
 typedef struct theBrand {
   char name[16];
   char api_url[128];
@@ -59,30 +55,11 @@ typedef struct theBrand {
 void display_init(void);
 
 /**
- * @brief Panel ID (EPD revision) as 8 hex digits for the Panel-Rev request header
- * @return hex string, or empty if the ID is unknown/not read
- */
-String display_panel_rev_string(void);
-
-/**
- * @brief Diagnostic function to continuously show the battery voltage
- * @param none
- * @return none
- */
-void display_show_battery(float f);
-
-/**
  * @brief Function to reset the display
  * @param none
  * @return none
  */
 void display_reset(void);
-
-typedef enum {
-  TOUCHBAR_LEFT,
-  TOUCHBAR_MIDDLE,
-  TOUCHBAR_RIGHT,
-} touchbar_side_t;
 
 /**
  * @brief Function to read the display height
@@ -97,22 +74,6 @@ uint16_t display_height();
 uint16_t display_width();
 
 /**
- * @brief Function to draw multi-line text onto the display
- * @param x_start X coordinate to start drawing
- * @param y_start Y coordinate to start drawing
- * @param message Text message to draw
- * @param max_width Maximum width in pixels for each line
- * @param font_width Width of a single character in pixels
- * @param color_fg Foreground color
- * @param color_bg Background color
- * @param font Font to use
- * @param is_center_aligned If true, center the text; if false, left-align
- * @return none
- */
-void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message, uint16_t max_width, UWORD color_fg,
-                             UWORD color_bg, const void *font);
-
-/**
  * @brief Function to show the image on the display
  * @param image_buffer pointer to the uint8_t image buffer
  * @param reverse shows if the color scheme is reverse
@@ -120,52 +81,6 @@ void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message, 
  */
 
 void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool bSkipClear = false);
-
-/**
- * @brief Function to show the image with message on the display
- * @param image_buffer pointer to the uint8_t image buffer
- * @param message_type type of message that will show on the screen
- * @return none
- */
-void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *message_text = nullptr);
-
-/**
- * @brief Function to show the image with message on the display
- * @param image_buffer pointer to the uint8_t image buffer
- * @param message_type type of message that will show on the screen
- * @param friendly_id device friendly ID
- * @param id shows if ID exists
- * @param fw_version version of the firmaware
- * @param message additional message
- * @return none
- */
-void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_id, bool id, const char *fw_version,
-                      String message);
-
-/**
- * @brief Function to show the image with API response message on the display
- * @param image_buffer pointer to the uint8_t image buffer
- * @param message message text from API response
- * @return none
- */
-void display_show_msg_api(uint8_t *image_buffer, String message);
-
-void display_show_msg_qa(const float *voltage, const float *temperature, bool qa_result);
-
-// Draws a black indicator in a white border above the touched region of the touch bar (TRMNL X):
-// an arrow pointing left or right at the sides, a pill in the middle
-void display_draw_touchbar_indicator(touchbar_side_t side);
-
-// Fills a pill (a rectangle whose left and right ends are half circles) in the image buffer
-void display_fill_pill(int x, int y, int w, int h, uint8_t color);
-
-// The battery icon (TRMNL X), DISPLAY_BATTERY_ICON_W x DISPLAY_BATTERY_ICON_H, drawn in the image
-// buffer with its top left at (x, y): charging while on USB power, otherwise the charge level from
-// the fuel gauge's last reading (battery().gaugeInit()), or a cross when there is none
-#define DISPLAY_BATTERY_ICON_W      124
-#define DISPLAY_BATTERY_ICON_H      74
-#define DISPLAY_BATTERY_ICON_MARGIN 40 // from the top and right edges, where the screens put it
-void display_draw_battery_icon(int x, int y);
 
 /**
  * @brief Enable or disable light sleep at runtime

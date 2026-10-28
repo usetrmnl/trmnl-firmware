@@ -11,7 +11,9 @@
 #include <bl.h>
 #include <config.h>
 #include <display.h>
-#include <display_internal.h>
+#include <display_widgets.h>
+#include <epd_driver.h>
+#include <epd_panel_rev.h>
 #include <globals.h>
 #include <power.h>
 #include <qa.h>

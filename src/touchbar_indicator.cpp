@@ -1,9 +1,11 @@
 #include <display.h>
+#include <display_widgets.h>
 #include <math.h>
+#include <touchbar_indicator.h>
 #include <trmnl_log.h>
 
 #ifdef BOARD_TRMNL_X
-#include <display_internal.h>
+#include <epd_driver.h>
 #endif // BOARD_TRMNL_X
 
 #ifdef PARALLEL_EPD

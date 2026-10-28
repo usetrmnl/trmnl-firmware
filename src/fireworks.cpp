@@ -4,7 +4,7 @@
 #ifdef BOARD_TRMNL_X
 
 #include <Arduino.h>
-#include <display_internal.h>
+#include <epd_driver.h>
 
 // Fireworks, white on black: the screen is wiped to black, then three rockets arc up from the
 // bottom, one after another, and each bursts into a ring of arcs. Each frame is a partial update that

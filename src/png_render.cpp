@@ -1,7 +1,8 @@
 #include <PNGdec.h>
 #include <board_config.h>
 #include <color_reduce.h>
-#include <display_internal.h>
+#include <epd_driver.h>
+#include <png_render.h>
 #include <globals.h>
 #include <trmnl_log.h>
 

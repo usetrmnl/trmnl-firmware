@@ -4,7 +4,7 @@
 #if defined(INCLUDE_TCA9535_POWER)
 // bbep is defined in display.cpp. On TRMNL X the BQ25616 PG/STAT lines are wired to the
 // TCA9535 I/O expander, which is reached through the FastEPD io* helpers.
-#include <display_internal.h>
+#include <epd_driver.h>
 
 static TCA9535Power powerInstance(bbep, TCA9535_PG_PIN, TCA9535_STAT_PIN);
 #elif defined(INCLUDE_GPIO_POWER)

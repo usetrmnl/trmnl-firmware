@@ -1,4 +1,6 @@
 #include <display_internal.h>
+#include <display_widgets.h>
+#include <message_screens.h>
 #include <globals.h>
 #include <trmnl_log.h>
 

@@ -2,6 +2,7 @@
 #include <WifiCaptive.h>
 #include <config.h>
 #include <globals.h>
+#include <message_screens.h>
 #include <status_screens.h>
 #include <trmnl_log.h>
 

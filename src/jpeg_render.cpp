@@ -1,5 +1,6 @@
 #include <JPEGDEC.h>
-#include <display_internal.h>
+#include <epd_driver.h>
+#include <jpeg_render.h>
 #include <trmnl_log.h>
 
 static uint8_t *pDither;
