@@ -2,6 +2,7 @@
 #include <ArduinoLog.h>
 #include <app_logger.h>
 #include <bl.h>
+#include <pairing_runtime.h>
 #include <display.h>
 #include <display_session.h>
 #include <globals.h>
@@ -32,6 +33,7 @@ void bl_init(void)
 
   wifiSessionConnect(wake.showErrorsNow);
   updateTimeSinceSleep();
+  const bool bleSetup = pairingUsesBle();
   ensureDeviceSetUp(); // may sleep
   submitStoredLogs();
   log_retry = true;
@@ -42,7 +44,7 @@ void bl_init(void)
   showImageTooBigIfNeeded(request_result);
   applyRetryPolicy(request_result, wake.showErrorsNow); // may sleep
   submitStoredLogs();
-  showFriendlyIdIfUnregistered(request_result);
+  showFriendlyIdIfUnregistered(request_result, bleSetup);
   resetIfRequested(request_result);
   updateFirmwareIfDue();
   showRequestResult(request_result);

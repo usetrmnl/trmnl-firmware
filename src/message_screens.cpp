@@ -10,6 +10,56 @@
 #include "wifi_connect_qr.h"
 #include "wifi_failed_qr.h"
 
+#include <pairing_runtime.h>
+#ifdef TRMNL_BLE_PAIRING
+#include <qrcodegen.h>
+
+// The fragment stays on the phone; an ordinary camera still opens the help article.
+static const char pairingHelpUrlPrefix[] = "HTTPS://TRMNL.COM/GO/HELPND#";
+static const int pairingHelpQrMaxVersion = 5;
+static const size_t pairingHelpQrBufferSize = qrcodegen_BUFFER_LEN_FOR_VERSION(pairingHelpQrMaxVersion);
+
+static bool encodePairingHelpQr(const char *fragment, uint8_t *qr) {
+    // Segment constructors require sufficient buffers for the identity fragment.
+    if (!fragment || !qr) return false;
+    const size_t length = strlen(fragment);
+    if (!length || length > 62 || !qrcodegen_isAlphanumeric(fragment)) return false;
+    uint8_t prefixData[sizeof(pairingHelpUrlPrefix) - 1];
+    uint8_t fragmentData[62];
+    uint8_t scratch[pairingHelpQrBufferSize];
+    const qrcodegen_Segment segments[] = {
+        qrcodegen_makeBytes(reinterpret_cast<const uint8_t *>(pairingHelpUrlPrefix), sizeof(pairingHelpUrlPrefix) - 1, prefixData),
+        qrcodegen_makeAlphanumeric(fragment, fragmentData)
+    };
+    // Two segments keep the URL at QR version 5 with medium error correction.
+    return qrcodegen_encodeSegmentsAdvanced(segments, 2, qrcodegen_Ecc_MEDIUM, 1, pairingHelpQrMaxVersion,
+                                            qrcodegen_Mask_AUTO, true, scratch, qr);
+}
+
+static bool drawPairingHelpOnWifiScreen() {
+    if (!pairingIdentityReady()) return false;
+    const String fragment = pairingHelpQrFragment(pairingIdentity());
+    uint8_t qr[pairingHelpQrBufferSize];
+    if (!encodePairingHelpQr(fragment.c_str(), qr)) return false;
+    const int modules = qrcodegen_getSize(qr);
+    if (modules < 21 || modules > 45) return false;
+    const bool large = bbep.width() > 1000;
+    const int scale = large ? 6 : 3;
+    const int margin = large ? 80 : 40;
+    const int side = (modules + 8) * scale;
+    const int left = bbep.width() - margin - side;
+    if (left <= (bbep.width() + 240) / 2 || margin + side >= bbep.height() - 100) return false;
+    bbep.fillRect(left, margin, side, side, BBEP_WHITE);
+    for (int y = 0; y < modules; ++y)
+        for (int x = 0; x < modules; ++x)
+            if (qrcodegen_getModule(qr, x, y))
+                bbep.fillRect(left + (x + 4) * scale, margin + (y + 4) * scale, scale, scale, BBEP_BLACK);
+    return true;
+}
+#else
+static bool drawPairingHelpOnWifiScreen() { return false; }
+#endif
+
 // The message bodies below keep the indentation they had as cases of the display_show_msg()
 // switches, so open changes to those lines still apply; a formatting pass can re-indent them.
 
@@ -566,6 +616,9 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
     case MSG_FORMAT_ERROR:
         draw_msg_format_error_message();
         break;
+    case PHONE_CONNECTED:
+        draw_centered_line("Connected to Phone", bbep.height() - 60);
+        break;
     case TEST:
         draw_test_message();
         break;
@@ -717,11 +770,13 @@ static void draw_wifi_connect_setup_message(const char *fw_version, String messa
         bbep.println(string2);
         const char string3[] = "or scan the QR code for help";
         draw_centered_line(string3, -1);
+        if (!drawPairingHelpOnWifiScreen()) {
 #ifdef __BB_EPAPER__
         bbep.loadG5Image(wifi_connect_qr, bbep.width() - 40 - 66, 40, BBEP_WHITE, BBEP_BLACK); // 66x66 QR code
 #else // bigger for X
         bbep.loadG5Image(wifi_connect_qr, bbep.width() - (66*2) - 80, 80, BBEP_WHITE, BBEP_BLACK, 2.0f);
 #endif
+        }
 }
 
 static void draw_mac_not_registered_setup_message(String message)

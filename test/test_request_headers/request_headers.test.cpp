@@ -247,6 +247,32 @@ void test_format_setup_headers_round_trip(void) {
     formatted.c_str());
 }
 
+void test_ble_key_is_optional_and_only_sent_to_setup_and_display(void) {
+  auto inputs = makeDisplayInputs();
+  TEST_ASSERT_FALSE(has(buildSetupHeaders(inputs), "BLE-Key"));
+  TEST_ASSERT_FALSE(has(buildDisplayHeaders(inputs), "BLE-Key"));
+  inputs.bleKey = "0123456789ABCDEF";
+  inputs.bleSessionId = "12345678-1234-1234-1234-123456789abc";
+  for (const auto &headers : {buildSetupHeaders(inputs), buildDisplayHeaders(inputs)}) {
+    TEST_ASSERT_EQUAL_STRING(inputs.bleSessionId.c_str(), valueOf(headers, "BLE-Session-ID").c_str());
+    TEST_ASSERT_FALSE(has(headers, "BLE-Model"));
+  }
+  TEST_ASSERT_EQUAL_STRING(inputs.bleKey.c_str(), valueOf(buildSetupHeaders(inputs), "BLE-Key").c_str());
+  TEST_ASSERT_EQUAL_STRING(inputs.bleKey.c_str(), valueOf(buildDisplayHeaders(inputs), "BLE-Key").c_str());
+  TEST_ASSERT_FALSE(has(buildImageHeaders(inputs), "BLE-Key"));
+}
+
+void test_logged_headers_redact_credentials_without_changing_transport_headers(void) {
+  auto inputs = makeDisplayInputs();
+  inputs.bleKey = "0123456789ABCDEF";
+  auto headers = buildDisplayHeaders(inputs);
+  String logged = formatHeadersForLog(headers);
+  TEST_ASSERT_EQUAL(-1, logged.indexOf(inputs.bleKey));
+  TEST_ASSERT_EQUAL(-1, logged.indexOf(inputs.apiKey));
+  TEST_ASSERT_TRUE(logged.indexOf("BLE-Key: [REDACTED]") >= 0);
+  TEST_ASSERT_TRUE(formatHeaders(headers).indexOf(inputs.bleKey) >= 0);
+}
+
 // --- runner ----------------------------------------------------------------
 
 void setUp(void) {}
@@ -254,6 +280,8 @@ void tearDown(void) {}
 
 void process() {
   UNITY_BEGIN();
+  RUN_TEST(test_ble_key_is_optional_and_only_sent_to_setup_and_display);
+  RUN_TEST(test_logged_headers_redact_credentials_without_changing_transport_headers);
   RUN_TEST(test_setup_headers_names_and_order);
   RUN_TEST(test_setup_headers_include_panel_id_when_set);
   RUN_TEST(test_log_headers_names_and_values);

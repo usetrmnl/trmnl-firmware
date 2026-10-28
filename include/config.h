@@ -124,12 +124,14 @@
 
 // #define FAKE_BATTERY_VOLTAGE // Uncomment to report 4.2V instead of reading ADC
 
-#define BUTTON_HOLD_TIME                   5000
-#define BUTTON_MEDIUM_HOLD_TIME            1000
-#define BUTTON_SOFT_RESET_TIME             15000
-#define BUTTON_DOUBLE_CLICK_WINDOW         800
+#define BUTTON_HOLD_TIME           5000
+#define BUTTON_MEDIUM_HOLD_TIME    1000
+#define BUTTON_SOFT_RESET_TIME     15000
+#define BUTTON_DOUBLE_CLICK_WINDOW 800
 
-#define API_BASE_URL                       "https://trmnl.app"
+#ifndef API_BASE_URL
+#define API_BASE_URL "https://trmnl.app"
+#endif
 
 // Abort an image download when the stream goes this long with no data.
 #define IMAGE_STREAM_INACTIVITY_TIMEOUT_MS 15000

@@ -44,6 +44,8 @@ struct ApiDisplayInputs {
   String baseUrl;
   String apiKey;
   String friendlyId;
+  String bleKey; // Optional persistent Security 1 pairing secret.
+  String bleSessionId;
   String updateSource;
   uint32_t refreshRate;
   String macAddress;

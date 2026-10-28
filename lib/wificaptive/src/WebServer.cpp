@@ -69,10 +69,8 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
     request->send(response); // redirect to the local IP URL
   });
 
-  server.on("/soft-reset", HTTP_ANY, [callbacks](AsyncWebServerRequest *request) {
-    callbacks.resetSettings();
-    request->send(200);
-  });
+  server.on("/soft-reset", HTTP_ANY,
+            [callbacks](AsyncWebServerRequest *request) { request->send(callbacks.resetSettings() ? 200 : 409); });
 
   server.on("/advanced", HTTP_GET, [&](AsyncWebServerRequest *request) { request->redirect("/#advanced"); });
   server.on("/run-test", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -101,20 +99,9 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
   auto scanGET = server.on("/scan", HTTP_GET, [callbacks, modemMac](AsyncWebServerRequest *request) {
     String json = "{\"networks\":[";
 
-    if (request->hasParam("force")) {
-      callbacks.forceRescan();
-    }
-
-    if (!callbacks.isNetworkListReady()) {
-      if (WiFi.scanComplete() == WIFI_SCAN_FAILED) {
-        WiFi.scanNetworks(true);
-      }
-      return request->send(202);
-    }
-
-    // Data structure to store the highest RSSI for each SSID
-    // Warning: DO NOT USE true on getAnnotatedNetworks in an async context!
-    std::vector<WifiNetwork> combinedNetworks = callbacks.getAnnotatedNetworks(false);
+    auto snapshot = callbacks.getNetworks(request->hasParam("force"));
+    if (!snapshot.ready) return request->send(202);
+    const auto &combinedNetworks = snapshot.networks;
 
     // Generate JSON response
     size_t size = 0;
@@ -141,15 +128,7 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
       }
     }
 
-    WiFi.scanDelete();
     Serial.println(json);
-
-    if (WiFi.scanComplete() == -2) {
-#ifdef CONFIG_IDF_TARGET_ESP32C5
-      WiFi.setBandMode(WIFI_BAND_MODE_AUTO);
-#endif
-      WiFi.scanNetworks(true);
-    }
 
     json += "],";
 
@@ -219,7 +198,10 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
 
       Log_info("WebServer: Received SSID: %s, Static IP: %s", ssid.c_str(), useStaticIP ? "yes" : "no");
 
-      callbacks.setConnectionCredentials(credentials, api_server, band);
+      if (!callbacks.setConnectionCredentials(credentials, api_server, band)) {
+        request->send(409, "application/json", "{\"error\":\"busy\"}");
+        return;
+      }
       String mac = WiFi.macAddress();
       String message = "{\"ssid\":\"" + ssid + "\",\"mac\":\"" + mac + "\"";
 #ifdef BOARD_TRMNL_X

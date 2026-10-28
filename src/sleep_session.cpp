@@ -9,6 +9,7 @@
 #include <filesystem.h>
 #include <globals.h>
 #include <misc/clock.h>
+#include <pairing_runtime.h>
 #include <pins.h>
 #include <refresh_interval.h>
 #include <sleep_duration.h>
@@ -31,6 +32,7 @@
  * @return none
  */
 void goToSleep(void) {
+  pairingBeforeSleep();
   Log.info("%s [%d]: go to sleep\r\n", __FILE__, __LINE__);
   submitStoredLogs();
 

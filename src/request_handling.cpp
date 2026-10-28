@@ -7,6 +7,7 @@
 #include <globals.h>
 #include <http_result_handling.h>
 #include <request_handling.h>
+#include <pairing_runtime.h>
 #include <status_screens.h>
 #include <touch_i2c_lock.h>
 #include <trmnl_log.h>
@@ -59,9 +60,9 @@ void applyRetryPolicy(https_request_err_e request_result, bool should_show_error
   }
 }
 
-void showFriendlyIdIfUnregistered(https_request_err_e request_result)
+void showFriendlyIdIfUnregistered(https_request_err_e request_result, bool bleSetup)
 {
-  if (request_result == HTTPS_NO_REGISTER && need_to_refresh_display == 1)
+  if (request_result == HTTPS_NO_REGISTER && need_to_refresh_display == 1 && !bleSetup)
   {
     // show the image
     String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
@@ -88,6 +89,7 @@ void updateFirmwareIfDue(void)
           apiDisplayResult.response.firmware_url))
   {
     showMessageWithLogo(FW_UPDATE);
+    pairingBeforeOta();
     FirmwareUpdateResult firmwareUpdateResult = firmwareUpdateService.performUpdate();
     if (firmwareUpdateResult.updated)
     {

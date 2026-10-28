@@ -7,7 +7,10 @@
 #include <board_config.h>
 #include <config.h>
 #include <globals.h>
+#include <messages.h>
 #include <misc/buzzer.h>
+#include <pairing_runtime.h>
+#include <status_screens.h>
 
 #include "trmnl_log.h"
 
@@ -138,6 +141,10 @@ void button_wake_run_special_function(void) {
     } break;
     case SF_ADD_WIFI: {
       Log.info("%s [%d]: Add WiFi function...\r\n", __FILE__, __LINE__);
+#ifdef TRMNL_BLE_PAIRING
+      pairingPrepare();
+      showMessageWithLogo(WIFI_CONNECT, "", false, Messages::firmware_version().c_str(), WifiCaptivePortal.getAPSSID());
+#endif
       WifiCaptivePortal.startPortal();
     } break;
     case SF_RESTART_PLAYLIST: {
