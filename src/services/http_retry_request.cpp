@@ -17,6 +17,40 @@
 #include <modem.h>
 #endif
 
+namespace {
+
+  // A write-only Stream into a fixed buffer, for HTTPClient::writeToStream(). Writing past its
+  // capacity fails, which writeToStream() reports as HTTPC_ERROR_STREAM_WRITE.
+  class BodyBufferStream : public Stream {
+  public:
+    BodyBufferStream(uint8_t *buffer, size_t capacity) : _buffer(buffer), _capacity(capacity) {}
+
+    size_t write(const uint8_t *data, size_t len) override {
+      if (len > _capacity - _size) {
+        _overflowed = true;
+        return 0;
+      }
+      memcpy(_buffer + _size, data, len);
+      _size += len;
+      return len;
+    }
+    size_t write(uint8_t data) override { return write(&data, 1); }
+    int available() override { return 0; }
+    int read() override { return -1; }
+    int peek() override { return -1; }
+
+    size_t size() const { return _size; }
+    bool overflowed() const { return _overflowed; }
+
+  private:
+    uint8_t *_buffer;
+    size_t _capacity;
+    size_t _size = 0;
+    bool _overflowed = false;
+  };
+
+} // namespace
+
 HttpRetryRequest::HttpRetryRequest(const HttpRetryRequestConfig &config) : _config(config) {
   _readTimeoutMs =
     _config.readTimeoutSeconds > 0 ? _config.readTimeoutSeconds * MS_TO_S_FACTOR : HTTP_DEFAULT_TIMEOUT_MS;
@@ -61,6 +95,7 @@ uint8_t *HttpRetryRequest::body() const {
 
 String HttpRetryRequest::bodyAsString() const {
   if (_bodyBuffer) {
+    // The buffer is NUL-terminated past the body: Arduino 2's concat(buf, len) copies len + 1.
     String s;
     s.reserve(_bodySize);
     s.concat((const char *)_bodyBuffer, _bodySize);
@@ -194,23 +229,7 @@ https_request_err_e HttpRetryRequest::attemptWiFi() {
 https_request_err_e HttpRetryRequest::readWiFiBody(HTTPClient &https, int contentLength) {
   unsigned long start = millis();
 
-  if (contentLength <= 0) {
-    // writeToStream() handles a missing Content-Length and chunked transfer encoding, and
-    // (unlike getString()) reports an error when the connection closes before the whole body arrived.
-    Log_info("Content-Length not provided, using writeToStream()");
-    StreamString sstream;
-    int written = https.writeToStream(&sstream);
-    if (written < 0) {
-      _errorDetail =
-        "connection closed mid-download, error: " + String(written) + " (" + https.errorToString(written) + ")";
-      Log_error_serial("Receiving failed; %s, RSSI %d", _errorDetail.c_str(), WiFi.RSSI());
-      return HTTPS_TIMED_OUT;
-    }
-    _payload = std::move(static_cast<String &>(sstream));
-    _bodySize = _payload.length();
-    Log_info("%" PRIu32 " bytes received in %lu ms", _bodySize, millis() - start);
-    return HTTPS_NO_ERR;
-  }
+  if (contentLength <= 0) return readBodyMissingContentLength(https, start);
 
   uint32_t expected = (uint32_t)contentLength;
   Log_info("Content size: %" PRIu32, expected);
@@ -220,7 +239,7 @@ https_request_err_e HttpRetryRequest::readWiFiBody(HTTPClient &https, int conten
     return HTTPS_IMAGE_FILE_TOO_BIG;
   }
 
-  _bodyBuffer = (uint8_t *)malloc(expected);
+  _bodyBuffer = (uint8_t *)malloc(expected + 1); // + a NUL, see bodyAsString()
   if (!_bodyBuffer) {
     _errorDetail = "Failed to allocate " + String(expected) + " bytes for body";
     Log_error_serial("%s", _errorDetail.c_str());
@@ -259,7 +278,58 @@ https_request_err_e HttpRetryRequest::readWiFiBody(HTTPClient &https, int conten
     return HTTPS_TIMED_OUT;
   }
 
+  _bodyBuffer[received] = '\0';
   _bodySize = received;
+  Log_info("%" PRIu32 " bytes received in %lu ms", _bodySize, millis() - start);
+  return HTTPS_NO_ERR;
+}
+
+https_request_err_e HttpRetryRequest::readBodyMissingContentLength(HTTPClient &https, unsigned long start) {
+  Log_info("Content-Length not provided, using writeToStream()");
+
+  // Attempt to read into a single max-size buffer first, to save on allocations.
+  _bodyBuffer = (uint8_t *)malloc(MAX_IMAGE_SIZE + 1); // + a NUL, see bodyAsString()
+  if (_bodyBuffer) return readBodyIntoBuffer(https, start);
+
+  // No room for the max-size buffer; a small body may still fit as it grows.
+  return readBodyIntoStreamString(https, start);
+}
+
+// Fills _bodyBuffer, already allocated at MAX_IMAGE_SIZE + 1, then shrinks it to fit.
+https_request_err_e HttpRetryRequest::readBodyIntoBuffer(HTTPClient &https, unsigned long start) {
+  BodyBufferStream sink(_bodyBuffer, MAX_IMAGE_SIZE);
+  int written = https.writeToStream(&sink);
+  if (written < 0) {
+    releaseBody();
+    if (sink.overflowed()) {
+      _errorDetail = "file size too big: over " + String(MAX_IMAGE_SIZE);
+      Log_error_serial("Receiving failed; %s", _errorDetail.c_str());
+      return HTTPS_IMAGE_FILE_TOO_BIG;
+    }
+    _errorDetail =
+      "connection closed mid-download, error: " + String(written) + " (" + https.errorToString(written) + ")";
+    Log_error_serial("Receiving failed; %s, RSSI %d", _errorDetail.c_str(), WiFi.RSSI());
+    return HTTPS_TIMED_OUT;
+  }
+  _bodySize = sink.size();
+  _bodyBuffer[_bodySize] = '\0';
+  uint8_t *fitted = (uint8_t *)realloc(_bodyBuffer, _bodySize + 1); // give back the rest
+  if (fitted) _bodyBuffer = fitted;
+  Log_info("%" PRIu32 " bytes received in %lu ms", _bodySize, millis() - start);
+  return HTTPS_NO_ERR;
+}
+
+https_request_err_e HttpRetryRequest::readBodyIntoStreamString(HTTPClient &https, unsigned long start) {
+  StreamString sstream;
+  int written = https.writeToStream(&sstream);
+  if (written < 0) {
+    _errorDetail =
+      "connection closed mid-download, error: " + String(written) + " (" + https.errorToString(written) + ")";
+    Log_error_serial("Receiving failed; %s, RSSI %d", _errorDetail.c_str(), WiFi.RSSI());
+    return HTTPS_TIMED_OUT;
+  }
+  _payload = std::move(static_cast<String &>(sstream));
+  _bodySize = _payload.length();
   Log_info("%" PRIu32 " bytes received in %lu ms", _bodySize, millis() - start);
   return HTTPS_NO_ERR;
 }
@@ -288,11 +358,12 @@ https_request_err_e HttpRetryRequest::attemptModem() {
         tooBig = true;
         return false;
       }
-      if (_bodySize + len > capacity) {
+      // one byte more than the body for its NUL, see bodyAsString()
+      if (_bodySize + len + 1 > capacity) {
         uint32_t next = capacity ? capacity * 2 : 16384;
-        while (next < _bodySize + len)
+        while (next < _bodySize + len + 1)
           next *= 2;
-        if (next > MAX_IMAGE_SIZE) next = MAX_IMAGE_SIZE;
+        if (next > MAX_IMAGE_SIZE + 1) next = MAX_IMAGE_SIZE + 1;
         uint8_t *grown = (uint8_t *)realloc(_bodyBuffer, next);
         if (!grown) {
           outOfMemory = true;
@@ -303,6 +374,7 @@ https_request_err_e HttpRetryRequest::attemptModem() {
       }
       memcpy(_bodyBuffer + _bodySize, data, len);
       _bodySize += len;
+      _bodyBuffer[_bodySize] = '\0';
       return true;
     },
     0, reqHeaders, timeoutMs);

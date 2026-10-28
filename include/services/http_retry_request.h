@@ -47,6 +47,9 @@ private:
   https_request_err_e attemptOnce();
   https_request_err_e attemptWiFi();
   https_request_err_e readWiFiBody(HTTPClient &https, int contentLength);
+  https_request_err_e readBodyMissingContentLength(HTTPClient &https, unsigned long start);
+  https_request_err_e readBodyIntoBuffer(HTTPClient &https, unsigned long start);
+  https_request_err_e readBodyIntoStreamString(HTTPClient &https, unsigned long start);
   void applyRequestSettings(HTTPClient &https, const String &hopUrl);
 #ifdef BOARD_TRMNL_X
   https_request_err_e attemptModem();

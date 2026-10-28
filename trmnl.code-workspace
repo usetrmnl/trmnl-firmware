@@ -1,0 +1,26 @@
+{
+  // "Debug in simulator" (Run and Debug view) builds PlatformIO's selected env, runs it in the
+  // simulator and attaches GDB; ending the debug session stops the simulator. Its tasks are in
+  // .vscode/tasks.json. It lives here rather than in .vscode/launch.json, which PlatformIO
+  // regenerates with machine-specific paths (and is gitignored). Needs the C/C++ extension
+  // (ms-vscode.cpptools), which the PlatformIO extension installs.
+  "folders": [{ "path": "." }],
+  "launch": {
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "Debug in simulator",
+        "type": "cppdbg",
+        "request": "launch",
+        "program": "${workspaceFolder}/.pio/sim-debug/firmware.elf",
+        "cwd": "${workspaceFolder}",
+        "MIMode": "gdb",
+        "miDebuggerPath": "${workspaceFolder}/.pio/sim-debug/gdb",
+        "miDebuggerServerAddress": "127.0.0.1:3333",
+        "stopAtConnect": false,
+        "preLaunchTask": "Simulator: build and run",
+        "postDebugTask": "Simulator: stop"
+      }
+    ]
+  }
+}

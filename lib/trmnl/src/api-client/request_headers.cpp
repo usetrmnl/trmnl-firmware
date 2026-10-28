@@ -31,6 +31,7 @@ HttpHeaderList buildDisplayHeaders(const ApiDisplayInputs &inputs) {
   headers.push_back({"FW-Version", inputs.firmwareVersion});
   if (inputs.firmwareCommit.length() > 0) headers.push_back({"FW-Commit", inputs.firmwareCommit});
   headers.push_back({"Model", String(inputs.model)});
+  if (inputs.panelId.length() > 0) headers.push_back({"Panel-Rev", inputs.panelId});
   headers.push_back({"Image-Cached", inputs.imageCached ? "true" : "false"});
   headers.push_back({"Wake-Time", String(inputs.prevWakeTime)});
   headers.push_back({"RSSI", String(inputs.rssi)});
@@ -39,7 +40,15 @@ HttpHeaderList buildDisplayHeaders(const ApiDisplayInputs &inputs) {
   headers.push_back({"Width", String(inputs.displayWidth)});
   headers.push_back({"Height", String(inputs.displayHeight)});
 
-  if (inputs.specialFunction != SF_NONE) headers.push_back({"special_function", "true"});
+  if (inputs.specialFunction != SF_NONE) {
+    // "true" runs the function configured on the server; a name asks for that function
+    char name[32];
+    if (inputs.specialFunctionChosen && parseSpecialFunctionToStr(name, sizeof(name), inputs.specialFunction)) {
+      headers.push_back({"special_function", name});
+    } else {
+      headers.push_back({"special_function", "true"});
+    }
+  }
 
   return headers;
 }
@@ -50,6 +59,10 @@ HttpHeaderList buildSetupHeaders(const ApiSetupInputs &inputs) {
   headers.push_back({"Content-Type", "application/json"});
   headers.push_back({"FW-Version", inputs.firmwareVersion});
   headers.push_back({"Model", inputs.model});
+  if (inputs.panelId.length() > 0) headers.push_back({"Panel-Rev", inputs.panelId});
+  headers.push_back({"Width", String(inputs.displayWidth)});
+  headers.push_back({"Height", String(inputs.displayHeight)});
+  headers.push_back({"RSSI", String(inputs.rssi)});
   return headers;
 }
 
