@@ -5,6 +5,7 @@
 #include <config.h>
 #include <device_id.h>
 #include <display.h>
+#include <epd_panel_rev.h>
 #include <globals.h>
 #include <power.h>
 #include <wifi_network.h>
