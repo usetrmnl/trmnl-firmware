@@ -3,8 +3,9 @@
 
 #include <Arduino.h>
 #ifndef _NO_DEV_CONFIG_
-#include "DEV_Config.h"
+#include "config.h"
 #endif
+#include "x_hardware.h" // the TRMNL X IO expander functions were declared here; existing callers rely on it
 
 enum MSG {
   NONE,
@@ -15,15 +16,12 @@ enum MSG {
   MODEM_FLASH_FAILED,
   READY_TO_SHIP,
   SHIPPING_MODE,
-  WIFI_RESET_CONFIRM,
-  POWER_OFF_CONFIRM,
   WIFI_CONNECT,
   WIFI_FAILED,
   WIFI_WEAK,
   WIFI_INTERNAL_ERROR,
   WIFI_IMAGE_TIMEOUT,
   API_ERROR,
-  API_REQUEST_FAILED,
   API_SIZE_ERROR,
   API_UNABLE_TO_CONNECT,
   API_SETUP_FAILED,
@@ -40,11 +38,8 @@ enum MSG {
   FILL_WHITE,
   WIFI_RETRY_LIMIT,
   CAPTIVE_WIFI_TIMEOUT,
+  IMAGE_DOWNLOAD_FAILED,
 };
-
-typedef struct dp_tag {
-  uint32_t OneBit, TwoBit; // profiles for 1 and 2-bit modes
-} DISPLAY_PROFILE;
 
 typedef struct theBrand {
   char name[16];
@@ -59,46 +54,12 @@ typedef struct theBrand {
  */
 void display_init(void);
 
-uint8_t tca9535_interrupt_clear();
-void config_bma530_interrupt();
-void config_tca95535_pins_for_lp();
-void enter_shipment_sleep();
-void BQ27427_reset();
-void otg_turn_on();
-void otg_turn_off();
-
-typedef enum {
-  BATTERY_NONE = 0, // no battery — pin stayed HIGH (timeout >6000 µs)
-  BATTERY_ONE = 1,  // one 6K cell — discharge > 1100 µs
-  BATTERY_TWO = 2,  // two 6K cells — discharge ≤ 1100 µs
-} battery_count_t;
-
-battery_count_t detect_battery_count();
-
-extern "C" {
-  void modem_enter_bootloader();
-  void modem_reset_target();
-}
-
-/**
- * @brief Diagnostic function to continuously show the battery voltage
- * @param none
- * @return none
- */
-void display_show_battery(float f);
-
 /**
  * @brief Function to reset the display
  * @param none
  * @return none
  */
 void display_reset(void);
-
-typedef enum {
-  TOUCHBAR_LEFT,
-  TOUCHBAR_MIDDLE,
-  TOUCHBAR_RIGHT,
-} touchbar_side_t;
 
 /**
  * @brief Function to read the display height
@@ -113,22 +74,6 @@ uint16_t display_height();
 uint16_t display_width();
 
 /**
- * @brief Function to draw multi-line text onto the display
- * @param x_start X coordinate to start drawing
- * @param y_start Y coordinate to start drawing
- * @param message Text message to draw
- * @param max_width Maximum width in pixels for each line
- * @param font_width Width of a single character in pixels
- * @param color_fg Foreground color
- * @param color_bg Background color
- * @param font Font to use
- * @param is_center_aligned If true, center the text; if false, left-align
- * @return none
- */
-void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message, uint16_t max_width, uint16_t font_width,
-                             UWORD color_fg, UWORD color_bg, const void *font, bool is_center_aligned);
-
-/**
  * @brief Function to show the image on the display
  * @param image_buffer pointer to the uint8_t image buffer
  * @param reverse shows if the color scheme is reverse
@@ -138,51 +83,10 @@ void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message, 
 void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool bSkipClear = false);
 
 /**
- * @brief Function to read an image from the file system
- * @param filename
- * @param pointer to file size returned
- * @return pointer to allocated buffer
- */
-uint8_t *display_read_file(const char *filename, int *file_size);
-
-/**
- * @brief Function to show the image with message on the display
- * @param image_buffer pointer to the uint8_t image buffer
- * @param message_type type of message that will show on the screen
- * @return none
- */
-void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *message_text = nullptr);
-
-/**
- * @brief Function to show the image with message on the display
- * @param image_buffer pointer to the uint8_t image buffer
- * @param message_type type of message that will show on the screen
- * @param friendly_id device friendly ID
- * @param id shows if ID exists
- * @param fw_version version of the firmaware
- * @param message additional message
- * @return none
- */
-void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_id, bool id, const char *fw_version,
-                      String message);
-
-/**
- * @brief Function to show the image with API response message on the display
- * @param image_buffer pointer to the uint8_t image buffer
- * @param message message text from API response
- * @return none
- */
-void display_show_msg_api(uint8_t *image_buffer, String message);
-
-void display_show_msg_qa(uint8_t *image_buffer, const float *voltage, const float *temperature, bool qa_result);
-
-/**
  * @brief Enable or disable light sleep at runtime
  * @param enabled true to enable light sleep, false to disable
  * @return none
  */
-void display_draw_touchbar_indicator(touchbar_side_t side, bool filled);
-
 void display_set_light_sleep(uint8_t enabled);
 
 /**
@@ -191,5 +95,12 @@ void display_set_light_sleep(uint8_t enabled);
  * @return none
  */
 void display_sleep(void);
+
+/**
+ * @brief Function to wipe the display
+ * @param none
+ * @return none
+ */
+void display_wipe(void);
 
 #endif

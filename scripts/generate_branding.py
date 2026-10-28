@@ -3,6 +3,10 @@
 generate_branding.py - Read config.yml and emit:
   1. include/branding.h                     (string / URL #define macros)
   2. src/wifi_connect_qr.h, wifi_failed_qr.h (QR bitmaps for the configured URLs)
+  3. lib/wificaptive/src/WifiCaptivePage.h  (gzipped captive-portal page, from
+     lib/wificaptive/portal/index.html with the accent colour, device name and
+     optional logo applied)
+  4. optional *.local.h sidecars (custom e-paper logos, Wi-Fi AP SSID prefix)
 
 These outputs are build artifacts (git-ignored) regenerated on every build.
 
@@ -51,9 +55,14 @@ def _parse_yaml(path):
                 parent[key] = child
                 stack.append((child, indent))
             else:
-                if (value.startswith('"') and value.endswith('"')) or \
-                   (value.startswith("'") and value.endswith("'")):
-                    value = value[1:-1]
+                dq = re.match(r'^"((?:[^"\\]|\\.)*)"\s*(?:#.*)?$', value)
+                sq = re.match(r"^'([^']*)'\s*(?:#.*)?$", value)
+                if dq:
+                    value = re.sub(r"\\(.)", r"\1", dq.group(1))  # \" and \\ escapes
+                elif sq:
+                    value = sq.group(1)
+                else:
+                    value = re.sub(r"\s+#.*$", "", value)  # trailing comment
                 parent[key] = value
     return result
 
@@ -238,7 +247,13 @@ def make_bb_bitmap(g5_data, width, height):
 
 def _write_g5_header(rows, width, height, var_name, out_path, source_note):
     g5_data = g5_encode(rows, width, height)
-    bb_data = make_bb_bitmap(g5_data, width, height)
+    _write_bb_bitmap_header(make_bb_bitmap(g5_data, width, height), var_name, out_path, source_note)
+
+
+def _write_bb_bitmap_header(bb_data, var_name, out_path, source_note):
+    width, height, g5_len = struct.unpack("<HHH", bb_data[2:8])
+    g5_data = bb_data[8:]
+    assert len(g5_data) == g5_len
     vals = [f"0x{b:02x}" for b in bb_data]
     hex_body = ",\n    ".join(",".join(vals[i:i + 16]) for i in range(0, len(vals), 16))
     content = (
@@ -310,10 +325,61 @@ def _qr_rows(matrix, scale, border):
     return rows, total
 
 
-def generate_qr_header(url, var_name, out_path, segno, scale=2, border=4):
-    q = segno.make(url, error="m")
+# URLs encoded in the QR bitmaps that used to be committed as src/*_qr.h.
+STOCK_QR_CONNECT_URL = "https://help.usetrmnl.com/en/articles/9416306-how-to-set-up-a-new-device"
+STOCK_QR_HELP_URL = "https://help.usetrmnl.com/en/articles/10193157-device-wifi-troubleshooting"
+
+# The bitmaps that were committed as src/*_qr.h (made with Larry Bank's
+# imageconvert). A stock URL emits its original bitmap byte-for-byte, so stock
+# builds draw exactly the QR codes the golden screenshots (spec/golden/) expect;
+# other URLs are rendered with segno below.
+STOCK_QR_BITMAPS = {
+    STOCK_QR_CONNECT_URL: bytes.fromhex(
+        "bfbb420042008a01281c4c89118422a10583bffe542a45848972281ca857ffffc8b72a181e2105916fffffff0c8a1349"
+        "120fffffffff841c89621ffffffff8f225e1ca840444b1ffffff8ff84104448897c7fffff8f0e185879880fff9042244"
+        "9030f841722c453fffff841926225861122864908a7ffffc33109912108431ffff22845022a10192422448889126ffff"
+        "f8411120e1c2082108219120fffffc30893112082c91430821fffffcc230712641044c82ffff10c8b04452448924997f"
+        "fff9262a10104448431088b07fffc8142088b6165440c2207ffff0c89430844c21185284453fff082c391422c488324d"
+        "c987ffffc291410e10410445b225ffffe30a1112268186115083088105ffffca04430a11121ca8405ffff87108920411"
+        "1408b04114c2ffffe11143881045a193210cc207ffc448a461122124c4cbffe503a14921342652250fffff950a864583"
+        "0c632281ffff916e4c8c210724430ffffffe111208e2040932228105ffffff8c3088a4c2106185fffff1c8943c22252a"
+        "241ffffe3891610c3228448222444bffff00"
+    ),
+    STOCK_QR_HELP_URL: bytes.fromhex(
+        "bfbb420042009301281c488911322a18583bffe542a104106191222c1ca857ffffc8b71088b041112082c8b7ffffffe1"
+        "850bc3ffffffffe1150cc3225fffffffe3c322410444899041112c7fffffe38410444bc897f1fffffe30e38c30b3101f"
+        "fc8211224848a10449089722c453fffffe30f0c3870c92114ffff86308222444a5c387fffe4c843082228191422524df"
+        "fff2090c8a1320c420820864483fffff082083308c48820a18410ffffe192208308a841142641044c82fffff8c61841c"
+        "8a4997ffff249224448890842211160ffffe48846261508a4c2207ffc821122292a11872a144502229fffff0a1841870"
+        "8894324dc987ffff10a1044d02e10445b225ffffe104111291688619844082ffff8448844208a84112ca8405ffff8624"
+        "d2448499160822985ffff08891120e1041112228193210cc207ffff111c4308894890926265fffca0749a04104104113"
+        "291287fffff2a150f0c286319140fffff22dc22250889061c910c3fffffff8410421916126445020bffffff191487308"
+        "418617ffffc722818ca8907ffe38611842864508904448897ffff8"
+    ),
+}
+
+# The message screens place the QR bitmaps as fixed 66x66 images (2x on TRMNL X).
+QR_SIZE = 66
+QR_SCALE = 2
+
+
+def generate_qr_header(url, var_name, out_path, segno):
+    """Render *url* as a QR_SIZE x QR_SIZE bitmap: 2 px per module, centred, with
+    whatever quiet zone is left over (none for a version-4 code, like the stock
+    help-article URLs; the white screen around it serves as the quiet zone)."""
+    if url in STOCK_QR_BITMAPS:
+        _write_bb_bitmap_header(STOCK_QR_BITMAPS[url], var_name, out_path, f'QR for "{url}" (stock bitmap)')
+        return
+    q = segno.make(url, error="l", micro=False)  # segno boosts the ECC level when it fits
     matrix = list(q.matrix)
-    rows, size = _qr_rows(matrix, scale, border)
+    border = (QR_SIZE // QR_SCALE - len(matrix)) // 2
+    if border < 0:
+        raise ValueError(
+            f"[branding] QR URL too long for a {QR_SIZE}x{QR_SIZE} code (needs QR version "
+            f"{q.version}, max 4): {url}"
+        )
+    rows, size = _qr_rows(matrix, QR_SCALE, border)
+    assert size == QR_SIZE
     _write_g5_header(rows, size, size, var_name, out_path, f'QR for "{url}"')
 
 
@@ -428,56 +494,93 @@ def generate_image_header(png_path, var_name, expected_w, expected_h, out_path):
 # Captive-portal page (WifiCaptivePage.h) generation
 # ---------------------------------------------------------------------------
 
-def _brand_html(html_text, cfg):
-    """Apply configured portal-text overrides to stock captive-portal HTML.
+STOCK_DEVICE_NAME = "TRMNL"
+STOCK_ACCENT_COLOR = "#F86527"
 
-    Only keys present in config replace a stock literal, so an unmodified config
-    reproduces the stock page content verbatim.
-    """
-    strings = cfg.get("strings", {})
-    variables = {
-        "device_name": cfg.get("branding", {}).get("device_name", "TRMNL"),
-        "api_base_url": cfg.get("urls", {}).get("api_base_url", "https://trmnl.app"),
-    }
+# User-visible "TRMNL" occurrences in lib/wificaptive/portal/index.html, as
+# (exact snippet, context). Only page text and aria-labels are rebranded; URLs,
+# ids, placeholders, hostnames and the AP SSID are left alone. Context "html" is
+# HTML text/attributes, "js" a single-quoted JS string set via textContent, and
+# "js_html" a single-quoted JS string assigned to innerHTML.
+_PORTAL_NAME_SITES = [
+    ("<title>TRMNL Wi-Fi Configuration</title>", "html"),
+    ("'Could not reach your TRMNL. Check that you are still on its Wi-Fi network, then try again.'", "js"),
+    ("'Soft reset complete. Your TRMNL is back to its default settings.'", "js"),
+    ("btn.textContent = 'Soft reset this TRMNL';", "js"),
+    ("'<strong>Test did not run</strong>Check that you are still on your TRMNL\\'s Wi-Fi network.'", "js_html"),
+    ('role="img" aria-label="TRMNL">', "html"),
+    ('<h1 class="p-title" tabindex="-1">Connect your TRMNL</h1>', "html"),
+    ("<span>Keep this page open. Your TRMNL restarts when it's connected.</span>", "html"),
+    ('<p class="hint">Point your TRMNL at your own server (BYOS).</p>', "html"),
+    ('onclick="confirmSoftReset()">Soft reset this\n            TRMNL</button>', "html"),
+    ("<p id=\"resetTitle\"><strong>Soft reset this TRMNL?</strong></p>", "html"),
+]
 
-    title = strings.get("portal_title")
-    if title:
-        html_text = html_text.replace(
-            "<title>TRMNL Wi-Fi Configuration</title>",
-            f"<title>{_expand(title, variables)}</title>",
-        )
-    adv_title = strings.get("portal_advanced_title")
-    if adv_title:
-        html_text = html_text.replace(
-            "<title>TRMNL Advanced Configuration</title>",
-            f"<title>{_expand(adv_title, variables)}</title>",
-        )
-    reset_warning = strings.get("portal_reset_warning")
-    if reset_warning:
-        html_text = re.sub(
-            r"Are you sure\? Soft resetting your TRMNL device will delete all WiFi credentials,\s*"
-            r"clear your Device's ID, and reset your API key\.",
-            lambda _m: _expand(reset_warning, variables),
-            html_text,
-        )
-    server_note = strings.get("portal_server_note")
-    if server_note:
-        html_text = re.sub(
-            r"This button allows you to specify a custom API server.*?"
-            r"Are you sure you want to have a custom server specified\?",
-            lambda _m: _expand(server_note, variables),
-            html_text,
-            flags=re.DOTALL,
-        )
-    api_placeholder = strings.get("portal_api_placeholder")
-    if api_placeholder:
-        html_text = html_text.replace(
-            "Enter your custom server without a trailing / (e.g. https://trmnl.app)",
-            _expand(api_placeholder, variables),
-        )
-    accent = cfg.get("branding", {}).get("accent_color")
-    if accent:
-        html_text = html_text.replace("{{accent_color}}", accent)
+
+def _html_escape(s):
+    return (s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            .replace('"', "&quot;"))
+
+
+def _js_escape(s):
+    return s.replace("\\", "\\\\").replace("'", "\\'").replace("<", "\\x3c")
+
+
+def _portal_settings(cfg):
+    branding = cfg.get("branding", {})
+    device_name = branding.get("device_name", STOCK_DEVICE_NAME) or STOCK_DEVICE_NAME
+    accent = branding.get("accent_color", STOCK_ACCENT_COLOR) or STOCK_ACCENT_COLOR
+    if re.search(r"[;{}<>]", accent):
+        print(f"[branding] WARNING: ignoring invalid branding.accent_color {accent!r}")
+        accent = STOCK_ACCENT_COLOR
+    return device_name, accent
+
+
+def _brand_portal_html(html_text, device_name, accent, svg_logo):
+    """Apply branding to the stock captive-portal index.html (decoded text)."""
+    # (a) Accent colour: the page derives every accent from the --spark CSS
+    # variable (light and dark palettes); point both at the configured colour.
+    if accent != STOCK_ACCENT_COLOR:
+        html_text, n = re.subn(r"(--spark:\s*)#[0-9A-Fa-f]{3,8}(\s*;)",
+                               lambda m: m.group(1) + accent + m.group(2), html_text)
+        if n == 0:
+            print("[branding] WARNING: no --spark declaration found in the portal page")
+
+    # (b) Device name in user-visible text.
+    if device_name != STOCK_DEVICE_NAME:
+        encoded = {
+            "html": _html_escape(device_name),
+            "js": _js_escape(device_name),
+            "js_html": _js_escape(_html_escape(device_name)),
+        }
+        for snippet, ctx in _PORTAL_NAME_SITES:
+            if snippet not in html_text:
+                print(f"[branding] WARNING: portal text not found, not rebranded: {snippet!r}")
+                continue
+            html_text = html_text.replace(snippet, snippet.replace("TRMNL", encoded[ctx]))
+        leftover = len(re.findall(r"\bTRMNL\b", html_text))
+        if leftover:
+            print(f"[branding] WARNING: {leftover} 'TRMNL' occurrence(s) left in the portal page; "
+                  "update _PORTAL_NAME_SITES in scripts/generate_branding.py")
+
+    # (c) Custom logo: replace the inline <svg class="logo"> element.
+    if svg_logo is not None:
+        svg = re.sub(r"<\?xml.*?\?>|<!DOCTYPE.*?>|<!--.*?-->", "", svg_logo, flags=re.DOTALL).strip()
+        m = re.match(r"<svg\b[^>]*>", svg)
+        if not m:
+            print("[branding] WARNING: images.portal_logo is not an <svg> element, using stock logo")
+        else:
+            tag = m.group(0)
+            new_tag = tag
+            if not re.search(r"\sclass=", tag):
+                new_tag = new_tag[:4] + ' class="logo"' + new_tag[4:]
+            if not re.search(r"\saria-label=", tag):
+                new_tag = new_tag[:-1] + f' role="img" aria-label="{_html_escape(device_name)}">'
+            svg = new_tag + svg[len(tag):]
+            html_text, n = re.subn(r'<svg class="logo"[^>]*>.*?</svg>', lambda _m: svg, html_text,
+                                   count=1, flags=re.DOTALL)
+            if n == 0:
+                print('[branding] WARNING: no <svg class="logo"> found in the portal page')
     return html_text
 
 
@@ -488,34 +591,27 @@ def _gzip_bytes(data):
     return buf.getvalue()
 
 
-def _has_portal_overrides(cfg):
-    strings = cfg.get("strings", {})
-    portal_keys = ("portal_title", "portal_advanced_title", "portal_reset_warning",
-                   "portal_server_note", "portal_api_placeholder")
-    return bool(cfg.get("branding", {}).get("accent_color")) or any(strings.get(k) for k in portal_keys)
+def generate_captive_portal(cfg, portal_dir, out_path, svg_logo=None):
+    """Brand the portal page, gzip it, and write the WifiCaptivePage.h header.
 
-
-def generate_captive_portal(cfg, portal_dir, out_path, svg_override=None):
-    """Brand the portal HTML/SVG, gzip it, and write the WifiCaptivePage.h header.
-
-    With no portal overrides configured, the raw source bytes are gzipped
-    unchanged so the page content is byte-identical to stock.
+    The array names match what the old lib/wificaptive/portal/convert.py
+    produced (INDEX_HTML / INDEX_HTML_LEN). With no portal branding configured,
+    the raw source bytes are gzipped unchanged, so the page is the stock one.
     """
     if not os.path.isdir(portal_dir):
         print(f"[branding] WARNING: {portal_dir} not found, skipping portal page")
         return
-    apply_branding = _has_portal_overrides(cfg)
+    device_name, accent = _portal_settings(cfg)
+    apply_branding = (device_name != STOCK_DEVICE_NAME or accent != STOCK_ACCENT_COLOR
+                      or svg_logo is not None)
     entries = []
     for fname in sorted(os.listdir(portal_dir)):
         if not fname.endswith((".html", ".svg")):
             continue
-        if fname == "logo.svg" and svg_override is not None:
-            data = svg_override.encode("utf-8")
-        else:
-            with open(os.path.join(portal_dir, fname), "rb") as f:
-                data = f.read()
-        if fname.endswith(".html") and apply_branding:
-            data = _brand_html(data.decode("utf-8"), cfg).encode("utf-8")
+        with open(os.path.join(portal_dir, fname), "rb") as f:
+            data = f.read()
+        if fname == "index.html" and apply_branding:
+            data = _brand_portal_html(data.decode("utf-8"), device_name, accent, svg_logo).encode("utf-8")
         compressed = _gzip_bytes(data)
         array_name = fname.replace(".", "_").upper()
         hex_vals = ", ".join(hex(b) for b in compressed)
@@ -524,6 +620,7 @@ def generate_captive_portal(cfg, portal_dir, out_path, svg_override=None):
             f"const int {array_name}_LEN = sizeof({array_name});\n"
         )
     content = (
+        "// AUTO-GENERATED by scripts/generate_branding.py from lib/wificaptive/portal/ - DO NOT EDIT\n"
         "#ifndef WifiCaptivePage_h\n"
         "#define WifiCaptivePage_h\n\n"
         "#include <pgmspace.h>\n\n"
@@ -571,8 +668,8 @@ def main(project_dir=None):
     # --- QR codes (regenerated from config.yml URLs) ---
     qr = cfg.get("qr", {})
     specs = [
-        (qr.get("connect_url", "https://trmnl.com/start"), "wifi_connect_qr", "wifi_connect_qr.h"),
-        (qr.get("help_url", "https://help.usetrmnl.com"), "wifi_failed_qr", "wifi_failed_qr.h"),
+        (qr.get("connect_url", STOCK_QR_CONNECT_URL), "wifi_connect_qr", "wifi_connect_qr.h"),
+        (qr.get("help_url", STOCK_QR_HELP_URL), "wifi_failed_qr", "wifi_failed_qr.h"),
     ]
     segno = _ensure_segno()
     for url, var_name, out_name in specs:
@@ -582,16 +679,16 @@ def main(project_dir=None):
     images = cfg.get("images", {})
     portal_dir = os.path.join(project_dir, "lib", "wificaptive", "portal")
     captive_h = os.path.join(project_dir, "lib", "wificaptive", "src", "WifiCaptivePage.h")
-    svg_override = None
+    svg_logo = None
     portal_logo = images.get("portal_logo", "")
     if portal_logo:
         abs_svg = os.path.join(project_dir, portal_logo)
         if os.path.isfile(abs_svg):
             with open(abs_svg, "r", encoding="utf-8") as f:
-                svg_override = f.read()
+                svg_logo = f.read()
         else:
             print(f"[branding] WARNING: {portal_logo} not found, using stock portal logo")
-    generate_captive_portal(cfg, portal_dir, captive_h, svg_override)
+    generate_captive_portal(cfg, portal_dir, captive_h, svg_logo)
 
     # --- Optional custom logos -> git-ignored *.local.h sidecars ---
     # Stock headers stay the tracked default; a configured image emits a sidecar
@@ -606,6 +703,9 @@ def main(project_dir=None):
     for cfg_key, var_name, w, h, out_name in image_specs:
         path = images.get(cfg_key, "")
         if not path:
+            stale = os.path.join(src_dir, out_name)
+            if os.path.exists(stale):
+                os.remove(stale)  # override removed from config: revert to the stock image
             continue
         abs_png = os.path.join(project_dir, path)
         if not os.path.isfile(abs_png):
@@ -632,21 +732,15 @@ def main(project_dir=None):
     return cfg
 
 
-def _truthy(v):
-    return str(v).strip().lower() in ("1", "true", "yes", "on")
-
-
 # PlatformIO pre-script hook ------------------------------------------------
 try:
     Import("env")  # noqa: F821
-    _proj_dir = env.subst("$PROJECT_DIR") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # noqa: F821
-    _cfg = main(_proj_dir)
-    if _truthy(_cfg.get("build", {}).get("debug", False)):
-        env.Append(CPPDEFINES=["DEV_FIRMWARE"])  # noqa: F821
-        print("[branding] build.debug enabled -> DEV_FIRMWARE (verbose serial logging)")
-except NameError:
-    pass
+    _pio_env = env  # noqa: F821
+except NameError:  # run standalone, not by PlatformIO
+    _pio_env = None
+if _pio_env is not None:
+    main(_pio_env.subst("$PROJECT_DIR"))
 
 
-if __name__ == "__main__":
+if __name__ == "__main__" and _pio_env is None:
     main()

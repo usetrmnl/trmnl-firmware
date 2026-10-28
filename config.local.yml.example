@@ -10,7 +10,12 @@
 # =============================================================================
 
 # branding:
-#   device_name: "Timeframe"
+#   device_name: "Timeframe"      # also replaces "TRMNL" in the portal page text
+#   accent_color: "#123456"       # captive-portal accent colour
+#   message_logo_size: "medium"   # small | medium | big
+
+# wifi:
+#   ap_ssid_prefix: "Timeframe"
 
 # urls:
 #   api_base_url: "https://api.example.com"
@@ -22,9 +27,6 @@
 
 # strings:
 #   welcome: "Welcome to {device_name}."
-#   # Captive-portal web page text:
-#   portal_title: "{device_name} Wi-Fi Configuration"
-#   portal_advanced_title: "{device_name} Advanced Configuration"
 
 # Custom logos: point at 1-bit PNGs of the exact size (git-ignored overlay).
 # images:
@@ -32,4 +34,4 @@
 #   logo_medium: "assets/local/logo_medium.png"   # 240x240
 #   logo_big:    "assets/local/logo_big.png"      # 640x640
 #   loading:     "assets/local/loading.png"       # 800x480
-#   portal_logo: "assets/local/logo.svg"
+#   portal_logo: "assets/local/logo.svg"          # SVG, replaces the portal logo

@@ -11,9 +11,7 @@ lib/trmnl_x/**
 
 # pre-generated constants
 include/branding.h
-include/Inter_18.h
-include/Roboto_Black_24.h
-include/nicoclean_8.h
+include/fonts/**
 src/battery_small.h
 src/loading.h
 src/logo_big.h
@@ -21,3 +19,16 @@ src/logo_medium.h
 src/logo_small.h
 src/wifi_connect_qr.h
 src/wifi_failed_qr.h
+lib/wificaptive/src/WifiCaptivePage.h
+# split out of display.cpp/bl.cpp as-is, so the moves stay reviewable with --color-moved
+src/board_config.cpp
+src/epd_panel_rev.cpp
+src/x_io_expander.cpp
+src/color_reduce.cpp
+src/png_render.cpp
+src/jpeg_render.cpp
+src/display_widgets.cpp
+src/message_screens.cpp
+src/wake_init.cpp
+src/setup_session.cpp
+src/request_handling.cpp
