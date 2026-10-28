@@ -25,9 +25,6 @@
 #include "rtc_wake_stub_trmnl_x.h"
 #endif
 
-// --- Helpers / state still owned by bl.cpp ---
-extern unsigned long startup_time;
-
 /**
  * @brief Function to sleep preparing and go to sleep
  * @param none
