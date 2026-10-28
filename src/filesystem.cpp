@@ -1,9 +1,9 @@
 #include <Arduino.h>
+#include <api_types.h>
 #include <config.h>
 #include <filesystem.h>
 #include <inttypes.h>
 #include <trmnl_log.h>
-#include <api_types.h>
 #if defined(PARALLEL_EPD)
 #include <LittleFS.h>
 #define FS LittleFS
@@ -109,8 +109,7 @@ bool filesystem_read_from_file(const char *name, uint8_t *out_buffer, size_t siz
  * @param ApiDisplayResponse structure
  * @return nothing
  */
-void filesystem_purge_playlist(ApiDisplayResponse *pResponse)
-{
+void filesystem_purge_playlist(ApiDisplayResponse *pResponse) {
   File rootDir;
   int i, iLen;
   char *s, *d, szTemp[32];
@@ -133,13 +132,13 @@ void filesystem_purge_playlist(ApiDisplayResponse *pResponse)
     // Compare the filename with all of the names in the playlist and if it doesn't
     // match any, then delete it
     bDel = true; // assume we delete it unless it matches a name in the current playlist
-    for (i=0; i<pResponse->playlist_count; i++) {
-        iLen = strlen(d); // the playlist names don't have a timestamp and are shorter
-        if (memcmp(s, d, iLen) == 0) {
-          bDel = false; // keep the name
-          i = pResponse->playlist_count; // early exit from the loop
-        }
-        d += iLen + 1; // point to next name in the list
+    for (i = 0; i < pResponse->playlist_count; i++) {
+      iLen = strlen(d); // the playlist names don't have a timestamp and are shorter
+      if (memcmp(s, d, iLen) == 0) {
+        bDel = false; // keep the name
+        i = pResponse->playlist_count; // early exit from the loop
+      }
+      d += iLen + 1; // point to next name in the list
     }
     if (bDel) { // to avoid double code
       Log_info("Deleting obsolete file %s", file.name());
@@ -163,7 +162,7 @@ void filesystem_purge_old_file(const char *name) {
   time_t now;
   File rootDir;
   char *s, szTemp[32];
- 
+
   time(&now); // get the current epoch time
   rootDir = FS.open("/");
   while (File file = rootDir.openNextFile()) {
@@ -178,7 +177,7 @@ void filesystem_purge_old_file(const char *name) {
     s = (char *)file.name();
 
     timestamp = filesystem_extract_timestamp(s);
- 
+
     strcpy(szTemp, "/"); // needed on this file operation
     strcat(szTemp, file.name());
 
