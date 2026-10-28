@@ -61,6 +61,43 @@ void test_skips_trmnl_and_malformed(void) {
   TEST_ASSERT_EQUAL_INT(0, (int)nets.size());
 }
 
+void test_ssid_with_parentheses(void) {
+  String raw = "+CWLAP:(3,\"Foo (Bar)\",-50,\"aa:aa:aa:aa:aa:aa\",36)\r\n"
+               "+CWLAP:(3,\"(x)\",-60,\"bb:bb:bb:bb:bb:bb\",6)\r\nOK\r\n";
+  auto nets = parseCwlapResponse(raw);
+  TEST_ASSERT_EQUAL_INT(2, (int)nets.size());
+  ParsedModemNetwork *n = find(nets, "Foo (Bar)", true);
+  TEST_ASSERT_NOT_NULL(n);
+  TEST_ASSERT_EQUAL_INT32(-50, n->rssi);
+  TEST_ASSERT_FALSE(n->open);
+  n = find(nets, "(x)", false);
+  TEST_ASSERT_NOT_NULL(n);
+  TEST_ASSERT_EQUAL_INT32(-60, n->rssi);
+}
+
+void test_ssid_with_quotes_and_commas(void) {
+  String raw = "+CWLAP:(0,\"my \"net\",-5,\"x\",-55,\"aa:aa:aa:aa:aa:aa\",40)\r\nOK\r\n";
+  auto nets = parseCwlapResponse(raw);
+  ParsedModemNetwork *n = find(nets, "my \"net\",-5,\"x", true);
+  TEST_ASSERT_NOT_NULL(n);
+  TEST_ASSERT_EQUAL_INT32(-55, n->rssi);
+  TEST_ASSERT_TRUE(n->open);
+}
+
+void test_full_cwlapopt_fields(void) {
+  // ESP-AT's default AT+CWLAPOPT mask adds freq_offset, freqcal_val, ciphers, bgn and wps
+  String raw = "+CWLAP:(3,\"Home (5G)\",-48,\"aa:aa:aa:aa:aa:aa\",149,-1,-1,4,4,7,0)\r\nOK\r\n";
+  auto nets = parseCwlapResponse(raw);
+  ParsedModemNetwork *n = find(nets, "Home (5G)", true);
+  TEST_ASSERT_NOT_NULL(n);
+  TEST_ASSERT_EQUAL_INT32(-48, n->rssi);
+}
+
+void test_skips_empty_ssid(void) {
+  String raw = "+CWLAP:(3,\"\",-40,\"aa:aa:aa:aa:aa:aa\",6)\r\nOK\r\n";
+  TEST_ASSERT_EQUAL_INT(0, (int)parseCwlapResponse(raw).size());
+}
+
 void setUp(void) {}
 void tearDown(void) {}
 
@@ -71,6 +108,10 @@ void process() {
   RUN_TEST(test_band_from_channel);
   RUN_TEST(test_dedup_keeps_highest_rssi_same_band);
   RUN_TEST(test_skips_trmnl_and_malformed);
+  RUN_TEST(test_ssid_with_parentheses);
+  RUN_TEST(test_ssid_with_quotes_and_commas);
+  RUN_TEST(test_full_cwlapopt_fields);
+  RUN_TEST(test_skips_empty_ssid);
   UNITY_END();
 }
 

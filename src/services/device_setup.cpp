@@ -2,13 +2,13 @@
 #include <ArduinoLog.h>
 #include <HTTPClient.h>
 #include <WiFi.h>
+#include <api-client/header.h>
 #include <api-client/setup.h>
 #include <config.h>
-#include <device_id.h>
-#include <display.h>
 #include <filesystem.h>
 #include <globals.h>
 #include <http_client.h>
+#include <http_utils.h>
 #include <inttypes.h>
 #include <preferences_persistence.h>
 #include <services/device_setup.h>
@@ -19,7 +19,17 @@ DeviceSetupResult DeviceSetup::perform() {
   _result = DeviceSetupResult();
   performApiSetup();
   if (_result.outcome == DeviceSetupOutcome::Success) {
+    if (_result.imageUrl.isEmpty()) {
+      _result.friendlyId = _persistence.readString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
+      _result.showSetupScreen = true;
+    } else {
+      downloadSetupImage();
+    }
+  } else if (_result.outcome == DeviceSetupOutcome::MacNotRegistered && _result.imageUrl.length() > 0) {
     downloadSetupImage();
+    _result.outcome = DeviceSetupOutcome::MacNotRegistered;
+    _result.showSetupScreen = false;
+    _result.errorScreen = NONE;
   }
   return _result;
 }
@@ -37,13 +47,8 @@ void DeviceSetup::handleInvalidImage(uint32_t bytesRead) {
  *        _result; Success means the image download should proceed
  */
 void DeviceSetup::performApiSetup() {
-  // Set up the API inputs
-  ApiSetupInputs inputs;
+  ApiDisplayInputs inputs = createApiHeaders();
   inputs.baseUrl = _persistence.readString(PREFERENCES_API_URL, API_BASE_URL);
-  inputs.macAddress = device_mac_address();
-  inputs.firmwareVersion = FW_VERSION_STRING;
-  inputs.model = String(DEVICE_MODEL);
-  inputs.panelId = display_panel_rev_string();
 
   Log.info("%s [%d]: [HTTPS] begin /api/setup ...\r\n", __FILE__, __LINE__);
   Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
@@ -106,6 +111,7 @@ void DeviceSetup::performApiSetup() {
 
     _result.apiResponse = apiResponse;
     _result.shouldGoToSleep = true;
+    _result.imageUrl = apiResponse.image_url;
     _result.outcome = DeviceSetupOutcome::MacNotRegistered;
   } else {
     Log.info("%s [%d]: status FAIL.\r\n", __FILE__, __LINE__);
@@ -138,9 +144,11 @@ void DeviceSetup::downloadSetupImage() {
     int httpCode = https->GET();
 
     if (httpCode == HTTP_CODE_PERMANENT_REDIRECT || httpCode == HTTP_CODE_TEMPORARY_REDIRECT) {
+      // the Location may be relative (as in HttpRetryRequest)
+      String redirectUrl = resolveRedirectLocation(https->getLocation(), httpOriginOf(_result.imageUrl));
       https->end();
-      https->begin(https->getLocation());
-      Log_info("Redirected to: %s", https->getLocation().c_str());
+      https->begin(redirectUrl);
+      Log_info("Redirected to: %s", redirectUrl.c_str());
       https->setTimeout(15000);
       https->setConnectTimeout(15000);
       httpCode = https->GET();
@@ -175,14 +183,18 @@ void DeviceSetup::downloadSetupImage() {
       Log_error_submit("Failed to allocate buffer for setup image (%d bytes)", contentSize);
       return false;
     }
-    if (stream->available() && contentSize > 0) {
+    // Not gated on stream->available(): right after the headers the body may not have arrived yet
+    // (often over TLS); downloadStream waits for it.
+    if (contentSize > 0) {
       counter = downloadStream(stream, contentSize, imageBuffer);
     }
 
     if (counter == DISPLAY_BMP_IMAGE_SIZE) {
       Log.info("%s [%d]: Received successfully\r\n", __FILE__, __LINE__);
 
-      writeImageToFile("/logo.bmp", imageBuffer, DEFAULT_IMAGE_SIZE);
+      // the whole BMP (header and bitmap): it can be drawn from flash for an unregistered device
+      writeImageToFile("/logo.bmp", imageBuffer, DISPLAY_BMP_IMAGE_SIZE);
+      _result.imagePath = "/logo.bmp";
       free(imageBuffer);
 
       _result.friendlyId = _persistence.readString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
@@ -192,6 +204,7 @@ void DeviceSetup::downloadSetupImage() {
                imageBuffer[2] == 'N' && imageBuffer[3] == 'G') {
       Log.info("%s [%d]: Received PNG setup logo (%d bytes)\r\n", __FILE__, __LINE__, counter);
       writeImageToFile("/logo.png", imageBuffer, counter);
+      _result.imagePath = "/logo.png";
       free(imageBuffer);
 
       _result.friendlyId = _persistence.readString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);

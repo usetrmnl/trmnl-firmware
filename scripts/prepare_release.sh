@@ -11,12 +11,16 @@ TRMNL_ENVS=(
 BYOD_ENVS=(
     seeed_xiao_esp32c3
     xteink_x4
+    xteink_x4_pwr_btn
     TRMNL_7inch5_OG_DIY_Kit
     seeed_reTerminal_E1001
     seeed_reTerminal_E1002
     TRMNL_X_E1003
     xteink_x3
     seeed_sticky
+    seeed_reTerminal_E1004
+    TRMNL_X_PAPERS3
+    TRMNL_X_LILYGO_T5PRO
 )
 
 CONFIG="include/config.h"
