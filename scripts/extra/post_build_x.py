@@ -31,7 +31,8 @@ def post_build(source, target, env):
         print(f"board_build.filesystem is '{filesystem}'; skipping littlefs.bin in merged image")
 
     subprocess.run([
-        "pio", "pkg", "exec", "-p", "tool-esptoolpy", "esptool.py", "--",
+        # The build's Python: pioarduino installs esptool's dependencies only in its penv.
+        env.subst("$PYTHONEXE"), str(Path(env.PioPlatform().get_package_dir("tool-esptoolpy")) / "esptool.py"),
         "--chip", "ESP32S3",
         "merge_bin",
         "-o", str(output),
@@ -44,5 +45,8 @@ def post_build(source, target, env):
     print(f"Merged firmware: {output}")
 
 
-env.AddPostAction("$BUILD_DIR/${PROGNAME}.bin", post_build)
+# On "buildprog", which always runs: a firmware.bin taken from the build cache skips its own post actions
+env.AddPostAction("buildprog", post_build)
 env.AddPostAction("buildprog", lambda source, target, env: copy_versioned(env))
+# "upload" builds only firmware.bin, so it would flash without refreshing the merged image
+env.Depends("upload", "buildprog")

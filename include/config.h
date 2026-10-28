@@ -10,6 +10,9 @@
 #define STRINGIFY(x)     #x
 #define TOSTRING(x)      STRINGIFY(x)
 
+#if __has_include(<fw_commit.h>)
+#include <fw_commit.h> // written by scripts/extra/git_version.py
+#endif
 #ifndef FW_COMMIT
 #define FW_COMMIT ""
 #endif
@@ -40,8 +43,8 @@
 #define PREFERENCES_LAST_SLEEP_TIME          "last_sleep"
 #define PREFERENCES_CONNECT_API_RETRY_COUNT  "retry_count"
 #define PREFERENCES_CONNECT_WIFI_RETRY_COUNT "wifi_retry"
-#define PREFERENCES_TOUCHBAR_MODE_KEY        "touchbar_mode"
 #define PREFERENCES_LAST_OTA                 "last_ota"
+#define PREFERENCES_TOUCHBAR_TUTORIAL_KEY    "touch_tutorial" // TRMNL X: the touch bar tutorial was finished
 
 #define WIFI_CONNECTION_RSSI                 (-100)
 
@@ -164,6 +167,7 @@ typedef struct tag_trmnl_device {
   uint8_t interrupt_pin;
   uint8_t batt_pin;
   uint8_t batt_en_pin;
+  uint8_t epd_en_pin;
   uint8_t batt_type; // ADC, BQ27xx
   uint8_t panel_set;
 } TRMNL_DEVICE;
