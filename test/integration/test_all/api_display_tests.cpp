@@ -44,7 +44,7 @@ static void fetch_api_key_or_skip() {
 }
 
 static ApiDisplayInputs make_display_inputs(float battery_voltage) {
-  // Mirrors the inputs production assembles in bl.cpp around line 1400-1475.
+  // Mirrors the inputs production assembles in display_session.cpp (loadApiDisplayInputs()).
   // Anything that's not under test gets a value the real device would send.
   ApiDisplayInputs inputs = {};
   inputs.baseUrl = TEST_BACKEND_URL;
@@ -61,6 +61,7 @@ static ApiDisplayInputs make_display_inputs(float battery_voltage) {
   inputs.displayWidth = display_width();
   inputs.displayHeight = display_height();
   inputs.specialFunction = SF_NONE;
+  inputs.specialFunctionChosen = false;
   return inputs;
 }
 

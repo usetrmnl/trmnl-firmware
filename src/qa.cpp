@@ -1,7 +1,9 @@
 #include <Arduino.h>
 #include <ArduinoLog.h>
 #include <Preferences.h>
+#include <board_config.h>
 #include <display.h>
+#include <message_screens.h>
 #include <power.h>
 
 #include "WifiCaptive.h"
@@ -10,8 +12,6 @@
 #include "logo_medium.h"
 #include "logo_small.h"
 #include "pins.h"
-extern TRMNL_DEVICE *pDevice;
-void hw_config_init(const char *name);
 
 extern "C" {
 #include "esp_timer.h"   // esp_timer_get_time()

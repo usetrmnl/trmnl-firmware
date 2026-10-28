@@ -50,14 +50,16 @@ static iqs323_data_callback_t data_callback = NULL;  // Callback for new data no
 
 // Snapshot published under iqs323_mutex, see iqs323_publish_snapshot().
 static touchbar_snapshot_t g_touchbar_snapshot = {
-    false, false, false, IQS323_GESTURE_NONE, 65535, 0
+    false, false, false, 0
 };
 
 // One-time copy taken at wake-stub validation; never updated again.
 static touchbar_snapshot_t g_wake_stub_snapshot = {
-    false, false, false, IQS323_GESTURE_NONE, 65535, 0
+    false, false, false, 0
 };
 static bool g_wake_stub_snapshot_valid = false;
+// Channels (bit n: channel n) whose touch started since iqs323_task_take_touch_starts(), under iqs323_mutex
+static uint8_t g_touch_starts = 0;
 
 // Sole accessor of the IQS323 object; other files use the snapshot/request API below.
 IQS323 iqs323;
@@ -303,22 +305,17 @@ void iqs323_task_set_data_callback(iqs323_data_callback_t callback)
 // Decodes current IQS323 state into g_touchbar_snapshot. Caller must hold iqs323_mutex.
 static void iqs323_publish_snapshot(void)
 {
+    const touchbar_snapshot_t before = g_touchbar_snapshot;
     g_touchbar_snapshot.ch0_touch = iqs323.channel_touchState(IQS323_CH0);
     g_touchbar_snapshot.ch1_touch = iqs323.channel_touchState(IQS323_CH1);
     g_touchbar_snapshot.ch2_touch = iqs323.channel_touchState(IQS323_CH2);
+    if (g_touchbar_snapshot.ch0_touch && !before.ch0_touch) g_touch_starts |= 1 << 0;
+    if (g_touchbar_snapshot.ch1_touch && !before.ch1_touch) g_touch_starts |= 1 << 1;
+    if (g_touchbar_snapshot.ch2_touch && !before.ch2_touch) g_touch_starts |= 1 << 2;
 
     Serial.printf("IQS323 Task: publish snapshot at t=%lu ch0=%d ch1=%d ch2=%d STATUS=0x%02X 0x%02X\n",
         (unsigned long)millis(), g_touchbar_snapshot.ch0_touch, g_touchbar_snapshot.ch1_touch, g_touchbar_snapshot.ch2_touch,
         iqs323.IQSMemoryMap.SYSTEM_STATUS[0], iqs323.IQSMemoryMap.SYSTEM_STATUS[1]);
-
-    g_touchbar_snapshot.slider_position = iqs323.sliderCoordinate();
-
-    if (iqs323.getSliderEvent()) {
-        iqs323_gesture_events gesture = iqs323.getGestureType();
-        if (gesture != IQS323_GESTURE_NONE) {
-            g_touchbar_snapshot.slider_event = gesture;
-        }
-    }
 
     g_touchbar_snapshot.last_updated_ms = millis();
 }
@@ -334,6 +331,19 @@ void iqs323_task_read_snapshot(touchbar_snapshot_t *out)
     } else {
         *out = g_touchbar_snapshot; // mutex unavailable, best-effort stale copy
     }
+}
+
+uint8_t iqs323_task_take_touch_starts(void)
+{
+    uint8_t starts;
+    if (iqs323_mutex != NULL && xSemaphoreTake(iqs323_mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+        starts = g_touch_starts;
+        g_touch_starts = 0;
+        xSemaphoreGive(iqs323_mutex);
+    } else {
+        starts = 0; // left for the next call
+    }
+    return starts;
 }
 
 bool iqs323_task_read_wake_stub_snapshot(touchbar_snapshot_t *out)
@@ -369,28 +379,17 @@ bool iqs323_task_set_streaming_mode(bool enable)
     return true;
 }
 
-bool iqs323_task_set_gesture_config(bool tap_mode)
+bool iqs323_task_set_gesture_config(void)
 {
     if (iqs323_mutex == NULL || xSemaphoreTake(iqs323_mutex, pdMS_TO_TICKS(200)) != pdTRUE) {
         Serial.println("IQS323 Task: Failed to acquire mutex for gesture config write");
         return false;
     }
 
-    iqs323.setGestureConfig(tap_mode, STOP);
+    iqs323.setGestureConfig(true, STOP); // tap gestures, touch events only
 
     xSemaphoreGive(iqs323_mutex);
     return true;
-}
-
-void iqs323_task_clear_slider_event(void)
-{
-    if (iqs323_mutex == NULL || xSemaphoreTake(iqs323_mutex, pdMS_TO_TICKS(200)) != pdTRUE) {
-        return;
-    }
-
-    g_touchbar_snapshot.slider_event = IQS323_GESTURE_NONE;
-
-    xSemaphoreGive(iqs323_mutex);
 }
 
 /**

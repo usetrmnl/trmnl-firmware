@@ -12,6 +12,9 @@
 /** Prepare peripherals, enable timer + GPIO wake, enter deep sleep. */
 void goToSleep(void);
 
+/** Sync the clock from NTP and set time_since_sleep from the time goToSleep saved (0 when unsynced). */
+void updateTimeSinceSleep(void);
+
 /** Deep sleep until button only (no timer). Currently has no callers (wifiErrorDeepSleep now
  * sleeps on the slow-retry timer at the limit). */
 void goToSleepButtonOnly(void);

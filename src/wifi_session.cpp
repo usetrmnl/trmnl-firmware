@@ -7,6 +7,7 @@
 #include <globals.h>
 #include <messages.h>
 #include <sleep_session.h>
+#include <status_screens.h>
 #include <trmnl_log.h>
 #include <wifi-helpers.h>
 #include <wifi_network.h>
@@ -133,10 +134,16 @@ void wifiSessionConnect(bool should_show_error_now) {
     Log_info("FW version %s", Messages::firmware_version().c_str());
 
     showMessageWithLogo(WIFI_CONNECT, "", false, Messages::firmware_version().c_str(), WifiCaptivePortal.getAPSSID());
-#ifdef BOARD_TRMNL_X
-    touchbar_init_captive_portal_power_off_hook();
-#endif
     WifiCaptivePortal.setResetSettingsCallback(resetDeviceCredentials);
+#ifdef BOARD_TRMNL_X
+    // Device builders hold the middle of the touch bar to check it and ship the device
+    WifiCaptivePortal.setPortalTickCallback([]() {
+      if (touchbar_poll_ship_check()) {
+        showMessageWithLogo(WIFI_CONNECT, "", false, Messages::firmware_version().c_str(),
+                            WifiCaptivePortal.getAPSSID());
+      }
+    });
+#endif
     bool portal_ok = WifiCaptivePortal.startPortal();
     if (!portal_ok) {
       WiFi.disconnect(true);
