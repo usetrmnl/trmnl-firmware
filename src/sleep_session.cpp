@@ -44,12 +44,12 @@ void goToSleep(void) {
 #endif
 
 #ifdef WAVESHARE_PHOTOPAINTER
-    Wire.begin(47, 48);
-    Wire.beginTransmission(0x34); // AXP2101
-    Wire.write(0x90); // LDOS ON/OFF control
-    Wire.write(0); // all LDOs off
-    Wire.write(0);
-    Wire.endTransmission();
+  Wire.begin(47, 48);
+  Wire.beginTransmission(0x34); // AXP2101
+  Wire.write(0x90); // LDOS ON/OFF control
+  Wire.write(0); // all LDOs off
+  Wire.write(0);
+  Wire.endTransmission();
 #endif // WAVESHARE_PHOTOPAINTER
 
 #if BOARD_TRMNL_X
