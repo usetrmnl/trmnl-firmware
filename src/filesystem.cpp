@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <config.h>
 #include <filesystem.h>
 #include <inttypes.h>
 #include <trmnl_log.h>
@@ -340,6 +341,63 @@ void writeImageToFile(const char *name, uint8_t *in_buffer, size_t size) {
   }
 }
 
+void update_playlist_order(Preferences &preferences, const char *new_path, const char *prev_path) {
+  String order = preferences.getString(PREFERENCES_PLAYLIST_ORDER_KEY, "");
+  String newStr = String(new_path);
+  String prefix = newStr.substring(0, 14); // same-plugin identity (matches purge logic)
+  String prevStr = String(prev_path);
+
+  if (order.isEmpty()) {
+    preferences.putString(PREFERENCES_PLAYLIST_ORDER_KEY, newStr);
+    return;
+  }
+
+  // Scan list: update in-place if prefix matches (refresh), otherwise build a cleaned list
+  // dropping entries whose files no longer exist (except prev_path, which anchors insertion).
+  bool found = false;
+  String result = "";
+  int start = 0;
+  while (start <= (int)order.length()) {
+    int sep = order.indexOf('|', start);
+    String entry = (sep < 0) ? order.substring(start) : order.substring(start, sep);
+    if (!entry.isEmpty()) {
+      if (!found && entry.startsWith(prefix)) {
+        result += (result.isEmpty() ? "" : "|") + newStr;
+        found = true;
+      } else if (entry == prevStr || filesystem_file_exists(entry.c_str())) {
+        result += (result.isEmpty() ? "" : "|") + entry;
+      }
+      // else: file was purged from filesystem — drop from list
+    }
+    if (sep < 0) break;
+    start = sep + 1;
+  }
+  if (found) {
+    preferences.putString(PREFERENCES_PLAYLIST_ORDER_KEY, result);
+    return;
+  }
+
+  // New plugin — insert right after prev_path's position in the cleaned list
+  String result2 = "";
+  bool inserted = false;
+  start = 0;
+  while (start <= (int)result.length()) {
+    int sep = result.indexOf('|', start);
+    String entry = (sep < 0) ? result.substring(start) : result.substring(start, sep);
+    if (!entry.isEmpty()) {
+      result2 += (result2.isEmpty() ? "" : "|") + entry;
+      if (!inserted && entry == prevStr) {
+        result2 += "|" + newStr;
+        inserted = true;
+      }
+    }
+    if (sep < 0) break;
+    start = sep + 1;
+  }
+  if (!inserted) result2 += (result2.isEmpty() ? "" : "|") + newStr;
+  preferences.putString(PREFERENCES_PLAYLIST_ORDER_KEY, result2);
+}
+
 void filesystem_fix_filename(const char *src, char *dest) {
   int iLen;
 
@@ -363,3 +421,42 @@ bool filesystem_fixed_file_exists(String &newName) {
     szTemp); // shorten the name (if needed) to fit the SPIFFS file length limit of 31 chars + 0 terminator
   return filesystem_file_exists(szTemp);
 } /* filesystem_fixed_file_exists() */
+
+/**
+ * @brief Function to read an image from the file system
+ * @param filename
+ * @param pointer to file size returned
+ * @return pointer to allocated buffer
+ */
+uint8_t *display_read_file(const char *filename, int *file_size) {
+  File f = FS.open(filename, "r");
+  uint8_t *buffer;
+
+  if (!f) {
+    Serial.println("Failed to open file!");
+    *file_size = 0;
+    return nullptr;
+  }
+  *file_size = f.size();
+  if (*file_size == 0) {
+    Serial.println("File is empty!");
+    f.close();
+    return nullptr;
+  }
+  Serial.printf("File size to allocate: %d bytes\n", *file_size);
+#ifdef CONFIG_SPIRAM
+  Serial.println("Allocating file buffer in PSRAM");
+  buffer = (uint8_t *)ps_malloc(*file_size);
+#else
+  Serial.println("Allocating file buffer in regular RAM");
+  buffer = (uint8_t *)malloc(*file_size);
+#endif
+  if (!buffer) {
+    Serial.println("Memory allocation failed!");
+    *file_size = 0;
+    return nullptr;
+  }
+  f.read(buffer, *file_size);
+  f.close();
+  return buffer;
+} /* display_read_file() */

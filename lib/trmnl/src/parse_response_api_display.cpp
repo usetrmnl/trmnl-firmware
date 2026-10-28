@@ -26,7 +26,6 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
         .reset_firmware = false,
         .special_function = SF_NONE,
         .action = "",
-        .touchbar_mode = "",
         .playlist_count = 0,
         .playlist_names = NULL};
   }
@@ -70,7 +69,6 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
       .reset_firmware = doc["reset_firmware"],
       .special_function = parseSpecialFunction(special_function_str),
       .action = doc["action"] | "",
-      .touchbar_mode = doc["touchbar_mode"] | "",
       .playlist_count = (uint32_t)iCount,
       .playlist_names = pNames};
 }

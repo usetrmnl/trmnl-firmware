@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <Preferences.h>
 #include <api_types.h>
 
 /**
@@ -85,6 +86,17 @@ size_t filesystem_write_to_file(const char *name, uint8_t *in_buffer, size_t siz
 void writeImageToFile(const char *name, uint8_t *in_buffer, size_t size);
 
 /**
+ * @brief Update the X playlist order NVS string after a new image becomes current.
+ *        Refreshes an existing same-plugin entry in place, or inserts after prev_path.
+ *        Drops playlist entries whose files no longer exist (except prev_path).
+ * @param preferences NVS "data" namespace
+ * @param new_path path that is now current
+ * @param prev_path previous current path (may be empty)
+ * @return none
+ */
+void update_playlist_order(Preferences &preferences, const char *new_path, const char *prev_path);
+
+/**
  * @brief Function to shorten a filename (if needed) to fit the SPIFFS file length
  *        limit of 31 chars + 0 terminator, prefixing the root dir
  * @param src source filename
@@ -131,3 +143,11 @@ bool filesystem_file_rename(const char *old_name, const char *new_name);
 uint32_t filesystem_extract_timestamp(const char *filename);
 
 void list_files();
+
+/**
+ * @brief Function to read an image from the file system
+ * @param filename
+ * @param pointer to file size returned
+ * @return pointer to allocated buffer
+ */
+uint8_t *display_read_file(const char *filename, int *file_size);

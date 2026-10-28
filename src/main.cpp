@@ -10,6 +10,7 @@
 #include "esp_sleep.h"
 #include "filesystem.h"
 #include "logo_medium.h"
+#include "message_screens.h"
 #include "modem.h"
 
 // TRMNL X setup (quite different from OG)
