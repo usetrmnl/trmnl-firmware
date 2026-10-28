@@ -13,6 +13,11 @@ void log_impl(LogLevel level, LogMode mode, const char *file, int line, const ch
 void set_verbose_logging(bool enabled);
 bool get_verbose_logging();
 
+/// The saved verbose-logging setting (on by default in dev firmware)
+bool read_verbose_logging();
+/// Saves the verbose-logging setting and applies it right away
+void write_verbose_logging(bool enabled);
+
 #define _LOG_IMPL(level, mode, format, ...) log_impl(level, mode, __FILE__, __LINE__, format, ##__VA_ARGS__)
 
 /**

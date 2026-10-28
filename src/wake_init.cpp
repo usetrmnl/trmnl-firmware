@@ -57,18 +57,8 @@ uint32_t bootEarly(void)
   uint32_t init_time = micros();
   startup_time = init_time/1000L; // convert to milliseconds
 #endif
-  // Serial logging is on when the portal or the server turned it on (on by default in dev firmware).
-  // A read-only handle, since the shared preferences open later in openPreferences().
-  Preferences prefs;
-#ifdef DEV_FIRMWARE
-  bool verbose_logging = true;
-#else
-  bool verbose_logging = false;
-#endif
-  if (prefs.begin("data", true)) {
-    verbose_logging = prefs.getBool(PREFERENCES_VERBOSE_LOG_KEY, verbose_logging);
-    prefs.end();
-  }
+  // Serial logging is on when the portal or the server turned it on (on by default in dev firmware)
+  bool verbose_logging = read_verbose_logging();
   set_verbose_logging(verbose_logging);
 #ifdef WAIT_FOR_SERIAL
   if (verbose_logging) wait_for_serial();

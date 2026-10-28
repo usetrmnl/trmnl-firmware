@@ -156,6 +156,30 @@ void set_verbose_logging(bool enabled) {
 
 bool get_verbose_logging() { return serial_logging_enabled; }
 
+// Uses its own handle, so it works before openPreferences() and from the portal's web server
+bool read_verbose_logging() {
+#ifdef DEV_FIRMWARE
+  bool enabled = true;
+#else
+  bool enabled = false;
+#endif
+  Preferences prefs;
+  if (prefs.begin("data", true)) {
+    enabled = prefs.getBool(PREFERENCES_VERBOSE_LOG_KEY, enabled);
+    prefs.end();
+  }
+  return enabled;
+}
+
+void write_verbose_logging(bool enabled) {
+  Preferences prefs;
+  if (prefs.begin("data", false)) {
+    prefs.putBool(PREFERENCES_VERBOSE_LOG_KEY, enabled);
+    prefs.end();
+  }
+  set_verbose_logging(enabled);
+}
+
 static void handle_store_submit(LogLevel level, const char *clean_message, const char *file, int line,
                                 LogMode mode = LOG_STORE_ONLY) {
   if (level >= store_submit_threshold) {

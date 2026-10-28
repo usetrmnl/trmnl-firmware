@@ -62,8 +62,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse) {
   if (apiResponse.verbose_logging.length() > 0) {
     bool enabled = (apiResponse.verbose_logging == "debug");
     if (enabled != get_verbose_logging()) {
-      set_verbose_logging(enabled);
-      preferences.putBool(PREFERENCES_VERBOSE_LOG_KEY, enabled);
+      write_verbose_logging(enabled);
     }
   }
 
