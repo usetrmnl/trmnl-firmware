@@ -133,3 +133,11 @@ bool filesystem_file_rename(const char *old_name, const char *new_name);
 uint32_t filesystem_extract_timestamp(const char *filename);
 
 void list_files();
+
+/**
+ * @brief Function to read an image from the file system
+ * @param filename
+ * @param pointer to file size returned
+ * @return pointer to allocated buffer
+ */
+uint8_t *display_read_file(const char *filename, int *file_size);
