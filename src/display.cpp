@@ -215,7 +215,11 @@ void display_wipe(void)
     int refreshCount = 60;
 #endif
 
-    bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit);
+    if (pDevice->epd_mosi_pin == pDevice->epd_sck_pin) { // predefined device
+        bbep.begin(dpList[pDevice->panel_set][0].OneBit);
+    } else {
+        bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit);
+    }
     bbep.fillScreen(BBEP_WHITE);
     for (int i=0; i<refreshCount; i++) {
         bbep.refresh(REFRESH_FULL); // 2 to 3 minutes of Black/White clearing of the display
