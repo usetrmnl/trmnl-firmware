@@ -26,4 +26,7 @@ extern const DISPLAY_PROFILE dpList[12][3];
 bool display_update_epaper(int refreshMode, bool wait, bool writePlane = false, uint8_t plane = PLANE_0);
 void display_select_one_bit_panel(bool only_if_changed = false);
 void display_prepare_message(void);
+
+// Reads the panel ID (REV command) over bit-banged SPI; 0 when unknown or not readable
+uint32_t get_panel_rev(void);
 #endif // BB_EPAPER
