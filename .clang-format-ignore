@@ -27,3 +27,6 @@ src/png_render.cpp
 src/jpeg_render.cpp
 src/display_widgets.cpp
 src/message_screens.cpp
+src/wake_init.cpp
+src/setup_session.cpp
+src/request_handling.cpp
