@@ -133,7 +133,7 @@
 
 /* Gesture Setup */
 /* Memory Map Position 0xA0 - 0xA6 */
-#define GESTURE_SELECT                           0x0B
+#define GESTURE_SELECT                           0x09
 #define RESERVED_BYTE                            0x00
 #define MINIMUM_TIME_0                           0x32
 #define MINIMUM_TIME_1                           0x00
@@ -184,7 +184,7 @@
 #define I2C_TIMEOUT_1                            0x00
 #define PROX_EVENT_TIMEOUT                       0x75
 #define TOUCH_EVENT_TIMEOUT                      0x75
-#define EVENTS_ENABLE                            0x04
+#define EVENTS_ENABLE                            0x02
 #define ACTIVATION_THRESHOLD                     0x18
 #define RELEASE_DELTA_PERCENTAGE                 0x08
 #define DELTA_SNAP_SAMPLE_DELAY                  0x0A
