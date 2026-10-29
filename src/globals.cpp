@@ -24,6 +24,7 @@ unsigned long startup_time = 0;
 uint32_t time_since_sleep;
 float battery_voltage;
 esp_sleep_wakeup_cause_t wakeup_reason = ESP_SLEEP_WAKEUP_UNDEFINED;
+uint64_t ext1_wake_bits = 0;
 SPECIAL_FUNCTION special_function = SF_NONE;
 bool special_function_chosen = false;
 RTC_DATA_ATTR int iPrevWakeTime = 0;

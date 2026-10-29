@@ -43,6 +43,7 @@ extern unsigned long startup_time; // millis() at boot, for the wake time statis
 extern uint32_t time_since_sleep;
 extern float battery_voltage; // read at wake, before the display and WiFi draw current
 extern esp_sleep_wakeup_cause_t wakeup_reason;
+extern uint64_t ext1_wake_bits; // which ext1 pin(s) woke us, on boards with extra wake buttons
 extern SPECIAL_FUNCTION special_function;
 extern bool special_function_chosen; // picked on the device (TRMNL X touch menu), not the saved one
 extern int last_wifi_rssi;              // RTC: signal strength (dBm) at the last connection, 0 if unknown

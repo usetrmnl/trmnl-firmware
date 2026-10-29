@@ -91,6 +91,12 @@ WakeContext readWakeContext(void) {
   bool gpio_wakeup = (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO || wakeup_reason == ESP_SLEEP_WAKEUP_EXT0 ||
                       wakeup_reason == ESP_SLEEP_WAKEUP_EXT1);
   Log.info("%s [%d]: Wake reason: %d\r\n", __FILE__, __LINE__, (int)wakeup_reason);
+#ifdef CONFIG_IDF_TARGET_ESP32S3
+  if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT1 && has_extra_wake_buttons()) {
+    ext1_wake_bits = esp_sleep_get_ext1_wakeup_status();
+    Log_info("ext1 wake bits=0x%llx", (unsigned long long)ext1_wake_bits);
+  }
+#endif
   return WakeContext{wakeup_reason, gpio_wakeup, should_show_error_now};
 }
 
@@ -109,7 +115,10 @@ void openPreferences(void) {
 #ifndef BOARD_TRMNL_X
 void startBoardHardware(const WakeContext &wake, uint32_t init_time) {
   bool double_click = false;
-  if (wake.gpio) {
+  // An extra-button wake is a plain press: the classification below reads
+  // only the interrupt pin and would idle through its double-click window.
+  bool skip_button_read = ext1_wake_bits != 0 && (ext1_wake_bits & (1ULL << pDevice->interrupt_pin)) == 0;
+  if (wake.gpio && !skip_button_read) {
     Log_info("GPIO wakeup detected (%d)", wake.reason);
     ButtonPressResult button = read_button_presses();
     wait_for_serial();

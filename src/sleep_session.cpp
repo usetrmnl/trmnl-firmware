@@ -17,12 +17,31 @@
 #include <trmnl_log.h>
 
 #include "driver/gpio.h"
+#ifdef CONFIG_IDF_TARGET_ESP32S3
+#include "driver/rtc_io.h"
+#endif
 
 #ifdef BOARD_TRMNL_X
 #include <iqs323_task.h>
 #include <touchbar_gesture.h>
 
 #include "rtc_wake_stub_trmnl_x.h"
+#endif
+
+#ifdef CONFIG_IDF_TARGET_ESP32S3
+// Wake on any of the device's buttons. The extra buttons rely on internal
+// pull-ups, which must be held through deep sleep via the RTC domain.
+static void multi_button_arm_wakeup(void) {
+  uint64_t mask = wake_button_mask();
+  for (int p = 0; p < 64; p++) {
+    if ((mask & (1ULL << p)) == 0) continue;
+    rtc_gpio_init((gpio_num_t)p);
+    rtc_gpio_set_direction((gpio_num_t)p, RTC_GPIO_MODE_INPUT_ONLY);
+    rtc_gpio_pullup_en((gpio_num_t)p);
+    rtc_gpio_pulldown_dis((gpio_num_t)p);
+  }
+  esp_sleep_enable_ext1_wakeup(mask, ESP_EXT1_WAKEUP_ANY_LOW);
+}
 #endif
 
 /**
@@ -81,7 +100,10 @@ void goToSleep(void) {
 #ifdef BOARD_TRMNL_X
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
 #else
-  esp_sleep_enable_ext0_wakeup((gpio_num_t)pDevice->interrupt_pin, 0);
+  if (has_extra_wake_buttons())
+    multi_button_arm_wakeup();
+  else
+    esp_sleep_enable_ext0_wakeup((gpio_num_t)pDevice->interrupt_pin, 0);
 #endif
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"
@@ -131,7 +153,10 @@ void goToSleepButtonOnly(void) {
 #ifdef BOARD_TRMNL_X
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
 #else
-  esp_sleep_enable_ext0_wakeup((gpio_num_t)pDevice->interrupt_pin, 0);
+  if (has_extra_wake_buttons())
+    multi_button_arm_wakeup();
+  else
+    esp_sleep_enable_ext0_wakeup((gpio_num_t)pDevice->interrupt_pin, 0);
 #endif
 #else
 #error "Unsupported ESP32 target for GPIO wakeup configuration"

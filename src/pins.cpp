@@ -11,7 +11,7 @@ void pins_init(void) {
 #ifdef BOARD_TRMNL_X
   io_conf.pin_bit_mask = (1ULL << PIN_INTERRUPT);
 #else
-  io_conf.pin_bit_mask = (1ULL << pDevice->interrupt_pin);
+  io_conf.pin_bit_mask = wake_button_mask();
 #endif
   io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
   io_conf.pull_up_en = GPIO_PULLUP_ENABLE;

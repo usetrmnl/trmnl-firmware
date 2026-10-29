@@ -2,6 +2,8 @@
 #include <Preferences.h>
 #include <api-client/header.h>
 #include <battery.h>
+#include <board_config.h>
+#include <button_wakeup.h>
 #include <config.h>
 #include <device_id.h>
 #include <display.h>
@@ -19,6 +21,13 @@ ApiDisplayInputs createApiHeaders() {
     inputs.updateSource = String(wakeupReasonString);
   } else {
     inputs.updateSource = "unknown";
+  }
+  // Name the button that woke us in Update-Source. The interrupt pin reports
+  // "button"; the extra buttons report "button_a" and "button_b".
+  if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT1 && ext1_wake_bits != 0 && has_extra_wake_buttons()) {
+    const char *button_source =
+      updateSourceForWakeBits(ext1_wake_bits, pDevice->interrupt_pin, pDevice->button_a_pin, pDevice->button_b_pin);
+    if (button_source != nullptr) inputs.updateSource = button_source;
   }
 
   if (preferences.isKey(PREFERENCES_API_KEY)) {

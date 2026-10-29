@@ -16,13 +16,13 @@ TRMNL_DEVICE *pDevice = NULL;
 // clang-format off
 const TRMNL_DEVICE device_list[] = 
 {
-// name           board_name            panel_type.            sda    scl    intr   batt  batt_en batt_type
-  "x",            BB_PANEL_TRMNL_X,     BB_PANEL_NONE,         0xff,  0xff,  0xff,  0xff, 0xff,   BATT_ADC,
-  "m5_papers3",   BB_PANEL_M5PAPERS3,   BB_PANEL_NONE,         0xff,  0xff,  0xff,  3,    0xff,   BATT_ADC,
-  "sensoria_c5",  BB_PANEL_SENSORIA_C5, BB_PANEL_NONE,         7,     6,     0,     0xff, 0xff,   BATT_ADC,
-  "lilygo_t5pro", BB_PANEL_EPDIY_V7,    BBEP_DISPLAY_ED047TC1, 39,    40,    0,     0xff, 0xff,   BATT_BQ27220,
-  "reterminal_e1003", BB_PANEL_NONE,    BB_PANEL_NONE,         0xff,  0xff,  3,     1,    40,     BATT_ADC, // IT8951 init is in display_init()
-  NULL, 0, 0, 0, 0, 0, 0, 0, 0,
+// name           board_name            panel_type.            sda    scl    intr   btn_a  btn_b  batt  batt_en batt_type
+  "x",            BB_PANEL_TRMNL_X,     BB_PANEL_NONE,         0xff,  0xff,  0xff,  0xff,  0xff,  0xff, 0xff,   BATT_ADC,
+  "m5_papers3",   BB_PANEL_M5PAPERS3,   BB_PANEL_NONE,         0xff,  0xff,  0xff,  0xff,  0xff,  3,    0xff,   BATT_ADC,
+  "sensoria_c5",  BB_PANEL_SENSORIA_C5, BB_PANEL_NONE,         7,     6,     0,     0xff,  0xff,  0xff, 0xff,   BATT_ADC,
+  "lilygo_t5pro", BB_PANEL_EPDIY_V7,    BBEP_DISPLAY_ED047TC1, 39,    40,    0,     0xff,  0xff,  0xff, 0xff,   BATT_BQ27220,
+  "reterminal_e1003", BB_PANEL_NONE,    BB_PANEL_NONE,         0xff,  0xff,  3,     0xff,  0xff,  1,    40,     BATT_ADC, // IT8951 init is in display_init()
+  NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 }; // Parallel Eink device list
 // clang-format on
 
@@ -30,30 +30,30 @@ const TRMNL_DEVICE device_list[] =
 // clang-format off
 const TRMNL_DEVICE device_list[] = 
 {
-// name            sck   mosi   cs   rst   dc   busy  sda   scl   intr   batt  batt_en, epd_en  batt_type, panel
-  "og",            7,    8,     6,   10,   5,   4,    21,   20,   2,     3,    0xff,    0xff,   BATT_ADC,  EPD_75,
-  "og_4clr",       7,    8,     6,   10,   5,   4,    21,   20,   2,     3,    0xff,    0xff,   BATT_ADC,  EPD_75_4CLR,
-  "og_gen2",       6,    1,     4,   2,    5,   0,    23,   10,   3,     0xff, 0xff,    0xff,   BATT_BQ27427,  EPD_75, // fake battery == 0xff
-  "og_gen2_4clr",  6,    1,     4,   2,    5,   0,    23,   10,   3,     0xff, 0xff,    0xff,   BATT_BQ27427,  EPD_75_4CLR, // fake battery == 0xff
-  "xteink_x4",     8,    10,    21,  5,    4,   6,    0xff, 0xff, 3,     0,    0xff,    0xff,   BATT_ADC,  EPD_426,
-  "xteink_x3",     8,    10,    21,  5,    4,   6,    20,   0,    3,     0xff, 0xff,    0xff,   BATT_BQ27220,  EPD_368,
-  "waveshare",     13,   14,    15,  26,   27,  25,   0xff, 0xff, 33,    0xff, 0xff,    0xff,   BATT_ADC,  EPD_75,
-  "waveshare_397", 11,   12,    10,  46,   9,   3,    41,   42,   0,     0xff, 0xff,    0xff,   BATT_AXP2101,  EPD_397,
-  "seeed_sticky",  13,   14,    15,  17,   16,  18,   1,    0,    4,     0xff, 0xff,    0xff,   BATT_BQ27220,  EPD_397,  
-  "seeed_esp32c3", 8,    10,    3,   2,    5,   4,    0xff, 0xff, 9,     0xff, 0xff,    0xff,   BATT_ADC,  EPD_75,
-  "seeed_esp32s3", 7,    9,     2,   1,    4,   3,    0xff, 0xff, 0,     0xff, 0xff,    0xff,   BATT_ADC,  EPD_75,
-  "xiao_epaper_mini", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 2,     1,    6,       0xff,   BATT_ADC,  EPD_426,
-  "xiao_epaper_display", 7, 9,  44,  38,   10,  4,    0xff, 0xff, 5,     1,    6,       0xff,   BATT_ADC,  EPD_75,
-  "xiao_epaper_3clr", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 5,     1,    6,       0xff,   BATT_ADC,  EPD_75_3CLR,
-  "xiao_epaper_6clr", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 5,     1,    6,       0xff,   BATT_ADC,  EPD_75_6CLR,
-  "reterminal_e1001", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     1,    21,      0xff,   BATT_ADC,  EPD_75,
-  "reterminal_e1002", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     1,    21,      12,     BATT_ADC,  EPD_75_6CLR,
-  "crowpanel42",   0,    0,     0,   0,    0,   0,    0xff, 0xff, 2,     0xff, 0xff,    0xff,   BATT_NONE, EPD_CROWPANEL, 
-  "m5_paper_mono", 0,    0,     0,   0,    0,   0,    47,   48,   2,     0xff, 0xff,    0xff,   BATT_NONE, EPD_PAPER_MONO, 
-  "m5_paper_color", 0,   0,     0,   0,    0,   0,    3,    2,    1,     0xff, 0xff,    0xff,   BATT_NONE, EPD_PAPER_COLOR, 
-  "reterminal_e1004", 0, 0,     0,   0,    0,   0,    0xff, 0xff, 4,     1,    21,      12,     BATT_ADC,  EPD_133_COLOR,
-  "trmnl_steam",   7,    8,     6,   10,   5,   4,    21,   20,   2,     3,    0xff,    0xff,   BATT_ADC,  EPD_583,
-  NULL,            0,    0,     0,   0,    0,   0,    0,    0,    0,     0,    0,       0,      0,         0,
+// name            sck   mosi   cs   rst   dc   busy  sda   scl   intr   btn_a  btn_b  batt  batt_en, epd_en  batt_type, panel
+  "og",            7,    8,     6,   10,   5,   4,    21,   20,   2,     0xff,  0xff,  3,    0xff,    0xff,   BATT_ADC,  EPD_75,
+  "og_4clr",       7,    8,     6,   10,   5,   4,    21,   20,   2,     0xff,  0xff,  3,    0xff,    0xff,   BATT_ADC,  EPD_75_4CLR,
+  "og_gen2",       6,    1,     4,   2,    5,   0,    23,   10,   3,     0xff,  0xff,  0xff, 0xff,    0xff,   BATT_BQ27427,  EPD_75, // fake battery == 0xff
+  "og_gen2_4clr",  6,    1,     4,   2,    5,   0,    23,   10,   3,     0xff,  0xff,  0xff, 0xff,    0xff,   BATT_BQ27427,  EPD_75_4CLR, // fake battery == 0xff
+  "xteink_x4",     8,    10,    21,  5,    4,   6,    0xff, 0xff, 3,     0xff,  0xff,  0,    0xff,    0xff,   BATT_ADC,  EPD_426,
+  "xteink_x3",     8,    10,    21,  5,    4,   6,    20,   0,    3,     0xff,  0xff,  0xff, 0xff,    0xff,   BATT_BQ27220,  EPD_368,
+  "waveshare",     13,   14,    15,  26,   27,  25,   0xff, 0xff, 33,    0xff,  0xff,  0xff, 0xff,    0xff,   BATT_ADC,  EPD_75,
+  "waveshare_397", 11,   12,    10,  46,   9,   3,    41,   42,   0,     0xff,  0xff,  0xff, 0xff,    0xff,   BATT_AXP2101,  EPD_397,
+  "seeed_sticky",  13,   14,    15,  17,   16,  18,   1,    0,    4,     0xff,  0xff,  0xff, 0xff,    0xff,   BATT_BQ27220,  EPD_397,  
+  "seeed_esp32c3", 8,    10,    3,   2,    5,   4,    0xff, 0xff, 9,     0xff,  0xff,  0xff, 0xff,    0xff,   BATT_ADC,  EPD_75,
+  "seeed_esp32s3", 7,    9,     2,   1,    4,   3,    0xff, 0xff, 0,     0xff,  0xff,  0xff, 0xff,    0xff,   BATT_ADC,  EPD_75,
+  "xiao_epaper_mini", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 2,     0xff,  0xff,  1,    6,       0xff,   BATT_ADC,  EPD_426,
+  "xiao_epaper_display", 7, 9,  44,  38,   10,  4,    0xff, 0xff, 5,     0xff,  0xff,  1,    6,       0xff,   BATT_ADC,  EPD_75,
+  "xiao_epaper_3clr", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 5,     0xff,  0xff,  1,    6,       0xff,   BATT_ADC,  EPD_75_3CLR,
+  "xiao_epaper_6clr", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 5,     0xff,  0xff,  1,    6,       0xff,   BATT_ADC,  EPD_75_6CLR,
+  "reterminal_e1001", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     4,     5,     1,    21,      0xff,   BATT_ADC,  EPD_75,
+  "reterminal_e1002", 7, 9,     10,  12,   11,  13,   0xff, 0xff, 3,     0xff,  0xff,  1,    21,      12,     BATT_ADC,  EPD_75_6CLR,
+  "crowpanel42",   0,    0,     0,   0,    0,   0,    0xff, 0xff, 2,     0xff,  0xff,  0xff, 0xff,    0xff,   BATT_NONE, EPD_CROWPANEL, 
+  "m5_paper_mono", 0,    0,     0,   0,    0,   0,    47,   48,   2,     0xff,  0xff,  0xff, 0xff,    0xff,   BATT_NONE, EPD_PAPER_MONO, 
+  "m5_paper_color", 0,   0,     0,   0,    0,   0,    3,    2,    1,     0xff,  0xff,  0xff, 0xff,    0xff,   BATT_NONE, EPD_PAPER_COLOR, 
+  "reterminal_e1004", 0, 0,     0,   0,    0,   0,    0xff, 0xff, 4,     0xff,  0xff,  1,    21,      12,     BATT_ADC,  EPD_133_COLOR,
+  "trmnl_steam",   7,    8,     6,   10,   5,   4,    21,   20,   2,     0xff,  0xff,  3,    0xff,    0xff,   BATT_ADC,  EPD_583,
+  NULL,            0,    0,     0,   0,    0,   0,    0,    0,    0,     0, 0, 0,    0,       0,      0,         0,
 }; // device_list
 // clang-format on
 
@@ -90,3 +90,14 @@ void hw_config_init(void) {
     Log_info("Device name (%s) not found in supported list!", DEVICE_MODEL);
   }
 } /* hw_config_init() */
+
+bool has_extra_wake_buttons(void) {
+  return pDevice->button_a_pin != 0xff || pDevice->button_b_pin != 0xff;
+} /* has_extra_wake_buttons() */
+
+uint64_t wake_button_mask(void) {
+  uint64_t mask = 1ULL << pDevice->interrupt_pin;
+  if (pDevice->button_a_pin != 0xff) mask |= 1ULL << pDevice->button_a_pin;
+  if (pDevice->button_b_pin != 0xff) mask |= 1ULL << pDevice->button_b_pin;
+  return mask;
+} /* wake_button_mask() */

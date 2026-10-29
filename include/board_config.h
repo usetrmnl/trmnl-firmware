@@ -14,3 +14,9 @@ extern const DISPLAY_PROFILE dpList[12][3];
 
 // Finds DEVICE_MODEL in the supported device list and points pDevice at it
 void hw_config_init(void);
+
+// True when this board lists extra wake buttons (button_a_pin/button_b_pin)
+bool has_extra_wake_buttons(void);
+
+// Bit mask of every pin that wakes this board: interrupt_pin plus any extra buttons
+uint64_t wake_button_mask(void);

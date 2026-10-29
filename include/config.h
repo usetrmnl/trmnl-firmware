@@ -147,6 +147,8 @@ typedef struct tag_trmnl_device {
   uint8_t sensor_sda;
   uint8_t sensor_scl;
   uint8_t interrupt_pin;
+  uint8_t button_a_pin; // extra wake buttons, 0xff = none
+  uint8_t button_b_pin;
   uint8_t batt_pin;
   uint8_t batt_en_pin;
   uint8_t batt_type; // ADC, BQxxx
@@ -165,6 +167,8 @@ typedef struct tag_trmnl_device {
   uint8_t sensor_sda;
   uint8_t sensor_scl;
   uint8_t interrupt_pin;
+  uint8_t button_a_pin; // extra wake buttons, 0xff = none
+  uint8_t button_b_pin;
   uint8_t batt_pin;
   uint8_t batt_en_pin;
   uint8_t epd_en_pin;
