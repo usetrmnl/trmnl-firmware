@@ -13,6 +13,7 @@ TRMNL_DEVICE *pDevice = NULL;
 // List of supported TRMNL devices with SPI ePaper displays. The list can be in any order since the name is matched
 // The final parameter is the panel type which is from an enumerated list
 #ifdef PARALLEL_EPD
+// clang-format off
 const TRMNL_DEVICE device_list[] = 
 {
 // name           board_name            panel_type.            sda    scl    intr   batt  batt_en batt_type
@@ -23,8 +24,10 @@ const TRMNL_DEVICE device_list[] =
   "reterminal_e1003", BB_PANEL_NONE,    BB_PANEL_NONE,         0xff,  0xff,  3,     1,    40,     BATT_ADC, // IT8951 init is in display_init()
   NULL, 0, 0, 0, 0, 0, 0, 0, 0,
 }; // Parallel Eink device list
+// clang-format on
 
 #else // BB_EPAPER boards
+// clang-format off
 const TRMNL_DEVICE device_list[] = 
 {
 // name            sck   mosi   cs   rst   dc   busy  sda   scl   intr   batt  batt_en, epd_en  batt_type, panel
@@ -53,9 +56,11 @@ const TRMNL_DEVICE device_list[] =
   "trmnl_steam",   7,    8,     6,   10,   5,   4,    21,   20,   2,     3,    0xff,    0xff,   BATT_ADC,  EPD_583,
   NULL,            0,    0,     0,   0,    0,   0,    0,    0,    0,     0,    0,       0,      0,         0,
 }; // device_list
+// clang-format on
 
 // TRMNL SPI ePaper panel types list. The list order is fixed and based on enumerated values
 // N.B. ALWAYS ADD NEW PANELS TO THE END OF THE LIST
+// clang-format off
 const DISPLAY_PROFILE dpList[13][3] = { // 1-bit and 2-bit display types for each profile
     {{EP75_800x480, EP75_800x480_4GRAY}, {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, {EP75_800x480, EP75_800x480_4GRAY_V2}},
     {{EP426_800x480, EP426_800x480_4GRAY}, {EP426_800x480, EP426_800x480_4GRAY}, {EP426_800x480, EP426_800x480_4GRAY}},
@@ -73,26 +78,25 @@ const DISPLAY_PROFILE dpList[13][3] = { // 1-bit and 2-bit display types for eac
     {{EP368_792x528_UC8279, EP368_792x528_UC8279_4GRAY}, {EP368_792x528_UC8279, EP368_792x528_UC8279_4GRAY}, {EP368_792x528_UC8279, EP368_792x528_UC8279_4GRAY}},
 #endif
 };
+// clang-format on
 #endif // !PARALLEL_EPD
 
-TRMNL_DEVICE *find_device(const char *szName)
-{
-    int i = 0;
-    while (device_list[i].device_name && strcmp(device_list[i].device_name, szName) != 0) {
-        i++;
-    }
-    if (!device_list[i].device_name) {
-        return NULL;
-    }
-    Log_info("Found device model %s at index %d\n", szName, i);
-    return (TRMNL_DEVICE *)&device_list[i];
+TRMNL_DEVICE *find_device(const char *szName) {
+  int i = 0;
+  while (device_list[i].device_name && strcmp(device_list[i].device_name, szName) != 0) {
+    i++;
+  }
+  if (!device_list[i].device_name) {
+    return NULL;
+  }
+  Log_info("Found device model %s at index %d\n", szName, i);
+  return (TRMNL_DEVICE *)&device_list[i];
 } /* find_device() */
 
-void hw_config_init(void)
-{
+void hw_config_init(void) {
     // Match the device name with the configuration in the list
-    pDevice = find_device(DEVICE_MODEL);
-    if (pDevice == NULL) {
-        Log_info("Device name (%s) not found in supported list!", DEVICE_MODEL);
-    }
+  pDevice = find_device(DEVICE_MODEL);
+  if (pDevice == NULL) {
+    Log_info("Device name (%s) not found in supported list!", DEVICE_MODEL);
+  }
 } /* hw_config_init() */
