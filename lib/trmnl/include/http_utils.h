@@ -29,4 +29,4 @@ const char *sniffImageContentType(const uint8_t *data, size_t len);
 // transport failures (code <= 0, including HTTPClient's negative errors and the
 // modem's 0 / -1), 408, and any 5xx. Other 4xx are deterministic and are not.
 // HTTPS_TIMED_OUT (body cut short) is always retried, as the code (often 200) came before the cut.
-bool shouldFastRetryCode(int code, https_request_err_e http_err);
+bool shouldFastRetry(int code, https_request_err_e http_err);

@@ -79,40 +79,40 @@ void test_sniff_too_short_is_null(void) {
   TEST_ASSERT_NULL(sniffImageContentType(nullptr, 0));
 }
 
-// --- shouldFastRetryCode ---------------------------------------------------
+// --- shouldFastRetry -------------------------------------------------------
 
 void test_retry_transport_errors(void) {
-  TEST_ASSERT_TRUE(shouldFastRetryCode(-1, HTTPS_UNABLE_TO_CONNECT)); // HTTPC_ERROR_CONNECTION_REFUSED / modem timeout
-  TEST_ASSERT_TRUE(shouldFastRetryCode(-11, HTTPS_UNABLE_TO_CONNECT)); // HTTPC_ERROR_READ_TIMEOUT
-  TEST_ASSERT_TRUE(shouldFastRetryCode(0, HTTPS_UNABLE_TO_CONNECT)); // no client / modem ERROR
+  TEST_ASSERT_TRUE(shouldFastRetry(-1, HTTPS_UNABLE_TO_CONNECT)); // HTTPC_ERROR_CONNECTION_REFUSED / modem timeout
+  TEST_ASSERT_TRUE(shouldFastRetry(-11, HTTPS_UNABLE_TO_CONNECT)); // HTTPC_ERROR_READ_TIMEOUT
+  TEST_ASSERT_TRUE(shouldFastRetry(0, HTTPS_UNABLE_TO_CONNECT)); // no client / modem ERROR
 }
 
 void test_retry_server_errors(void) {
-  TEST_ASSERT_TRUE(shouldFastRetryCode(500, HTTPS_RESPONSE_CODE_INVALID));
-  TEST_ASSERT_TRUE(shouldFastRetryCode(502, HTTPS_RESPONSE_CODE_INVALID));
-  TEST_ASSERT_TRUE(shouldFastRetryCode(503, HTTPS_RESPONSE_CODE_INVALID));
-  TEST_ASSERT_TRUE(shouldFastRetryCode(599, HTTPS_RESPONSE_CODE_INVALID));
+  TEST_ASSERT_TRUE(shouldFastRetry(500, HTTPS_RESPONSE_CODE_INVALID));
+  TEST_ASSERT_TRUE(shouldFastRetry(502, HTTPS_RESPONSE_CODE_INVALID));
+  TEST_ASSERT_TRUE(shouldFastRetry(503, HTTPS_RESPONSE_CODE_INVALID));
+  TEST_ASSERT_TRUE(shouldFastRetry(599, HTTPS_RESPONSE_CODE_INVALID));
 }
 
-void test_retry_request_timeout(void) { TEST_ASSERT_TRUE(shouldFastRetryCode(408, HTTPS_RESPONSE_CODE_INVALID)); }
+void test_retry_request_timeout(void) { TEST_ASSERT_TRUE(shouldFastRetry(408, HTTPS_RESPONSE_CODE_INVALID)); }
 
 void test_no_retry_success_and_redirects(void) {
-  TEST_ASSERT_FALSE(shouldFastRetryCode(200, HTTPS_RESPONSE_CODE_INVALID));
-  TEST_ASSERT_FALSE(shouldFastRetryCode(301, HTTPS_RESPONSE_CODE_INVALID));
-  TEST_ASSERT_FALSE(shouldFastRetryCode(307, HTTPS_RESPONSE_CODE_INVALID));
+  TEST_ASSERT_FALSE(shouldFastRetry(200, HTTPS_RESPONSE_CODE_INVALID));
+  TEST_ASSERT_FALSE(shouldFastRetry(301, HTTPS_RESPONSE_CODE_INVALID));
+  TEST_ASSERT_FALSE(shouldFastRetry(307, HTTPS_RESPONSE_CODE_INVALID));
 }
 
 void test_no_retry_deterministic_client_errors(void) {
-  TEST_ASSERT_FALSE(shouldFastRetryCode(400, HTTPS_RESPONSE_CODE_INVALID));
-  TEST_ASSERT_FALSE(shouldFastRetryCode(401, HTTPS_RESPONSE_CODE_INVALID));
-  TEST_ASSERT_FALSE(shouldFastRetryCode(404, HTTPS_RESPONSE_CODE_INVALID));
-  TEST_ASSERT_FALSE(shouldFastRetryCode(429, HTTPS_RESPONSE_CODE_INVALID));
-  TEST_ASSERT_FALSE(shouldFastRetryCode(499, HTTPS_RESPONSE_CODE_INVALID));
+  TEST_ASSERT_FALSE(shouldFastRetry(400, HTTPS_RESPONSE_CODE_INVALID));
+  TEST_ASSERT_FALSE(shouldFastRetry(401, HTTPS_RESPONSE_CODE_INVALID));
+  TEST_ASSERT_FALSE(shouldFastRetry(404, HTTPS_RESPONSE_CODE_INVALID));
+  TEST_ASSERT_FALSE(shouldFastRetry(429, HTTPS_RESPONSE_CODE_INVALID));
+  TEST_ASSERT_FALSE(shouldFastRetry(499, HTTPS_RESPONSE_CODE_INVALID));
 }
 
-void test_no_retry_above_5xx(void) { TEST_ASSERT_FALSE(shouldFastRetryCode(600, HTTPS_RESPONSE_CODE_INVALID)); }
+void test_no_retry_above_5xx(void) { TEST_ASSERT_FALSE(shouldFastRetry(600, HTTPS_RESPONSE_CODE_INVALID)); }
 
-void test_retry_body_cut_short_after_ok(void) { TEST_ASSERT_TRUE(shouldFastRetryCode(200, HTTPS_TIMED_OUT)); }
+void test_retry_body_cut_short_after_ok(void) { TEST_ASSERT_TRUE(shouldFastRetry(200, HTTPS_TIMED_OUT)); }
 
 // --- runner ----------------------------------------------------------------
 
