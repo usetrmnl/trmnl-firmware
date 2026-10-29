@@ -36,17 +36,15 @@ void wait_for_serial() {
   int idx = 0;
   unsigned long start = millis();
   while (millis() - start < 2000) {
-      if (Serial)
-        break;
-      delay(100);
-      idx++;
-    }
+    if (Serial) break;
+    delay(100);
+    idx++;
+  }
   Log_info("## Waited for serial.. %d ms", idx * 100);
 #endif
 }
 
-uint32_t bootEarly(void)
-{
+uint32_t bootEarly(void) {
 #ifdef BOARD_SEEED_STICKY
   pinMode(45, OUTPUT); // power hold (DATA)
   pinMode(46, OUTPUT); // power lock (CLK)
@@ -58,7 +56,7 @@ uint32_t bootEarly(void)
   uint32_t init_time = esp_cpu_get_cycle_count() / esp_rom_get_cpu_ticks_per_us();
 #else
   uint32_t init_time = micros();
-  startup_time = init_time/1000L; // convert to milliseconds
+  startup_time = init_time / 1000L; // convert to milliseconds
 #endif
 #ifdef DEV_FIRMWARE
   Serial.begin(115200);
@@ -69,8 +67,7 @@ uint32_t bootEarly(void)
   return init_time;
 }
 
-void initPeripherals(void)
-{
+void initPeripherals(void) {
   hw_config_init();
   pins_init();
   buzzer().init();
@@ -90,27 +87,22 @@ void initPeripherals(void)
 #endif
 }
 
-WakeContext readWakeContext(void)
-{
+WakeContext readWakeContext(void) {
   wakeup_reason = esp_sleep_get_wakeup_cause();
-  bool should_show_error_now = (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER); // don't immediately show errors on timer wakeup
-  bool gpio_wakeup = (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO ||
-                      wakeup_reason == ESP_SLEEP_WAKEUP_EXT0 ||
+  bool should_show_error_now =
+    (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER); // don't immediately show errors on timer wakeup
+  bool gpio_wakeup = (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO || wakeup_reason == ESP_SLEEP_WAKEUP_EXT0 ||
                       wakeup_reason == ESP_SLEEP_WAKEUP_EXT1);
   Log.info("%s [%d]: Wake reason: %d\r\n", __FILE__, __LINE__, (int)wakeup_reason);
   return WakeContext{wakeup_reason, gpio_wakeup, should_show_error_now};
 }
 
-void openPreferences(void)
-{
+void openPreferences(void) {
   Log_info("preferences start");
   bool res = preferences.begin("data", false);
-  if (res)
-  {
+  if (res) {
     Log_info("preferences init success (%d free entries)", preferences.freeEntries());
-  }
-  else
-  {
+  } else {
     Log_fatal("preferences init failed");
     ESP.restart();
   }
@@ -118,24 +110,19 @@ void openPreferences(void)
 }
 
 #ifndef BOARD_TRMNL_X
-void startBoardHardware(const WakeContext &wake, uint32_t init_time)
-{
+void startBoardHardware(const WakeContext &wake, uint32_t init_time) {
   bool double_click = false;
-  if (wake.gpio)
-  {
+  if (wake.gpio) {
     Log_info("GPIO wakeup detected (%d)", wake.reason);
     ButtonPressResult button = read_button_presses();
     wait_for_serial();
     double_click = button_wake_act(button);
-  }
-  else
-  {
+  } else {
     wait_for_serial();
     Log_info("Non-GPIO wakeup (%d) -> didn't read buttons", wake.reason);
   }
 
-  if (double_click)
-    button_wake_run_special_function();
+  if (double_click) button_wake_run_special_function();
   // Read the battery voltage BEFORE the display or WiFi is turned on
   battery_voltage = battery().readVoltage(pDevice);
 
@@ -148,8 +135,7 @@ void startBoardHardware(const WakeContext &wake, uint32_t init_time)
   filesystem_init();
 }
 #else // BOARD_TRMNL_X
-static void handle_orientation_change_confirmation(struct bma5_dev *dev, uint8_t previous_orientation)
-{
+static void handle_orientation_change_confirmation(struct bma5_dev *dev, uint8_t previous_orientation) {
   const unsigned long ORIENTATION_POLL_INTERVAL_MS = 1000;
   int dots_filled = 0;
   bool reverted = false;
@@ -182,8 +168,7 @@ static void handle_orientation_change_confirmation(struct bma5_dev *dev, uint8_t
   Log_info("Orientation change confirmed after %lums", millis() - confirm_start);
 }
 
-void startBoardHardware(const WakeContext &wake, uint32_t init_time)
-{
+void startBoardHardware(const WakeContext &wake, uint32_t init_time) {
   Log.info("%s [%d]: Display init\r\n", __FILE__, __LINE__);
   iqs323_task_i2c_lock();
   display_init();
@@ -236,8 +221,7 @@ void startBoardHardware(const WakeContext &wake, uint32_t init_time)
 }
 #endif // BOARD_TRMNL_X
 
-void logVersions(void)
-{
+void logVersions(void) {
   Log_info("Firmware version %s", Messages::firmware_version().c_str());
   Log_info("Arduino version %d.%d.%d", ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH);
   Log_info("ESP-IDF version %d.%d.%d", ESP_IDF_VERSION_MAJOR, ESP_IDF_VERSION_MINOR, ESP_IDF_VERSION_PATCH);
