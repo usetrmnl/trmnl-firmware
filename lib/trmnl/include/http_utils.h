@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <https_request_err.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -24,8 +25,8 @@ bool isSameOrigin(const String &url, const String &base);
 // "image/jpeg", or nullptr when unrecognised.
 const char *sniffImageContentType(const uint8_t *data, size_t len);
 
-// True if a request that ended with this code is worth retrying right away:
+// True if a request that ended with this code and error is worth retrying right away:
 // transport failures (code <= 0, including HTTPClient's negative errors and the
 // modem's 0 / -1), 408, and any 5xx. Other 4xx are deterministic and are not.
-// A body cut short is always retried, as the code (often 200) came before the cut.
-bool shouldFastRetryCode(int code, bool bodyCutShort = false);
+// HTTPS_TIMED_OUT (body cut short) is always retried, as the code (often 200) came before the cut.
+bool shouldFastRetryCode(int code, https_request_err_e http_err);
