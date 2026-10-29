@@ -6,8 +6,8 @@
 #include <display_session.h>
 #include <globals.h>
 #ifdef BOARD_TRMNL_X
-#include "ethernet_config.h"
 #include "connection_manager.h"
+#include "ethernet_config.h"
 #endif // BOARD_TRMNL_X
 #include <request_handling.h>
 #include <setup_session.h>
@@ -22,16 +22,14 @@
  * @param none
  * @return none
  */
-void bl_init(void)
-{
+void bl_init(void) {
   uint32_t init_time = bootEarly();
   wifiSessionInit();
   initPeripherals();
   WakeContext wake = readWakeContext();
   openPreferences();
   startBoardHardware(wake, init_time);
-  if (wake.reason != ESP_SLEEP_WAKEUP_TIMER)
-    showWakeLogo();
+  if (wake.reason != ESP_SLEEP_WAKEUP_TIMER) showWakeLogo();
   logVersions();
 
 #ifdef BOARD_TRMNL_X
@@ -81,6 +79,4 @@ void bl_init(void)
  * @param none
  * @return none
  */
-void bl_process(void)
-{
-}
+void bl_process(void) {}
