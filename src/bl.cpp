@@ -5,6 +5,10 @@
 #include <display.h>
 #include <display_session.h>
 #include <globals.h>
+#ifdef BOARD_TRMNL_X
+#include "connection_manager.h"
+#include "ethernet_config.h"
+#endif // BOARD_TRMNL_X
 #include <request_handling.h>
 #include <setup_session.h>
 #include <sleep_session.h>
@@ -28,7 +32,26 @@ void bl_init(void) {
   if (wake.reason != ESP_SLEEP_WAKEUP_TIMER) showWakeLogo();
   logVersions();
 
-  wifiSessionConnect(wake.showErrorsNow);
+#ifdef BOARD_TRMNL_X
+  ESP_ERROR_CHECK(esp_netif_init());
+  ESP_ERROR_CHECK(esp_event_loop_create_default());
+  conn_mgr_init();
+  if (preferences.getBool("eth_enabled", false)) {
+    ethernet_start();
+    Log_info("Waiting for Ethernet DHCP");
+    for (int _eth_s = 1; _eth_s <= 5; _eth_s++) {
+      if ((conn_mgr_wait_any(pdMS_TO_TICKS(1000)) & ETH_READY_BIT) != 0) break;
+      Log_info("No Ethernet yet... (waiting %ds)", _eth_s);
+      if (_eth_s == 5) {
+        Log_info("Ethernet DHCP still not ready after %ds, giving up and trying WiFi", _eth_s);
+      }
+    }
+  }
+
+  // WiFi block — runs when Ethernet is not available.
+  if (!conn_mgr_is_eth())
+#endif // BOARD_TRMNL_X
+    wifiSessionConnect(wake.showErrorsNow);
   updateTimeSinceSleep();
   ensureDeviceSetUp(); // may sleep
   submitStoredLogs();

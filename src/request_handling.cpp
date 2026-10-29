@@ -3,6 +3,9 @@
 #include <WiFi.h>
 #include <bl.h>
 #include <config.h>
+#ifdef BOARD_TRMNL_X
+#include "connection_manager.h"
+#endif // BOARD_TRMNL_X
 #include <display.h>
 #include <globals.h>
 #include <http_result_handling.h>
@@ -83,6 +86,11 @@ void updateFirmwareIfDue(void) {
 
 void showRequestResult(https_request_err_e request_result) {
   if (request_result == HTTPS_PLUGIN_NOT_ATTACHED) refreshInterval.applyFastPoll();
-  MSG error_screen = requestErrorScreen(request_result, WiFi.RSSI() <= WIFI_CONNECTION_RSSI);
+#ifdef BOARD_TRMNL_X
+  bool weak_signal = !conn_mgr_is_eth() && WiFi.RSSI() <= WIFI_CONNECTION_RSSI;
+#else
+  bool weak_signal = WiFi.RSSI() <= WIFI_CONNECTION_RSSI;
+#endif
+  MSG error_screen = requestErrorScreen(request_result, weak_signal);
   if (error_screen != NONE) showMessageWithLogo(error_screen);
 }

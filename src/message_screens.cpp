@@ -386,6 +386,32 @@ static void draw_captive_wifi_timeout_message(void) {
   draw_centered_line(string2, -1);
 }
 
+static void draw_eth_not_detected_message(void) {
+  BB_RECT rect;
+
+  const char string1[] = "Ethernet adapter not detected. Check connection or";
+  bbep.getStringBox(string1, &rect);
+  bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - (rect.h * 2));
+  bbep.println(string1);
+  const char string2[] = "tap the middle of touch bar, then Settings > Reset Wi-Fi.";
+  bbep.getStringBox(string2, &rect);
+  bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+  bbep.print(string2);
+}
+
+static void draw_eth_dhcp_failed_message(void) {
+  BB_RECT rect;
+
+  const char string1[] = "Ethernet connected, but DHCP failed.";
+  bbep.getStringBox(string1, &rect);
+  bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - (rect.h * 2));
+  bbep.println(string1);
+  const char string2[] = "Tap the middle of touch bar, then Settings > Reset Wi-Fi.";
+  bbep.getStringBox(string2, &rect);
+  bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+  bbep.print(string2);
+}
+
 // Message screens are 1-bit
 static void begin_message_screen(void) {
 #ifdef BB_EPAPER
@@ -536,6 +562,12 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
     break;
   case CAPTIVE_WIFI_TIMEOUT:
     draw_captive_wifi_timeout_message();
+    break;
+  case ETH_NOT_DETECTED:
+    draw_eth_not_detected_message();
+    break;
+  case ETH_DHCP_FAILED:
+    draw_eth_dhcp_failed_message();
     break;
   default:
     break;

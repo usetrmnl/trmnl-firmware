@@ -200,7 +200,7 @@ void config_gpio_for_lp() {
 #endif // BOARD_TRMNL_X
 } /* config_gpio_for_lp() */
 
-void wifiErrorDeepSleep(void) {
+void wifiErrorDeepSleep(bool show_message) {
   if (!preferences.isKey(PREFERENCES_CONNECT_WIFI_RETRY_COUNT)) {
     preferences.putInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT, 1);
   }
@@ -213,7 +213,7 @@ void wifiErrorDeepSleep(void) {
 
   if (retry_count >= MAX_QUIET_SLOW_RETRIES) {
     preferences.putInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT, 1);
-    showMessageWithLogo(WIFI_FAILED);
+    if (show_message) showMessageWithLogo(WIFI_FAILED);
     display_sleep();
     goToSleep();
     return;

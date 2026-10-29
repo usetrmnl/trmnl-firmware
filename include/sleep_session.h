@@ -24,6 +24,7 @@ void config_gpio_for_lp(void);
 
 /**
  * Wi-Fi connect failure: sleep on the Wi-Fi retry backoff; at MAX_QUIET_SLOW_RETRIES show
- * WIFI_FAILED and reset the count (still a timed sleep). Does not return.
+ * WIFI_FAILED (unless show_message is false) and reset the count (still a timed sleep).
+ * Does not return.
  */
-void wifiErrorDeepSleep(void);
+void wifiErrorDeepSleep(bool show_message = true);

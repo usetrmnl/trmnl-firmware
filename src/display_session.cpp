@@ -11,6 +11,9 @@
 #include <device_id.h>
 #include <display.h>
 #include <display_session.h>
+#ifdef BOARD_TRMNL_X
+#include <connection_manager.h>
+#endif
 #include <filesystem.h>
 #include <globals.h>
 #include <logging_parcers.h>
@@ -581,7 +584,14 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
 
   submitStoredLogs();
 
+#ifdef BOARD_TRMNL_X
+  if (conn_mgr_is_wifi()) {
+    WiFi.disconnect(true); // no need for WiFi, save power starting here
+    conn_mgr_mark_lost(CONNECTION_INTERFACE_WIFI);
+  }
+#else
   WiFi.disconnect(true); // no need for WiFi, save power starting here
+#endif
   Log.info("%s [%d]: Received successfully; WiFi off.\r\n", __FILE__, __LINE__);
 
   bool image_reverse = false;

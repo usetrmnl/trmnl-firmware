@@ -81,7 +81,7 @@ void showWakeLogo(void) {
 
 #ifdef BOARD_TRMNL_X
 
-  if (!otg_message && WifiCaptivePortal.isSaved()) {
+  if (!otg_message && (WifiCaptivePortal.isSaved() || preferences.getBool("eth_enabled", false))) {
     display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false, true);
     touchbar_redraw_pending_indicator();
   } else if (!WifiCaptivePortal.isSaved()) {

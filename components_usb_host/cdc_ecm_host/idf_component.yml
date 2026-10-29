@@ -1,0 +1,12 @@
+## IDF Component Manager Manifest File
+version: "1.0.4"
+description: USB Host CDC-ECM driver
+tags:
+  - usb
+  - usb_host
+  - cdc
+url: https://github.com/gadget-man/usb_host_cdc_ecm
+license: "Apache-2.0"
+dependencies:
+  idf: ">=5.4"
+  espressif/usb: "^1.3.0"
