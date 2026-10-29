@@ -1,7 +1,3 @@
-# currently large diffs in open PRs (>200 LOC) — skip to reduce merge conflicts for now
-src/bl.cpp
-src/display.cpp
-
 # vendor
 components/**
 lib/BMA530_SensorAPI/**
@@ -20,15 +16,3 @@ src/logo_small.h
 src/wifi_connect_qr.h
 src/wifi_failed_qr.h
 lib/wificaptive/src/WifiCaptivePage.h
-# split out of display.cpp/bl.cpp as-is, so the moves stay reviewable with --color-moved
-src/board_config.cpp
-src/epd_panel_rev.cpp
-src/x_io_expander.cpp
-src/color_reduce.cpp
-src/png_render.cpp
-src/jpeg_render.cpp
-src/display_widgets.cpp
-src/message_screens.cpp
-src/wake_init.cpp
-src/setup_session.cpp
-src/request_handling.cpp
