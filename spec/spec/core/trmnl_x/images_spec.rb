@@ -52,6 +52,18 @@ RSpec.describe "TRMNL X images", env: "TRMNL_X" do
       end
     end
 
+    { 1 => 1, 4 => 15, 8 => 255 }.each do |bits, white|
+      it "#{bits}bit png smaller than the panel is drawn on white" do
+        iw = (w / 2) + 3 # odd and not a multiple of 8, so the last byte of each line is part padding
+        ih = h / 2
+        level = levels(0, white)
+        padded = ->(x, y) { x < iw && y < ih ? level.(x, y) : white }
+        show("small#{bits}.png", TrmnlSim::Images.png_image(level, iw, ih, bits:), "image/png") do |s|
+          expect(s).to show_image(TrmnlSim::Images.expected_gray(padded, w, h, bits:), tolerance: 64, max_ratio: 0.001)
+        end
+      end
+    end
+
     { 1 => 1, 4 => 15 }.each do |bits, white|
       it "portrait #{bits}bit png taller than the panel is cropped" do
         px = TrmnlX.digits("7")

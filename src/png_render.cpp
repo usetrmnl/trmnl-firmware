@@ -414,6 +414,7 @@ int png_draw(PNGDRAW *pDraw) {
     if (!bRotated) {
       d += y * iPitch; // point to the correct line
       memcpy(d, s, (iCopyWidth + 7) / 8);
+      if (iCopyWidth & 7) d[iCopyWidth / 8] |= 0xff >> (iCopyWidth & 7); // pad bits past the image are white
     } else {
       uint8_t ucPixel, ucMask, j;
       d += (bbep.height() - 1) * iPitch;
@@ -438,6 +439,7 @@ int png_draw(PNGDRAW *pDraw) {
     if (!bRotated) {
       d += y * iPitch; // point to the correct line
       memcpy(d, s, (iCopyWidth + 1) / 2);
+      if (iCopyWidth & 1) d[iCopyWidth / 2] |= 0x0f; // pad pixel past the image is white
     } else {
       d += (bbep.height() - 1) * iPitch;
       d += (y / 2);
@@ -660,6 +662,11 @@ int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious) {
         break;
       }
       Log_info("%s [%d]: FastEPD graphics mode set to: %d\n", __FILE__, __LINE__, bbep.getMode());
+      { // in case the image is too small - undrawn areas will be white (0xff at both 1 and 4 bpp)
+        uint8_t *pBuffer = (bPrevious) ? bbep.previousBuffer() : bbep.currentBuffer();
+        int iPitch = (png->getBpp() == 1) ? (bbep.width() + 7) / 8 : bbep.width() / 2;
+        memset(pBuffer, 0xff, iPitch * bbep.height());
+      }
       png->decode((void *)bPrevious, 0);
       png->close();
 #endif
