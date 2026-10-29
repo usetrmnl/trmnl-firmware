@@ -13,6 +13,7 @@ TRMNL_DEVICE *pDevice = NULL;
 // List of supported TRMNL devices with SPI ePaper displays. The list can be in any order since the name is matched
 // The final parameter is the panel type which is from an enumerated list
 #ifdef PARALLEL_EPD
+// clang-format off
 const TRMNL_DEVICE device_list[] = 
 {
 // name           board_name            panel_type.            sda    scl    intr   btn_a  btn_b  batt  batt_en batt_type
@@ -23,8 +24,10 @@ const TRMNL_DEVICE device_list[] =
   "reterminal_e1003", BB_PANEL_NONE,    BB_PANEL_NONE,         0xff,  0xff,  3,     0xff,  0xff,  1,    40,     BATT_ADC, // IT8951 init is in display_init()
   NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 }; // Parallel Eink device list
+// clang-format on
 
 #else // BB_EPAPER boards
+// clang-format off
 const TRMNL_DEVICE device_list[] = 
 {
 // name            sck   mosi   cs   rst   dc   busy  sda   scl   intr   btn_a  btn_b  batt  batt_en, epd_en  batt_type, panel
@@ -52,9 +55,11 @@ const TRMNL_DEVICE device_list[] =
   "trmnl_steam",   7,    8,     6,   10,   5,   4,    21,   20,   2,     0xff,  0xff,  3,    0xff,    0xff,   BATT_ADC,  EPD_583,
   NULL,            0,    0,     0,   0,    0,   0,    0,    0,    0,     0, 0, 0,    0,       0,      0,         0,
 }; // device_list
+// clang-format on
 
 // TRMNL SPI ePaper panel types list. The list order is fixed and based on enumerated values
 // N.B. ALWAYS ADD NEW PANELS TO THE END OF THE LIST
+// clang-format off
 const DISPLAY_PROFILE dpList[12][3] = { // 1-bit and 2-bit display types for each profile
     {{EP75_800x480, EP75_800x480_4GRAY}, {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, {EP75_800x480, EP75_800x480_4GRAY_V2}},
     {{EP426_800x480, EP426_800x480_4GRAY}, {EP426_800x480, EP426_800x480_4GRAY}, {EP426_800x480, EP426_800x480_4GRAY}},
@@ -69,34 +74,30 @@ const DISPLAY_PROFILE dpList[12][3] = { // 1-bit and 2-bit display types for eac
     {{EPD_SEEED_E1004, EPD_SEEED_E1004},{EPD_SEEED_E1004, EPD_SEEED_E1004},{EPD_SEEED_E1004, EPD_SEEED_E1004}},
     {{EP368_792x528, EP368_792x528_4GRAY}, {EP368_792x528, EP368_792x528_4GRAY}, {EP368_792x528, EP368_792x528_4GRAY}},
 };
+// clang-format on
 #endif // !PARALLEL_EPD
 
-void hw_config_init(void)
-{
-    int i = 0;
+void hw_config_init(void) {
+  int i = 0;
     // Match the device name with the configuration in the list
-    while (device_list[i].device_name && strcmp(device_list[i].device_name, DEVICE_MODEL) != 0) {
-        i++;
-    }
-    if (device_list[i].device_name) {
-        Log_info("Found device model at index %d\n", i);
-        pDevice = (TRMNL_DEVICE *)&device_list[i];
-    } else {
-        Log_info("Device name (%s) not found in supported list!", DEVICE_MODEL);
-    }
+  while (device_list[i].device_name && strcmp(device_list[i].device_name, DEVICE_MODEL) != 0) {
+    i++;
+  }
+  if (device_list[i].device_name) {
+    Log_info("Found device model at index %d\n", i);
+    pDevice = (TRMNL_DEVICE *)&device_list[i];
+  } else {
+    Log_info("Device name (%s) not found in supported list!", DEVICE_MODEL);
+  }
 } /* hw_config_init() */
 
-bool has_extra_wake_buttons(void)
-{
-    return pDevice->button_a_pin != 0xff || pDevice->button_b_pin != 0xff;
+bool has_extra_wake_buttons(void) {
+  return pDevice->button_a_pin != 0xff || pDevice->button_b_pin != 0xff;
 } /* has_extra_wake_buttons() */
 
-uint64_t wake_button_mask(void)
-{
-    uint64_t mask = 1ULL << pDevice->interrupt_pin;
-    if (pDevice->button_a_pin != 0xff)
-        mask |= 1ULL << pDevice->button_a_pin;
-    if (pDevice->button_b_pin != 0xff)
-        mask |= 1ULL << pDevice->button_b_pin;
-    return mask;
+uint64_t wake_button_mask(void) {
+  uint64_t mask = 1ULL << pDevice->interrupt_pin;
+  if (pDevice->button_a_pin != 0xff) mask |= 1ULL << pDevice->button_a_pin;
+  if (pDevice->button_b_pin != 0xff) mask |= 1ULL << pDevice->button_b_pin;
+  return mask;
 } /* wake_button_mask() */

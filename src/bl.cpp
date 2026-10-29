@@ -18,16 +18,14 @@
  * @param none
  * @return none
  */
-void bl_init(void)
-{
+void bl_init(void) {
   uint32_t init_time = bootEarly();
   wifiSessionInit();
   initPeripherals();
   WakeContext wake = readWakeContext();
   openPreferences();
   startBoardHardware(wake, init_time);
-  if (wake.reason != ESP_SLEEP_WAKEUP_TIMER)
-    showWakeLogo();
+  if (wake.reason != ESP_SLEEP_WAKEUP_TIMER) showWakeLogo();
   logVersions();
 
   wifiSessionConnect(wake.showErrorsNow);
@@ -58,6 +56,4 @@ void bl_init(void)
  * @param none
  * @return none
  */
-void bl_process(void)
-{
-}
+void bl_process(void) {}
