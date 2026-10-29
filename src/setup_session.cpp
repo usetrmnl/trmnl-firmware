@@ -11,8 +11,7 @@
 #include <status_screens.h>
 #include <trmnl_log.h>
 
-static void showMacNotRegistered(const DeviceSetupResult &setup)
-{
+static void showMacNotRegistered(const DeviceSetupResult &setup) {
   // The server's image for an unregistered device when it sent one and this run saved it
   // (not a logo left on flash by an earlier setup), else the server's message under the logo.
   bool drawable = setup.imagePath.length() > 0;
@@ -22,25 +21,19 @@ static void showMacNotRegistered(const DeviceSetupResult &setup)
 #endif
   int image_size = 0;
   uint8_t *image = drawable ? display_read_file(setup.imagePath.c_str(), &image_size) : nullptr;
-  if (image)
-  {
+  if (image) {
     display_show_image(image, image_size, true);
     free(image);
-  }
-  else
+  } else
     showMessageWithLogo(MAC_NOT_REGISTERED, setup.apiResponse);
   preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
   refreshInterval.applyDefault();
 }
 
-void ensureDeviceSetUp(void)
-{
-  if (preferences.isKey(PREFERENCES_API_KEY) && preferences.isKey(PREFERENCES_FRIENDLY_ID))
-  {
+void ensureDeviceSetUp(void) {
+  if (preferences.isKey(PREFERENCES_API_KEY) && preferences.isKey(PREFERENCES_FRIENDLY_ID)) {
     Log.info("%s [%d]: API key and friendly ID saved\r\n", __FILE__, __LINE__);
-  }
-  else
-  {
+  } else {
     Log.info("%s [%d]: API key or friendly ID not saved\r\n", __FILE__, __LINE__);
 
     // attempt to get the API key and friendly ID
@@ -51,21 +44,16 @@ void ensureDeviceSetUp(void)
     setup.message.toCharArray(message_buffer, sizeof(message_buffer));
 
     // perform post-setup actions
-    if (setup.showSetupScreen)
-    {
+    if (setup.showSetupScreen) {
       display_show_msg(storedLogoOrDefault(0), FRIENDLY_ID, setup.friendlyId, true, "", setup.message);
       need_to_refresh_display = 0;
-    }
-    else if (setup.errorScreen != NONE)
-    {
+    } else if (setup.errorScreen != NONE) {
       showMessageWithLogo(setup.errorScreen);
     }
 
-    if (setup.outcome == DeviceSetupOutcome::MacNotRegistered)
-      showMacNotRegistered(setup);
+    if (setup.outcome == DeviceSetupOutcome::MacNotRegistered) showMacNotRegistered(setup);
 
-    if (setup.shouldGoToSleep)
-    {
+    if (setup.shouldGoToSleep) {
       display_sleep();
       goToSleep();
     }
@@ -77,8 +65,7 @@ void ensureDeviceSetUp(void)
  * @param url Server URL address
  * @return none
  */
-void resetDeviceCredentials(void)
-{
+void resetDeviceCredentials(void) {
   Log.info("%s [%d]: The device will be reset now...\r\n", __FILE__, __LINE__);
   Log.info("%s [%d]: WiFi resetting...\r\n", __FILE__, __LINE__);
   WifiCaptivePortal.resetSettings();
