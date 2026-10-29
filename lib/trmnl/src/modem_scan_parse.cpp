@@ -1,4 +1,5 @@
 #include "modem_scan_parse.h"
+#include "wifi_auth.h"
 
 // One entry per line: +CWLAP:(<ecn>,"<ssid>",<rssi>,"<mac>",<channel>[,<numeric fields>...])
 // ESP-AT prints the SSID unescaped, so it may contain ( ) " and , itself. Only ecn is parsed from
@@ -61,7 +62,7 @@ std::vector<ParsedModemNetwork> parseCwlapResponse(const String &raw) {
       }
     }
     if (!found) {
-      results.push_back({ssid, rssi, ecn == 0, is5GHz, ecn == 5});
+      results.push_back({ssid, rssi, ecn == 0, is5GHz, isEnterpriseWifiAuthMode(ecn)});
     }
   }
 
