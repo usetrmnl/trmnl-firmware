@@ -1,4 +1,5 @@
 #include "modem_scan_parse.h"
+
 #include "wifi_auth.h"
 
 // One entry per line: +CWLAP:(<ecn>,"<ssid>",<rssi>,"<mac>",<channel>[,<numeric fields>...])
