@@ -2,6 +2,14 @@
 #define CONFIG_H
 #include <stdint.h>
 
+// Generated branding (git-ignored); falls back to stock values when absent.
+#if defined(__has_include) && __has_include("branding.h")
+#include "branding.h"
+#endif
+#ifndef BRAND_API_BASE_URL
+#define BRAND_API_BASE_URL "https://trmnl.app"
+#endif
+
 #define FW_MAJOR_VERSION 1
 #define FW_MINOR_VERSION 8
 #define FW_PATCH_VERSION 16
@@ -129,7 +137,7 @@
 #define BUTTON_SOFT_RESET_TIME             15000
 #define BUTTON_DOUBLE_CLICK_WINDOW         800
 
-#define API_BASE_URL                       "https://trmnl.app"
+#define API_BASE_URL                       BRAND_API_BASE_URL
 
 // Abort an image download when the stream goes this long with no data.
 #define IMAGE_STREAM_INACTIVITY_TIMEOUT_MS 15000

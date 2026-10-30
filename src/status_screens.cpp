@@ -9,6 +9,7 @@
 #include "displayed_image.h"
 #include "esp_flash.h"
 #include "loading.h"
+#include "logo_big.h"
 #include "logo_medium.h"
 #include "logo_small.h"
 
@@ -30,6 +31,12 @@ void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiResponse) 
   need_to_refresh_display = 1;
   preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
 }
+
+// Logo for the message screens on non-parallel panels; config.yml branding.message_logo_size
+// picks it via the generated branding.h (included by config.h).
+#ifndef BRAND_MESSAGE_LOGO
+#define BRAND_MESSAGE_LOGO logo_small
+#endif
 
 uint8_t *storedLogoOrDefault(int iType) {
   //
@@ -66,7 +73,7 @@ uint8_t *storedLogoOrDefault(int iType) {
   return const_cast<uint8_t *>(logo_medium);
 #else
   if (iType == 0) {
-    return const_cast<uint8_t *>(logo_small);
+    return const_cast<uint8_t *>(BRAND_MESSAGE_LOGO);
   } else {
     // Force the loading screen to always use the slower update method because
     // we don't know (yet) if the panel can handle the faster update modes

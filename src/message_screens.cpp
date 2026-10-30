@@ -5,6 +5,7 @@
 #include <trmnl_log.h>
 
 #include "Group5.h"
+#include "branding.h"
 #include "fonts.h"
 #include "messages.h"
 #include "wifi_connect_qr.h"
@@ -20,25 +21,25 @@ template <typename T> static void draw_centered_line(const T &text, int y) {
 }
 
 static void draw_otg_turned_on_message(void) {
-  const char string1[] = "OTG turned on!";
+  const char string1[] = BRAND_STR_OTG_ON;
   draw_centered_line(string1, 430);
 }
 
 static void draw_otg_turned_off_message(void) {
-  const char string1[] = "OTG turned off!";
+  const char string1[] = BRAND_STR_OTG_OFF;
   draw_centered_line(string1, 430);
 }
 
 static void draw_modem_flashing_message(void) {
-  const char string1[] = "Flashing modem firmware...";
+  const char string1[] = BRAND_STR_MODEM_FLASHING;
   draw_centered_line(string1, 430);
 }
 
 static void draw_modem_flash_failed_message(const char *message_text) {
-  const char string1[] = "Failed to flash modem firmware,";
+  const char string1[] = BRAND_STR_MODEM_FLASH_FAILED_1;
   draw_centered_line(string1, 430);
 
-  const char string2[] = "device would only operate with 2.4Ghz WiFi.";
+  const char string2[] = BRAND_STR_MODEM_FLASH_FAILED_2;
   draw_centered_line(string2, 500);
   if (message_text) {
     draw_centered_line(message_text, 570);
@@ -46,32 +47,32 @@ static void draw_modem_flash_failed_message(const char *message_text) {
 }
 
 static void draw_ready_to_ship_message(void) {
-  const char string1[] = "Device is ready to ship!";
+  const char string1[] = BRAND_STR_READY_TO_SHIP;
   draw_centered_line(string1, 430);
 
-  const char string2[] = "Unplug the USB-C to complete shutdown.";
+  const char string2[] = BRAND_STR_UNPLUG_USB;
   draw_centered_line(string2, 500);
 }
 
 static void draw_shipping_mode_message(void) {
-  const char string1[] = "Welcome to TRMNL.";
+  const char string1[] = BRAND_STR_WELCOME;
   draw_centered_line(string1, 430);
 
-  const char string2[] = "Attach the dock and a USB-C to get started.";
+  const char string2[] = BRAND_STR_DOCK_INSTRUCTIONS;
   draw_centered_line(string2, 500);
 }
 
 static void draw_wifi_connect_message(void) {
-  const char string1[] = "Connect to TRMNL WiFi";
+  const char string1[] = BRAND_STR_WIFI_CONNECT_SHORT;
   draw_centered_line(string1, 430);
-  const char string2[] = "on your phone or computer";
+  const char string2[] = BRAND_STR_WIFI_CONNECT_SUBTITLE;
   draw_centered_line(string2, -1);
 }
 
 static void draw_wifi_failed_message(void) {
   BB_RECT rect;
 
-  String string0 = "TRMNL firmware ";
+  String string0 = BRAND_STR_FW_PREFIX;
   string0 += Messages::firmware_version();
 #ifdef __BB_EPAPER__
   bbep.setCursor(40, 48); // place in upper left corner
@@ -79,14 +80,14 @@ static void draw_wifi_failed_message(void) {
   bbep.setCursor(80, 104); // place in upper left corner
 #endif
   bbep.println(string0);
-  const char string1[] = "Can't establish WiFi connection. Will keep trying.";
+  const char string1[] = BRAND_STR_WIFI_FAILED;
   bbep.getStringBox(string1, &rect);
   bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - (rect.h * 2) - 140);
   bbep.println(string1);
 #ifndef BOARD_TRMNL_X
-  const char string2[] = "Hold button on the back to reset WiFi, or scan QR Code for help.";
+  const char string2[] = BRAND_STR_WIFI_FAILED_HELP_BUTTON;
 #else
-  const char string2[] = "Hold left and right corner of touch bar to reset WiFi, or scan QR Code for help.";
+  const char string2[] = BRAND_STR_WIFI_FAILED_HELP_TOUCHBAR;
 #endif
   draw_centered_line(string2, -1);
 #ifdef __BB_EPAPER__
@@ -99,7 +100,7 @@ static void draw_wifi_failed_message(void) {
 static void draw_wifi_internal_error_message(void) {
   BB_RECT rect;
 
-  const char string1[] = "WiFi connected, but";
+  const char string1[] = BRAND_STR_API_INTERNAL_ERROR_1;
 #ifdef __BB_EPAPER__
   int x = 132;
 #else
@@ -112,15 +113,15 @@ static void draw_wifi_internal_error_message(void) {
   bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - (rect.h * 2) - 140);
 #endif
   bbep.println(string1);
-  const char string2[] = "API connection cannot be";
+  const char string2[] = BRAND_STR_API_INTERNAL_ERROR_2;
   bbep.getStringBox(string2, &rect);
   bbep.setCursor((bbep.width() - x - rect.w) / 2, -1);
   bbep.println(string2);
-  const char string3[] = "established. Try to refresh,";
+  const char string3[] = BRAND_STR_API_INTERNAL_ERROR_3;
   bbep.getStringBox(string3, &rect);
   bbep.setCursor((bbep.width() - x - rect.w) / 2, -1);
   bbep.println(string3);
-  const char string4[] = "or scan QR Code for help.";
+  const char string4[] = BRAND_STR_API_INTERNAL_ERROR_4;
   bbep.getStringBox(string4, &rect);
   bbep.setCursor((bbep.width() - x - rect.w) / 2, -1);
   bbep.print(string4);
@@ -134,7 +135,7 @@ static void draw_wifi_internal_error_message(void) {
 static void draw_wifi_weak_message(void) {
   BB_RECT rect;
 
-  const char string1[] = "WiFi connected but signal is weak";
+  const char string1[] = BRAND_STR_WIFI_WEAK;
   bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
   bbep.setCursor((bbep.width() - rect.w) / 2, 400);
@@ -145,35 +146,35 @@ static void draw_wifi_weak_message(void) {
 }
 
 static void draw_image_download_failed_message(void) {
-  const char string1[] = "API responded, but image download failed.";
+  const char string1[] = BRAND_STR_IMAGE_DOWNLOAD_FAILED;
   draw_centered_line(string1, 340);
 #ifndef BOARD_TRMNL_X
-  const char string2[] = "Short click the button on back";
+  const char string2[] = BRAND_STR_TAP_BUTTON_NEXT;
 #else
-  const char string2[] = "Tap the middle of touch bar";
+  const char string2[] = BRAND_STR_TAP_TOUCHBAR_NEXT;
 #endif
   draw_centered_line(string2, -1);
-  const char string3[] = "to advance to the next screen.";
+  const char string3[] = BRAND_STR_ADVANCE_NEXT_SCREEN;
   draw_centered_line(string3, -1);
 }
 
 static void draw_api_unable_to_connect_message(void) {
-  const char string1[] = "WiFi connected, unable connect to API.";
+  const char string1[] = BRAND_STR_API_UNABLE_TO_CONNECT;
   draw_centered_line(string1, 340);
 #ifndef BOARD_TRMNL_X
-  const char string2[] = "Short click the button on back,";
+  const char string2[] = BRAND_STR_TAP_BUTTON;
 #else
-  const char string2[] = "Tap the middle of touch bar,";
+  const char string2[] = BRAND_STR_TAP_TOUCHBAR;
 #endif
   draw_centered_line(string2, -1);
-  const char string3[] = "otherwise check your internet.";
+  const char string3[] = BRAND_STR_CHECK_INTERNET;
   draw_centered_line(string3, -1);
 }
 
 static void draw_api_setup_failed_message(void) {
   BB_RECT rect;
 
-  const char string1[] = "WiFi connected, /api/setup returned error.";
+  const char string1[] = BRAND_STR_API_SETUP_FAILED;
   bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
   bbep.setCursor((bbep.width() - rect.w) / 2, 340);
@@ -182,19 +183,19 @@ static void draw_api_setup_failed_message(void) {
 #endif
   bbep.println(string1);
 #ifndef BOARD_TRMNL_X
-  const char string2[] = "Short click the button on back,";
+  const char string2[] = BRAND_STR_TAP_BUTTON;
 #else
-  const char string2[] = "Tap the middle of touch bar,";
+  const char string2[] = BRAND_STR_TAP_TOUCHBAR;
 #endif
   draw_centered_line(string2, -1);
-  const char string3[] = "otherwise check your internet.";
+  const char string3[] = BRAND_STR_CHECK_INTERNET;
   draw_centered_line(string3, -1);
 }
 
 static void draw_api_size_error_message(void) {
   BB_RECT rect;
 
-  const char string1[] = "WiFi connected, TRMNL content malformed.";
+  const char string1[] = BRAND_STR_API_SIZE_ERROR;
   bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
   bbep.setCursor((bbep.width() - rect.w) / 2, 400);
@@ -203,20 +204,20 @@ static void draw_api_size_error_message(void) {
 #endif
   bbep.println(string1);
 #ifndef BOARD_TRMNL_X
-  const char string2[] = "Wait or reset by holding button on back.";
+  const char string2[] = BRAND_STR_HOLD_BUTTON_RESET;
 #else
-  const char string2[] = "Wait or reset by holding left and right corner of touch bar.";
+  const char string2[] = BRAND_STR_HOLD_TOUCHBAR_RESET;
 #endif
   draw_centered_line(string2, -1);
 }
 
 static void draw_api_firmware_update_error_message(void) {
-  const char string1[] = "WiFi connected, could not get firmware update from api.";
+  const char string1[] = BRAND_STR_API_FIRMWARE_UPDATE_ERROR;
   draw_centered_line(string1, 400);
 #ifndef BOARD_TRMNL_X
-  const char string2[] = "Wait or reset by holding button on back.";
+  const char string2[] = BRAND_STR_HOLD_BUTTON_RESET;
 #else
-  const char string2[] = "Wait or reset by holding left and right corner of touch bar.";
+  const char string2[] = BRAND_STR_HOLD_TOUCHBAR_RESET;
 #endif
   draw_centered_line(string2, -1);
 }
@@ -224,7 +225,7 @@ static void draw_api_firmware_update_error_message(void) {
 static void draw_wifi_image_timeout_message(void) {
   BB_RECT rect;
 
-  const char string1[] = "Image download timed out; check your network status.";
+  const char string1[] = BRAND_STR_IMAGE_TIMEOUT;
   bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
   bbep.setCursor((bbep.width() - rect.w) / 2, 400);
@@ -235,12 +236,12 @@ static void draw_wifi_image_timeout_message(void) {
 }
 
 static void draw_api_image_download_error_message(void) {
-  const char string1[] = "WiFi connected, API could not deliver image to device.";
+  const char string1[] = BRAND_STR_API_IMAGE_DOWNLOAD_ERROR;
   draw_centered_line(string1, 400);
 #ifndef BOARD_TRMNL_X
-  const char string2[] = "Wait or reset by holding button on back.";
+  const char string2[] = BRAND_STR_HOLD_BUTTON_RESET;
 #else
-  const char string2[] = "Wait or reset by holding left and right corner of touch bar.";
+  const char string2[] = BRAND_STR_HOLD_TOUCHBAR_RESET;
 #endif
   draw_centered_line(string2, -1);
 }
@@ -248,7 +249,7 @@ static void draw_api_image_download_error_message(void) {
 static void draw_fw_update_message(void) {
   BB_RECT rect;
 
-  const char string1[] = "Firmware update available! Starting now...";
+  const char string1[] = BRAND_STR_FW_UPDATE_AVAILABLE;
   bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
   bbep.setCursor((bbep.width() - rect.w) / 2, 400);
@@ -261,7 +262,7 @@ static void draw_fw_update_message(void) {
 static void draw_fw_update_failed_message(void) {
   BB_RECT rect;
 
-  const char string1[] = "Firmware update failed. Device will restart...";
+  const char string1[] = BRAND_STR_FW_UPDATE_FAILED;
   bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
   bbep.setCursor((bbep.width() - rect.w) / 2, 400);
@@ -274,7 +275,7 @@ static void draw_fw_update_failed_message(void) {
 static void draw_fw_update_success_message(void) {
   BB_RECT rect;
 
-  const char string1[] = "Firmware update success. Device will restart...";
+  const char string1[] = BRAND_STR_FW_UPDATE_SUCCESS;
   bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
   bbep.setCursor((bbep.width() - rect.w) / 2, 400);
@@ -285,14 +286,14 @@ static void draw_fw_update_success_message(void) {
 }
 
 static void draw_qa_start_message(void) {
-  const char string1[] = "Starting QA test";
+  const char string1[] = BRAND_STR_QA_STARTING;
   draw_centered_line(string1, 400);
 }
 
 static void draw_msg_too_big_message(void) {
   BB_RECT rect;
 
-  const char string1[] = "The image file from this URL is too large.";
+  const char string1[] = BRAND_STR_IMAGE_TOO_LARGE;
   bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
   bbep.setCursor((bbep.width() - rect.w) / 2, 360);
@@ -306,7 +307,7 @@ static void draw_msg_too_big_message(void) {
   }
   draw_centered_line(filename, -1);
 
-  const char string2[] = "PNG images can be a maximum of";
+  const char string2[] = BRAND_STR_PNG_MAX_PREFIX;
   draw_centered_line(string2, -1);
 #ifdef __BB_EPAPER__
   String string3 = String(MAX_IMAGE_SIZE) + String(" bytes each and 1 or 2-bpp");
@@ -319,7 +320,7 @@ static void draw_msg_too_big_message(void) {
 static void draw_msg_format_error_message(void) {
   BB_RECT rect;
 
-  const char string1[] = "The image format is incorrect";
+  const char string1[] = BRAND_STR_IMAGE_FORMAT_INCORRECT;
   bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
   bbep.setCursor((bbep.width() - rect.w) / 2, 400);
@@ -353,7 +354,7 @@ static void draw_fill_white_message(void) {
 static void draw_wifi_retry_limit_message(void) {
   BB_RECT rect;
 
-  const char string1[] = "Maximum WiFi retries reached.";
+  const char string1[] = BRAND_STR_WIFI_RETRY_LIMIT;
   bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
   bbep.setCursor((bbep.width() - rect.w) / 2, 340);
@@ -361,16 +362,16 @@ static void draw_wifi_retry_limit_message(void) {
   bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - (rect.h * 3));
 #endif
   bbep.println(string1);
-  const char string2[] = "Press button to manually refresh.";
+  const char string2[] = BRAND_STR_WIFI_RETRY_PRESS;
   draw_centered_line(string2, -1);
-  const char string3[] = "Hold button to reset WiFi and try another network.";
+  const char string3[] = BRAND_STR_WIFI_RETRY_HOLD;
   draw_centered_line(string3, -1);
 }
 
 static void draw_captive_wifi_timeout_message(void) {
   BB_RECT rect;
 
-  const char string1[] = "Wifi Captive Portal timed out";
+  const char string1[] = BRAND_STR_PORTAL_TIMEOUT;
   bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
   bbep.setCursor((bbep.width() - rect.w) / 2, 340);
@@ -379,9 +380,9 @@ static void draw_captive_wifi_timeout_message(void) {
 #endif
   bbep.println(string1);
 #ifdef BOARD_TRMNL_X
-  const char string2[] = "Tap touchbar to try again";
+  const char string2[] = BRAND_STR_TRY_AGAIN_TOUCHBAR;
 #else
-  const char string2[] = "Press button to try again";
+  const char string2[] = BRAND_STR_TRY_AGAIN_BUTTON;
 #endif
   draw_centered_line(string2, -1);
 }
@@ -620,7 +621,7 @@ static void draw_friendly_id_setup_message(String friendly_id, bool id) {
   BB_RECT rect;
 
   Log_info("friendly id case");
-  const char string1[] = "Please visit trmnl.com/start";
+  const char string1[] = BRAND_STR_SETUP_VISIT;
   bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
   bbep.setCursor((bbep.width() - rect.w) / 2, 400);
@@ -629,11 +630,11 @@ static void draw_friendly_id_setup_message(String friendly_id, bool id) {
 #endif
   bbep.println(string1);
 
-  String string2 = "with Friendly ID ";
+  String string2 = BRAND_STR_FRIENDLY_ID_PREFIX;
   if (id) {
     string2 += friendly_id;
   }
-  string2 += " to finish setup";
+  string2 += BRAND_STR_FRIENDLY_ID_SUFFIX;
   draw_centered_line(string2, -1);
 }
 
@@ -642,13 +643,13 @@ static void draw_wifi_connect_setup_message(const char *fw_version, String messa
 
   Log_info("wifi connect case");
 
-  String string1 = "TRMNL firmware ";
+  String string1 = BRAND_STR_FW_PREFIX;
   string1 += fw_version;
   bbep.setCursor(40, 48); // place in upper left corner
   bbep.println(string1);
-  String string2 = "Connect your phone or computer to ";
-  string2 += (message.length() > 0) ? "\"" + message + "\"" : String("the TRMNL");
-  string2 += " Wi-Fi";
+  String string2 = BRAND_STR_WIFI_CONNECT_MESSAGE_PREFIX;
+  string2 += (message.length() > 0) ? "\"" + message + "\"" : String(BRAND_STR_WIFI_CONNECT_DEFAULT_NAME);
+  string2 += BRAND_STR_WIFI_CONNECT_MESSAGE_SUFFIX;
   bbep.getStringBox(string2, &rect);
 #ifdef __BB_EPAPER__
   bbep.setCursor((bbep.width() - rect.w) / 2, 386);
@@ -656,7 +657,7 @@ static void draw_wifi_connect_setup_message(const char *fw_version, String messa
   bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 100 - rect.h);
 #endif
   bbep.println(string2);
-  const char string3[] = "or scan the QR code for help";
+  const char string3[] = BRAND_STR_SCAN_QR_HELP;
   draw_centered_line(string3, -1);
 #ifdef __BB_EPAPER__
   bbep.loadG5Image(wifi_connect_qr, bbep.width() - 40 - 66, 40, BBEP_WHITE, BBEP_BLACK); // 66x66 QR code

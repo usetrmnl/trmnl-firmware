@@ -1,0 +1,4 @@
+# Python packages used by scripts/generate_branding.py.
+# Installed on demand during the build; install manually with:
+#   pip install -r scripts/requirements.txt
+segno>=1.6

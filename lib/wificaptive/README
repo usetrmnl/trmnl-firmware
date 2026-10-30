@@ -9,9 +9,10 @@ Custom Wifi Portal implemented for TRMNL.
 
 ## Editing web portal
 
-After changing the web portal (index.html), run `convert.py` python script
-to convert it to the compressed gzip format. This script updates the `src/WifiCaptivePage.h`
-automatically.
+`src/WifiCaptivePage.h` (the gzipped portal page) is a git-ignored build artifact.
+`scripts/generate_branding.py` regenerates it from `portal/index.html` before every
+PlatformIO build, applying the branding in `config.yml` / `config.local.yml`. After
+editing index.html outside a build, run `python3 scripts/generate_branding.py`.
 
 ## Acknowledgments
 

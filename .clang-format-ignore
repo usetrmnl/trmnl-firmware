@@ -6,6 +6,7 @@ lib/IQS323/**
 lib/trmnl_x/**
 
 # pre-generated constants
+include/branding.h
 include/fonts/**
 src/battery_small.h
 src/loading.h
@@ -14,3 +15,4 @@ src/logo_medium.h
 src/logo_small.h
 src/wifi_connect_qr.h
 src/wifi_failed_qr.h
+lib/wificaptive/src/WifiCaptivePage.h
