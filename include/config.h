@@ -189,6 +189,7 @@ enum {
   EPD_PAPER_COLOR,
   EPD_133_COLOR,
   EPD_368,
+  EPD_368_UC8279,
 };
 
 /**
