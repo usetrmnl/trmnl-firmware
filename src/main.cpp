@@ -4,6 +4,9 @@
 #include "esp_ota_ops.h"
 #include "power.h"
 #include "qa.h"
+#ifdef BOARD_SEEED_RETERMINAL_E1003
+#include "e1003_sleep.h"
+#endif
 
 #ifdef BOARD_TRMNL_X
 #include "display.h"
@@ -68,6 +71,11 @@ void setup() {
 }
 #else // TRMNL OG setup()
 void setup() {
+#ifdef BOARD_SEEED_RETERMINAL_E1003
+  // Release the deep-sleep GPIO holds before the display driver powers the
+  // panel. See include/e1003_sleep.h.
+  e1003_release_sleep_holds();
+#endif
 
   bool testPassed = checkIfAlreadyPassed();
   if (!testPassed) {
