@@ -86,7 +86,7 @@ static void draw_wifi_failed_message(void) {
 #ifndef BOARD_TRMNL_X
   const char string2[] = "Hold button on the back to reset WiFi, or scan QR Code for help.";
 #else
-  const char string2[] = "Hold left and right corner of touch bar to reset WiFi, or scan QR Code for help.";
+  const char string2[] = "Tap the middle of touch bar for Settings > Reset Wi-Fi, or scan QR Code for help.";
 #endif
   draw_centered_line(string2, -1);
 #ifdef __BB_EPAPER__
@@ -150,7 +150,7 @@ static void draw_image_download_failed_message(void) {
 #ifndef BOARD_TRMNL_X
   const char string2[] = "Short click the button on back";
 #else
-  const char string2[] = "Tap the middle of touch bar";
+  const char string2[] = "Tap the middle of touch bar for Next Screen";
 #endif
   draw_centered_line(string2, -1);
   const char string3[] = "to advance to the next screen.";
@@ -163,7 +163,7 @@ static void draw_api_unable_to_connect_message(void) {
 #ifndef BOARD_TRMNL_X
   const char string2[] = "Short click the button on back,";
 #else
-  const char string2[] = "Tap the middle of touch bar,";
+  const char string2[] = "Tap the middle of touch bar for Next Screen,";
 #endif
   draw_centered_line(string2, -1);
   const char string3[] = "otherwise check your internet.";
@@ -184,7 +184,7 @@ static void draw_api_setup_failed_message(void) {
 #ifndef BOARD_TRMNL_X
   const char string2[] = "Short click the button on back,";
 #else
-  const char string2[] = "Tap the middle of touch bar,";
+  const char string2[] = "Tap the middle of touch bar for Next Screen,";
 #endif
   draw_centered_line(string2, -1);
   const char string3[] = "otherwise check your internet.";
@@ -205,7 +205,7 @@ static void draw_api_size_error_message(void) {
 #ifndef BOARD_TRMNL_X
   const char string2[] = "Wait or reset by holding button on back.";
 #else
-  const char string2[] = "Wait or reset by holding left and right corner of touch bar.";
+  const char string2[] = "Wait, or tap the middle of touch bar for Settings > Reset Wi-Fi.";
 #endif
   draw_centered_line(string2, -1);
 }
@@ -216,7 +216,7 @@ static void draw_api_firmware_update_error_message(void) {
 #ifndef BOARD_TRMNL_X
   const char string2[] = "Wait or reset by holding button on back.";
 #else
-  const char string2[] = "Wait or reset by holding left and right corner of touch bar.";
+  const char string2[] = "Wait, or tap the middle of touch bar for Settings > Reset Wi-Fi.";
 #endif
   draw_centered_line(string2, -1);
 }
@@ -240,7 +240,7 @@ static void draw_api_image_download_error_message(void) {
 #ifndef BOARD_TRMNL_X
   const char string2[] = "Wait or reset by holding button on back.";
 #else
-  const char string2[] = "Wait or reset by holding left and right corner of touch bar.";
+  const char string2[] = "Wait, or tap the middle of touch bar for Settings > Reset Wi-Fi.";
 #endif
   draw_centered_line(string2, -1);
 }
