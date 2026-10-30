@@ -4,6 +4,9 @@
 
 #include "esp_sntp.h"
 
+#define CLOCK_SNTP_TIMEOUT_MS 10000
+#define CLOCK_SNTP_POLL_MS    50
+
 uint32_t Clock::getTime() {
   time_t now;
   struct tm timeinfo;
@@ -42,15 +45,14 @@ bool Clock::setTimeFromNTP() {
 
 bool Clock::sync(Preferences &prefs, const String &ntpServer) {
   bool sync_status = false;
-  struct tm timeinfo;
+  struct tm timeinfo = {};
+  esp_sntp_set_sync_status(SNTP_SYNC_STATUS_RESET);
 
   // SNTP keeps the pointer it is given and resolves the name again on every retry, after this
   // function (and the caller's String) is gone: hand it storage that stays.
   static char server[256];
   strlcpy(server, ntpServer.c_str(), sizeof(server));
   configTime(0, 0, server, "pool.ntp.org");
-
-  waitForSync();
 
   for (int i = 0; i < SNTP_MAX_SERVERS; i++) {
     const char *srv = esp_sntp_getservername(i);
@@ -59,26 +61,37 @@ bool Clock::sync(Preferences &prefs, const String &ntpServer) {
     }
   }
 
-  Log.info("%s [%d]: Time synchronization...\r\n", __FILE__, __LINE__);
+  Log.info("%s [%d]: Time sync started\r\n", __FILE__, __LINE__);
 
-  // Wait for time to be set
-  if (getLocalTime(&timeinfo)) {
-    sync_status = true;
-    Log.info("%s [%d]: Time synchronization succeed!\r\n", __FILE__, __LINE__);
-    prefs.putUInt("last_sync", getTime()); // save epoch time of last sync
-  } else {
-    Log.info("%s [%d]: Time synchronization failed...\r\n", __FILE__, __LINE__);
+  // Wait for an actual SNTP response. getLocalTime() alone only checks that the clock holds a
+  // plausible year, which the RTC already does after deep sleep, so it reports success whether
+  // or not NTP answered.
+  bool synced = false;
+  const uint32_t start_ms = millis();
+  while (millis() - start_ms < CLOCK_SNTP_TIMEOUT_MS) {
+    if (esp_sntp_get_sync_status() == SNTP_SYNC_STATUS_COMPLETED) {
+      synced = true;
+      break;
+    }
+    delay(CLOCK_SNTP_POLL_MS);
   }
 
-  Log.info("%s [%d]: Current time - %s\r\n", __FILE__, __LINE__, asctime(&timeinfo));
+  if (synced && getLocalTime(&timeinfo)) {
+    sync_status = true;
+    Log.info("%s [%d]: Time sync succeeded in %d ms\r\n", __FILE__, __LINE__, (int)(millis() - start_ms));
+    prefs.putUInt("last_sync", getTime()); // save epoch time of last sync
+  } else {
+    Log.info("%s [%d]: Time sync failed after %d ms\r\n", __FILE__, __LINE__, (int)(millis() - start_ms));
+  }
+
+  time_t now = time(nullptr);
+  Log.info("%s [%d]: Current time - %s\r\n", __FILE__, __LINE__, ctime(&now));
 
   return sync_status;
 }
 
 #if defined(INCLUDE_CLOCK_X)
 static ClockX clockInstance;
-#elif defined(INCLUDE_CLOCK_GEN2)
-static ClockGen2 clockInstance;
 #else
 static Clock clockInstance;
 #endif
