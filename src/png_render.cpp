@@ -378,8 +378,10 @@ int png_draw(PNGDRAW *pDraw) {
   uint8_t ucMask, ucPixel, src, *s, *d;
   int iPitch, iBpp;
 
-  if (y >= bbep.height() && pDraw->iWidth != bbep.height())
-    return 0; // image is larger than the display (and not rotated), stop decoding it
+  if (pDraw->iWidth == bbep.height()) { // rotated: rows past the panel's width are cropped
+    if (y >= bbep.width()) return 0;
+  } else if (y >= bbep.height())
+    return 0; // image is larger than the display, stop decoding it
   if (pDraw->iPixelType == PNG_PIXEL_INDEXED ||
       pDraw->iBpp > 4) { // need to convert through the palette and/or reduce the bpp
     s = bbep.tempBuffer(); // temp space we can use
@@ -403,13 +405,17 @@ int png_draw(PNGDRAW *pDraw) {
   } else {
     d = bbep.currentBuffer();
   }
+    // Only a portrait image of exactly the panel's size is rotated; any other width is cropped.
+  bool bRotated = pDraw->iWidth == bbep.height();
+  int iCopyWidth = (pDraw->iWidth < bbep.width()) ? pDraw->iWidth : bbep.width();
   iPitch = bbep.width() / 2;
   if (iBpp == 1) {
-    if (bbep.width() >= pDraw->iWidth) { // normal orientation
-      iPitch = (bbep.width() + 7) / 8;
+    iPitch = (bbep.width() + 7) / 8; // 1-bit lines, rotated or not
+    if (!bRotated) {
       d += y * iPitch; // point to the correct line
-      memcpy(d, s, (pDraw->iWidth + 7) / 8);
-    } else { // rotated
+      memcpy(d, s, (iCopyWidth + 7) / 8);
+      if (iCopyWidth & 7) d[iCopyWidth / 8] |= 0xff >> (iCopyWidth & 7); // pad bits past the image are white
+    } else {
       uint8_t ucPixel, ucMask, j;
       d += (bbep.height() - 1) * iPitch;
       d += (y / 8);
@@ -430,10 +436,11 @@ int png_draw(PNGDRAW *pDraw) {
       iBpp = 4;
     }
         // 4-bit native format (includes expanded 2-bit)
-    if (bbep.width() == pDraw->iWidth) { // normal orientation
+    if (!bRotated) {
       d += y * iPitch; // point to the correct line
-      memcpy(d, s, (pDraw->iWidth + 1) / 2);
-    } else { // rotated
+      memcpy(d, s, (iCopyWidth + 1) / 2);
+      if (iCopyWidth & 1) d[iCopyWidth / 2] |= 0x0f; // pad pixel past the image is white
+    } else {
       d += (bbep.height() - 1) * iPitch;
       d += (y / 2);
       if (y & 1) { // odd line (column)
@@ -655,6 +662,11 @@ int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious) {
         break;
       }
       Log_info("%s [%d]: FastEPD graphics mode set to: %d\n", __FILE__, __LINE__, bbep.getMode());
+      { // in case the image is too small - undrawn areas will be white (0xff at both 1 and 4 bpp)
+        uint8_t *pBuffer = (bPrevious) ? bbep.previousBuffer() : bbep.currentBuffer();
+        int iPitch = (png->getBpp() == 1) ? (bbep.width() + 7) / 8 : bbep.width() / 2;
+        memset(pBuffer, 0xff, iPitch * bbep.height());
+      }
       png->decode((void *)bPrevious, 0);
       png->close();
 #endif
