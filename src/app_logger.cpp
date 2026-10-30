@@ -197,7 +197,7 @@ void log_impl(LogLevel level, LogMode mode, const char *file, int line, const ch
   va_list args;
   va_start(args, format);
 
-    // Format user message with truncation (heap to avoid stack overflow in deep call chains)
+  // Format user message with truncation (heap to avoid stack overflow in deep call chains)
   char *user_message = (char *)malloc(MAX_USER_MESSAGE);
   if (!user_message) {
     va_end(args);
@@ -206,7 +206,7 @@ void log_impl(LogLevel level, LogMode mode, const char *file, int line, const ch
   format_message_truncated(user_message, MAX_USER_MESSAGE, format, args);
   va_end(args);
 
-    // Measure exact length needed for serial buffer
+  // Measure exact length needed for serial buffer
   int serial_len = snprintf(nullptr, 0, "%s [%d]: %s", file, line, user_message) + 1;
   char *serial_buffer = (char *)malloc(serial_len);
   if (!serial_buffer) {
@@ -215,8 +215,8 @@ void log_impl(LogLevel level, LogMode mode, const char *file, int line, const ch
   }
   snprintf(serial_buffer, serial_len, "%s [%d]: %s", file, line, user_message);
 
-// This mode is not handled correctly by underlying implementation,
-// so shortcut it here
+  // This mode is not handled correctly by underlying implementation,
+  // so shortcut it here
   if (mode == LOG_SERIAL_ONLY) {
     if (serial_logging_enabled) {
       Serial.println(serial_buffer);
@@ -229,19 +229,19 @@ void log_impl(LogLevel level, LogMode mode, const char *file, int line, const ch
   if (serial_logging_enabled) {
     switch (level) {
     case LOG_VERBOSE:
-      Log.verboseln(serial_buffer);
+      Log.verboseln("%s", serial_buffer);
       break;
     case LOG_INFO:
-      Log.infoln(serial_buffer);
+      Log.infoln("%s", serial_buffer);
       break;
     case LOG_WARN:
-      Log.warningln(serial_buffer);
+      Log.warningln("%s", serial_buffer);
       break;
     case LOG_ERROR:
-      Log.errorln(serial_buffer);
+      Log.errorln("%s", serial_buffer);
       break;
     case LOG_FATAL:
-      Log.fatalln(serial_buffer);
+      Log.fatalln("%s", serial_buffer);
       break;
     }
   }
