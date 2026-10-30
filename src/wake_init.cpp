@@ -71,7 +71,6 @@ void initPeripherals(void) {
   hw_config_init();
   pins_init();
   buzzer().init();
-  sensor().init(pDevice);
 #ifdef BOARD_TRMNL_X
   touchbar_log_wake_stub_status();
 #endif
@@ -122,6 +121,9 @@ void startBoardHardware(const WakeContext &wake, uint32_t init_time) {
     Log_info("Non-GPIO wakeup (%d) -> didn't read buttons", wake.reason);
   }
 
+  // After the button: the SCD41's sample wait is a light sleep, which overwrites the wakeup cause
+  sensor().init(pDevice);
+
   if (double_click) button_wake_run_special_function();
   // Read the battery voltage BEFORE the display or WiFi is turned on
   battery_voltage = battery().readVoltage(pDevice);
@@ -144,6 +146,9 @@ void startBoardHardware(const WakeContext &wake, uint32_t init_time) {
   filesystem_init();
 
   Wire.setClock(100000);
+
+  // After the button: the SCD41's sample wait is a light sleep, which overwrites the wakeup cause
+  sensor().init(pDevice);
 
   touchbar_start(wake.reason, wake.gpio);
 
