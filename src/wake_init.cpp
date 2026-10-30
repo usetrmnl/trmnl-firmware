@@ -99,6 +99,19 @@ WakeContext readWakeContext(void) {
 void openPreferences(void) {
   Log_info("preferences start");
   bool res = preferences.begin("data", false);
+#ifdef BYOS_SERVER_URL
+  {
+    // BYOS v1: the server URL is baked in at build time, so no captive-portal round trip
+    // is needed to repoint the device. Changing the URL forces a fresh /api/setup (new api key).
+    String wanted = BYOS_SERVER_URL;
+    if (wanted.length() > 0 && preferences.getString(PREFERENCES_API_URL, "") != wanted) {
+      preferences.putString(PREFERENCES_API_URL, wanted);
+      preferences.remove(PREFERENCES_API_KEY);
+      preferences.remove(PREFERENCES_FRIENDLY_ID);
+      Log.info("%s [%d]: byos: api_url set to %s, re-pairing\r\n", __FILE__, __LINE__, wanted.c_str());
+    }
+  }
+#endif
   if (res) {
     Log_info("preferences init success (%d free entries)", preferences.freeEntries());
   } else {

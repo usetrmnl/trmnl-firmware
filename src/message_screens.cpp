@@ -245,6 +245,15 @@ static void draw_api_image_download_error_message(void) {
   draw_centered_line(string2, -1);
 }
 
+static void draw_free_text_message(const char *message_text) {
+  BB_RECT rect;
+
+  const char *text = message_text ? message_text : "";
+  bbep.getStringBox(text, &rect);
+  bbep.setCursor((bbep.width() - rect.w) / 2, 400);
+  bbep.print(text);
+}
+
 static void draw_fw_update_message(void) {
   BB_RECT rect;
 
@@ -507,6 +516,9 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
   case API_IMAGE_DOWNLOAD_ERROR:
     draw_api_image_download_error_message();
     break;
+  case MSG_FREE_TEXT:
+    draw_free_text_message(message_text);
+    break;
   case FW_UPDATE:
     draw_fw_update_message();
     break;
@@ -733,3 +745,10 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
   Log_info("Start drawing...");
   present_setup_message();
 }
+
+#ifdef BYOS_PROTOCOL_V1
+// Declared in display.h upstream but never defined; BYOS v1 uses it for "waiting for update".
+void display_show_msg_api(uint8_t *image_buffer, String message) {
+  display_show_msg(image_buffer, MSG_FREE_TEXT, message.c_str());
+}
+#endif

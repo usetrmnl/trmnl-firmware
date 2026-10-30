@@ -25,8 +25,28 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
         .temp_profile = 0,
         .reset_firmware = false,
         .special_function = SF_NONE,
-        .action = ""};
+        .action = "",
+        .v1_action = V1_ACTION_FULL,
+        .frame_id = "",
+        .full_url = "",
+        .regions_url = "",
+        .full_mode = V1_FULL_FULL,
+        .sleep_mode = V1_SLEEP_DEEP,
+        .ota_wait = false};
   }
+  // protocol v1: missing/unknown values fall back to the stock behaviour (full refresh via image_url)
+  String v1ActionStr = doc["action"] | "";
+  V1Action v1Action = V1_ACTION_FULL;
+  if (v1ActionStr == "none")
+    v1Action = V1_ACTION_NONE;
+  else if (v1ActionStr == "partial")
+    v1Action = V1_ACTION_PARTIAL;
+  String fullModeStr = doc["full_mode"] | "";
+  String sleepModeStr = doc["sleep_mode"] | "";
+  String imageUrl = doc["image_url"] | "";
+  String fullUrl = doc["full_url"] | "";
+  String frameId = doc["frame_id"] | "";
+  String fileName = doc["filename"] | "";
   String special_function_str = doc["special_function"];
   // Convert the temperature profile ("default", "a", "b", "c")
   // into an integer value (0,1,2,3)
@@ -53,5 +73,12 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
       .temp_profile = u32TP,
       .reset_firmware = doc["reset_firmware"],
       .special_function = parseSpecialFunction(special_function_str),
-      .action = doc["action"] | ""};
+      .action = doc["action"] | "",
+      .v1_action = v1Action,
+      .frame_id = frameId.length() ? frameId : fileName,
+      .full_url = fullUrl.length() ? fullUrl : imageUrl,
+      .regions_url = doc["regions_url"] | "",
+      .full_mode = (fullModeStr == "fast") ? V1_FULL_FAST : V1_FULL_FULL,
+      .sleep_mode = (sleepModeStr == "light") ? V1_SLEEP_LIGHT : V1_SLEEP_DEEP,
+      .ota_wait = doc["ota_wait"] | false};
 }

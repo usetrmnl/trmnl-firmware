@@ -25,3 +25,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
                       String message);
 
 void display_show_msg_qa(const float *voltage, const float *temperature, bool qa_result);
+
+#ifdef BYOS_PROTOCOL_V1
+void display_show_msg_api(uint8_t *image_buffer, String message);
+#endif

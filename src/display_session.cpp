@@ -14,11 +14,13 @@
 #include <filesystem.h>
 #include <globals.h>
 #include <logging_parcers.h>
+#include <message_screens.h>
 #include <png.h>
 #include <power.h>
 #include <refresh_interval.h>
 #include <services/http_retry_request.h>
 #include <special_function.h>
+#include <status_screens.h>
 #include <trmnl_log.h>
 #include <types.h>
 #include <wifi_network.h>
@@ -67,6 +69,35 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse) {
       String image_url = apiResponse.image_url;
       uint64_t rate = apiResponse.refresh_rate;
       reset_firmware = apiResponse.reset_firmware;
+#ifdef BYOS_PROTOCOL_V1
+      if (apiResponse.ota_wait) {
+        // OTA waiting mode: short polls, no drawing; the server flips update_firmware when the binary is ready.
+        Log.info("%s [%d]: byos: ota_wait, polling every %d s\r\n", __FILE__, __LINE__, (int)rate);
+        if (!preferences.getBool(PREFERENCES_OTA_WAIT_SHOWN, false)) {
+          display_show_msg_api(storedLogoOrDefault(0), "Waiting for firmware update...");
+          preferences.putBool(PREFERENCES_OTA_WAIT_SHOWN, true);
+        }
+      } else if (preferences.getBool(PREFERENCES_OTA_WAIT_SHOWN, false)) {
+        preferences.putBool(PREFERENCES_OTA_WAIT_SHOWN, false);
+        preferences.remove(PREFERENCES_FRAME_ID_KEY); // the panel shows the waiting screen, force a full frame next
+      }
+      if (apiResponse.v1_action == V1_ACTION_NONE) {
+        Log.info("%s [%d]: byos: action none, frame %s stays\r\n", __FILE__, __LINE__, apiResponse.frame_id.c_str());
+        refreshInterval.applyServerRate(rate);
+        refreshInterval.resetFastPollStreak();
+        status = false;
+        result = HTTPS_SUCCESS;
+        if (reset_firmware) result = HTTPS_RESET;
+        break;
+      }
+      // partial: until windowed regions land, download the full frame; display_show_image() already does a
+      // non-flashing REFRESH_PARTIAL against the cached previous image, so only changed pixels move.
+      // full + full_mode=full: the server asks for a real full refresh (ghost cleaning) → maximum_compatibility.
+      if (apiResponse.v1_action == V1_ACTION_FULL && apiResponse.full_mode == V1_FULL_FULL)
+        apiResponse.maximum_compatibility = true;
+      else
+        apiResponse.maximum_compatibility = false;
+#endif
 
       bool sleep_5_seconds = false;
 
@@ -451,6 +482,9 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse) {
 static ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences, float batteryVoltage) {
   ApiDisplayInputs inputs = createApiHeaders();
   inputs.baseUrl = preferences.getString(PREFERENCES_API_URL, API_BASE_URL);
+#ifdef BYOS_PROTOCOL_V1
+  inputs.frameId = preferences.getString(PREFERENCES_FRAME_ID_KEY, "");
+#endif
   inputs.batteryVoltage = batteryVoltage; // read before the display and WiFi were turned on
   last_wifi_rssi = inputs.rssi;
   Log.info("%s [%d]: baseUrl from preferences: %s\r\n", __FILE__, __LINE__, inputs.baseUrl.c_str());
@@ -470,7 +504,7 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
 
   https_request_err_e result = handleApiDisplayResponse(apiDisplayResult.response);
   if (apiDisplayResult.response.filename == "screen_wiper.png") {
-      // Guard against re-fetching forever if the wiper is the only playlist item
+    // Guard against re-fetching forever if the wiper is the only playlist item
     static bool wiped_this_wake = false;
     if (wiped_this_wake) {
       Log_info("Screen wiper returned again; not wiping twice in one wake");
@@ -479,8 +513,8 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
     wiped_this_wake = true;
     Log_info("Detected screen wiper filename: %s, clearing display...", apiDisplayResult.response.filename.c_str());
     display_wipe();
-      // Wiping leaves the screen blank; fetch and show the next playlist item
-      // right away instead of waiting for the next scheduled refresh.
+    // Wiping leaves the screen blank; fetch and show the next playlist item
+    // right away instead of waiting for the next scheduled refresh.
     Log_info("Screen wipe complete, fetching next playlist item");
     return downloadAndShow(batteryVoltage);
   }
@@ -489,14 +523,14 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
     char szTemp[36];
     filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
     if (DisplayedImage::matches(szTemp)) {
-        // We just displayed the same image, don't refresh the display
+      // We just displayed the same image, don't refresh the display
       Log.info("%s [%d]: The image hasn't changed since the last wakeup, don't refresh the display.\r\n", __FILE__,
                __LINE__);
       buffer = nullptr;
       return result;
     }
     if (!filesystem_file_exists(szTemp)) {
-        // BMPs aren't cached under their filename (e.g. after a sleep special function); redraw /current.bmp
+      // BMPs aren't cached under their filename (e.g. after a sleep special function); redraw /current.bmp
       buffer = nullptr;
       size_t current_size = 0;
       if (filesystem_file_exists("/current.bmp")) {
@@ -516,6 +550,9 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
       return result;
     }
     DisplayedImage::remember(szTemp);
+#ifdef BYOS_PROTOCOL_V1
+    preferences.putString(PREFERENCES_FRAME_ID_KEY, apiDisplayResult.response.frame_id);
+#endif
     Log.info("%s [%d]: Reading %s from SPIFFS\r\n", __FILE__, __LINE__, szTemp);
     size_t content_size = filesystem_read_and_allocate(szTemp, &buffer);
     if (!buffer || content_size == 0) {
@@ -528,7 +565,10 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
     free(buffer);
     buffer = nullptr;
     DisplayedImage::remember(szTemp); // current image becomes the previous image
-      // Rotate NVS path keys: last ← current ← szTemp
+#ifdef BYOS_PROTOCOL_V1
+    preferences.putString(PREFERENCES_FRAME_ID_KEY, apiDisplayResult.response.frame_id);
+#endif
+    // Rotate NVS path keys: last ← current ← szTemp
     String _curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
     String _lastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
     if (!_curPath.isEmpty() && (_curPath != String(szTemp) || _lastPath.isEmpty()))
@@ -598,6 +638,9 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
     filesystem_purge_old_file(szTemp); // try to delete the old version or older than 24h
     writeImageToFile(szTemp, buffer, content_size);
     DisplayedImage::remember(szTemp); // current image becomes the previous image
+#ifdef BYOS_PROTOCOL_V1
+    preferences.putString(PREFERENCES_FRAME_ID_KEY, apiDisplayResult.response.frame_id);
+#endif
     String _curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
     String _lastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
     if (!_curPath.isEmpty() && (_curPath != String(szTemp) || _lastPath.isEmpty()))
@@ -652,6 +695,9 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
       char szTemp[36];
       filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
       DisplayedImage::remember(szTemp);
+#ifdef BYOS_PROTOCOL_V1
+      preferences.putString(PREFERENCES_FRAME_ID_KEY, apiDisplayResult.response.frame_id);
+#endif
     }
 
     // Using filename from API response
