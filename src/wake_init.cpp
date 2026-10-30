@@ -21,7 +21,10 @@
 
 #ifdef BOARD_TRMNL_X
 #include <Wire.h>
+#include <cached_images.h>
+#include <status_screens.h>
 
+#include "accelerometer.h"
 #include "touchbar_actions.h"
 #else
 // Create stub functions for the touchbar workaround
@@ -134,12 +137,49 @@ void startBoardHardware(const WakeContext &wake, uint32_t init_time) {
   filesystem_init();
 }
 #else // BOARD_TRMNL_X
+static void handle_orientation_change_confirmation(struct bma5_dev *dev, uint8_t previous_orientation) {
+  const unsigned long ORIENTATION_POLL_INTERVAL_MS = 1000;
+  int dots_filled = 0;
+  bool reverted = false;
+  uint8_t *confirm_logo = storedLogoOrDefault(1);
+
+  display_show_orientation_confirm(confirm_logo, dots_filled);
+  unsigned long confirm_start = millis();
+
+  while (dots_filled < ORIENTATION_CONFIRM_DOT_COUNT) {
+    delay(ORIENTATION_POLL_INTERVAL_MS);
+
+    uint8_t polled_orientation;
+    if (bma530_read_orientation(dev, &polled_orientation) == BMA530_ORIENT_VALID &&
+        polled_orientation == previous_orientation) {
+      reverted = true;
+      break;
+    }
+
+    dots_filled++;
+    display_show_orientation_confirm(confirm_logo, dots_filled);
+  }
+
+  if (reverted) {
+    Log_info("Orientation change reverted within confirm window - aborting, restoring previous orientation");
+    device_orientation = previous_orientation;
+    display_set_orientation(device_orientation);
+    show_last_image_and_sleep(); // does not return
+  }
+
+  Log_info("Orientation change confirmed after %lums", millis() - confirm_start);
+}
+
 void startBoardHardware(const WakeContext &wake, uint32_t init_time) {
   Log.info("%s [%d]: Display init\r\n", __FILE__, __LINE__);
   iqs323_task_i2c_lock();
   display_init();
   otg_turn_off(); // Since OTG function was commented out, need to ensure that OTG is turned off
   iqs323_task_i2c_unlock();
+
+  // Apply the last-known (RTC-persisted) orientation
+  display_set_orientation(device_orientation);
+
   filesystem_init();
 
   Wire.setClock(100000);
@@ -147,6 +187,29 @@ void startBoardHardware(const WakeContext &wake, uint32_t init_time) {
   touchbar_start(wake.reason, wake.gpio);
 
   Log_info("init time: %ld us", init_time);
+
+  // I2C already initialized by IQS323 - do not call Wire.begin() again as it corrupts the bus on ESP32S3
+  Serial.printf("Using I2C bus already initialized (SDA: %d, SCL: %d)\n\n", 39, 40);
+
+  struct bma5_dev bma530_dev;
+  bma530_wake_and_init(&bma530_dev);
+
+  config_bma530_interrupt();
+  pinMode(GPIO_NUM_38, INPUT);
+
+  uint8_t orientation_before_confirm = device_orientation;
+  {
+    uint8_t computed_orientation;
+    if (bma530_read_orientation(&bma530_dev, &computed_orientation) == BMA530_ORIENT_VALID) {
+      device_orientation = computed_orientation;
+      display_set_orientation(device_orientation);
+    }
+  }
+
+  if (device_orientation != orientation_before_confirm) {
+    Log_info("Device orientation changed: %d -> %d", orientation_before_confirm, device_orientation);
+    handle_orientation_change_confirmation(&bma530_dev, orientation_before_confirm);
+  }
 
   // Read the gauge before the panel draws load current, and before the logo
   // is drawn so its battery icon has a snapshot to read.

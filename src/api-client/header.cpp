@@ -12,6 +12,10 @@
 
 #include "logging_parcers.h"
 
+#ifdef BOARD_TRMNL_X
+#include "accelerometer.h"
+#endif
+
 ApiDisplayInputs createApiHeaders() {
   ApiDisplayInputs inputs;
   char wakeupReasonString[32] = {0};
@@ -60,6 +64,7 @@ ApiDisplayInputs createApiHeaders() {
   inputs.chargingStatus = power().chargingStatus();
 
 #ifdef BOARD_TRMNL_X
+  inputs.orientation = bma530_orientation_to_string(device_orientation);
   // These getters already return -1 if the last gaugeInit() didn't produce a valid reading.
   inputs.batteryCount = battery_count;
   inputs.stateOfCharge = battery().readSoc();

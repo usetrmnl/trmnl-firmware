@@ -24,6 +24,7 @@ HttpHeaderList buildDisplayHeaders(const ApiDisplayInputs &inputs) {
   headers.push_back({"Battery-Temp", String(inputs.batteryTemperature)});
   headers.push_back(
     {"Battery-Capacity", String(inputs.currentBatteryCapacity) + "/" + String(inputs.maxBatteryCapacity)});
+  headers.push_back({"Orientation", inputs.orientation});
   headers.push_back({"Gauge-SOC", String(inputs.gaugeSoc)});
   headers.push_back({"Gauge-Health", String(inputs.gaugeHealth)});
   headers.push_back({"Gauge-Capacity", String(inputs.gaugeCapacityRemain) + "/" + String(inputs.gaugeCapacityFull)});

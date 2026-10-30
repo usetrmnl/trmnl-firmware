@@ -31,6 +31,7 @@ RTC_DATA_ATTR int last_wifi_rssi = 0;
 RTC_DATA_ATTR bool bUsedCachedImage = false;
 RTC_DATA_ATTR uint8_t need_to_refresh_display = 1;
 RTC_DATA_ATTR bool otg_state = false;
+RTC_DATA_ATTR uint8_t device_orientation = 3; // LANDSCAPE_RIGHT
 
 // --- Display refresh bookkeeping ---
 // Counts the number of partial updates to know when to do a full update
