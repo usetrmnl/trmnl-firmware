@@ -2,10 +2,12 @@
 
 #include <WiFi.h>
 #include <trmnl_log.h>
+#include <utility>
 #define _NO_DEV_CONFIG_
 #define UWORD uint16_t
 
 #include "../../../include/display.h"
+#include "../../../include/pairing_runtime.h"
 #include "../../../include/power.h"
 #include "WebServer.h"
 #include "connect.h"
@@ -32,6 +34,10 @@ String WifiCaptive::getAPSSID() {
 }
 
 bool WifiCaptive::startPortal() {
+  _pendingSubmission = false;
+  _acceptSubmissions = true;
+  _resetRequested = false;
+  _acceptResets = true;
   _dnsServer = new DNSServer();
   _server = new AsyncWebServer(80);
   _connectionState = WifiConnectionState::Idle;
@@ -65,6 +71,15 @@ bool WifiCaptive::startPortal() {
   esp_wifi_init(&my_config);
   esp_wifi_start();
   vTaskDelay(100 / portTICK_PERIOD_MS); // Add a small delay
+  pairingBegin();
+  readWifiCredentials();
+  _useExternalScan = !_networks.empty();
+#ifdef BOARD_TRMNL_X
+  _useExternalScan = _useExternalScan || (bool)_modemScanCallback;
+#endif
+  _nativeScanRunning = false;
+  _scanCache.begin(_useExternalScan ? externalScanSnapshot() : ScanNetworks{}, _useExternalScan);
+  serviceNetworkScan();
 
     // configure DSN and WEB server
   setUpDNSServer(*_dnsServer, localIP);
@@ -72,59 +87,17 @@ bool WifiCaptive::startPortal() {
   WifiOperationCallbacks callbacks = {
       .resetSettings =
         [this]() {
-          resetSettings();
-          if (_resetcallback != NULL) {
-            _resetcallback(); // @CALLBACK
-          }
+          std::lock_guard<std::mutex> lock(_submissionMutex);
+          const bool accepted = _acceptResets;
+          if (accepted) _resetRequested = true;
+          return accepted;
         },
       .setConnectionCredentials =
         [this](const WifiCredentials credentials, const String api_server, const String band) {
-          _ssid = credentials.ssid;
-          _password = credentials.pswd;
-          _band = band;
-          _api_server = api_server;
-          _enterprise_credentials = credentials;
-          _connectionRequestedAt = millis();
-          _connectionState = WifiConnectionState::Connecting;
+          return enqueueCredentials(credentials, api_server, band);
         },
       .getConnectionState = [this]() { return _connectionState.load(); },
-      .getAnnotatedNetworks =
-        [this](bool runScan) {
-          if (!_networks.empty()) {
-            std::vector<WifiNetwork> result;
-            for (auto &n : _networks) {
-              bool saved = false;
-              for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
-                if (_savedWifis[i].ssid == n.ssid) {
-                  saved = true;
-                  break;
-                }
-              result.push_back({n.ssid, n.rssi, n.open, saved, n.is5GHz, n.enterprise});
-            }
-            return result;
-          }
-            // Warning: DO NOT USE true on this function in an async context!
-          std::vector<WifiNetwork> uniqueNetworks = getScannedUniqueNetworks(false);
-          std::vector<WifiNetwork> combinedNetworks = combineNetworks(uniqueNetworks, _savedWifis);
-          return combinedNetworks;
-        },
-      .isNetworkListReady =
-        [this]() {
-          if (!_networks.empty()) return true;
-          int n = WiFi.scanComplete();
-          return n >= 0;
-        },
-      .forceRescan =
-        [this]() {
-#ifdef BOARD_TRMNL_X
-          if (_modemScanCallback) {
-            _networks = _modemScanCallback();
-            return;
-          }
-#endif
-          WiFi.scanDelete();
-          WiFi.scanNetworks(true);
-        }};
+      .getNetworks = [this](bool force) { return _scanCache.read(force); }};
 
 #ifdef BOARD_TRMNL_X
   setUpWebserver(*_server, localIP, callbacks, _modemMac);
@@ -135,17 +108,6 @@ bool WifiCaptive::startPortal() {
     // begin serving
   _server->begin();
 
-    // Start async WiFi scan only when no external network list is provided
-  if (_networks.empty()) {
-#ifdef CONFIG_IDF_TARGET_ESP32C5
-    // Enable 5GHz network scan
-    WiFi.setBandMode(WIFI_BAND_MODE_AUTO);
-#endif
-    WiFi.scanNetworks(true);
-  }
-
-  readWifiCredentials();
-
   bool succesfullyConnected = false;
   bool connected_via_modem = false;
   long lTime = millis();
@@ -154,71 +116,72 @@ bool WifiCaptive::startPortal() {
   {
     _dnsServer->processNextRequest();
 
-    if (_tickCallback) _tickCallback();
+    bool resetRequested;
+    {
+      std::lock_guard<std::mutex> lock(_submissionMutex);
+      resetRequested = _resetRequested;
+      _resetRequested = false;
+    }
+    if (resetRequested) {
+      resetSettings();
+      if (_resetcallback != NULL) _resetcallback();
+    }
 
-    if (_connectionState.load() != WifiConnectionState::Connecting) {
-      delay(DNS_INTERVAL);
-    } else if ((uint32_t)(millis() - _connectionRequestedAt.load()) < 1000) {
-      // Give the /connect response time to reach the browser before the STA
-      // radio changes channel and may briefly disconnect captive-portal clients.
+    if (_tickCallback) _tickCallback();
+    serviceNetworkScan();
+    pairingTick();
+
+    Submission submission;
+    bool pending;
+    {
+      std::lock_guard<std::mutex> lock(_submissionMutex);
+      // Leave portal requests queued until their HTTP response can reach the browser.
+      pending =
+        _pendingSubmission && (pairingUsesBle() || (uint32_t)(millis() - _connectionRequestedAt.load()) >= 1000);
+      if (pending) {
+        submission = _submission;
+        _submission = Submission{};
+        _pendingSubmission = false;
+      }
+    }
+    if (!pending) {
       delay(DNS_INTERVAL);
     } else {
-            // use enterprise credentials if available, otherwise use basic credentials
-            // Always start with _enterprise_credentials to preserve static IP settings
-      WifiCredentials credentials = _enterprise_credentials;
-      if (!credentials.isEnterprise) {
-                // For non-enterprise, ensure basic fields are set
-        credentials.ssid = _ssid;
-        credentials.pswd = _password;
-      }
-      Log_info("Connecting with static IP: %s, IP: %s", credentials.useStaticIP ? "yes" : "no",
-               credentials.staticIP.c_str());
-
-            // Honor an explicit band choice from the portal; fallback to prioritizing 5 GHz
-      if (_band == "5GHz") {
-        credentials.is5GHz = true;
-      } else if (_band == "2.4GHz") {
-        credentials.is5GHz = false;
-      } else {
-        for (auto &n : _networks) {
-          if (n.ssid == credentials.ssid) {
-            credentials.is5GHz = n.is5GHz;
-            break;
-          }
-        }
-      }
-
-      bool res = false;
-      WifiConnectionState failureState = WifiConnectionState::Failed;
-      if (credentials.is5GHz && !credentials.isEnterprise && _modemConnectCallback) {
-        res = _modemConnectCallback(credentials.ssid, credentials.pswd);
-        if (res) connected_via_modem = true;
-      } else {
-        auto result = initiateConnectionAndWaitForOutcome(credentials);
-        res = result.status == WL_CONNECTED;
-        if (!res) failureState = classifyConnectionFailure(result);
-        if (!res) {
-          // The main chip dropped the portal AP to try this network, so restart to avoid leaving the device stuck
-          Log_info("Connection failed, restarting device to bring the portal back up");
-          ESP.restart();
-        }
-      }
+      _enterprise_credentials = submission.credentials;
+      bool res = connectAndSave(submission.credentials, submission.server, submission.band, connected_via_modem);
+      pairingWifiResult(res);
 
       if (res) {
-        _connectionState = WifiConnectionState::Connected;
-        saveWifiCredentials(credentials);
-        saveApiServer(_api_server);
+        {
+          std::lock_guard<std::mutex> lock(_submissionMutex);
+          _acceptSubmissions = false;
+        }
         succesfullyConnected = true;
         break;
       } else {
-        _connectionState = failureState;
         WiFi.disconnect();
         WiFi.enableSTA(false);
+        continue;
       }
     }
   }
+  bool finalResetRequested;
+  {
+    std::lock_guard<std::mutex> lock(_submissionMutex);
+    _acceptSubmissions = false;
+    // Drain a reset queued while connectAndSave was blocking, even if it succeeded.
+    // Later web requests are rejected instead of acknowledging work with no owner.
+    _acceptResets = false;
+    finalResetRequested = _resetRequested;
+    _resetRequested = false;
+  }
+  if (finalResetRequested) {
+    resetSettings();
+    if (_resetcallback != NULL) _resetcallback();
+  }
 
-  // SSID provided, stop server
+    // SSID provided, stop server
+  _nativeScanRunning = false;
   WiFi.scanDelete();
   WiFi.softAPdisconnect(true);
   delay(1000);
@@ -230,11 +193,6 @@ bool WifiCaptive::startPortal() {
       WiFi.mode(WIFI_STA);
       // Always start with _enterprise_credentials to preserve static IP settings
       WifiCredentials credentials = _enterprise_credentials;
-      if (!credentials.isEnterprise) {
-        // For non-enterprise, ensure basic fields are set
-        credentials.ssid = _ssid;
-        credentials.pswd = _password;
-      }
       Log_info("Reconnecting with static IP: %s, IP: %s", credentials.useStaticIP ? "yes" : "no",
                credentials.staticIP.c_str());
       auto result = initiateConnectionAndWaitForOutcome(credentials);
@@ -258,6 +216,7 @@ bool WifiCaptive::startPortal() {
   _server = nullptr;
   // Take different action for timeout (go to sleep)
   if ((millis() - lTime) > PORTAL_TIMEOUT) {
+    pairingBeforeSleep();
 #ifdef BOARD_TRMNL_X
     if (power().usbStatus() == UsbStatus::CONNECTED) {
       showMessageWithLogo(READY_TO_SHIP);
@@ -289,6 +248,172 @@ WifiConnectionState WifiCaptive::classifyConnectionFailure(const WifiConnectionR
   default:
     return WifiConnectionState::Failed;
   }
+}
+
+bool WifiCaptive::enqueueCredentials(const WifiCredentials &credentials, const String &server, const String &band,
+                                     bool fromBle) {
+  std::lock_guard<std::mutex> lock(_submissionMutex);
+  if (!_acceptSubmissions || _pendingSubmission) return false;
+  if (!fromBle && !pairingReservePortal(server)) return false;
+  _submission.credentials = credentials;
+  _submission.server = server;
+  _submission.band = band;
+  _connectionRequestedAt = millis();
+  _connectionState = WifiConnectionState::Connecting;
+  _pendingSubmission = true;
+  return true;
+}
+bool WifiCaptive::connectAndSave(WifiCredentials credentials, const String &server, const String &band,
+                                 bool &connectedViaModem) {
+  Log_info("Connecting with static IP: %s, IP: %s", credentials.useStaticIP ? "yes" : "no",
+           credentials.staticIP.c_str());
+  if (band == "5GHz")
+    credentials.is5GHz = true;
+  else if (band == "2.4GHz")
+    credentials.is5GHz = false;
+  else {
+    for (const auto &network : pairingNetworks()) {
+      if (network.ssid == credentials.ssid) {
+        credentials.is5GHz = network.is5GHz;
+        break;
+      }
+    }
+  }
+  const bool useModem = credentials.is5GHz && !credentials.isEnterprise && _modemConnectCallback;
+  bool connected = false;
+  WifiConnectionState failureState = WifiConnectionState::Failed;
+  if (useModem) {
+    connected = _modemConnectCallback(credentials.ssid, credentials.pswd);
+  } else {
+    const auto result = initiateConnectionAndWaitForOutcome(credentials);
+    connected = result.status == WL_CONNECTED;
+    if (!connected) failureState = classifyConnectionFailure(result);
+  }
+  _connectionState = connected ? WifiConnectionState::Connected : failureState;
+  if (!connected && !useModem && !pairingUsesBle()) {
+    // Native portal joins drop the AP; restart to make setup reachable again.
+    Log_info("Connection failed, restarting device to bring the portal back up");
+    ESP.restart();
+  }
+  connectedViaModem = connected && useModem;
+  if (connected) {
+    saveWifiCredentials(credentials);
+    saveApiServer(server);
+  }
+  return connected;
+}
+void WifiCaptive::ScanCache::begin(ScanNetworks networks, bool isExternal) {
+  std::lock_guard<std::mutex> lock(mutex);
+  value = std::move(networks);
+  external = isExternal;
+  ready = external;
+  pending = !external;
+  refreshing = false;
+  ++generation;
+}
+
+// Async consumers copy snapshots and queue requests; they never touch the radio.
+WifiNetworkList WifiCaptive::ScanCache::read(bool force) {
+  std::lock_guard<std::mutex> lock(mutex);
+  if (force) {
+    ++generation;
+    pending = true;
+    ready = false;
+  }
+  WifiNetworkList reply{ready, {}};
+  if (ready) reply.networks = value.annotated;
+  if (ready && !external) {
+    pending = true;
+    ready = false;
+  }
+  return reply;
+}
+
+std::vector<ExternalNetwork> WifiCaptive::ScanCache::latest() {
+  std::lock_guard<std::mutex> lock(mutex);
+  return value.discovered;
+}
+
+WifiCaptive::ScanCache::Request WifiCaptive::ScanCache::takeRequest() {
+  std::lock_guard<std::mutex> lock(mutex);
+  Request request;
+  if (pending && !refreshing) {
+    request.requested = true;
+    request.generation = generation;
+    pending = false;
+    refreshing = true;
+  }
+  return request;
+}
+
+void WifiCaptive::ScanCache::publish(Request request, ScanNetworks networks) {
+  std::lock_guard<std::mutex> lock(mutex);
+  refreshing = false;
+  // Preserve a force request that arrived while the radio scan was running.
+  if (request.generation != generation) return;
+  value = std::move(networks);
+  ready = true;
+}
+
+void WifiCaptive::ScanCache::retry() {
+  std::lock_guard<std::mutex> lock(mutex);
+  refreshing = false;
+  pending = true;
+}
+
+std::vector<ExternalNetwork> WifiCaptive::pairingNetworks() { return _scanCache.latest(); }
+
+WifiCaptive::ScanNetworks WifiCaptive::externalScanSnapshot() {
+  ScanNetworks snapshot;
+  snapshot.discovered = _networks;
+  for (const auto &network : _networks) {
+    bool saved = false;
+    for (const auto &credentials : _savedWifis)
+      if (credentials.ssid == network.ssid) {
+        saved = true;
+        break;
+      }
+    snapshot.annotated.push_back({network.ssid, network.rssi, network.open, saved, network.is5GHz, network.enterprise});
+  }
+  return snapshot;
+}
+
+void WifiCaptive::serviceNetworkScan() {
+  // Only the portal's main task accesses native scan storage or invokes the
+  // modem scanner. No cache lock is held during radio work or SDK buffer copies.
+  if (_nativeScanRunning) {
+    const int status = WiFi.scanComplete();
+    if (status == WIFI_SCAN_RUNNING) return;
+    _nativeScanRunning = false;
+    if (status == WIFI_SCAN_FAILED) {
+      _scanCache.retry();
+      return;
+    }
+    auto networks = getScannedUniqueNetworks(false);
+    ScanNetworks snapshot;
+    for (const auto &network : networks)
+      snapshot.discovered.push_back({network.ssid, network.rssi, network.open, network.is5GHz, network.enterprise});
+    snapshot.annotated = combineNetworks(networks, _savedWifis);
+    WiFi.scanDelete();
+    _scanCache.publish(_nativeScanRequest, std::move(snapshot));
+  }
+
+  const auto request = _scanCache.takeRequest();
+  if (!request.requested) return;
+  if (_useExternalScan) {
+#ifdef BOARD_TRMNL_X
+    if (_modemScanCallback) _networks = _modemScanCallback();
+#endif
+    _scanCache.publish(request, externalScanSnapshot());
+    return;
+  }
+  _nativeScanRequest = request;
+  WiFi.scanDelete();
+#ifdef CONFIG_IDF_TARGET_ESP32C5
+  WiFi.setBandMode(WIFI_BAND_MODE_AUTO);
+#endif
+  WiFi.scanNetworks(true);
+  _nativeScanRunning = true;
 }
 
 void WifiCaptive::resetSettings() {
@@ -348,7 +473,9 @@ String WifiCaptive::getHostname() { return _hostname; }
 
 bool WifiCaptive::isSaved() {
   readWifiCredentials();
-  return _savedWifis[0].ssid != "";
+  for (const auto &network : _savedWifis)
+    if (!network.ssid.isEmpty()) return true;
+  return false;
 }
 
 void WifiCaptive::readWifiCredentials() {
@@ -372,7 +499,14 @@ void WifiCaptive::readWifiCredentials() {
   }
 
   int idx = preferences.getInt(WIFI_LAST_INDEX, 0);
-  if (idx < 0 || idx >= WIFI_MAX_SAVED_CREDS || _savedWifis[idx].ssid.isEmpty()) idx = 0;
+  if (idx < 0 || idx >= WIFI_MAX_SAVED_CREDS || _savedWifis[idx].ssid.isEmpty()) {
+    idx = 0;
+    for (int i = 0; i < WIFI_MAX_SAVED_CREDS; ++i)
+      if (!_savedWifis[i].ssid.isEmpty()) {
+        idx = i;
+        break;
+      }
+  }
   _lastIndex = idx;
 
   preferences.end();
@@ -450,23 +584,8 @@ void WifiCaptive::saveLastUsedWifiIndex(int index) {
 }
 
 int WifiCaptive::readLastUsedWifiIndex() {
-  Preferences preferences;
-  preferences.begin("wificaptive", true);
-  int index = preferences.getInt(WIFI_LAST_INDEX, 0);
-  // if index is out of range, return 0
-  if (index < 0 || index >= WIFI_MAX_SAVED_CREDS) {
-    index = 0;
-  }
-
-  // if index is greater than the total number of saved wifis, set to 0
-  if (index > 0) {
-    readWifiCredentials();
-    if (_savedWifis[index].ssid == "") {
-      index = 0;
-    }
-  }
-  preferences.end();
-  return index;
+  readWifiCredentials();
+  return _lastIndex;
 }
 
 void WifiCaptive::saveApiServer(String url) {
@@ -657,7 +776,13 @@ bool WifiCaptive::autoConnect() {
 
   if (_savedWifis[last_used_index].ssid != "") {
     Log_info("Trying to connect to last used %s...", _savedWifis[last_used_index].ssid.c_str());
-    WiFi.setSleep(0);
+#ifdef TRMNL_BLE_PAIRING
+    // BLE recovery and wake advertising share the radio with Wi-Fi.
+    // ESP32-C3 coexistence aborts if Wi-Fi modem sleep is disabled.
+    WiFi.setSleep(true);
+#else
+    WiFi.setSleep(false);
+#endif
     WiFi.setMinSecurity(WIFI_AUTH_OPEN);
     WiFi.mode(WIFI_STA);
 
@@ -723,9 +848,14 @@ bool WifiCaptive::tryConnectWithRetries(const WifiCredentials creds, int last_us
 bool checkForSavedCredentials() {
   Preferences preferences;
   preferences.begin("wificaptive", true);
-  PreferenceType type = preferences.getType(WIFI_SSID_KEY(0));
+  bool saved = false;
+  for (int i = 0; i < WIFI_MAX_SAVED_CREDS; ++i)
+    if (!preferences.getString(WIFI_SSID_KEY(i), "").isEmpty()) {
+      saved = true;
+      break;
+    }
   preferences.end();
-  return type == PT_STR;
+  return saved;
 }
 
 void WifiCaptive::setNetworks(const std::vector<ExternalNetwork> &nets) { _networks = nets; }

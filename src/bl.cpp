@@ -5,6 +5,7 @@
 #include <display.h>
 #include <display_session.h>
 #include <globals.h>
+#include <pairing_runtime.h>
 #include <request_handling.h>
 #include <setup_session.h>
 #include <sleep_session.h>
@@ -30,6 +31,7 @@ void bl_init(void) {
 
   wifiSessionConnect(wake.showErrorsNow);
   updateTimeSinceSleep();
+  const bool bleSetup = pairingUsesBle();
   ensureDeviceSetUp(); // may sleep
   submitStoredLogs();
   log_retry = true;
@@ -40,7 +42,7 @@ void bl_init(void) {
   showImageTooBigIfNeeded(request_result);
   applyRetryPolicy(request_result, wake.showErrorsNow); // may sleep
   submitStoredLogs();
-  showFriendlyIdIfUnregistered(request_result);
+  showFriendlyIdIfUnregistered(request_result, bleSetup);
   resetIfRequested(request_result);
   updateFirmwareIfDue();
   showRequestResult(request_result);

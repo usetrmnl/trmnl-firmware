@@ -51,6 +51,10 @@ HttpHeaderList buildDisplayHeaders(const ApiDisplayInputs &inputs) {
     }
   }
 
+  if (inputs.bleKey.length() > 0) {
+    headers.push_back({"BLE-Key", inputs.bleKey});
+    if (inputs.bleSessionId.length() > 0) headers.push_back({"BLE-Session-ID", inputs.bleSessionId});
+  }
   return headers;
 }
 
@@ -64,6 +68,10 @@ HttpHeaderList buildSetupHeaders(const ApiSetupInputs &inputs) {
   headers.push_back({"Width", String(inputs.displayWidth)});
   headers.push_back({"Height", String(inputs.displayHeight)});
   headers.push_back({"RSSI", String(inputs.rssi)});
+  if (inputs.bleKey.length() > 0) {
+    headers.push_back({"BLE-Key", inputs.bleKey});
+    if (inputs.bleSessionId.length() > 0) headers.push_back({"BLE-Session-ID", inputs.bleSessionId});
+  }
   return headers;
 }
 
@@ -92,4 +100,12 @@ String formatHeaders(const HttpHeaderList &headers) {
   return out;
 }
 
-void logHeaders(const HttpHeaderList &headers) { Log_info("Added headers:\n%s", formatHeaders(headers).c_str()); }
+String formatHeadersForLog(const HttpHeaderList &headers) {
+  HttpHeaderList redacted = headers;
+  for (auto &header : redacted)
+    if (header.first.equalsIgnoreCase("BLE-Key") || header.first.equalsIgnoreCase("Access-Token"))
+      header.second = "[REDACTED]";
+  return formatHeaders(redacted);
+}
+
+void logHeaders(const HttpHeaderList &headers) { Log_info("Added headers:\n%s", formatHeadersForLog(headers).c_str()); }

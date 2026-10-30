@@ -9,6 +9,7 @@
 #include <atomic>
 #include <esp_wifi.h> //Used for mpdu_rx_disable android workaround
 #include <functional>
+#include <mutex>
 #include <vector>
 
 #include "Preferences.h"
@@ -47,6 +48,8 @@
 
 #define WIFI_LAST_INDEX          "wifi_last_index"
 
+struct WifiNetworkList;
+
 struct ExternalNetwork {
   String ssid;
   int32_t rssi;
@@ -66,6 +69,16 @@ private:
   WifiCredentials _enterprise_credentials;
   std::atomic<WifiConnectionState> _connectionState{WifiConnectionState::Idle};
   std::atomic<uint32_t> _connectionRequestedAt{0};
+  std::mutex _submissionMutex;
+  struct Submission {
+    WifiCredentials credentials;
+    String server, band;
+  };
+  Submission _submission;
+  bool _pendingSubmission = false;
+  bool _acceptSubmissions = false;
+  bool _resetRequested = false;
+  bool _acceptResets = false;
 
   std::function<void()> _resetcallback;
   std::function<void()> _tickCallback = nullptr;
@@ -75,6 +88,36 @@ private:
   int _lastIndex = 0;
 
   std::vector<ExternalNetwork> _networks;
+  struct ScanNetworks {
+    std::vector<WifiNetwork> annotated;
+    std::vector<ExternalNetwork> discovered;
+  };
+  class ScanCache {
+  public:
+    struct Request {
+      bool requested = false;
+      uint32_t generation = 0;
+    };
+    void begin(ScanNetworks value, bool external);
+    WifiNetworkList read(bool force);
+    std::vector<ExternalNetwork> latest();
+    Request takeRequest();
+    void publish(Request request, ScanNetworks value);
+    void retry();
+
+  private:
+    std::mutex mutex;
+    ScanNetworks value;
+    uint32_t generation = 0;
+    bool external = false, ready = false, pending = false, refreshing = false;
+  };
+  ScanCache _scanCache;
+  ScanCache::Request _nativeScanRequest;
+  bool _useExternalScan = false;
+  bool _nativeScanRunning = false;
+  ScanNetworks externalScanSnapshot();
+  void serviceNetworkScan();
+  bool connectAndSave(WifiCredentials credentials, const String &server, const String &band, bool &connectedViaModem);
 
   using ModemConnectCallback = std::function<bool(const String &ssid, const String &pass)>;
   ModemConnectCallback _modemConnectCallback;
@@ -98,6 +141,8 @@ private:
   WifiConnectionState classifyConnectionFailure(const WifiConnectionResult &result);
 
 public:
+  bool enqueueCredentials(const WifiCredentials &, const String &server, const String &band, bool fromBle = false);
+  std::vector<ExternalNetwork> pairingNetworks();
   wl_status_t connect(const WifiCredentials credentials);
 
   /// @brief Starts WiFi configuration portal.

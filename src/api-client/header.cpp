@@ -7,6 +7,7 @@
 #include <display.h>
 #include <epd_panel_rev.h>
 #include <globals.h>
+#include <pairing_runtime.h>
 #include <power.h>
 #include <wifi_network.h>
 
@@ -61,6 +62,10 @@ ApiDisplayInputs createApiHeaders() {
   inputs.refreshRate = refreshInterval.seconds();
   Log.info("%s [%d]: refresh rate: %d\r\n", __FILE__, __LINE__, inputs.refreshRate);
 
+  inputs.bleKey = pairingPersistentKey();
+  if (!inputs.bleKey.isEmpty()) {
+    inputs.bleSessionId = pairingIdentity().sessionId;
+  }
   inputs.macAddress = device_mac_address();
   WiFiStatus wifi = getWiFiStatus();
   inputs.rssi = wifi.rssi;
