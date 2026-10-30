@@ -88,7 +88,7 @@ bool display_update_epaper(int refreshMode, bool wait, bool writePlane, uint8_t 
   if (refreshMode == REFRESH_PARTIAL && !bCanDoPartial) {
     refreshMode = REFRESH_FAST;
     Log_info("Can't do partial refresh, no previous image");
-  } else {
+  } else if (refreshMode == REFRESH_PARTIAL) {
     Log_info("Have valid previous image in EPD memory, doing partial refresh");
   }
   bbep.refresh(refreshMode, wait);
