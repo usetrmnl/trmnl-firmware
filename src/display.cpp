@@ -27,7 +27,9 @@ BBEPAPER bbep;
 #include <SPIFFS.h>
 #define FS SPIFFS
 #endif // !PARALLEL_EPD
-
+#ifdef BOARD_TRMNL_FRAME
+#include "frame.h"
+#endif // BOARD_TRMNL_FRAME
 // List of supported TRMNL devices with SPI ePaper displays. The list can be in any order since the name is matched
 // The final parameter is the panel type which is from an enumerated list
 #ifdef PARALLEL_EPD
@@ -68,6 +70,7 @@ const TRMNL_DEVICE device_list[] =
   "m5_paper_color", 0,   0,     0,   0,    0,   0,    3,    2,    1,     0xff, 0xff,    0xff,   BATT_NONE, EPD_PAPER_COLOR, 
   "reterminal_e1004", 0, 0,     0,   0,    0,   0,    0xff, 0xff, 4,     1,    21,      12,     BATT_ADC,  EPD_133_COLOR,
   "trmnl_steam",   7,    8,     6,   10,   5,   4,    21,   20,   2,     3,    0xff,    0xff,   BATT_ADC,  EPD_583,
+  "trmnl_frame",   0,    0,     0,   0,    0,   4,    0xff, 0xff, 0,     0xff, 0xff,    0xff,   BATT_NONE, EPD_315_6CLR,
   NULL,            0,    0,     0,   0,    0,   0,    0,    0,    0,     0,    0,       0,      0,         0,
 }; // device_list
 
@@ -88,6 +91,10 @@ const DISPLAY_PROFILE dpList[12][3] = { // 1-bit and 2-bit display types for eac
     {{EP368_792x528, EP368_792x528_4GRAY}, {EP368_792x528, EP368_792x528_4GRAY}, {EP368_792x528, EP368_792x528_4GRAY}},
 };
 uint8_t u8SpectraPal[512]; // RGB333 mapped to closest Spectra6 color
+// Fixes the 'gap' in Spectra6 color numbering
+const uint8_t u8SpectraAdjust[8] = {
+    0, 1, 2, 3, 5, 6, 0, 0
+};
 #endif // !PARALLEL_EPD
 
 #ifdef PARALLEL_EPD
@@ -155,6 +162,9 @@ static bool display_update_epaper(int refreshMode, bool wait, bool writePlane = 
         display_apply_light_sleep(bLightSleepWanted);
     }
 #endif
+#ifdef BOARD_TRMNL_FRAME
+    FrameUpdate((uint8_t *)bbep.getBuffer());
+#else
     if (writePlane) {
         bbep.writePlane(plane);
     }
@@ -167,6 +177,7 @@ static bool display_update_epaper(int refreshMode, bool wait, bool writePlane = 
     bbep.refresh(refreshMode, wait);
     // The next update can be a partial update because the current is 1-bpp and stays in the EPD RAM
     bCanDoPartial = (bbep.getPanelType() == dpList[pDevice->panel_set][iTempProfile].OneBit);
+#endif // !BOARD_TRMNL_FRAME
     return true;
 }
 
@@ -189,9 +200,11 @@ static void display_select_one_bit_panel(bool only_if_changed = false)
 // Message screens are 1-bit
 static void display_prepare_message(void)
 {
+#ifndef BOARD_TRMNL_FRAME
     display_select_one_bit_panel(true);
-    bbep.setMemoryMode(BB_MODE_1BPP); // use 1-bit mode to save memory
+    bbep.setMemoryMode(BBEP_MODE_1BPP); // use 1-bit mode to save memory
     bbep.allocBuffer(false);
+#endif
 }
 
 static void WriteSPIByte(uint8_t data)
@@ -331,7 +344,12 @@ void display_init(void)
         bbep.initIO(pDevice->epd_dc_pin, pDevice->epd_rst_pin, pDevice->epd_busy_pin, pDevice->epd_cs_pin,
         pDevice->epd_mosi_pin, pDevice->epd_sck_pin, 8000000);
     } else { // it's a pre-defined PCB+display in bb_epaper
+#ifdef BOARD_TRMNL_FRAME
+        bbep.createVirtual(2560, 1440, BBEP_7COLOR); // create memory buffer to draw full EPD image into
+        Log_info("Created virtual ePaper surface (2560x1440) for frame");
+#else
         bbep.begin(dpList[pDevice->panel_set][0].OneBit);
+#endif
     }
 #else // Parallel eink devices
 #if defined (BOARD_SEEED_RETERMINAL_E1003)
@@ -665,12 +683,14 @@ void display_wipe(void)
     int refreshCount = 60;
 #endif
 
+#ifndef BOARD_TRMNL_FRAME
     bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit);
     bbep.fillScreen(BBEP_WHITE);
     for (int i=0; i<refreshCount; i++) {
         bbep.refresh(REFRESH_FULL); // 2 to 3 minutes of Black/White clearing of the display
     }
     bbep.sleep(LIGHT_SLEEP);
+#endif // !BOARD_TRMNL_FRAME
 #else
     bbep.setMode(BB_MODE_1BPP);
     bbep.fillScreen(BBEP_WHITE);
@@ -1030,7 +1050,12 @@ void CreateSpectra6Pal(void)
                 min_index = j;
             }
         } // for j
-        u8SpectraPal[i] = min_index; // best match palette index for this RGB333 color
+// Save the best match palette index for this RGB333 color
+#ifdef BOARD_TRMNL_FRAME
+        u8SpectraPal[i] = u8SpectraAdjust[min_index];
+#else
+        u8SpectraPal[i] = min_index;
+#endif
     } // for i
 } /* CreateSpectra6Pal() */
 //
@@ -1093,6 +1118,12 @@ int png_draw_6clr(PNGDRAW *pDraw)
     } // switch on pixel type
     iDelta = iBpp/8;
     s = pDraw->pPixels;
+#ifdef BOARD_TRMNL_FRAME
+// 1.8 million pixels needs a speed boost - avoid using the drawPixel() function
+    int iPitch = bbep.width()/2;
+    uint8_t pixel, *d = (uint8_t *)bbep.getBuffer();
+    d += (pDraw->y * iPitch);
+#endif // BOARD_TRMNL_FRAME
     for (x=0; x<iWidth; x++) { // slower code, but less code :)
         switch (iBpp) {
             case 24:
@@ -1161,7 +1192,17 @@ int png_draw_6clr(PNGDRAW *pDraw)
             if (bRotated) {
                 bbep.drawPixel(bbep.width()-1-y, x, GetSpectraPixel(r, g, b));
             } else {
+#ifdef BOARD_TRMNL_FRAME
+// direct memory writes will be faster than calling drawPixel()
+                if (x & 1) {
+                    pixel |= GetSpectraPixel(r, g, b);
+                    *d++ = pixel;
+                } else {
+                    pixel = GetSpectraPixel(r, g, b) << 4;
+                }
+#else
                 bbep.drawPixel(x, y, GetSpectraPixel(r, g, b));
+#endif
             }
         } // for x
     return 1; // continue decoding
@@ -1840,7 +1881,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
         }
     }
 #endif
-#ifdef BB_EPAPER
+#if defined( BB_EPAPER ) && !defined( BOARD_TRMNL_FRAME )
     display_select_one_bit_panel();
 #endif // BB_EPAPER
     if (isPNG == true && data_size < MAX_IMAGE_SIZE)
@@ -1859,7 +1900,9 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
             // G5 compressed image
             BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
 #ifdef BB_EPAPER
-            bbep.setMemoryMode(BB_MODE_1BPP); // use 1-bit mode to save memory
+#ifndef BOARD_TRMNL_FRAME
+            bbep.setMemoryMode(BBEP_MODE_1BPP); // use 1-bit mode to save memory
+#endif // !BOARD_TRMNL_FRAME
             if (bbep.allocBuffer(false) != BBEP_SUCCESS) {
                 Log_info("Error allocating bb_epaper frame buffer");
                 return;
@@ -1875,7 +1918,9 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
             {
                 bbep.fillScreen(BBEP_WHITE);
             }
+            Log_info("About to call loadG5Image()");
             bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
+            Log_info("Returned from loadG5Image()");
 #ifdef BOARD_TRMNL_X
             display_draw_battery_icon(bbep.width() - DISPLAY_BATTERY_ICON_W - DISPLAY_BATTERY_ICON_MARGIN,
                                       DISPLAY_BATTERY_ICON_MARGIN);
@@ -1889,7 +1934,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
             bmpNormalizePolarity(image_buffer, image_buffer+62, (iBmpWidth / 8) * iBmpHeight); // palette may be [white, black]
             flip_image(image_buffer+62, iBmpWidth, iBmpHeight, false); // fix bottom-up bitmap images
 #ifdef BB_EPAPER
-            bbep.setMemoryMode(BB_MODE_1BPP);
+            bbep.setMemoryMode(BBEP_MODE_1BPP);
             bbep.setBuffer(image_buffer+62); // uncompressed 1-bpp bitmap
 #endif // BB_EPAPER
         }

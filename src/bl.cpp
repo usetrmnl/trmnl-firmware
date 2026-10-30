@@ -71,6 +71,7 @@ void iqs323_task_i2c_lock(void) {}
 void iqs323_task_i2c_unlock(void) {}
 #endif // !BOARD_TRMNL_X
 void hw_config_init(void);
+void frameInit(void);
 extern TRMNL_DEVICE *pDevice;
 
 void wait_for_serial() {
@@ -134,6 +135,10 @@ void bl_init(void)
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
 #endif
   Log_info("BL init success");
+
+#ifdef BOARD_TRMNL_FRAME
+  frameInit();
+#endif // BOARD_TRMNL_FRAME
 
   wifiSessionInit();
 
