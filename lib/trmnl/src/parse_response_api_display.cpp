@@ -25,7 +25,9 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
         .temp_profile = 0,
         .reset_firmware = false,
         .special_function = SF_NONE,
-        .action = ""};
+        .action = "",
+        .playlist_count = 0,
+        .playlist_names = NULL};
   }
   String special_function_str = doc["special_function"];
   // Convert the temperature profile ("default", "a", "b", "c")
@@ -37,6 +39,19 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
   else if (tp == "b")
     u32TP = 2;
 //     else if (tp == "c") u32TP = 3;
+
+ // The playlist image names arrive as a JSON array
+ // Create a zero-separated string array of the names (single pointer)
+  JsonArray names = doc["playlist_image_names"];
+  char *p, *pNames = NULL;
+  int i, iLen, iCount = names.size();
+  p = pNames = (char *)malloc(iCount * 32);
+  for (i = 0; i < iCount; i++) {
+    iLen = strlen(names[i].as<const char *>()) + 1;
+    memcpy(p, names[i].as<const char *>(), iLen);
+    Log_info("Current playlist name %d: %s", i, names[i].as<const char *>());
+    p += iLen;
+  } // for i
 
   return ApiDisplayResponse{
       .outcome = ApiDisplayOutcome::Ok,
@@ -53,5 +68,7 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
       .temp_profile = u32TP,
       .reset_firmware = doc["reset_firmware"],
       .special_function = parseSpecialFunction(special_function_str),
-      .action = doc["action"] | ""};
+      .action = doc["action"] | "",
+      .playlist_count = (uint32_t)iCount,
+      .playlist_names = pNames};
 }

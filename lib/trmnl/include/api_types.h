@@ -38,6 +38,8 @@ struct ApiDisplayResponse {
   bool reset_firmware;
   SPECIAL_FUNCTION special_function;
   String action;
+  uint32_t playlist_count;
+  char *playlist_names;
 };
 
 struct ApiDisplayInputs {
