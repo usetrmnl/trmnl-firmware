@@ -25,7 +25,13 @@ module Golden
       # "The image format is incorrect"
       "format_error.png" => [640, 1184, 592, 64],
       # "Please visit trmnl.com/start" / "with Friendly ID SIMTST to finish setup"
-      "friendly_id_message.png" => [560, 1156, 752, 112]
+      "friendly_id_message.png" => [560, 1156, 752, 112],
+      # "WiFi connected, but API connection cannot be established." and the QR code hint
+      "wifi_internal_error.png" => [688, 1160, 496, 184],
+      # "WiFi connected but signal is weak"
+      "wifi_weak.png" => [640, 1192, 592, 56],
+      # "Image download timed out; check your network status"
+      "image_timeout.png" => [464, 1192, 944, 56]
     },
     # the 960x540 FastEPD panels: Inter_18 at the OG's rows (the centred logo runs into them)
     "TRMNL_X_PAPERS3" => { "api_unable_to_connect.png" => [0, 304, 960, 144] },

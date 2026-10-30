@@ -14,10 +14,13 @@ on:
       sim_ref:
         type: string
         default: ""
+      sim_extra_args:
+        type: string
+        default: ""
 
 jobs:
   check:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 10
 
     defaults:
@@ -41,22 +44,21 @@ jobs:
   integration:
     strategy:
       fail-fast: false
+      # The OG splits its spec files across two runners: groups 1-4 or 5-8 of parallel_rspec's
+      # eight, four workers each. savepoints_spec needs the BWRY's build (it shares the OG's
+      # platform, so it builds quickly after it) in whichever half has it.
       matrix:
         include:
-          - env: trmnl
-            envs: "trmnl:full"
-            # savepoints_spec checks a save point is refused by another build: the BWRY's (it
-            # shares the OG's platform, so it builds quickly after it).
-            also_build: trmnl_4clr
+          - { env: trmnl, envs: "trmnl:full", also_build: trmnl_4clr, groups: "1,2,3,4" }
+          - { env: trmnl, envs: "trmnl:full", also_build: trmnl_4clr, groups: "5,6,7,8" }
           # The X's own specs and the full general suite take well over half an hour on a 4-vCPU
           # runner, and the load trips wall-clock waits: one example per area instead.
-          - env: TRMNL_X
-            envs: "TRMNL_X:smoke"
-          - env: trmnl_4clr # BWRY
-            envs: "trmnl_4clr"
+          # Splitting gains nothing: both halves redo the X's slow setup flows.
+          - { env: TRMNL_X, envs: "TRMNL_X:smoke" }
+          - { env: trmnl_4clr, envs: "trmnl_4clr" } # BWRY
 
-    name: integration (${{ matrix.env }})
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    name: integration (${{ matrix.env }}${{ matrix.groups && format(' {0}', matrix.groups) || '' }})
+    runs-on: ubuntu-latest
     timeout-minutes: 60
 
     steps:
@@ -66,21 +68,22 @@ jobs:
 
       # Each env caches its own PlatformIO core: TRMNL_X's platform (pioarduino) and espressif32
       # 6.x install different packages under the same names (see prepare_release.sh).
-      - uses: actions/cache@v6
+      - uses: actions/cache/restore@v6
+        id: packages-cache
         with:
           path: |
             ~/.cache/pip
             ~/.platformio
-            ~/.buildcache
           key: ${{ runner.os }}-pio-integration-${{ matrix.env }}-${{ hashFiles('platformio.ini') }}
           restore-keys: |
             ${{ runner.os }}-pio-integration-${{ matrix.env }}-
 
-      - name: Setup ccache
-        uses: hendrikmuhs/ccache-action@v1
+      - uses: actions/cache/restore@v6
         with:
-          key: ${{ runner.os }}-ccache-${{ matrix.env }}-${{ hashFiles('platformio.ini') }}
-          job-summary: "" # disabled
+          path: ~/.buildcache
+          key: ${{ runner.os }}-pio-build-cache-${{ matrix.env }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-pio-build-cache-${{ matrix.env }}-
 
       - uses: actions/setup-python@v7
         with:
@@ -89,7 +92,7 @@ jobs:
       - name: Install PlatformIO Core
         run: pip install --upgrade platformio==6.1.19
 
-      - name: Configure ccache for PlatformIO
+      - name: Configure the PlatformIO build cache
         run: |
           echo "PLATFORMIO_BUILD_CACHE_DIR=$HOME/.buildcache" >> $GITHUB_ENV
 
@@ -101,6 +104,22 @@ jobs:
       - name: build (${{ matrix.also_build }})
         if: matrix.also_build
         run: pio run -e ${{ matrix.also_build }} -j 4 -v
+
+      # Saved on main only: pull requests read main's caches, but not each other's. The build
+      # cache gets a key per commit, as a cache is only saved when its key is new.
+      - uses: actions/cache/save@v6
+        if: github.ref == 'refs/heads/main' && steps.packages-cache.outputs.cache-hit != 'true'
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio
+          key: ${{ runner.os }}-pio-integration-${{ matrix.env }}-${{ hashFiles('platformio.ini') }}
+
+      - uses: actions/cache/save@v6
+        if: github.ref == 'refs/heads/main'
+        with:
+          path: ~/.buildcache
+          key: ${{ runner.os }}-pio-build-cache-${{ matrix.env }}-${{ github.sha }}
 
       - uses: actions/checkout@v7
         if: inputs.sim_ref
@@ -147,10 +166,12 @@ jobs:
         working-directory: spec
         env:
           ENVS: ${{ matrix.envs }}
+          SIM_EXTRA_ARGS: ${{ inputs.sim_extra_args }}
           # The setup cache (spec/tmp/spec-cache) starts empty, so every setup flow still runs in
           # full, but once per run: the workers share it instead of each redoing it (NO_CACHE=1),
           # which on the X (the factory flow and onboarding) costs minutes per example.
-        run: bundle exec rake spec
+          SPEC_GROUPS: ${{ matrix.groups }}
+        run: bundle exec rake "spec[${SPEC_GROUPS:+-n 8 --only-group $SPEC_GROUPS}]"
 
       - name: Collect screen diffs
         if: failure()
@@ -161,14 +182,14 @@ jobs:
       - uses: actions/upload-artifact@v6
         if: always()
         with:
-          name: simulator-logs-and-screens-${{ matrix.env }}
+          name: simulator-logs-and-screens-${{ matrix.env }}${{ matrix.groups && format('-{0}', matrix.groups) || '' }}${{ inputs.sim_extra_args && '-sim-extra-args' || '' }}
           path: spec/out/artifacts/
           if-no-files-found: ignore
 
       - uses: actions/upload-artifact@v6
         if: always()
         with:
-          name: firmware-coverage-${{ matrix.env }}
+          name: firmware-coverage-${{ matrix.env }}${{ matrix.groups && format('-{0}', matrix.groups) || '' }}${{ inputs.sim_extra_args && '-sim-extra-args' || '' }}
           path: |
             spec/out/cov/merged.info
             spec/out/cov/html/

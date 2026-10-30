@@ -10,6 +10,9 @@
 #define STRINGIFY(x)     #x
 #define TOSTRING(x)      STRINGIFY(x)
 
+#if __has_include(<fw_commit.h>)
+#include <fw_commit.h> // written by scripts/extra/git_version.py
+#endif
 #ifndef FW_COMMIT
 #define FW_COMMIT ""
 #endif
@@ -164,6 +167,7 @@ typedef struct tag_trmnl_device {
   uint8_t interrupt_pin;
   uint8_t batt_pin;
   uint8_t batt_en_pin;
+  uint8_t epd_en_pin;
   uint8_t batt_type; // ADC, BQ27xx
   uint8_t panel_set;
 } TRMNL_DEVICE;

@@ -12,6 +12,9 @@
 /** Prepare peripherals, enable timer + GPIO wake, enter deep sleep. */
 void goToSleep(void);
 
+/** Sync the clock from NTP and set time_since_sleep from the time goToSleep saved (0 when unsynced). */
+void updateTimeSinceSleep(void);
+
 /** Deep sleep until button only (no timer). Currently has no callers (wifiErrorDeepSleep now
  * sleeps on the slow-retry timer at the limit). */
 void goToSleepButtonOnly(void);
@@ -24,3 +27,6 @@ void config_gpio_for_lp(void);
  * WIFI_FAILED and reset the count (still a timed sleep). Does not return.
  */
 void wifiErrorDeepSleep(void);
+
+/** Restart the device if this wake has not reached deep sleep within 20 minutes. Not used on the X. */
+void awake_time_limit_start(void);

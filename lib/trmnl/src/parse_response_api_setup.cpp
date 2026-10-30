@@ -21,6 +21,7 @@ ApiSetupResponse parseResponse_apiSetup(String &payload) {
   ApiSetupResponse response;
   response.status = doc["status"].as<int>();
   response.message = doc["message"] | "";
+  response.image_url = doc["image_url"] | "";
 
   if (response.status != 200) {
     Log_info("status FAIL.");
@@ -31,6 +32,5 @@ ApiSetupResponse parseResponse_apiSetup(String &payload) {
   response.outcome = ApiSetupOutcome::Ok;
   response.api_key = doc["api_key"] | "";
   response.friendly_id = doc["friendly_id"] | "";
-  response.image_url = doc["image_url"] | "";
   return response;
 }

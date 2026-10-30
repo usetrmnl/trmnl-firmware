@@ -3,6 +3,7 @@
 require "fileutils"
 require "json"
 require "net/http"
+require "shellwords"
 require "tmpdir"
 require "uri"
 
@@ -92,6 +93,7 @@ module TrmnlSim
         args << "--memcheck=#{memcheck}"
         args += ["--memcheck-suppress", memcheck_suppress.join(",")] if memcheck_suppress.any?
       end
+      args += Shellwords.split(ENV.fetch("SIM_EXTRA_ARGS", ""))
       args += extra_args.map(&:to_s)
       @pid = Process.spawn(*args, out: @log_path, err: %i[child out], pgroup: true)
       begin

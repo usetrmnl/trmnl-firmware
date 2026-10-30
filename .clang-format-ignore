@@ -1,7 +1,3 @@
-# currently large diffs in open PRs (>200 LOC) — skip to reduce merge conflicts for now
-src/bl.cpp
-src/display.cpp
-
 # vendor
 components/**
 lib/BMA530_SensorAPI/**

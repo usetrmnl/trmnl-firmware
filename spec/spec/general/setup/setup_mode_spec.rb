@@ -78,6 +78,10 @@ General.describe "Setup mode" do
           else
             expect(setup).not_to have_header("Panel-Rev")
           end
+          # the same Width, Height and RSSI /api/display sends (createApiHeaders, src/api-client/header.cpp)
+          expect(setup).to have_header("Width", device.width.to_s)
+          expect(setup).to have_header("Height", device.height.to_s)
+          expect(setup).to have_header("RSSI", "-54")
           display = mock.wait_for_request("/api/display", timeout: 60)
           expect(display).to have_header("Access-Token", mock.api_key)
           expect(display).to have_header("Update-Source", "powercycle")
