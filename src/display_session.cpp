@@ -588,8 +588,8 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
 
   submitStoredLogs();
 
-  WiFi.disconnect(true); // no need for WiFi, save power starting here
-  Log.info("%s [%d]: Received successfully; WiFi off.\r\n", __FILE__, __LINE__);
+  WiFi.disconnect();
+  Log.info("%s [%d]: Received successfully; WiFi disconnected.\r\n", __FILE__, __LINE__);
 
   bool image_reverse = false;
   if (isPNG)
