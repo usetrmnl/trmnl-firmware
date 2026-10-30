@@ -43,6 +43,7 @@
 #define PREFERENCES_LAST_SLEEP_TIME          "last_sleep"
 #define PREFERENCES_CONNECT_API_RETRY_COUNT  "retry_count"
 #define PREFERENCES_CONNECT_WIFI_RETRY_COUNT "wifi_retry"
+#define PREFERENCES_VERBOSE_LOG_KEY          "verbose_log"
 #define PREFERENCES_LAST_OTA                 "last_ota"
 #define PREFERENCES_TOUCHBAR_TUTORIAL_KEY    "touch_tutorial" // TRMNL X: the touch bar tutorial was finished
 
