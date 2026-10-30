@@ -141,3 +141,10 @@ void list_files();
  * @return pointer to allocated buffer
  */
 uint8_t *display_read_file(const char *filename, int *file_size);
+
+/**
+ * @brief Function to delete the largest root files until the free space is above the reserve
+ * @param none
+ * @return result - true if the function deleted a file; false - if it deleted nothing
+ */
+bool filesystem_purge_if_full(void);
