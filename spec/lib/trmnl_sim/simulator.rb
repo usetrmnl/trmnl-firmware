@@ -448,6 +448,14 @@ module TrmnlSim
       JSON.parse(data)
     end
 
+    # Turn on the firmware's serial logging through the setup page (saved in NVS, so it stays on
+    # for later boots of this flash). Release builds log nothing to the console without it. A
+    # firmware without the setting (404) logs regardless.
+    def portal_enable_verbose_logging
+      code, data = portal_request("/verbose-logging", { enabled: true })
+      raise Error, "/verbose-logging -> #{code}: #{data[0, 200].inspect}" unless [200, 404].include?(code)
+    end
+
     private
 
     # ---- HTTP ------------------------------------------------------------------------------------------
