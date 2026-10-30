@@ -486,6 +486,7 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
     wiped_this_wake = true;
     Log_info("Detected screen wiper filename: %s, clearing display...", apiDisplayResult.response.filename.c_str());
     display_wipe();
+    ensureWifiConnected(); // the wipe's minutes of light sleep can drop the WiFi connection
       // Wiping leaves the screen blank; fetch and show the next playlist item
       // right away instead of waiting for the next scheduled refresh.
     Log_info("Screen wipe complete, fetching next playlist item");
