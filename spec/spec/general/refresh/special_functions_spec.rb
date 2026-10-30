@@ -18,10 +18,10 @@ General.describe "Special functions" do
 
   # Press the button (a medium press counts as a double click) and answer the special-function
   # request with `answer`; returns that request.
-  def run_function(s, answer, press_ms: 1500)
+  def run_function(s, function, answer, press_ms: 1500)
     dev.mock.display = answer
     req = dev.mock.next_request("/api/display", timeout: 120) { s.press(press_ms) }
-    expect(req).to have_header("special_function", "true")
+    expect(req).to have_header("special_function", function)
     req
   end
 
@@ -31,7 +31,7 @@ General.describe "Special functions" do
     path, expected = device_image(dev.mock, name, device_number(number))
     dev.boot do |s|
       assign(s, function)
-      run_function(s, answer.merge(image: name))
+      run_function(s, function, answer.merge(image: name))
       dev.mock.wait_for_request(path, timeout: 90)
       st = s.wait_for_deep_sleep(timeout: 90, display_idle: true)
       expect(s).to show_image(expected, tolerance: 64, max_ratio: 0)
@@ -43,7 +43,7 @@ General.describe "Special functions" do
   def run_to_sleep(function, answer)
     dev.boot do |s|
       assign(s, function)
-      run_function(s, answer)
+      run_function(s, function, answer)
       s.wait_for_deep_sleep(timeout: 90)
     end
   end
@@ -65,7 +65,7 @@ General.describe "Special functions" do
       dev.boot do |s|
         assign(s, "sleep")
         screen = s.screenshot
-        run_function(s, { image: "default", action: "sleep", refresh_rate: 1800 })
+        run_function(s, "sleep", { image: "default", action: "sleep", refresh_rate: 1800 })
         s.wait_for_deep_sleep(timeout: 90, display_idle: true)
         expect(dev.mock.count("/api/log")).to eq(0)
         # the same picture: PNG devices redraw the cached image (with a fast refresh, whose
@@ -88,7 +88,7 @@ General.describe "Special functions" do
           s.wait(portal: true, timeout: 120)
           s.portal_connect("TRMNL-Sim", "password", server: dev.mock.device_url)
         end
-        expect(req).to have_header("special_function", "true")
+        expect(req).to have_header("special_function", "add_wifi")
         s.wait_for_deep_sleep(timeout: 120)
       end
     end
@@ -104,7 +104,7 @@ General.describe "Special functions" do
       _, two = device_image(dev.mock, "two", device_number("2"))
       dev.boot do |s|
         assign(s, "send_to_me", image: "two")
-        run_function(s, send_to_me)
+        run_function(s, "send_to_me", send_to_me)
         s.wait_for_deep_sleep(timeout: 90, display_idle: true)
         expect(dev.mock.count("/api/log")).to eq(0)
         expect(s).to show_image(two, tolerance: 64, max_ratio: 0)
@@ -123,7 +123,7 @@ General.describe "Special functions" do
           dev.mock.next_request("/api/display", timeout: 90) { s.wake }
         end
         s.wait_for_deep_sleep(timeout: 120, display_idle: true)
-        run_function(s, send_to_me)
+        run_function(s, "send_to_me", send_to_me)
         s.wait_for_deep_sleep(timeout: 90, display_idle: true)
         expect(s).to show_image(two, tolerance: 64, max_ratio: 0)
       end
@@ -140,7 +140,7 @@ General.describe "Special functions" do
       dev.boot do |s|
         assign(s, "rewind")
         boots = s.status["boot_count"]
-        run_function(s, { image: "default", action: "rewind", refresh_rate: 300 })
+        run_function(s, "rewind", { image: "default", action: "rewind", refresh_rate: 300 })
         st = s.wait_for_deep_sleep(timeout: 120)
         expect(st["state"]).not_to eq("halted")
         # the button press wakes it from deep sleep (a boot); any more is a restart
@@ -164,7 +164,7 @@ General.describe "Special functions" do
       # "status": 500 in an /api/display answer means "reset": forget WiFi and the API key.
       dev.boot do |s|
         assign(s, "identify")
-        run_function(s, { image: "default", status: 500, refresh_rate: 300 })
+        run_function(s, "identify", { image: "default", status: 500, refresh_rate: 300 })
         s.wait(portal: true, min_boots: 3, timeout: 120)
       end
     end
@@ -186,7 +186,7 @@ General.describe "Special functions" do
               s.portal_connect("TRMNL-Sim", "password", server: dev.mock.device_url)
               dev.mock.wait_for_request("/api/display", after: n + 1, timeout: 120)
             else
-              run_function(s, { image: "default", action: "wrong", refresh_rate: 300 })
+              run_function(s, function, { image: "default", action: "wrong", refresh_rate: 300 })
             end
             st = s.wait_for_deep_sleep(timeout: 120, settle_ms: 200)
             expect(st["state"]).not_to eq("halted"), function
@@ -256,7 +256,7 @@ General.describe "Special functions" do
         assign(s, "sleep")
         dev.mock.display = { image: "default", action: "sleep", refresh_rate: 1800 }
         req = dev.mock.next_request("/api/display", timeout: 120) { s.double_click(ms: 80, gap_ms: 150) }
-        expect(req).to have_header("special_function", "true")
+        expect(req).to have_header("special_function", "sleep")
         st = s.wait_for_deep_sleep
         expect(st["wake_at_s"] - st["sim_time_s"]).to be_within(30).of(1800)
       end

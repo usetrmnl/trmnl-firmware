@@ -152,27 +152,49 @@ void test_display_headers_special_function_omitted_when_none(void) {
   inputs.specialFunction = SF_NONE;
   auto headers = buildDisplayHeaders(inputs);
   TEST_ASSERT_FALSE(has(headers, "special_function"));
+  inputs.specialFunctionChosen = true;
+  TEST_ASSERT_FALSE(has(buildDisplayHeaders(inputs), "special_function"));
 }
 
-void test_display_headers_special_function_present_when_set(void) {
+void test_display_headers_special_function_named_when_configured(void) {
   auto inputs = makeDisplayInputs();
-  inputs.specialFunction = SF_IDENTIFY;
-  auto headers = buildDisplayHeaders(inputs);
-  TEST_ASSERT_TRUE(has(headers, "special_function"));
-  TEST_ASSERT_EQUAL_STRING("true", valueOf(headers, "special_function").c_str());
+  const SPECIAL_FUNCTION functions[] = {SF_IDENTIFY, SF_SLEEP,      SF_ADD_WIFI,  SF_RESTART_PLAYLIST,
+                                        SF_REWIND,   SF_SEND_TO_ME, SF_GUEST_MODE};
+  const char *names[] = {"identify", "sleep", "add_wifi", "restart_playlist", "rewind", "send_to_me", "guest_mode"};
+  for (size_t i = 0; i < sizeof(functions) / sizeof(functions[0]); ++i) {
+    inputs.specialFunction = functions[i];
+    auto headers = buildDisplayHeaders(inputs);
+    TEST_ASSERT_TRUE(has(headers, "special_function"));
+    TEST_ASSERT_EQUAL_STRING(names[i], valueOf(headers, "special_function").c_str());
+  }
 }
 
 void test_display_headers_special_function_named_when_chosen(void) {
   auto inputs = makeDisplayInputs();
-  inputs.specialFunction = SF_REWIND;
+  inputs.model = "x";
   inputs.specialFunctionChosen = true;
-  auto headers = buildDisplayHeaders(inputs);
-  TEST_ASSERT_EQUAL_STRING("rewind", valueOf(headers, "special_function").c_str());
+  const SPECIAL_FUNCTION functions[] = {SF_IDENTIFY, SF_SLEEP,      SF_ADD_WIFI,  SF_RESTART_PLAYLIST,
+                                        SF_REWIND,   SF_SEND_TO_ME, SF_GUEST_MODE};
+  const char *names[] = {"identify", "sleep", "add_wifi", "restart_playlist", "rewind", "send_to_me", "guest_mode"};
+  for (size_t i = 0; i < sizeof(functions) / sizeof(functions[0]); ++i) {
+    inputs.specialFunction = functions[i];
+    auto headers = buildDisplayHeaders(inputs);
+    TEST_ASSERT_TRUE(has(headers, "special_function"));
+    TEST_ASSERT_EQUAL_STRING(names[i], valueOf(headers, "special_function").c_str());
+  }
 }
 
 void test_display_headers_panel_id_omitted_when_empty(void) {
   auto headers = buildDisplayHeaders(makeDisplayInputs());
   TEST_ASSERT_EQUAL_INT(-1, indexOf(headers, "Panel-Rev"));
+}
+
+void test_display_headers_special_function_omitted_when_unknown(void) {
+  auto inputs = makeDisplayInputs();
+  inputs.specialFunction = static_cast<SPECIAL_FUNCTION>(255);
+  TEST_ASSERT_FALSE(has(buildDisplayHeaders(inputs), "special_function"));
+  inputs.specialFunctionChosen = true;
+  TEST_ASSERT_FALSE(has(buildDisplayHeaders(inputs), "special_function"));
 }
 
 void test_display_headers_panel_id_present_when_set(void) {
@@ -263,8 +285,9 @@ void process() {
   RUN_TEST(test_display_headers_include_update_source_and_temperature_profile);
   RUN_TEST(test_display_headers_image_cached_reflects_input);
   RUN_TEST(test_display_headers_special_function_omitted_when_none);
-  RUN_TEST(test_display_headers_special_function_present_when_set);
+  RUN_TEST(test_display_headers_special_function_named_when_configured);
   RUN_TEST(test_display_headers_special_function_named_when_chosen);
+  RUN_TEST(test_display_headers_special_function_omitted_when_unknown);
   RUN_TEST(test_display_headers_panel_id_omitted_when_empty);
   RUN_TEST(test_display_headers_panel_id_present_when_set);
   RUN_TEST(test_display_headers_wifi_band_2_4);

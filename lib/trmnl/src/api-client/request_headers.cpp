@@ -42,12 +42,9 @@ HttpHeaderList buildDisplayHeaders(const ApiDisplayInputs &inputs) {
   headers.push_back({"Height", String(inputs.displayHeight)});
 
   if (inputs.specialFunction != SF_NONE) {
-    // "true" runs the function configured on the server; a name asks for that function
     char name[32];
-    if (inputs.specialFunctionChosen && parseSpecialFunctionToStr(name, sizeof(name), inputs.specialFunction)) {
+    if (parseSpecialFunctionToStr(name, sizeof(name), inputs.specialFunction)) {
       headers.push_back({"special_function", name});
-    } else {
-      headers.push_back({"special_function", "true"});
     }
   }
 
