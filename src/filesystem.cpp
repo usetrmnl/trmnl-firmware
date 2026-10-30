@@ -4,7 +4,7 @@
 #include <inttypes.h>
 #include <trmnl_log.h>
 
-#if defined(PARALLEL_EPD)
+#if defined(PARALLEL_EPD) && !defined(USE_SPIFFS)
 #include <LittleFS.h>
 #define FS LittleFS
 #else
