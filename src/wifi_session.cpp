@@ -3,7 +3,10 @@
 #include <WiFi.h>
 #include <WifiCaptive.h>
 #include <bl.h>
+#include <board_config.h>
+#include <button.h>
 #include <config.h>
+#include <connect.h>
 #include <globals.h>
 #include <messages.h>
 #include <sleep_session.h>
@@ -12,6 +15,8 @@
 #include <wifi-helpers.h>
 #include <wifi_network.h>
 #include <wifi_session.h>
+
+#include "ship_mode.h"
 
 #ifdef BOARD_TRMNL_X
 #include <modem.h>
@@ -89,6 +94,42 @@ static void wifiSessionPrepareModem(void) {
 }
 #endif // BOARD_TRMNL_X
 
+#ifndef BOARD_TRMNL_X
+// Poll the physical button while the (blocking) WiFi auto-connect is running so
+// the user can reset WiFi / credentials or enter shipping mode even when the
+// device is stuck retrying a missing access point. Mirrors the GPIO-wakeup
+// button handling in button_wake_act().
+static void wifi_connect_button_tick(void) {
+  pinMode(pDevice->interrupt_pin, INPUT);
+  if (digitalRead(pDevice->interrupt_pin) != LOW) {
+    return;
+  }
+
+  ButtonPressResult button = read_button_presses();
+  Log_info("Button during WiFi connect -> %s", ButtonPressResultNames[button]);
+  switch (button) {
+  case LongPress:
+    Log_info("WiFi reset (button held during connect)");
+    WifiCaptivePortal.resetSettings();
+    ESP.restart();
+    break;
+  case SoftReset:
+    resetDeviceCredentials(); // clears credentials and restarts
+    break;
+#ifdef SHIP_MODE_SUPPORTED
+  case ShipMode:
+    enter_ship_mode(); // does not return
+    break;
+#endif
+  case DoubleClick:
+  case ShortPress:
+  case NoAction:
+  default:
+    break;
+  }
+}
+#endif // BOARD_TRMNL_X
+
 void wifiSessionConnect(bool should_show_error_now) {
 #ifdef BOARD_TRMNL_X
   wifiSessionPrepareModem();
@@ -109,7 +150,15 @@ void wifiSessionConnect(bool should_show_error_now) {
   if (WifiCaptivePortal.isSaved()) {
     // WiFi saved, connection
     Log.info("%s [%d]: WiFi saved\r\n", __FILE__, __LINE__);
+#ifndef BOARD_TRMNL_X
+    // Poll the button during the blocking auto-connect so a hold can reset WiFi
+    // or enter shipping mode even while stuck retrying a missing access point.
+    setConnectTickCallback(wifi_connect_button_tick);
+#endif // BOARD_TRMNL_X
     int connection_res = connectWithSavedCredentials() ? 1 : 0;
+#ifndef BOARD_TRMNL_X
+    setConnectTickCallback(nullptr);
+#endif // BOARD_TRMNL_X
 
     Log.info("%s [%d]: Connection result: %d, WiFI Status: %d\r\n", __FILE__, __LINE__, connection_res, WiFi.status());
 
@@ -144,6 +193,29 @@ void wifiSessionConnect(bool should_show_error_now) {
       }
     });
 #endif
+#ifdef SHIP_MODE_SUPPORTED
+    // Allow entering shipping mode (30 s hold) or resetting credentials (15 s hold)
+    // from the setup portal by holding the green button (staged beeps at 5 / 15 / 30 s).
+    // read_button_presses() blocks until release and drives the beep feedback.
+    WifiCaptivePortal.setPortalTickCallback([]() {
+      pinMode(pDevice->interrupt_pin, INPUT);
+      if (digitalRead(pDevice->interrupt_pin) != LOW) {
+        return;
+      }
+      ButtonPressResult button = read_button_presses();
+      Log_info("Button during setup portal -> %s", ButtonPressResultNames[button]);
+      switch (button) {
+      case SoftReset:
+        resetDeviceCredentials(); // clears credentials and restarts
+        break;
+      case ShipMode:
+        enter_ship_mode(); // does not return
+        break;
+      default:
+        break;
+      }
+    });
+#endif // SHIP_MODE_SUPPORTED
     bool portal_ok = WifiCaptivePortal.startPortal();
     if (!portal_ok) {
       WiFi.disconnect(true);

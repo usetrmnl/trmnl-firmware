@@ -148,6 +148,10 @@ void captureEventData(WiFiEvent_t event, WiFiEventInfo_t info, WifiEventData *ev
   }
 }
 
+static std::function<void()> s_connectTickCallback = nullptr;
+
+void setConnectTickCallback(std::function<void()> cb) { s_connectTickCallback = cb; }
+
 WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials credentials) {
   WifiEventData eventData;
 
@@ -308,6 +312,10 @@ wl_status_t waitForConnectResult(uint32_t timeout, const WifiEventData &eventDat
   unsigned long timeoutmillis = millis() + timeout;
 
   while (millis() < timeoutmillis) {
+    if (s_connectTickCallback) {
+      s_connectTickCallback();
+    }
+
     if (eventData.gotIp) {
       return WL_CONNECTED;
     }

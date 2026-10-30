@@ -128,6 +128,7 @@
 #define BUTTON_HOLD_TIME                   5000
 #define BUTTON_MEDIUM_HOLD_TIME            1000
 #define BUTTON_SOFT_RESET_TIME             15000
+#define BUTTON_SHIP_MODE_TIME              30000
 #define BUTTON_DOUBLE_CLICK_WINDOW         800
 
 #define API_BASE_URL                       "https://trmnl.app"
@@ -148,6 +149,8 @@ typedef struct tag_trmnl_device {
   uint8_t sensor_sda;
   uint8_t sensor_scl;
   uint8_t interrupt_pin;
+  uint8_t charger_sda; // SY6974B charger PMIC (ship mode), 0xff = none
+  uint8_t charger_scl;
   uint8_t batt_pin;
   uint8_t batt_en_pin;
   uint8_t batt_type; // ADC, BQxxx
@@ -166,6 +169,8 @@ typedef struct tag_trmnl_device {
   uint8_t sensor_sda;
   uint8_t sensor_scl;
   uint8_t interrupt_pin;
+  uint8_t charger_sda; // SY6974B charger PMIC (ship mode), 0xff = none
+  uint8_t charger_scl;
   uint8_t batt_pin;
   uint8_t batt_en_pin;
   uint8_t epd_en_pin;
