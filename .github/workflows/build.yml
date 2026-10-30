@@ -51,6 +51,9 @@ jobs:
           g++ --version
           gcc --version
 
+      - name: Test serial logger memory cleanup
+        run: python3 scripts/tests/test_serial_log_memory.py
+
       - name: test
         run: pio test -e native -v
 
