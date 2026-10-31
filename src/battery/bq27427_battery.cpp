@@ -54,6 +54,13 @@ static bool connectAndRead(bool oneCellPack, BQ27427Snapshot &snap) {
   return ok;
 }
 
+// The gauge can learn an impossible capacity after charging (60,000+ mAh in the field); a reset makes it forget.
+static bool isSaneCapacity(const BQ27427Snapshot &snap, bool oneCellPack) {
+  int expectedFull = oneCellPack ? 6000 : 12000; // design capacity × scale, mAh
+  if (snap.gaugeCapacityFull < expectedFull / 2 || snap.gaugeCapacityFull > expectedFull * 3 / 2) return false;
+  return snap.gaugeCapacityRemain >= 0 && snap.gaugeCapacityRemain <= snap.gaugeCapacityFull;
+}
+
 void BQ27427Battery::gaugeInit() {
   if (battery_count == BATTERY_NONE) {
     Log_info("No battery detected - skipping BQ27427 initialization");
@@ -66,6 +73,13 @@ void BQ27427Battery::gaugeInit() {
 
   BQ27427Snapshot snap;
   bool readingsValid = connectAndRead(oneCellPack, snap);
+
+  if (readingsValid && !isSaneCapacity(snap, oneCellPack)) {
+    Log_warn("BQ27427: implausible capacities (RM/FCC=%d/%d mAh) - resetting its learned data",
+             snap.gaugeCapacityRemain, snap.gaugeCapacityFull);
+    lipo.reset(); // back to ROM defaults, so the retry below reloads the golden file
+    readingsValid = false;
+  }
 
   if (!readingsValid) {
     Log_warn("BQ27427: init failed or invalid readings - resetting and retrying");

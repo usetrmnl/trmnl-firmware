@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-# Fault injection on the TRMNL X: a missing fuel gauge or one that loses its configuration, a
-# panel whose PMIC never powers up, a modem that stops answering, downloads cut on the 5 GHz
-# (modem) path, and power loss while the firmware writes NVS.
+# Fault injection on the TRMNL X: a missing fuel gauge, one that loses its configuration or learns
+# an impossible capacity, a panel whose PMIC never powers up, a modem that stops answering,
+# downloads cut on the 5 GHz (modem) path, and power loss while the firmware writes NVS.
 
 fuel_gauge = 0x55 # BQ27427
 touch_bar = 0x44 # IQS323
@@ -53,6 +53,21 @@ RSpec.describe "Faults on the TRMNL X", env: "TRMNL_X" do
       expect(h.values_at("Gauge-SOC", "Gauge-Capacity")).to eq(%w[83 4980/6000])
       # The factory calibration inverts the current; the firmware flips CC Gain's sign back.
       expect(h["Battery-Current"]).to eq("-50")
+    end
+
+    # BQ27427Battery::gaugeInit (src/battery/bq27427_battery.cpp) resets a gauge whose learned
+    # capacity is far from the pack's design capacity, as X devices report after charging.
+    it "resets a fuel gauge that learned an impossible capacity" do
+      h = dev.boot_asleep do |s|
+        s.wait(state: "deep_sleep", timeout: 15)
+        s.set_faults(gauge_full_capacity: 60_000)
+        s.set_faults(gauge_full_capacity: nil)
+        headers = dev.mock.next_request("/api/display", timeout: 30) { s.wake }.headers
+        s.wait(state: "deep_sleep", timeout: 30)
+        headers
+      end
+      # The golden file's 6000 mAh design capacity again, not the learned 49800/60000
+      expect(h["Gauge-Capacity"]).to eq("4980/6000")
     end
 
     it "reinitializes a touch controller reset while asleep" do
