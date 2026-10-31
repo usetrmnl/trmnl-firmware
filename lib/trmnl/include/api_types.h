@@ -38,6 +38,7 @@ struct ApiDisplayResponse {
   bool reset_firmware;
   SPECIAL_FUNCTION special_function;
   String action;
+  String verbose_logging;
 };
 
 struct ApiDisplayInputs {

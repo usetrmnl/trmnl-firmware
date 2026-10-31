@@ -140,6 +140,46 @@ static void logWithAction(LogAction action, LogLevel level, const char *message,
 /// Logs at or above this severity will be sent to the server
 static LogLevel store_submit_threshold = LogLevel::LOG_ERROR;
 
+static bool serial_logging_enabled = false;
+static bool serial_started = false;
+
+void set_verbose_logging(bool enabled) {
+  serial_logging_enabled = enabled;
+  if (enabled && !serial_started) {
+    Serial.begin(115200);
+    Log.begin(LOG_LEVEL_VERBOSE, &Serial);
+    serial_started = true;
+  } else if (serial_started) {
+    Log.setLevel(enabled ? LOG_LEVEL_VERBOSE : LOG_LEVEL_SILENT);
+  }
+}
+
+bool get_verbose_logging() { return serial_logging_enabled; }
+
+// Uses its own handle, so it works before openPreferences() and from the portal's web server
+bool read_verbose_logging() {
+#ifdef DEV_FIRMWARE
+  bool enabled = true;
+#else
+  bool enabled = false;
+#endif
+  Preferences prefs;
+  if (prefs.begin("data", true)) {
+    enabled = prefs.getBool(PREFERENCES_VERBOSE_LOG_KEY, enabled);
+    prefs.end();
+  }
+  return enabled;
+}
+
+void write_verbose_logging(bool enabled) {
+  Preferences prefs;
+  if (prefs.begin("data", false)) {
+    prefs.putBool(PREFERENCES_VERBOSE_LOG_KEY, enabled);
+    prefs.end();
+  }
+  set_verbose_logging(enabled);
+}
+
 static void handle_store_submit(LogLevel level, const char *clean_message, const char *file, int line,
                                 LogMode mode = LOG_STORE_ONLY) {
   if (level >= store_submit_threshold) {
@@ -157,7 +197,7 @@ void log_impl(LogLevel level, LogMode mode, const char *file, int line, const ch
   va_list args;
   va_start(args, format);
 
-    // Format user message with truncation (heap to avoid stack overflow in deep call chains)
+  // Format user message with truncation (heap to avoid stack overflow in deep call chains)
   char *user_message = (char *)malloc(MAX_USER_MESSAGE);
   if (!user_message) {
     va_end(args);
@@ -166,7 +206,7 @@ void log_impl(LogLevel level, LogMode mode, const char *file, int line, const ch
   format_message_truncated(user_message, MAX_USER_MESSAGE, format, args);
   va_end(args);
 
-    // Measure exact length needed for serial buffer
+  // Measure exact length needed for serial buffer
   int serial_len = snprintf(nullptr, 0, "%s [%d]: %s", file, line, user_message) + 1;
   char *serial_buffer = (char *)malloc(serial_len);
   if (!serial_buffer) {
@@ -175,31 +215,35 @@ void log_impl(LogLevel level, LogMode mode, const char *file, int line, const ch
   }
   snprintf(serial_buffer, serial_len, "%s [%d]: %s", file, line, user_message);
 
-// This mode is not handled correctly by underlying implementation,
-// so shortcut it here
+  // This mode is not handled correctly by underlying implementation,
+  // so shortcut it here
   if (mode == LOG_SERIAL_ONLY) {
-    Serial.println(serial_buffer);
+    if (serial_logging_enabled) {
+      Serial.println(serial_buffer);
+    }
     free(serial_buffer);
     free(user_message);
     return;
   }
 
-  switch (level) {
-  case LOG_VERBOSE:
-    Log.verboseln(serial_buffer);
-    break;
-  case LOG_INFO:
-    Log.infoln(serial_buffer);
-    break;
-  case LOG_WARN:
-    Log.warningln(serial_buffer);
-    break;
-  case LOG_ERROR:
-    Log.errorln(serial_buffer);
-    break;
-  case LOG_FATAL:
-    Log.fatalln(serial_buffer);
-    break;
+  if (serial_logging_enabled) {
+    switch (level) {
+    case LOG_VERBOSE:
+      Log.verboseln("%s", serial_buffer);
+      break;
+    case LOG_INFO:
+      Log.infoln("%s", serial_buffer);
+      break;
+    case LOG_WARN:
+      Log.warningln("%s", serial_buffer);
+      break;
+    case LOG_ERROR:
+      Log.errorln("%s", serial_buffer);
+      break;
+    case LOG_FATAL:
+      Log.fatalln("%s", serial_buffer);
+      break;
+    }
   }
   free(serial_buffer);
 

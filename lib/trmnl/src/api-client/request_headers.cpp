@@ -40,6 +40,7 @@ HttpHeaderList buildDisplayHeaders(const ApiDisplayInputs &inputs) {
   headers.push_back({"Temperature-Profile", "true"});
   headers.push_back({"Width", String(inputs.displayWidth)});
   headers.push_back({"Height", String(inputs.displayHeight)});
+  headers.push_back({"Log-Level", get_verbose_logging() ? "debug" : "info"});
 
   if (inputs.specialFunction != SF_NONE) {
     // "true" runs the function configured on the server; a name asks for that function

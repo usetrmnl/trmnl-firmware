@@ -3,6 +3,7 @@
 Run with: python3 scripts/tests/test_serial_log_memory.py
 The final log_impl definition is compiled unchanged with tracked allocations and
 platform stubs; the native suite otherwise uses lib/trmnl/src/test_logger.cpp.
+Four test groups cover 47 mode/level/switch, repetition, failure and truncation scenarios.
 """
 
 import os
@@ -28,8 +29,12 @@ static int attempts = 0;
 static int fail_at = 0;
 static int serial_calls = 0;
 static int normal_calls = 0;
-static int store_calls = 0;
+static int dispatch_calls = 0;
+static bool serial_logging_enabled = false;
 static std::string output;
+static std::string message;
+static LogLevel expected_level;
+static LogMode expected_mode;
 
 static void *tracked_malloc(size_t size) {
   if (++attempts == fail_at) return nullptr;
@@ -51,20 +56,26 @@ struct SerialStub {
 } Serial;
 
 struct LogStub {
-  void verboseln(const char *) { ++normal_calls; }
-  void infoln(const char *) { ++normal_calls; }
-  void warningln(const char *) { ++normal_calls; }
-  void errorln(const char *) { ++normal_calls; }
-  void fatalln(const char *) { ++normal_calls; }
+  void record(LogLevel level, const char *format, const char *text) {
+    if (level != expected_level || strcmp(format, "%s")) std::abort();
+    ++normal_calls;
+    output = text;
+  }
+  void verboseln(const char *format, const char *text) { record(LOG_VERBOSE, format, text); }
+  void infoln(const char *format, const char *text) { record(LOG_INFO, format, text); }
+  void warningln(const char *format, const char *text) { record(LOG_WARN, format, text); }
+  void errorln(const char *format, const char *text) { record(LOG_ERROR, format, text); }
+  void fatalln(const char *format, const char *text) { record(LOG_FATAL, format, text); }
 } Log;
 
 static void format_message_truncated(char *buffer, int size, const char *format, va_list args) {
   if (vsnprintf(buffer, size, format, args) >= size) strcpy(buffer + size - 4, "...");
 }
 
-static void handle_store_submit(LogLevel, const char *message, const char *file, int line, LogMode) {
-  ++store_calls;
-  if (strcmp(message, "message 42") || strcmp(file, "src/example.cpp") || line != 17) std::abort();
+static void handle_store_submit(LogLevel level, const char *text, const char *file, int line, LogMode mode) {
+  ++dispatch_calls;
+  if (level != expected_level || mode != expected_mode || message != text ||
+      strcmp(file, "src/example.cpp") || line != 17) std::abort();
 }
 
 #define malloc tracked_malloc
@@ -74,22 +85,28 @@ static void handle_store_submit(LogLevel, const char *message, const char *file,
 #undef free
 
 int main(int argc, char **argv) {
-  if (argc != 2) return 2;
-  const std::string scenario = argv[1];
-  if (scenario == "oom-first") fail_at = 1;
-  if (scenario == "oom-second") fail_at = 2;
-  const int count = scenario == "repeated" ? 100 : 1;
-  const bool normal = scenario == "normal";
-  const LogMode mode = normal ? LOG_STORE_ONLY : LOG_SERIAL_ONLY;
+  if (argc != 7) return 2;
+  expected_mode = static_cast<LogMode>(atoi(argv[1]));
+  expected_level = static_cast<LogLevel>(atoi(argv[2]));
+  serial_logging_enabled = atoi(argv[3]);
+  fail_at = atoi(argv[4]);
+  const int count = atoi(argv[5]);
+  const bool long_message = atoi(argv[6]);
+  const std::string input = long_message ? std::string(600, 'x') : "message 42 with 100% literal";
+  message = long_message ? std::string(508, 'x') + "..." : input;
   for (int i = 0; i < count; ++i) {
-    log_impl(LOG_ERROR, mode, "src/example.cpp", 17, "message %d", 42);
+    log_impl(expected_level, expected_mode, "src/example.cpp", 17, "%s", input.c_str());
   }
-  const int expected_serial = fail_at || normal ? 0 : count;
+  const bool serial_only = expected_mode == LOG_SERIAL_ONLY;
+  const int expected_serial = !fail_at && serial_logging_enabled && serial_only ? count : 0;
+  const int expected_normal = !fail_at && serial_logging_enabled && !serial_only ? count : 0;
+  const int expected_dispatch = !fail_at && !serial_only ? count : 0;
   const bool correct = live.empty() && serial_calls == expected_serial &&
-                       normal_calls == (normal ? 1 : 0) && store_calls == (normal ? 1 : 0) &&
-                       (!expected_serial || output == "src/example.cpp [17]: message 42");
-  printf("live allocations: %zu; serial: %d; normal: %d; store: %d\n",
-         live.size(), serial_calls, normal_calls, store_calls);
+                       normal_calls == expected_normal && dispatch_calls == expected_dispatch &&
+                       attempts == (fail_at ? fail_at : count * 2) &&
+                       (!(expected_serial || expected_normal) || output == "src/example.cpp [17]: " + message);
+  printf("live allocations: %zu; serial: %d; normal: %d; dispatch: %d\n",
+         live.size(), serial_calls, normal_calls, dispatch_calls);
   for (void *pointer : live) std::free(pointer);
   return correct ? 0 : 1;
 }
@@ -121,26 +138,34 @@ class SerialLogMemoryTest(unittest.TestCase):
         if compiled.returncode:
             raise RuntimeError(compiled.stdout + compiled.stderr)
 
-    def check_scenario(self, scenario):
+    def check_scenario(self, mode=0, level=3, enabled=1, fail_at=0, repeat=1, long_message=0):
         result = subprocess.run(
-            [str(self.binary), scenario], capture_output=True, text=True, timeout=10,
+            [str(self.binary), *map(str, (mode, level, enabled, fail_at, repeat, long_message))],
+            capture_output=True, text=True, timeout=10,
         )
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
-    def test_serial_output_releases_both_buffers(self):
-        self.check_scenario("serial")
+    def test_modes_levels_and_runtime_logging_switch(self):
+        for mode in range(3):
+            for level in range(5):
+                for enabled in (0, 1):
+                    with self.subTest(mode=mode, level=level, enabled=enabled):
+                        self.check_scenario(mode=mode, level=level, enabled=enabled)
 
-    def test_repeated_serial_output_does_not_accumulate_allocations(self):
-        self.check_scenario("repeated")
+    def test_repeated_serial_logging_with_switch_on_or_off(self):
+        for level in range(5):
+            for enabled in (0, 1):
+                with self.subTest(level=level, enabled=enabled):
+                    self.check_scenario(level=level, enabled=enabled, repeat=100)
 
-    def test_first_allocation_failure_is_safe(self):
-        self.check_scenario("oom-first")
+    def test_allocation_failures_in_each_mode(self):
+        for mode in range(3):
+            for fail_at in (1, 2):
+                with self.subTest(mode=mode, fail_at=fail_at):
+                    self.check_scenario(mode=mode, fail_at=fail_at)
 
-    def test_second_allocation_failure_releases_first_buffer(self):
-        self.check_scenario("oom-second")
-
-    def test_normal_logging_still_stores_and_releases_buffers(self):
-        self.check_scenario("normal")
+    def test_truncated_serial_message_releases_buffers(self):
+        self.check_scenario(long_message=1)
 
 
 if __name__ == "__main__":

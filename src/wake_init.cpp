@@ -57,10 +57,11 @@ uint32_t bootEarly(void) {
   uint32_t init_time = micros();
   startup_time = init_time / 1000L; // convert to milliseconds
 #endif
-#ifdef DEV_FIRMWARE
-  Serial.begin(115200);
-  wait_for_serial();
-  Log.begin(LOG_LEVEL_VERBOSE, &Serial);
+  // Serial logging is on when the portal or the server turned it on (on by default in dev firmware)
+  bool verbose_logging = read_verbose_logging();
+  set_verbose_logging(verbose_logging);
+#ifdef WAIT_FOR_SERIAL
+  if (verbose_logging) wait_for_serial();
 #endif
   Log_info("BL init success");
   return init_time;
