@@ -10,6 +10,7 @@
 #include <http_client.h>
 #include <http_utils.h>
 #include <inttypes.h>
+#include <pairing_runtime.h>
 #include <preferences_persistence.h>
 #include <services/device_setup.h>
 #include <trmnl_log.h>
@@ -91,13 +92,31 @@ void DeviceSetup::performApiSetup() {
 
     String api_key = apiResponse.api_key;
     Log.info("%s [%d]: API key - %s\r\n", __FILE__, __LINE__, api_key.c_str());
-    _persistence.writeString(PREFERENCES_API_KEY, api_key.c_str());
+    String friendly_id = apiResponse.friendly_id;
+    const bool bleSetup = pairingUsesBle();
+    if (bleSetup && (api_key.isEmpty() || !validFriendlyCode(friendly_id))) {
+      _result.outcome = DeviceSetupOutcome::ParsingError;
+      return;
+    }
+    const size_t apiKeyWritten = _persistence.writeString(PREFERENCES_API_KEY, api_key.c_str());
+    if (bleSetup && apiKeyWritten != api_key.length()) {
+      _result.outcome = DeviceSetupOutcome::RequestError;
+      return;
+    }
     Log.info("%s [%d]: api key saved in the preferences\r\n", __FILE__, __LINE__);
 
-    String friendly_id = apiResponse.friendly_id;
     Log.info("%s [%d]: friendly ID - %s\r\n", __FILE__, __LINE__, friendly_id.c_str());
-    _persistence.writeString(PREFERENCES_FRIENDLY_ID, friendly_id.c_str());
+    const size_t friendlyIdWritten = _persistence.writeString(PREFERENCES_FRIENDLY_ID, friendly_id.c_str());
     Log.info("%s [%d]: friendly ID saved in the preferences\r\n", __FILE__, __LINE__);
+    if (bleSetup) {
+      if (friendlyIdWritten != friendly_id.length()) {
+        _result.outcome = DeviceSetupOutcome::RequestError;
+        return;
+      }
+      _result.friendlyId = friendly_id;
+      _result.showSetupScreen = true;
+    }
+    pairingCredentialsReady(friendly_id);
 
     _result.imageUrl = apiResponse.image_url;
     Log.info("%s [%d]: image_url - %s\r\n", __FILE__, __LINE__, _result.imageUrl.c_str());

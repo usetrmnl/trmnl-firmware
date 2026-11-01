@@ -13,6 +13,7 @@
 #include <string_utils.h>
 #include <modem_scan_parse.h>
 #include <trmnl_log.h>
+#include <api-client/request_headers.h>
 
 #if defined (BOARD_TRMNL_X) || defined (BOARD_TRLML_X_EPDIY)
 #include <LittleFS.h>
@@ -463,7 +464,11 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, const String& saveToFil
       String hdr = (nl < 0) ? reqHeaders.substring(pos) : reqHeaders.substring(pos, nl);
       hdr.trim();
       if (!hdr.isEmpty()) {
-        Log_info_serial("[HTTP] HTTPCHEAD(%u): %s", hdr.length(), hdr.c_str());
+        int separator = hdr.indexOf(':');
+        String headerValue = hdr.substring(separator + 1);
+        headerValue.trim();
+        String loggedHeader = formatHeadersForLog({{hdr.substring(0, separator), headerValue}});
+        Log_info_serial("[HTTP] HTTPCHEAD(%u): %s", hdr.length(), loggedHeader.c_str());
         sendCommand(("AT+HTTPCHEAD=" + String(hdr.length())).c_str());
         if (waitForResponse(">", 3000).isEmpty()) {
           Log_info_serial("[HTTP] HTTPCHEAD: no '>' prompt");
@@ -472,7 +477,7 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, const String& saveToFil
         ModemSerial.write((const uint8_t*)hdr.c_str(), hdr.length());
         ModemSerial.flush();
         if (waitForResponse("OK", 3000).isEmpty()) {
-          Log_info_serial("[HTTP] HTTPCHEAD: no 'OK' for: %s", hdr.c_str());
+          Log_info_serial("[HTTP] HTTPCHEAD: no 'OK' for: %s", loggedHeader.c_str());
           return {false, 0, "", 0};
         }
       }

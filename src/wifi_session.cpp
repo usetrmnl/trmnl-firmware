@@ -4,8 +4,10 @@
 #include <WifiCaptive.h>
 #include <bl.h>
 #include <config.h>
+#include <displayed_image.h>
 #include <globals.h>
 #include <messages.h>
+#include <pairing_runtime.h>
 #include <sleep_session.h>
 #include <status_screens.h>
 #include <trmnl_log.h>
@@ -95,6 +97,19 @@ void wifiSessionConnect(bool should_show_error_now) {
 #endif
 
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
+  // Prepare a missing persistent secret on every boot, with RF entropy available.
+  // This does not start Bluetooth; timer wakes still skip the beacon check.
+  pairingPrepare();
+  if (WifiCaptivePortal.isSaved() && pairingWakeBegin()) {
+    // Keep the CPU/radio running while e-paper updates during management.
+    display_set_light_sleep(false);
+    showMessageWithLogo(PHONE_CONNECTED);
+    // The management screen replaced the image, even if the next API result is cached.
+    DisplayedImage::cover();
+    pairingBeforeSleep(); // wait for release/lease expiry and stop BLE before Wi-Fi
+    display_set_light_sleep(true);
+    // Resume the regular refresh below, using any updated saved Wi-Fi credentials.
+  }
 
 // uncomment this to hardcode WiFi credentials (useful for testing wifi errors, etc.)
 // #define HARDCODED_WIFI
@@ -133,6 +148,8 @@ void wifiSessionConnect(bool should_show_error_now) {
 
     Log_info("FW version %s", Messages::firmware_version().c_str());
 
+    pairingPrepare();
+
     showMessageWithLogo(WIFI_CONNECT, "", false, Messages::firmware_version().c_str(), WifiCaptivePortal.getAPSSID());
     WifiCaptivePortal.setResetSettingsCallback(resetDeviceCredentials);
 #ifdef BOARD_TRMNL_X
@@ -160,4 +177,6 @@ void wifiSessionConnect(bool should_show_error_now) {
   }
 
 #endif
+
+  pairingResume();
 }

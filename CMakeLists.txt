@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.16.0)
+option(TRMNL_ENABLE_BLE_PAIRING "Build BLE pairing for TRMNL OG, BWRY or TRMNL X" OFF)
 # sdkconfig.defaults lives under sdkconfigs/ (per-target configs are redirected there
 # via board_build.esp-idf.sdkconfig_path in platformio.ini). Must be set before project().
 # Only set the default when an env hasn't supplied its own SDKCONFIG_DEFAULTS chain
@@ -7,5 +8,7 @@ if(NOT DEFINED SDKCONFIG_DEFAULTS)
     set(SDKCONFIG_DEFAULTS "${CMAKE_SOURCE_DIR}/sdkconfigs/sdkconfig.defaults")
 endif()
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+# Export the option to ESP-IDF's separate early component-discovery process.
+idf_build_set_property(TRMNL_ENABLE_BLE_PAIRING "${TRMNL_ENABLE_BLE_PAIRING}")
 idf_build_set_property(DEPENDENCIES_LOCK "dependencies.lock.${IDF_TARGET}")
 project(trmnl-firmware)

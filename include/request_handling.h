@@ -14,7 +14,7 @@ void showImageTooBigIfNeeded(https_request_err_e result);
 void applyRetryPolicy(https_request_err_e result, bool showErrorsNow);
 
 // Shows the friendly ID setup screen when the server says the device isn't claimed yet
-void showFriendlyIdIfUnregistered(https_request_err_e result);
+void showFriendlyIdIfUnregistered(https_request_err_e result, bool bleSetup = false);
 
 // Clears the credentials and restarts when the server asked for a reset
 void resetIfRequested(https_request_err_e result);
