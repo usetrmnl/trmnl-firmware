@@ -38,4 +38,12 @@ module Builds
 
   # The device a build directory is for (nil: unknown).
   def device_of(build) = Devices::BY_ENV[env_of(build)]
+
+  # The firmware's version ("1.8.19"), as FW_VERSION_STRING in include/config.h makes it.
+  def fw_version
+    config = File.read(File.join(FIRMWARE, "include/config.h"))
+    %w[MAJOR MINOR PATCH].map do |part|
+      config[/^#define FW_#{part}_VERSION\s+(\d+)/, 1] or raise "no FW_#{part}_VERSION"
+    end.join(".")
+  end
 end

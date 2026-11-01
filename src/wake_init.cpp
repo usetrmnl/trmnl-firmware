@@ -12,6 +12,7 @@
 #include <pins.h>
 #include <power.h>
 #include <preferences_persistence.h>
+#include <sleep_session.h>
 #include <touch_i2c_lock.h>
 #include <trmnl_log.h>
 #include <wake_init.h>
@@ -52,13 +53,15 @@ uint32_t bootEarly(void) {
 #ifdef BOARD_TRMNL_X
   uint32_t init_time = esp_cpu_get_cycle_count() / esp_rom_get_cpu_ticks_per_us();
 #else
+  awake_time_limit_start(); // not on the X, which waits on purpose: "ready to ship" and shipment sleep
   uint32_t init_time = micros();
   startup_time = init_time / 1000L; // convert to milliseconds
 #endif
-#ifdef DEV_FIRMWARE
-  Serial.begin(115200);
-  wait_for_serial();
-  Log.begin(LOG_LEVEL_VERBOSE, &Serial);
+  // Serial logging is on when the portal or the server turned it on (on by default in dev firmware)
+  bool verbose_logging = read_verbose_logging();
+  set_verbose_logging(verbose_logging);
+#ifdef WAIT_FOR_SERIAL
+  if (verbose_logging) wait_for_serial();
 #endif
   Log_info("BL init success");
   return init_time;

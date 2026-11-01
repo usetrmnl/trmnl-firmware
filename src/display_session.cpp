@@ -59,6 +59,13 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse) {
   https_request_err_e result = HTTPS_NO_ERR;
   int file_size = 0;
 
+  if (apiResponse.verbose_logging.length() > 0) {
+    bool enabled = (apiResponse.verbose_logging == "debug");
+    if (enabled != get_verbose_logging()) {
+      write_verbose_logging(enabled);
+    }
+  }
+
   if (special_function == SF_NONE) {
     uint64_t request_status = apiResponse.status;
     Log.info("%s [%d]: status: %d\r\n", __FILE__, __LINE__, request_status);

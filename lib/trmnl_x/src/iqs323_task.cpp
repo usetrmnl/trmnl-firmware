@@ -10,6 +10,7 @@
 #include "freertos/event_groups.h"
 #include "freertos/semphr.h"
 #include "driver/gpio.h"
+#include <trmnl_log.h>
 
 // Event bits for task synchronization
 #define IQS323_EVT_INIT_DONE        (1 << 0)
@@ -87,13 +88,13 @@ bool iqs323_task_init(const iqs323_task_config_t *config)
     // Create synchronization primitives
     iqs323_event_group = xEventGroupCreate();
     if (iqs323_event_group == NULL) {
-        Serial.println("IQS323 Task: Failed to create event group");
+        Log_info_serial("IQS323 Task: Failed to create event group");
         return false;
     }
 
     iqs323_mutex = xSemaphoreCreateMutex();
     if (iqs323_mutex == NULL) {
-        Serial.println("IQS323 Task: Failed to create mutex");
+        Log_info_serial("IQS323 Task: Failed to create mutex");
         vEventGroupDelete(iqs323_event_group);
         iqs323_event_group = NULL;
         return false;
@@ -112,7 +113,7 @@ bool iqs323_task_init(const iqs323_task_config_t *config)
     );
 
     if (result != pdPASS) {
-        Serial.println("IQS323 Task: Failed to create task");
+        Log_info_serial("IQS323 Task: Failed to create task");
         task_running = false;
         vSemaphoreDelete(iqs323_mutex);
         iqs323_mutex = NULL;
@@ -121,7 +122,7 @@ bool iqs323_task_init(const iqs323_task_config_t *config)
         return false;
     }
 
-    Serial.println("IQS323 Task: Created successfully");
+    Log_info_serial("IQS323 Task: Created successfully");
     return true;
 }
 
@@ -267,7 +268,7 @@ void iqs323_task_deinit(void)
     current_state = IQS323_TASK_STATE_IDLE;
     i2c_locked = false;
     fast_poll_requested = false;
-    Serial.println("IQS323 Task: Cleanup complete");
+    Log_info_serial("IQS323 Task: Cleanup complete");
 }
 
 /**
@@ -313,7 +314,7 @@ static void iqs323_publish_snapshot(void)
     if (g_touchbar_snapshot.ch1_touch && !before.ch1_touch) g_touch_starts |= 1 << 1;
     if (g_touchbar_snapshot.ch2_touch && !before.ch2_touch) g_touch_starts |= 1 << 2;
 
-    Serial.printf("IQS323 Task: publish snapshot at t=%lu ch0=%d ch1=%d ch2=%d STATUS=0x%02X 0x%02X\n",
+    Log_info_serial("IQS323 Task: publish snapshot at t=%lu ch0=%d ch1=%d ch2=%d STATUS=0x%02X 0x%02X",
         (unsigned long)millis(), g_touchbar_snapshot.ch0_touch, g_touchbar_snapshot.ch1_touch, g_touchbar_snapshot.ch2_touch,
         iqs323.IQSMemoryMap.SYSTEM_STATUS[0], iqs323.IQSMemoryMap.SYSTEM_STATUS[1]);
 
@@ -364,7 +365,7 @@ bool iqs323_task_read_wake_stub_snapshot(touchbar_snapshot_t *out)
 bool iqs323_task_set_streaming_mode(bool enable)
 {
     if (iqs323_mutex == NULL || xSemaphoreTake(iqs323_mutex, pdMS_TO_TICKS(200)) != pdTRUE) {
-        Serial.println("IQS323 Task: Failed to acquire mutex for streaming mode switch");
+        Log_info_serial("IQS323 Task: Failed to acquire mutex for streaming mode switch");
         return false;
     }
 
@@ -382,7 +383,7 @@ bool iqs323_task_set_streaming_mode(bool enable)
 bool iqs323_task_set_gesture_config(void)
 {
     if (iqs323_mutex == NULL || xSemaphoreTake(iqs323_mutex, pdMS_TO_TICKS(200)) != pdTRUE) {
-        Serial.println("IQS323 Task: Failed to acquire mutex for gesture config write");
+        Log_info_serial("IQS323 Task: Failed to acquire mutex for gesture config write");
         return false;
     }
 
@@ -397,7 +398,7 @@ bool iqs323_task_set_gesture_config(void)
  */
 static void iqs323_task_main(void *pvParameters)
 {
-    Serial.println("IQS323 Task: Starting...");
+    Log_info_serial("IQS323 Task: Starting...");
 
     current_state = IQS323_TASK_STATE_INITIALIZING;
 
@@ -411,8 +412,8 @@ static void iqs323_task_main(void *pvParameters)
     bool init_success = false;
 
     while (retry_count < task_config.max_init_retries && !init_success) {
-        Serial.printf("IQS323 Task: Init attempt %d/%d (use_wake_stub=%d)\n",
-                      retry_count + 1, task_config.max_init_retries, use_wake_stub);
+        Log_info_serial("IQS323 Task: Init attempt %d/%d (use_wake_stub=%d)",
+                        retry_count + 1, task_config.max_init_retries, use_wake_stub);
 
         init_success = iqs323_do_init(use_wake_stub);
 
@@ -422,9 +423,9 @@ static void iqs323_task_main(void *pvParameters)
             use_wake_stub = false;  // Don't try wake stub again after failure
 
             if (retry_count < task_config.max_init_retries) {
-                Serial.println("IQS323 Task: Init failed, attempting hardware reset...");
+                Log_info_serial("IQS323 Task: Init failed, attempting hardware reset...");
                 if (iqs323_hardware_reset()) {
-                    Serial.println("IQS323 Task: Hardware reset completed");
+                    Log_info_serial("IQS323 Task: Hardware reset completed");
                 }
                 vTaskDelay(pdMS_TO_TICKS(IQS323_POST_RESET_DELAY_MS));
             }
@@ -434,11 +435,11 @@ static void iqs323_task_main(void *pvParameters)
     if (init_success) {
         current_state = IQS323_TASK_STATE_RUNNING;
         xEventGroupSetBits(iqs323_event_group, IQS323_EVT_INIT_DONE);
-        Serial.println("IQS323 Task: Initialization complete");
+        Log_info_serial("IQS323 Task: Initialization complete");
     } else {
         current_state = IQS323_TASK_STATE_ERROR;
         xEventGroupSetBits(iqs323_event_group, IQS323_EVT_INIT_FAILED);
-        Serial.println("IQS323 Task: Initialization failed after all retries");
+        Log_info_serial("IQS323 Task: Initialization failed after all retries");
     }
 
     // Main task loop
@@ -459,34 +460,34 @@ static void iqs323_task_main(void *pvParameters)
 
         // Handle shutdown request - highest priority
         if (events & IQS323_EVT_SHUTDOWN) {
-            Serial.println("IQS323 Task: Shutdown requested");
+            Log_info_serial("IQS323 Task: Shutdown requested");
             break;
         }
 
         // Handle sleep request
         if (events & IQS323_EVT_SLEEP_REQUEST) {
-            Serial.println("IQS323 Task: Sleep preparation requested");
+            Log_info_serial("IQS323 Task: Sleep preparation requested");
             current_state = IQS323_TASK_STATE_PREPARING_SLEEP;
             iqs323_do_prepare_sleep();
             current_state = IQS323_TASK_STATE_SLEEPING;
             xEventGroupSetBits(iqs323_event_group, IQS323_EVT_SLEEP_DONE);
-            Serial.println("IQS323 Task: Sleep preparation complete");
+            Log_info_serial("IQS323 Task: Sleep preparation complete");
             continue;
         }
 
         // Handle reinit request
         if (events & IQS323_EVT_REINIT_REQUEST) {
-            Serial.println("IQS323 Task: Reinit requested");
+            Log_info_serial("IQS323 Task: Reinit requested");
             current_state = IQS323_TASK_STATE_INITIALIZING;
             gpio_wakeup_pending = false;
 
             if (iqs323_do_init(false)) {
                 current_state = IQS323_TASK_STATE_RUNNING;
-                Serial.println("IQS323 Task: Reinit successful");
+                Log_info_serial("IQS323 Task: Reinit successful");
             } else {
                 current_state = IQS323_TASK_STATE_ERROR;
                 error_count = error_count + 1;
-                Serial.println("IQS323 Task: Reinit failed");
+                Log_info_serial("IQS323 Task: Reinit failed");
             }
             continue;
         }
@@ -502,7 +503,7 @@ static void iqs323_task_main(void *pvParameters)
                 if (iqs323.new_data_available) {
                     // Check for unexpected reset
                     if (iqs323.checkReset()) {
-                        Serial.println("IQS323 Task: Unexpected reset detected");
+                        Log_info_serial("IQS323 Task: Unexpected reset detected");
                         xSemaphoreGive(iqs323_mutex);
                         xEventGroupSetBits(iqs323_event_group, IQS323_EVT_REINIT_REQUEST);
                         continue;
@@ -510,7 +511,7 @@ static void iqs323_task_main(void *pvParameters)
 
                     // Check for I2C lockup
                     if (iqs323.check_i2c_lockup()) {
-                        Serial.println("IQS323 Task: I2C lockup detected");
+                        Log_info_serial("IQS323 Task: I2C lockup detected");
                         xSemaphoreGive(iqs323_mutex);
                         xEventGroupSetBits(iqs323_event_group, IQS323_EVT_REINIT_REQUEST);
                         continue;
@@ -518,7 +519,7 @@ static void iqs323_task_main(void *pvParameters)
 
                     // Check for ATI error and trigger Re-ATI if needed
                     if (iqs323.checkATIError()) {
-                        Serial.println("IQS323 Task: ATI error detected, forcing Re-ATI");
+                        Log_info_serial("IQS323 Task: ATI error detected, forcing Re-ATI");
                         iqs323.ReATI(STOP);
                     }
 
@@ -539,7 +540,7 @@ static void iqs323_task_main(void *pvParameters)
         }
     }
 
-    Serial.println("IQS323 Task: Exiting");
+    Log_info_serial("IQS323 Task: Exiting");
 
     task_running = false;
     vTaskSuspend(NULL);  // Suspend task, deinit() will delete it
@@ -551,7 +552,7 @@ static void iqs323_task_main(void *pvParameters)
 static bool iqs323_do_init(bool use_wake_stub)
 {
     if (xSemaphoreTake(iqs323_mutex, pdMS_TO_TICKS(1000)) != pdTRUE) {
-        Serial.println("IQS323 Task: Failed to acquire mutex for init");
+        Log_info_serial("IQS323 Task: Failed to acquire mutex for init");
         return false;
     }
 
@@ -559,7 +560,7 @@ static bool iqs323_do_init(bool use_wake_stub)
 
     if (use_wake_stub) {
         // Use data from wake stub - faster path for GPIO wakeup
-        Serial.println("IQS323 Task: Using wake stub data");
+        Log_info_serial("IQS323 Task: Using wake stub data");
 
         // Set up IQS323 without full init (just configures pins and address)
         iqs323.begin(
@@ -575,12 +576,12 @@ static bool iqs323_do_init(bool use_wake_stub)
 
         // Check if IQS323 reset during sleep
         if (iqs323.checkReset()) {
-            Serial.println("IQS323 Task: Reset detected in wake stub data, need full init");
+            Log_info_serial("IQS323 Task: Reset detected in wake stub data, need full init");
             use_wake_stub = false;
         } else {
             // Check I2C health by doing a quick communication check
             if (iqs323.check_i2c_lockup()) {
-                Serial.println("IQS323 Task: I2C lockup detected after wake, need full init");
+                Log_info_serial("IQS323 Task: I2C lockup detected after wake, need full init");
                 use_wake_stub = false;
             } else {
                 // Data is valid, set state to running
@@ -591,14 +592,14 @@ static bool iqs323_do_init(bool use_wake_stub)
                 g_wake_stub_snapshot = g_touchbar_snapshot;
                 g_wake_stub_snapshot_valid = true;
                 success = true;
-                Serial.println("IQS323 Task: Wake stub data validated OK");
+                Log_info_serial("IQS323 Task: Wake stub data validated OK");
             }
         }
     }
 
     if (!success) {
         // Full initialization
-        Serial.println("IQS323 Task: Starting full initialization");
+        Log_info_serial("IQS323 Task: Starting full initialization");
 
         // Initialize IQS323 with interrupt
         iqs323.begin(
@@ -610,7 +611,7 @@ static bool iqs323_do_init(bool use_wake_stub)
         );
 
         // Request software reset to ensure clean state
-        Serial.println("IQS323 Task: Requesting SW reset");
+        Log_info_serial("IQS323 Task: Requesting SW reset");
         iqs323.SW_Reset(true);  // STOP
         vTaskDelay(pdMS_TO_TICKS(100));
 
@@ -627,7 +628,7 @@ static bool iqs323_do_init(bool use_wake_stub)
             }
 
             if (iqs323.iqs323_state.init_state == IQS323_INIT_NONE) {
-                Serial.println("IQS323 Task: Init state machine error");
+                Log_info_serial("IQS323 Task: Init state machine error");
                 break;
             }
 
@@ -635,7 +636,7 @@ static bool iqs323_do_init(bool use_wake_stub)
         }
 
         if (!success && (millis() - start_time) >= timeout) {
-            Serial.println("IQS323 Task: Initialization timeout");
+            Log_info_serial("IQS323 Task: Initialization timeout");
         }
     }
 
@@ -649,25 +650,25 @@ static bool iqs323_do_init(bool use_wake_stub)
 static void iqs323_do_prepare_sleep(void)
 {
     if (xSemaphoreTake(iqs323_mutex, pdMS_TO_TICKS(1000)) != pdTRUE) {
-        Serial.println("IQS323 Task: Failed to acquire mutex for sleep prep");
+        Log_info_serial("IQS323 Task: Failed to acquire mutex for sleep prep");
         return;
     }
 
-    Serial.println("IQS323 Task: Reading final values before sleep");
+    Log_info_serial("IQS323 Task: Reading final values before sleep");
     iqs323.queueValueUpdates();
 
     iqs323.check_i2c_lockup();
 
     if (iqs323.checkReset()) {
-        Serial.println("IQS323 Task: Reset detected before sleep");
+        Log_info_serial("IQS323 Task: Reset detected before sleep");
     }
 
     // Activate event mode for low-power operation during sleep
     // In event mode, IQS323 only opens communication windows on touch events
-    Serial.println("IQS323 Task: Activating event mode for sleep");
+    Log_info_serial("IQS323 Task: Activating event mode for sleep");
     iqs323.setEventMode(true);  // STOP = true
 
-    Serial.println("IQS323 Task: IQS323 ready for sleep");
+    Log_info_serial("IQS323 Task: IQS323 ready for sleep");
 
     xSemaphoreGive(iqs323_mutex);
 }
@@ -677,7 +678,7 @@ static void iqs323_do_prepare_sleep(void)
  */
 static bool iqs323_hardware_reset(void)
 {
-    Serial.println("IQS323 Task: Performing hardware reset via MCLR");
+    Log_info_serial("IQS323 Task: Performing hardware reset via MCLR");
 
     gpio_num_t mclr_pin = (gpio_num_t)task_config.ready_pin;
 
@@ -685,7 +686,7 @@ static bool iqs323_hardware_reset(void)
     uint32_t timeout_start = millis();
     while (gpio_get_level(mclr_pin) == 0) {
         if (millis() - timeout_start > 500) {
-            Serial.println("IQS323 Task: Timeout waiting for RDY to go HIGH");
+            Log_info_serial("IQS323 Task: Timeout waiting for RDY to go HIGH");
             break;
         }
         delayMicroseconds(10);
@@ -716,7 +717,7 @@ static bool iqs323_hardware_reset(void)
     uint8_t error = Wire.endTransmission();
 
     if (error == 0) {
-        Serial.println("IQS323 Task: Hardware reset successful, device responding");
+        Log_info_serial("IQS323 Task: Hardware reset successful, device responding");
         return true;
     }
 
@@ -726,11 +727,11 @@ static bool iqs323_hardware_reset(void)
     error = Wire.endTransmission();
 
     if (error == 0) {
-        Serial.println("IQS323 Task: Hardware reset successful after additional wait");
+        Log_info_serial("IQS323 Task: Hardware reset successful after additional wait");
         return true;
     }
 
-    Serial.println("IQS323 Task: Hardware reset failed - device not responding");
+    Log_info_serial("IQS323 Task: Hardware reset failed - device not responding");
     return false;
 }
 #endif // BOARD_TRMNL_X

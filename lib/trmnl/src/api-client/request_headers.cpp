@@ -34,11 +34,13 @@ HttpHeaderList buildDisplayHeaders(const ApiDisplayInputs &inputs) {
   if (inputs.panelId.length() > 0) headers.push_back({"Panel-Rev", inputs.panelId});
   headers.push_back({"Image-Cached", inputs.imageCached ? "true" : "false"});
   headers.push_back({"Wake-Time", String(inputs.prevWakeTime)});
+  headers.push_back({"Reset-Reason", inputs.resetReason});
   headers.push_back({"RSSI", String(inputs.rssi)});
   if (inputs.wifiBand.length() > 0) headers.push_back({"WiFi-Band", inputs.wifiBand});
   headers.push_back({"Temperature-Profile", "true"});
   headers.push_back({"Width", String(inputs.displayWidth)});
   headers.push_back({"Height", String(inputs.displayHeight)});
+  headers.push_back({"Log-Level", get_verbose_logging() ? "debug" : "info"});
 
   if (inputs.specialFunction != SF_NONE) {
     // "true" runs the function configured on the server; a name asks for that function

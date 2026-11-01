@@ -17,6 +17,8 @@
 #include <trmnl_log.h>
 
 #include "driver/gpio.h"
+#include "esp_system.h"
+#include "esp_timer.h"
 
 #ifdef BOARD_TRMNL_X
 #include <iqs323_task.h>
@@ -24,6 +26,8 @@
 
 #include "rtc_wake_stub_trmnl_x.h"
 #endif
+
+#define AWAKE_TIME_LIMIT_MS (20 * 60 * 1000) // longer than the 15 minute Wi-Fi portal
 
 /**
  * @brief Function to sleep preparing and go to sleep
@@ -223,4 +227,20 @@ void wifiErrorDeepSleep(void) {
 
   display_sleep();
   goToSleep();
+}
+
+// A panic reset, so the next boot can report it.
+static void awake_time_limit_reached(void *arg) { esp_system_abort("Awake time limit reached"); }
+
+void awake_time_limit_start(void) {
+  esp_timer_handle_t timer;
+  esp_timer_create_args_t timerArgs = {};
+
+  timerArgs.callback = awake_time_limit_reached;
+  timerArgs.name = "awake_limit";
+  if (esp_timer_create(&timerArgs, &timer) == ESP_OK) {
+    esp_timer_start_once(timer, (uint64_t)AWAKE_TIME_LIMIT_MS * 1000);
+  } else {
+    Log_error("Awake time limit timer not created");
+  }
 }

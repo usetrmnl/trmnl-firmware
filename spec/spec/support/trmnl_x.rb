@@ -104,6 +104,7 @@ module TrmnlX
         s.wait_for_console(/Entering shipment mode light sleep loop/, timeout: 180)
         s.dock(true)
         s.wait(portal: true, timeout: 180)
+        s.portal_enable_verbose_logging
       end
       {}
     end
