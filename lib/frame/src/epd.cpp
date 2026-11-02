@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "battery.h"
+#include "frame.h"
 //#include "globals.h"
 #include "pindefine.h"
 #include "status.h"
@@ -121,7 +122,7 @@ void epd_gpio_init()
   delay(50);
   expander2.pinMode1(EXP2_EPD_RST, OUTPUT);
   delay(50);
-  Serial.println("EPD GPIO initialized: RST=OUTPUT, BUSY=INPUT");
+  Log_info("EPD GPIO initialized: RST=OUTPUT, BUSY=INPUT");
 }
 
 void frameDeepSleep(uint32_t sleepSeconds)
@@ -395,28 +396,26 @@ void frameInit(void)
   delay(500);
   scanI2C();
   // Read PMIC registers 0x1D and 0x1E
-  printf("\n========== Reading PMIC Registers ==========\n");
+  Log_info("\n========== Reading PMIC Registers ==========\n");
 
   unsigned char reg_data_0x1D = 0;
   unsigned char reg_data_0x1E = 0;
 
   // Read 1 byte from register 0x1D
-  printf("Reading from PMIC register 0x1D...\n");
+  Log_info("Reading from PMIC register 0x1D...\n");
   if (readPmicRegister(0x1D, &reg_data_0x1D, 1) == DONE)
   {
-    printf("Register 0x1D: 0x%02X (%d)\n", reg_data_0x1D, reg_data_0x1D);
+    Log_info("Register 0x1D: 0x%02X (%d)\n", reg_data_0x1D, reg_data_0x1D);
   }
-
-  printf("\n");
 
   // Read 1 byte from register 0x1E
-  printf("Reading from PMIC register 0x1E...\n");
+  Log_info("Reading from PMIC register 0x1E...\n");
   if (readPmicRegister(0x1E, &reg_data_0x1E, 1) == DONE)
   {
-    printf("Register 0x1E: 0x%02X (%d)\n", reg_data_0x1E, reg_data_0x1E);
+    Log_info("Register 0x1E: 0x%02X (%d)\n", reg_data_0x1E, reg_data_0x1E);
   }
 
-  printf("===========================================\n\n");
+  Log_info("===========================================\n\n");
   // delay(500);
   // powerSwitchEnable(); // tetst
   //  // Initialize EPD GPIO pins
@@ -427,12 +426,14 @@ void frameInit(void)
   spiInit();
   epdHardwareReset();
   // Initialize EPD driver ICs
-  printf("\n========== Initializing EPD ==========\n");
+  Log_info("\n========== Initializing EPD ==========\n");
 
   // Read battery before starting WiFi (shows state at wake-up)
   BatteryStatus bat = batteryRead();
   batteryLog(bat);
 
+  // Initialize the RGB LED
+  FrameLEDInit();
 } /* frameInit() */
 /**
  * @brief Set EPD reset pin level
@@ -507,12 +508,12 @@ void epdCheckBusyHigh(void)
         elapsed++;
         if (elapsed >= timeout)
         {
-            printf("ERROR: EPD BUSY timeout (waiting for HIGH)\n");
+            Log_error("ERROR: EPD BUSY timeout (waiting for HIGH)\n");
             return;
         }
     }
-    Serial.println("Busy_pin ");
-    Serial.println(elapsed);
+//    Serial.println("Busy_pin ");
+//    Serial.println(elapsed);
 }
 
 /**
@@ -528,7 +529,7 @@ void epdCheckBusyLow(void)
         elapsed++;
         if (elapsed >= timeout)
         {
-            printf("ERROR: EPD BUSY timeout (waiting for LOW)\n");
+            Log_error("ERROR: EPD BUSY timeout (waiting for LOW)\n");
             return;
         }
     }
@@ -538,12 +539,12 @@ void epdCheckBusyLow(void)
 
 void epdHardwareReset(void)
 {
-    printf("EPD Hardware Reset...\n");
+    Log_info("EPD Hardware Reset...\n");
     epdResetPin(GPIO_LOW);
     delay(20);
     epdResetPin(GPIO_HIGH);
     delay(20);
-    printf("EPD Hardware Reset complete\n");
+    Log_info("EPD Hardware Reset complete\n");
 }
 
 //================== SPI Communication ====================================
@@ -584,7 +585,7 @@ void epdWriteData(const unsigned char *epdData, unsigned int epdDataLength)
 
 void epdInit(void)
 {
-    printf("Initializing EPD...\n");
+    Log_info("Initializing EPD...\n");
 
     // Allocate image buffer in PSRAM
     if (epdImageDataBuffer == nullptr)
@@ -592,11 +593,11 @@ void epdInit(void)
         epdImageDataBuffer = (unsigned char *)ps_malloc(EPD_IMAGE_DATA_BUFFER);
         if (epdImageDataBuffer == nullptr)
         {
-            printf("[EPD] ERROR: Failed to allocate image buffer in PSRAM!\n");
+            Log_error("[EPD] ERROR: Failed to allocate image buffer in PSRAM!\n");
         }
         else
         {
-            printf("[EPD] Image buffer allocated in PSRAM (%u bytes)\n", EPD_IMAGE_DATA_BUFFER);
+            Log_info("[EPD] Image buffer allocated in PSRAM (%u bytes)\n", EPD_IMAGE_DATA_BUFFER);
         }
     }
 
@@ -653,7 +654,7 @@ void epdInit(void)
     epdWrite(EPD_CMD_CCSET, CCSET_V, sizeof(CCSET_V));
     epdSetCsAll(GPIO_HIGH);
 
-    printf("EPD initialization complete\n");
+    Log_info("EPD initialization complete\n");
 }
 
 //================== Driver IC Status Check ====================================
@@ -663,7 +664,7 @@ unsigned char epdCheckDriverICStatus(void)
     unsigned char csx, status = DONE;
     unsigned char dataBuf[3];
 
-    printf("Checking driver IC status...\n");
+    Log_info("Checking driver IC status...\n");
 
     for (csx = 0; csx < 8; csx++)
     {
@@ -673,21 +674,15 @@ unsigned char epdCheckDriverICStatus(void)
         epdRead(0xF2, dataBuf, sizeof(dataBuf));
         epdSetCs(csx, GPIO_HIGH);
 
-#if SHOW_LOG
-        printf("Driver IC [%d] = 0x%02X 0x%02X 0x%02X\n", csx, dataBuf[0], dataBuf[1], dataBuf[2]);
-#endif
+        Log_info("Driver IC [%d] = 0x%02X 0x%02X 0x%02X\n", csx, dataBuf[0], dataBuf[1], dataBuf[2]);
 
         if ((dataBuf[0] & 0x01) == 0x01)
         {
-#if SHOW_LOG
-            printf("Driver IC [%d] is ready.\n", csx);
-#endif
+            Log_info("Driver IC [%d] is ready.\n", csx);
         }
         else
         {
-#if SHOW_LOG
-            printf("Driver IC [%d] did not reply.\n", csx);
-#endif
+            Log_error("Driver IC [%d] did not reply.\n", csx);
             status = ERROR;
         }
     }
@@ -726,67 +721,51 @@ static void epdSetPwrToPmic(unsigned char *pmicData)
 
 void epdDisplay(void)
 {
-#if SHOW_LOG
     //   expander2.write1(12, HIGH);// for debug only
     //   expander2.pinMode1(12, OUTPUT);// for debug only
-    printf("Turn on PMIC.\n");
-#endif
+    Log_info("Turn on PMIC.\n");
     if (enablePmic() == DONE)
     {
         pgWasGood = 1; // reset before tracking PMIC_PG across the busy-wait loops below
 
-#if SHOW_LOG
-        printf("Write PON\n");
-#endif
+        Log_info("Write PON\n");
         epdSetCsAll(GPIO_LOW);
         epdWriteCommand(EPD_CMD_PON);
         epdCheckBusyHigh();
         epdSetCsAll(GPIO_HIGH);
 
-#if SHOW_LOG
-        printf("Write DRF\n");
-#endif
+        Log_info("Write DRF\n");
         epdSetCsAll(GPIO_LOW);
         delay(30);
         epdWrite(EPD_CMD_DRF, DRF_V, sizeof(DRF_V));
         epdCheckBusyHigh();
         epdSetCsAll(GPIO_HIGH);
 
-#if SHOW_LOG
-        printf("Write POF\n");
-#endif
+        Log_info("Write POF\n");
         epdSetCsAll(GPIO_LOW);
         epdWrite(EPD_CMD_POF, POF_V, sizeof(POF_V));
         epdSetCsAll(GPIO_HIGH);
-#if SHOW_LOG
         if (!pgWasGood)
         {
-            printf("WARNING: PMIC_PG == LOW ==\n");
+            Log_info("WARNING: PMIC_PG == LOW ==\n");
         }
-#endif
     }
     else
     {
-#if SHOW_LOG
-        printf("PMIC enable failed - skipping display refresh.\n");
-#endif
+        Log_error("PMIC enable failed - skipping display refresh.\n");
     }
 
-#if SHOW_LOG
-    printf("Turn off PMIC.\n");
-#endif
+    Log_info("Turn off PMIC.\n");
     disablePmic();
 
-#if SHOW_LOG
-    printf("Display Done!!\n");
-#endif
+    Log_info("Display Done!!\n");
 }
 
 void epdDisplayColor(unsigned char colorSelect)
 {
     unsigned long i;
 
-    printf("Displaying solid color: 0x%02X\n", colorSelect);
+    Log_info("Displaying solid color: 0x%02X\n", colorSelect);
 
     memset(epdImageDataBuffer, colorSelect, EPD_IMAGE_DATA_BUFFER);
 
@@ -805,15 +784,11 @@ void epdDisplayColor(unsigned char colorSelect)
 
         epdDisplay();
 
-#if SHOW_LOG
-        printf("Display color complete.\n");
-#endif
+        Log_info("Display color complete.\n");
     }
     else
     {
-#if SHOW_LOG
-        printf("Display color does not work due to epdSetPower() NG.\n");
-#endif
+        Log_error("Display color does not work due to epdSetPower() NG.\n");
     }
 }
 
@@ -821,7 +796,7 @@ void epdDisplayColorBar(void)
 {
     unsigned long i;
 
-    printf("Displaying color bar pattern...\n");
+    Log_info("Displaying color bar pattern...\n");
 
     if (epdSetPower() == DONE)
     {
@@ -880,15 +855,11 @@ void epdDisplayColorBar(void)
 
         epdDisplay();
 
-#if SHOW_LOG
-        printf("Display color bar complete.\n");
-#endif
+        Log_info("Display color bar complete.\n");
     }
     else
     {
-#if SHOW_LOG
-        printf("Display color bar does not work due to epdSetPower() NG.\n");
-#endif
+        Log_error("Display color bar does not work due to epdSetPower() NG.\n");
     }
 }
 //
@@ -957,9 +928,7 @@ unsigned char epdSetPower(void)
     epdRead(EPD_CMD_TSC, &readTscBuf[0], sizeof(readTscBuf));
     epdCheckBusyHigh();
     epdSetCs(0, GPIO_HIGH);
-#if SHOW_LOG
-    printf("TSC Data = 0x%02X, 0x%02X \r\n", readTscBuf[0], readTscBuf[1]);
-#endif
+    Log_info("TSC Data = 0x%02X, 0x%02X \r\n", readTscBuf[0], readTscBuf[1]);
 
     // PON without the external power
     epdSetCs(0, GPIO_LOW);
@@ -971,9 +940,7 @@ unsigned char epdSetPower(void)
     epdSetCs(0, GPIO_LOW);
     epdRead(0x9B, &readPwrBuf[0], 4);
     epdSetCs(0, GPIO_HIGH);
-#if SHOW_LOG
-    printf("PWR Data = 0x%02X, 0x%02X 0x%02X, 0x%02X \r\n", readPwrBuf[0], readPwrBuf[1], readPwrBuf[2], readPwrBuf[3]);
-#endif
+    Log_info("PWR Data = 0x%02X, 0x%02X 0x%02X, 0x%02X \r\n", readPwrBuf[0], readPwrBuf[1], readPwrBuf[2], readPwrBuf[3]);
 
     // POF
     epdSetCs(0, GPIO_LOW);
@@ -988,10 +955,8 @@ unsigned char epdSetPower(void)
 
     if (readPwrBuf[4] == 0x00)
     {
-#if SHOW_LOG
-        printf("VCOM Data = 0x%02X \r\n", readPwrBuf[4]);
-        printf("Data NG! \r\n");
-#endif
+        Log_info("VCOM Data = 0x%02X \r\n", readPwrBuf[4]);
+        Log_error("Data NG! \r\n");
         vcomStatus = ERROR;
     }
     else
@@ -1001,10 +966,8 @@ unsigned char epdSetPower(void)
             if (readPwrBuf[i] > 120)
             {
                 vcomStatus = ERROR;
-#if SHOW_LOG
-                printf("PWM Data [%d] = 0x%02X \r\n", i, readPwrBuf[4]);
-                printf("Data NG! \r\n");
-#endif
+                Log_info("PWM Data [%d] = 0x%02X \r\n", i, readPwrBuf[4]);
+                Log_error("Data NG! \r\n");
             }
         }
 
@@ -1012,9 +975,7 @@ unsigned char epdSetPower(void)
         {
             readPwrBuf[4] = readPwrBuf[4] - 128;
             epdSetPwrToPmic(readPwrBuf);
-#if SHOW_LOG
-            printf("PWM data and VCOM data are both in range! \r\n");
-#endif
+            Log_info("PWM data and VCOM data are both in range! \r\n");
         }
     }
 

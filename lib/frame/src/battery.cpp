@@ -1,3 +1,4 @@
+#include <trmnl_log.h>
 #include "battery.h"
 //#include "globals.h"
 #include "pindefine.h"
@@ -71,10 +72,10 @@ BatteryStatus batteryRead()
 void batteryLog(const BatteryStatus& s)
 {
     if (!s.valid) {
-        Serial.println("[BAT] gauge read failed (no battery or I2C error)");
+        Log_error("[BAT] gauge read failed (no battery or I2C error)");
         return;
     }
-    Serial.printf("[BAT] %u mV  %u%%  %+d mA  %s  %s\n",
+    Log_info("[BAT] %u mV  %u%%  %+d mA  %s  %s\n",
                   s.voltage_mV,
                   s.soc_pct,
                   s.current_mA,

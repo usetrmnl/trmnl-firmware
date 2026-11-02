@@ -75,63 +75,49 @@ unsigned char setPmic(void)
     buf[0] = 0x01;            // register
     buf[1] = initPmicData[0]; // value1
     buf[2] = initPmicData[1]; // value2
-#if SHOW_LOG
-    printf("1. 0x%02X, 2. 0x%02X, 3. 0x%02X \r\n", buf[0], buf[1], buf[2]);
-#endif
+    Log_info("1. 0x%02X, 2. 0x%02X, 3. 0x%02X \r\n", buf[0], buf[1], buf[2]);
     status = sendPmicData(buf, 3);
 
     //-----setting VPOS2
     buf[0] = 0x05;            // register
     buf[1] = initPmicData[4]; // value1
     buf[2] = initPmicData[5]; // value2
-#if SHOW_LOG
-    printf("1. 0x%02X, 2. 0x%02X, 3. 0x%02X \r\n", buf[0], buf[1], buf[2]);
-#endif
+    Log_info("1. 0x%02X, 2. 0x%02X, 3. 0x%02X \r\n", buf[0], buf[1], buf[2]);
     status = sendPmicData(buf, 3);
 
     //-----setting VPOS3
     buf[0] = 0x09;            // register
     buf[1] = initPmicData[8]; // value1
     buf[2] = initPmicData[9]; // value2
-#if SHOW_LOG
-    printf("1. 0x%02X, 2. 0x%02X, 3. 0x%02X \r\n", buf[0], buf[1], buf[2]);
-#endif
+    Log_info("1. 0x%02X, 2. 0x%02X, 3. 0x%02X \r\n", buf[0], buf[1], buf[2]);
     status = sendPmicData(buf, 3);
 
     //-----setting VNEG1
     buf[0] = 0x03;            // register
     buf[1] = initPmicData[2]; // value1
     buf[2] = initPmicData[3]; // value2
-#if SHOW_LOG
-    printf("1. 0x%02X, 2. 0x%02X, 3. 0x%02X \r\n", buf[0], buf[1], buf[2]);
-#endif
+    Log_info("1. 0x%02X, 2. 0x%02X, 3. 0x%02X \r\n", buf[0], buf[1], buf[2]);
     status = sendPmicData(buf, 3);
 
     //-----setting VNEG2
     buf[0] = 0x07;            // register
     buf[1] = initPmicData[6]; // value1
     buf[2] = initPmicData[7]; // value2
-#if SHOW_LOG
-    printf("1. 0x%02X, 2. 0x%02X, 3. 0x%02X \r\n", buf[0], buf[1], buf[2]);
-#endif
+    Log_info("1. 0x%02X, 2. 0x%02X, 3. 0x%02X \r\n", buf[0], buf[1], buf[2]);
     status = sendPmicData(buf, 3);
 
     //-----setting VNEG3
     buf[0] = 0x0B;             // register
     buf[1] = initPmicData[10]; // value1
     buf[2] = initPmicData[11]; // value2
-#if SHOW_LOG
-    printf("1. 0x%02X, 2. 0x%02X, 3. 0x%02X \r\n", buf[0], buf[1], buf[2]);
-#endif
+    Log_info("1. 0x%02X, 2. 0x%02X, 3. 0x%02X \r\n", buf[0], buf[1], buf[2]);
     status = sendPmicData(buf, 3);
 
     //-----setting DC VCOM
     buf[0] = 0x0D;             // register
     buf[1] = initPmicData[12]; // value1
     buf[2] = initPmicData[13]; // value2
-#if SHOW_LOG
-    printf("1. 0x%02X, 2. 0x%02X, 3. 0x%02X \r\n", buf[0], buf[1], buf[2]);
-#endif
+    Log_info("1. 0x%02X, 2. 0x%02X, 3. 0x%02X \r\n", buf[0], buf[1], buf[2]);
     status = sendPmicData(buf, 3);
 
     // 0x0F, 0x10, 0x11, 0x12   ΤU AVCOMH  VCOML b31.5 Τ   A ۷   AC VCOM
@@ -139,67 +125,51 @@ unsigned char setPmic(void)
     //-----setting Delay Time 1
     buf[0] = 0x13;             // register
     buf[1] = initPmicData[18]; // value
-#if SHOW_LOG
-    printf("1. 0x%02X, 2. 0x%02X \r\n", buf[0], buf[1]);
-#endif
+    Log_info("1. 0x%02X, 2. 0x%02X \r\n", buf[0], buf[1]);
     status = sendPmicData(buf, 2);
 
     //-----setting Delay Time 2
     buf[0] = 0x14;             // register
     buf[1] = initPmicData[19]; // value
-#if SHOW_LOG
-    printf("1. 0x%02X, 2. 0x%02X \r\n", buf[0], buf[1]);
-#endif
+    Log_info("1. 0x%02X, 2. 0x%02X \r\n", buf[0], buf[1]);
     status = sendPmicData(buf, 2);
 
     //-----setting VDDH_EXT delay time
     buf[0] = 0x15;             // register
     buf[1] = initPmicData[20]; // value
-#if SHOW_LOG
-    printf("1. 0x%02X, 2. 0x%02X \r\n", buf[0], buf[1]);
-#endif
+    Log_info("1. 0x%02X, 2. 0x%02X \r\n", buf[0], buf[1]);
     status = sendPmicData(buf, 2);
 
     //-----setting VGH1
     buf[0] = 0x16;             // register
     buf[1] = initPmicData[21]; // value1
     buf[2] = initPmicData[22]; // value2
-#if SHOW_LOG
-    printf("1. 0x%02X, 2. 0x%02X, 3. 0x%02X \r\n", buf[0], buf[1], buf[2]);
-#endif
+    Log_info("1. 0x%02X, 2. 0x%02X, 3. 0x%02X \r\n", buf[0], buf[1], buf[2]);
     status = sendPmicData(buf, 3);
 
     //-----setting VGH2
     buf[0] = 0x18;             // register
     buf[1] = initPmicData[23]; // value
     buf[2] = initPmicData[24]; // value
-#if SHOW_LOG
-    printf("1. 0x%02X, 2. 0x%02X, 3. 0x%02X \r\n", buf[0], buf[1], buf[2]);
-#endif
+    Log_info("1. 0x%02X, 2. 0x%02X, 3. 0x%02X \r\n", buf[0], buf[1], buf[2]);
     status = sendPmicData(buf, 3);
 
     //-----setting 0x1A (VPDD)
     buf[0] = 0x1A;             // register
     buf[1] = initPmicData[25]; // value
-#if SHOW_LOG
-    printf("1. 0x%02X, 2. 0x%02X \r\n", buf[0], buf[1]);
-#endif
+    Log_info("1. 0x%02X, 2. 0x%02X \r\n", buf[0], buf[1]);
     status = sendPmicData(buf, 2);
 
     //-----setting 0x1B
     buf[0] = 0x1B;             // register
     buf[1] = initPmicData[26]; // value
-#if SHOW_LOG
-    printf("1. 0x%02X, 2. 0x%02X \r\n", buf[0], buf[1]);
-#endif
+    Log_info("1. 0x%02X, 2. 0x%02X \r\n", buf[0], buf[1]);
     status = sendPmicData(buf, 2);
 
     //-----setting 0x1C
     buf[0] = 0x1C;             // register
     buf[1] = initPmicData[27]; // value
-#if SHOW_LOG
-    printf("1. 0x%02X, 2. 0x%02X \r\n", buf[0], buf[1]);
-#endif
+    Log_info("1. 0x%02X, 2. 0x%02X \r\n", buf[0], buf[1]);
     status = sendPmicData(buf, 2);
 
     return status;
@@ -211,16 +181,12 @@ unsigned char sendPmicData(unsigned char *dataBuffer, unsigned int dataLength)
     if (i2cTransmitData(PMIC_ADDR, dataBuffer, dataLength))
     {
         status = DONE;
-#if SHOW_LOG
-        printf("Complete I2C data sending. \r\n");
-#endif
+        Log_info("Complete I2C data sending. \r\n");
     }
     else
     {
         status = ERROR;
-#if SHOW_LOG
-        printf("Error sending I2C data. \r\n");
-#endif
+        Log_error("Error sending I2C data. \r\n");
     }
     return status;
 }
@@ -230,15 +196,11 @@ void recievePmicData(unsigned char *dataBuffer, unsigned int dataLength)
     unsigned char status;
     if (i2cReceiveData(PMIC_ADDR, dataBuffer, dataLength))
     {
-#if SHOW_LOG
-        printf("Complete I2C data receiving. \r\n");
-#endif
+        Log_info("Complete I2C data receiving. \r\n");
     }
     else
     {
-#if SHOW_LOG
-        printf("Error receiving I2C data. \r\n");
-#endif
+        Log_error("Error receiving I2C data. \r\n");
     }
     // Not used in current implementation
 }
@@ -255,12 +217,12 @@ unsigned char readPmicRegister(unsigned char registerAddress, unsigned char *dat
     // Then, read the data from that register
     if (i2cReceiveData(PMIC_ADDR, dataBuffer, dataLength))
     {
-        printf("Successfully read %d bytes from PMIC register 0x%02X\n", dataLength, registerAddress);
+        Log_info("Successfully read %d bytes from PMIC register 0x%02X\n", dataLength, registerAddress);
         return DONE;
     }
     else
     {
-        printf("Error: Failed to read from PMIC register 0x%02X\n", registerAddress);
+        Log_error("Error: Failed to read from PMIC register 0x%02X\n", registerAddress);
         return ERROR;
     }
 }
@@ -275,15 +237,15 @@ unsigned char enablePmic(void)
         powerSwitchEnable(); // we use other pins on OUR green-black devkit
         // delay(1000);       // test
         digitalWrite(PMIC_EN, 1); // Enable IST 9201
-        printf("Setting PMIC_EN to HIGH...\r\n");
+        Log_info("Setting PMIC_EN to HIGH...\r\n");
         // Read PMIC_PG for 1 second no matter its value, then check it
-        printf("Waiting for PMIC_PG to go HIGH...\n");
+        Log_info("Waiting for PMIC_PG to go HIGH...\n");
         int elapsed = 0;
         while (elapsed < 1000)
         {
             delay(100);
             elapsed += 100;
-            printf("PMIC_PG pin state: %d (%d ms)\n", digitalRead(PMIC_PG), elapsed);
+            Log_info("PMIC_PG pin state: %d (%d ms)\n", digitalRead(PMIC_PG), elapsed);
         }
         ////////// debug only
         // unsigned char reg_data_0x1D = 0;
@@ -305,7 +267,7 @@ unsigned char enablePmic(void)
         if (!digitalRead(PMIC_PG))
         {
             // Not high yet - allow up to 4 more seconds before giving up
-            printf("PMIC_PG not HIGH after 1s, waiting up to 4 more seconds...\n");
+            Log_info("PMIC_PG not HIGH after 1s, waiting up to 4 more seconds...\n");
             elapsed = 0;
             while (!digitalRead(PMIC_PG) && elapsed < 4000)
             {
@@ -314,25 +276,21 @@ unsigned char enablePmic(void)
             }
             if (!digitalRead(PMIC_PG))
             {
-                printf("WARNING: PMIC_PG timeout! Proceeding anyway.\n");
-                printf("PMIC_PG pin state: %d (should be 1)\n", digitalRead(PMIC_PG));
+                Log_error("WARNING: PMIC_PG timeout! Proceeding anyway.\n");
+                Log_error("PMIC_PG pin state: %d (should be 1)\n", digitalRead(PMIC_PG));
             }
         }
 
         if (digitalRead(PMIC_PG))
         {
-            printf("PMIC_PG is HIGH - Power good!\n");
+            Log_info("PMIC_PG is HIGH - Power good!\n");
         }
-#if SHOW_LOG
-        printf("enablePmic() done. \r\n");
-#endif
+        Log_info("enablePmic() done. \r\n");
         return digitalRead(PMIC_PG) ? DONE : ERROR;
     }
     else
     {
-#if SHOW_LOG
-        printf("enablePmic() error. \r\n");
-#endif
+        Log_error("enablePmic() error. \r\n");
         return ERROR;
     }
 }
@@ -347,17 +305,17 @@ void disablePmic(void)
 void powerSwitchEnable(void) // temporary modified in our test PCB setup
 {
     setGpioLevel_EXPANDER_2(EXP2_EN_DC19, GPIO_HIGH);
-    printf("EN DC19\n");
+    Log_info("EN DC19\n");
     delay(100);
     setGpioLevel(EXP1_VDDN_EN, GPIO_HIGH); // -19v
-    printf("-19\n");
+    Log_info("-19\n");
     delay(50);
     setGpioLevel(EXP1_VDDP_EN, GPIO_HIGH); // +19v
-    printf("+19\n");
+    Log_info("+19\n");
     delay(50);
     // setGpioLevel_EXPANDER_2(EXP2_EN_DC19, GPIO_HIGH); // -3.5v from black fix temporary
     setGpioLevel_EXPANDER_2(EXP2_EN_NEGATIVE_3_5V, GPIO_HIGH); // -3.5v our DC-DC EN
-    printf("-3.5\n");
+    Log_info("-3.5\n");
     delay(50);
     // setGpioLevel(EXP1_VNCP_EN, GPIO_HIGH);
     // printf("-3.5\n");
@@ -373,9 +331,7 @@ void powerSwitchEnable(void) // temporary modified in our test PCB setup
     // delay(1000); // Wait for VDDP to be ready.
     // setGpioLevel(EXP1_VNCP_EN, GPIO_HIGH);
     // printf("-3.5\n");
-#if SHOW_LOG
-    printf("Power Switch Enable \r\n");
-#endif
+    Log_info("Power Switch Enable \r\n");
 }
 
 void powerSwitchDisable(void)
@@ -385,19 +341,17 @@ void powerSwitchDisable(void)
                    //========================================================
     // setGpioLevel(EXP1_VNCP_EN, GPIO_LOW);
     setGpioLevel_EXPANDER_2(EXP2_EN_NEGATIVE_3_5V, GPIO_LOW);
-    printf("-3.5\n");
+    Log_info("-3.5\n");
     //====== Please use delay() to wait for VNCP to be 0V ======
     delay(5000); // Please confirm the discharge time of VNCP power supply.
                    //========================================================
     setGpioLevel_EXPANDER_2(EXP2_EN_DC19, GPIO_LOW);
-    printf("DC-DC 19\n");
+    Log_info("DC-DC 19\n");
     // delay(5000);
     // setGpioLevel(EXP1_VDDP_EN, GPIO_LOW);
     // setGpioLevel(EXP1_VDDN_EN, GPIO_LOW);
 
-#if SHOW_LOG
-    printf("Power Switch Disable \r\n");
-#endif
+    Log_info("Power Switch Disable \r\n");
 }
 
 unsigned int voltageToRegisterData(unsigned int voltageData, unsigned char setSelect)
@@ -419,9 +373,7 @@ unsigned int voltageToRegisterData(unsigned int voltageData, unsigned char setSe
         break;
     }
 
-#if SHOW_LOG
-    printf(" Register Data = %3d \r\n", registerBuf);
-#endif
+    Log_info(" Register Data = %3d \r\n", registerBuf);
 
     return registerBuf;
 }
