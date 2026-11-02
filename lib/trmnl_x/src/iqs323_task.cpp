@@ -615,6 +615,9 @@ static bool iqs323_do_init(bool use_wake_stub)
         iqs323.SW_Reset(true);  // STOP
         vTaskDelay(pdMS_TO_TICKS(100));
 
+        // A reinit comes straight from the run loop's health checks, with this still set from that read
+        iqs323.new_data_available = false;
+
         // Run initialization state machine with timeout
         uint32_t start_time = millis();
         uint32_t timeout = task_config.init_timeout_ms;
@@ -637,6 +640,11 @@ static bool iqs323_do_init(bool use_wake_stub)
 
         if (!success && (millis() - start_time) >= timeout) {
             Log_info_serial("IQS323 Task: Initialization timeout");
+        }
+
+        // Init ends in event mode; a reinit mid-streaming has to go back
+        if (success && fast_poll_requested) {
+            iqs323.clearEventMode(STOP);
         }
     }
 
