@@ -8,7 +8,7 @@ struct ParsedModemNetwork {
   int32_t rssi;
   bool open;        // ecn == 0 (unencrypted)
   bool is5GHz;      // channel >= 36
-  bool enterprise;  // ecn == 5 (WPA2-Enterprise)
+  bool enterprise;  // WPA2/WPA3 Enterprise, including transition mode
 };
 
 // Parse a raw `AT+CWLAP` response into deduplicated networks.
