@@ -2661,6 +2661,14 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     if (message_type == WIFI_CONNECT)
     {
         Log_info("Display set to white");
+#ifdef BOARD_TRMNL_FRAME
+        if (!bbep.getBuffer()) {
+            Log_info("Local framebuffer needs to be allocated");
+            if (bbep.allocBuffer() != BBEP_SUCCESS) {
+                Log_error("bbep.allocBuffer() failed!");
+            }
+        }
+#endif // Frame
         bbep.fillScreen(BBEP_WHITE);
 #ifdef BB_EPAPER
         if (!display_update_epaper(apiDisplayResult.response.maximum_compatibility ? REFRESH_FULL : REFRESH_FAST, true, true, PLANE_0)) {
