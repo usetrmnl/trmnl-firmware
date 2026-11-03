@@ -4,9 +4,10 @@
 #include <esp_sleep.h>
 
 // What the TRMNL X touch bar does on a wake - the app-level side effects built on top of
-// touchbar_gesture.h: left and right taps browse the cached images (cached_images.h), a middle tap
-// opens the menu (menu.h) with the touch bar's control scheme. Until the user finishes the touch bar
-// tutorial, any touch shows it instead.
+// touchbar_gesture.h: left and right taps ask /api/display for the previous or next screen (shown from
+// the cache when it's there), a middle tap opens the menu (menu.h) with the touch bar's control scheme.
+// Closing the menu keeps the device awake until 20 s pass without a touch, for the next tap.
+// Until the user finishes the touch bar tutorial, any touch shows it instead.
 
 // Logs the touch bar status the wake stub read before the app started. Called once per wake.
 void touchbar_log_wake_stub_status(void);
@@ -15,8 +16,15 @@ void touchbar_log_wake_stub_status(void);
 // device if the task fails to start.
 void touchbar_start(esp_sleep_wakeup_cause_t wakeup_reason, bool gpio_wakeup);
 
-// Resolves the current navigation intent and dispatches it. Called once per wake.
+// Resolves the current navigation intent and dispatches it. Called once per wake. If that closes the
+// menu, waits for a tap to dispatch instead, and sleeps (does not return) if none comes.
 void process_iqs323_data(void);
+
+// After a touch, stays awake until 20 s pass without a touch
+void touchbar_stay_awake(void (*show_screen)(void));
+
+// Whether a touch's arrow indicator is waiting to redraw
+bool touchbar_has_pending_indicator(void);
 
 // Redraws the touchbar indicator if a full-screen refresh would have erased it.
 void touchbar_redraw_pending_indicator(void);

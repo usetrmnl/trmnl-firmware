@@ -76,6 +76,13 @@ uint8_t *storedLogoOrDefault(int iType) {
 #endif
 }
 
+#ifdef BOARD_TRMNL_X
+void showTouchbarLoading(void) {
+  display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false, true);
+  touchbar_redraw_pending_indicator();
+}
+#endif // BOARD_TRMNL_X
+
 void showWakeLogo(void) {
   Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
 

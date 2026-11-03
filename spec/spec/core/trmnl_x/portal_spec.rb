@@ -65,6 +65,7 @@ RSpec.describe "TRMNL X", env: "TRMNL_X" do
           s.wait_for_console(/Entering shipment mode light sleep loop/, timeout: 30)
           s.dock(true)
           s.wait(portal: true, timeout: 90)
+          s.portal_enable_verbose_logging
           s.dock(false)
           c = s.status["console_total"]
           s.portal_request("/scan?force=1")
@@ -147,6 +148,7 @@ RSpec.describe "TRMNL X", env: "TRMNL_X" do
       s.wait_for_console(/Entering shipment mode light sleep loop/, timeout: 180)
       s.dock(true)
       s.wait(portal: true, timeout: 180)
+      s.portal_enable_verbose_logging
       s.dock(false)
       s.set_networks([{ ssid: TrmnlX::SSID_24, password: "password", rssi: -54, channel: 6 },
                       { ssid: TrmnlX::SSID_5, password: "password", rssi: -48, channel: 36 }])

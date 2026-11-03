@@ -4,19 +4,31 @@
 
 #include <config.h>
 #include <display.h>
+#include <globals.h>
+#include <status_screens.h>
 #include <touchbar_indicator.h>
 #include <trmnl_log.h>
 
 #include "IQS323.h"
-#include "cached_images.h"
+#include "displayed_image.h"
 #include "iqs323_task.h"
 #include "menu.h"
 #include "rtc_wake_stub_trmnl_x.h"
+#include "sleep_session.h"
 #include "touchbar_gesture.h"
 
 // Touchbar indicator to redraw after a full-refresh (e.g. logo screen)
 static touchbar_side_t pending_indicator_side = TOUCHBAR_LEFT;
 static bool has_pending_indicator = false;
+static bool staying_awake = false;
+
+// Draws the touch arrow indicator now, then queues up an arrow redraw after the loading logo (if needed)
+static void show_touchbar_indicator(touchbar_side_t side) {
+  display_draw_touchbar_indicator(side);
+  DisplayedImage::cover();
+  pending_indicator_side = side;
+  has_pending_indicator = true;
+}
 
 // The touch bar's control scheme for the menu (menu.h): left is up, right is down, the middle selects
 
@@ -92,35 +104,40 @@ static const menu_tutorial_t touchbar_ship_check = {
 };
 
 #define TOUCHBAR_SHIP_CHECK_HOLD_MS 2000
+#define TOUCHBAR_STAY_AWAKE_MS      20000
 
-// Single dispatch point for the resolved navigation intent.
-static void dispatch_touchbar_intent(const touchbar_resolution_t &resolved) {
+// Single dispatch point for the resolved navigation intent. Returns false if the screen needs no
+// fetching: the menu closed, with the current image back up.
+static bool dispatch_touchbar_intent(const touchbar_resolution_t &resolved) {
   if (resolved.intent != touchbar_intent_t::NONE && !menu_tutorial_done(touchbar_menu_controls)) {
     Log_info("Touch bar used before its tutorial - showing it");
     menu_open_tutorial(touchbar_menu_controls);
-    return;
+    return true;
   }
+  if (resolved.intent != touchbar_intent_t::NONE) stay_awake_for_touchbar = true;
+  has_pending_indicator = false;
   switch (resolved.intent) {
   case touchbar_intent_t::BACK:
-    display_draw_touchbar_indicator(TOUCHBAR_LEFT);
+    // The API request asks the server for the previous screen
+    show_touchbar_indicator(TOUCHBAR_LEFT);
     Log_info(resolved.held ? "Back button hold" : "Back button tapped");
-    show_cached_image_by_offset(-1);
+    special_function = SF_REWIND;
+    special_function_chosen = true;
     break;
   case touchbar_intent_t::NEXT:
-    display_draw_touchbar_indicator(TOUCHBAR_RIGHT);
+    // The API request gets the next screen
+    show_touchbar_indicator(TOUCHBAR_RIGHT);
     Log_info(resolved.held ? "Next button hold" : "Next button tapped");
-    show_cached_image_by_offset(+1);
     break;
   case touchbar_intent_t::MIDDLE:
     if (!resolved.held) {
       Log_info("Middle button tapped - opening the menu");
-      menu_open(touchbar_menu_controls);
+      if (!menu_open(touchbar_menu_controls)) return false;
+      if (staying_awake) showWakeLogo(); // over the menu
       break;
     }
-    display_draw_touchbar_indicator(TOUCHBAR_MIDDLE);
+    show_touchbar_indicator(TOUCHBAR_MIDDLE);
     Log_info("Middle button hold");
-    pending_indicator_side = TOUCHBAR_MIDDLE;
-    has_pending_indicator = true;
     // TODO: CH1 hold was previously reserved for an OTG toggle feature -
     // not implemented yet. See otg_state/otg_turn_on()/otg_turn_off().
     break;
@@ -128,9 +145,83 @@ static void dispatch_touchbar_intent(const touchbar_resolution_t &resolved) {
   default:
     break;
   }
+  return true;
 }
 
-void process_iqs323_data(void) { dispatch_touchbar_intent(touchbar_resolve_intent()); }
+// The intent of the first touch started since the last call, as a tap
+static touchbar_intent_t take_tap_intent(void) {
+  uint8_t starts = iqs323_task_take_touch_starts();
+  if (starts & (1 << 0)) return touchbar_intent_t::BACK;
+  if (starts & (1 << 2)) return touchbar_intent_t::NEXT;
+  if (starts & (1 << 1)) return touchbar_intent_t::MIDDLE;
+  return touchbar_intent_t::NONE;
+}
+
+static bool refresh_is_due(uint32_t screen_shown_ms, uint32_t refresh_s) {
+  return refresh_s > 0 && (millis() - screen_shown_ms) / 1000 >= refresh_s;
+}
+
+// The next tap, or NONE once TOUCHBAR_STAY_AWAKE_MS pass without a touch or a refresh of refresh_s (0: none)
+// comes due. Touches from before the call don't count. For streaming mode.
+static touchbar_intent_t wait_for_tap(uint32_t screen_shown_ms, uint32_t refresh_s) {
+  iqs323_task_take_touch_starts();
+  touchbar_intent_t intent = touchbar_intent_t::NONE;
+  uint32_t last_touch_ms = millis();
+  while (intent == touchbar_intent_t::NONE && millis() - last_touch_ms < TOUCHBAR_STAY_AWAKE_MS &&
+         !refresh_is_due(screen_shown_ms, refresh_s)) {
+    delay(20);
+    touchbar_snapshot_t snap;
+    iqs323_task_read_snapshot(&snap);
+    if (snap.ch0_touch || snap.ch1_touch || snap.ch2_touch) last_touch_ms = millis(); // a hold counts too
+    intent = take_tap_intent();
+  }
+  if (millis() - last_touch_ms >= TOUCHBAR_STAY_AWAKE_MS) {
+    Log_info("No touches for %d s", TOUCHBAR_STAY_AWAKE_MS / 1000);
+  }
+  return intent;
+}
+
+void process_iqs323_data(void) {
+  touchbar_resolution_t resolved = touchbar_resolve_intent();
+  // The menu closed before the wake went online: a tap from here goes on with the wake like the
+  // one that woke the device
+  while (!dispatch_touchbar_intent(resolved)) {
+    Log_info("Menu closed - staying awake %d s for a touch bar tap", TOUCHBAR_STAY_AWAKE_MS / 1000);
+    iqs323_task_set_streaming_mode(true);
+    resolved = {wait_for_tap(0, 0), false};
+    iqs323_task_set_streaming_mode(false);
+    if (resolved.intent == touchbar_intent_t::NONE) goToSleep();
+  }
+}
+
+void touchbar_stay_awake(void (*show_screen)(void)) {
+  if (!stay_awake_for_touchbar) return;
+  Log_info("Staying awake %d s for more touch bar taps", TOUCHBAR_STAY_AWAKE_MS / 1000);
+  staying_awake = true;
+  iqs323_task_set_streaming_mode(true);
+  uint32_t screen_shown_ms = millis();
+  // A short refresh (e.g. the server's "Catching you up" screen) comes due while still awake
+  uint32_t refresh_s = refreshInterval.seconds();
+  while (true) {
+    touchbar_intent_t intent = wait_for_tap(screen_shown_ms, refresh_s);
+    if (intent == touchbar_intent_t::NONE && !refresh_is_due(screen_shown_ms, refresh_s)) break;
+    special_function = SF_NONE;
+    special_function_chosen = false;
+    if (intent != touchbar_intent_t::NONE) {
+      bool fetch_screen = dispatch_touchbar_intent({intent, false});
+      iqs323_task_set_streaming_mode(true); // the menu turns it off when it closes
+      if (!fetch_screen) continue;
+    } else {
+      Log_info("Refresh of %u s due while awake - fetching the screen", (unsigned)refresh_s);
+      has_pending_indicator = false; // no known tap location, so skip the indicator arrow
+    }
+    show_screen();
+    screen_shown_ms = millis();
+    refresh_s = refreshInterval.seconds();
+  }
+  staying_awake = false;
+  iqs323_task_set_streaming_mode(false);
+}
 
 bool touchbar_poll_ship_check(void) {
   static TouchbarHoldTracker middle_hold(1 << 1, TOUCHBAR_SHIP_CHECK_HOLD_MS);
@@ -142,6 +233,8 @@ bool touchbar_poll_ship_check(void) {
   Log_info("Ship check: timeout - back to the setup portal");
   return true;
 }
+
+bool touchbar_has_pending_indicator(void) { return has_pending_indicator; }
 
 void touchbar_redraw_pending_indicator(void) {
   if (has_pending_indicator) {

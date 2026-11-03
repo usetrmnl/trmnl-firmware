@@ -646,7 +646,7 @@ static menu_outcome_t run_menu_screens(SPECIAL_FUNCTION *function) {
   }
 }
 
-void menu_open(const menu_controls_t &controls) {
+bool menu_open(const menu_controls_t &controls) {
   Log_info("Opening menu");
   SPECIAL_FUNCTION function = SF_NONE;
   menu_controls = &controls;
@@ -664,7 +664,9 @@ void menu_open(const menu_controls_t &controls) {
     // The rest of the wake fetches the next screen
     break;
   case MENU_OUTCOME_PREVIOUS_SCREEN:
-    show_cached_image_by_offset(-1);
+    // The rest of the wake asks the server for the previous screen
+    special_function = SF_REWIND;
+    special_function_chosen = true;
     break;
   case MENU_OUTCOME_SPECIAL_FUNCTION:
     // The API request names this function, so the server runs it rather than the saved one
@@ -680,10 +682,10 @@ void menu_open(const menu_controls_t &controls) {
     menu_shut_down();
     break;
   case MENU_OUTCOME_CLOSE:
-    // Re-show the current image and go back to sleep
-    show_last_image_and_sleep();
-    break;
+    show_last_image();
+    return false;
   }
+  return true;
 }
 
 bool menu_tutorial_done(const menu_controls_t &controls) {

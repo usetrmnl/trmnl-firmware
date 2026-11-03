@@ -71,9 +71,10 @@ struct menu_controls_t {
 };
 
 // Opens the menu with `controls` and does what is chosen. Next Screen and the special functions
-// return, for the wake to go on and fetch the next screen (with the special function, if chosen);
-// everything else sleeps or restarts and does not return.
-void menu_open(const menu_controls_t &controls);
+// return true, for the wake to go on and fetch the next screen (with the special function, if
+// chosen). Closing it, or a timeout, shows the current image again and returns false. Everything
+// else restarts and does not return.
+bool menu_open(const menu_controls_t &controls);
 
 // Whether the user finished the tutorial of `controls` (true without one)
 bool menu_tutorial_done(const menu_controls_t &controls);
