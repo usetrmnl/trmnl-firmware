@@ -664,7 +664,9 @@ void menu_open(const menu_controls_t &controls) {
     // The rest of the wake fetches the next screen
     break;
   case MENU_OUTCOME_PREVIOUS_SCREEN:
-    show_cached_image_by_offset(-1);
+    // The rest of the wake asks the server for the previous screen
+    special_function = SF_REWIND;
+    special_function_chosen = true;
     break;
   case MENU_OUTCOME_SPECIAL_FUNCTION:
     // The API request names this function, so the server runs it rather than the saved one

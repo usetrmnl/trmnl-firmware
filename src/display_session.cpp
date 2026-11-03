@@ -19,6 +19,7 @@
 #include <refresh_interval.h>
 #include <services/http_retry_request.h>
 #include <special_function.h>
+#include <status_screens.h>
 #include <trmnl_log.h>
 #include <types.h>
 #include <wifi_network.h>
@@ -26,6 +27,8 @@
 #include "displayed_image.h"
 
 #ifdef BOARD_TRMNL_X
+#include <touchbar_actions.h>
+
 #include "touchbar_gesture.h"
 #endif
 
@@ -352,6 +355,20 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse) {
             }
             showMessageWithLogo(MSG_FORMAT_ERROR);
           }
+        } else if (action.equals("guest_mode") && apiResponse.image_url.length() > 0) {
+          // Server returned previous screen, or a guest-mode screen; attempt to display from cache
+          Log_info("Rewind: server sent the previous screen %s", apiResponse.filename.c_str());
+          apiResponse.image_url.toCharArray(filename, apiResponse.image_url.length() + 1);
+          new_filename = apiResponse.filename;
+          if (filesystem_fixed_file_exists(new_filename)) {
+            status = false;
+            bUsedCachedImage = true;
+            result = HTTPS_SUCCESS;
+          } else {
+            status = true;
+            bUsedCachedImage = false;
+          }
+          refreshInterval.applyServerRate(apiResponse.refresh_rate);
         } else {
           Log.error("%s [%d]: rewind failed\r\n", __FILE__, __LINE__);
         }
@@ -477,7 +494,7 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
 
   https_request_err_e result = handleApiDisplayResponse(apiDisplayResult.response);
   if (apiDisplayResult.response.filename == "screen_wiper.png") {
-      // Guard against re-fetching forever if the wiper is the only playlist item
+    // Guard against re-fetching forever if the wiper is the only playlist item
     static bool wiped_this_wake = false;
     if (wiped_this_wake) {
       Log_info("Screen wiper returned again; not wiping twice in one wake");
@@ -486,8 +503,8 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
     wiped_this_wake = true;
     Log_info("Detected screen wiper filename: %s, clearing display...", apiDisplayResult.response.filename.c_str());
     display_wipe();
-      // Wiping leaves the screen blank; fetch and show the next playlist item
-      // right away instead of waiting for the next scheduled refresh.
+    // Wiping leaves the screen blank; fetch and show the next playlist item
+    // right away instead of waiting for the next scheduled refresh.
     Log_info("Screen wipe complete, fetching next playlist item");
     return downloadAndShow(batteryVoltage);
   }
@@ -496,14 +513,14 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
     char szTemp[36];
     filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
     if (DisplayedImage::matches(szTemp)) {
-        // We just displayed the same image, don't refresh the display
+      // We just displayed the same image, don't refresh the display
       Log.info("%s [%d]: The image hasn't changed since the last wakeup, don't refresh the display.\r\n", __FILE__,
                __LINE__);
       buffer = nullptr;
       return result;
     }
     if (!filesystem_file_exists(szTemp)) {
-        // BMPs aren't cached under their filename (e.g. after a sleep special function); redraw /current.bmp
+      // BMPs aren't cached under their filename (e.g. after a sleep special function); redraw /current.bmp
       buffer = nullptr;
       size_t current_size = 0;
       if (filesystem_file_exists("/current.bmp")) {
@@ -556,6 +573,10 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
   // that and the fetch below would report it as an API failure over the friendly ID screen.
   if (filename[0] == '\0') return result;
 
+#ifdef BOARD_TRMNL_X
+  if (touchbar_has_pending_indicator()) showTouchbarLoading(); // the tapped screen isn't cached
+#endif
+
   HttpRetryRequestConfig imageConfig;
   imageConfig.url = filename;
   imageConfig.apiBaseUrl = apiDisplayInputs.baseUrl; // ID / Access-Token only go to the API server
@@ -588,8 +609,12 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
 
   submitStoredLogs();
 
-  WiFi.disconnect(true); // no need for WiFi, save power starting here
-  Log.info("%s [%d]: Received successfully; WiFi off.\r\n", __FILE__, __LINE__);
+  if (stay_awake_for_touchbar) {
+    Log.info("Received successfully; staying awake for touch bar taps");
+  } else {
+    WiFi.disconnect(true); // no need for WiFi, save power starting here
+    Log.info("%s [%d]: Received successfully; WiFi off.\r\n", __FILE__, __LINE__);
+  }
 
   bool image_reverse = false;
   if (isPNG)
