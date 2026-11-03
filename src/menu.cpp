@@ -646,7 +646,7 @@ static menu_outcome_t run_menu_screens(SPECIAL_FUNCTION *function) {
   }
 }
 
-void menu_open(const menu_controls_t &controls) {
+bool menu_open(const menu_controls_t &controls) {
   Log_info("Opening menu");
   SPECIAL_FUNCTION function = SF_NONE;
   menu_controls = &controls;
@@ -682,10 +682,10 @@ void menu_open(const menu_controls_t &controls) {
     menu_shut_down();
     break;
   case MENU_OUTCOME_CLOSE:
-    // Re-show the current image and go back to sleep
-    show_last_image_and_sleep();
-    break;
+    show_last_image();
+    return false;
   }
+  return true;
 }
 
 bool menu_tutorial_done(const menu_controls_t &controls) {

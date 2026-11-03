@@ -12,7 +12,7 @@
 
 #include "displayed_image.h"
 
-void show_last_image_and_sleep(void) {
+void show_last_image(void) {
   int file_size = 0;
   String curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
   if (!curPath.isEmpty()) {
@@ -23,5 +23,9 @@ void show_last_image_and_sleep(void) {
       DisplayedImage::remember(curPath.c_str());
     }
   }
+}
+
+void show_last_image_and_sleep(void) {
+  show_last_image();
   goToSleep();
 }
