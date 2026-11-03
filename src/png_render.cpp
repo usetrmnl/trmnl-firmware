@@ -377,15 +377,18 @@ int png_draw(PNGDRAW *pDraw) {
   uint8_t uc = 0;
   uint8_t ucMask, ucPixel, src, *s, *d;
   int iPitch, iBpp;
+  int iWidth = pDraw->iWidth;
+  // A portrait image (as wide as the panel is high) is drawn turned; any other is cropped to the panel
+  const bool rotated = iWidth == bbep.height() && iWidth != bbep.width();
 
-  if (y >= bbep.height() && pDraw->iWidth != bbep.height())
-    return 0; // image is larger than the display (and not rotated), stop decoding it
+  if (!rotated && iWidth > bbep.width()) iWidth = bbep.width();
+  if (y >= (rotated ? bbep.width() : bbep.height())) return 0; // past the end of the panel, stop decoding it
   if (pDraw->iPixelType == PNG_PIXEL_INDEXED ||
       pDraw->iBpp > 4) { // need to convert through the palette and/or reduce the bpp
     s = bbep.tempBuffer(); // temp space we can use
     iBpp = (pDraw->iBpp > 4) ? 4 : pDraw->iBpp;
     if (iBpp == 2) iBpp = 4; // 2-bit indexed images -> 4bpp for calibrated gray refresh
-    ReduceBpp(iBpp, pDraw->iPixelType, pDraw->pPalette, pDraw->pPixels, s, pDraw->iWidth, pDraw->iBpp);
+    ReduceBpp(iBpp, pDraw->iPixelType, pDraw->pPalette, pDraw->pPixels, s, iWidth, pDraw->iBpp);
   } else { // for grayscale images of 1/2/4-bpp we can directly use the pixels as-is
     iBpp = pDraw->iBpp;
     s = (uint8_t *)pDraw->pPixels;
@@ -405,16 +408,16 @@ int png_draw(PNGDRAW *pDraw) {
   }
   iPitch = bbep.width() / 2;
   if (iBpp == 1) {
-    if (bbep.width() >= pDraw->iWidth) { // normal orientation
+    if (!rotated) { // normal orientation
       iPitch = (bbep.width() + 7) / 8;
       d += y * iPitch; // point to the correct line
-      memcpy(d, s, (pDraw->iWidth + 7) / 8);
+      memcpy(d, s, (iWidth + 7) / 8);
     } else { // rotated
       uint8_t ucPixel, ucMask, j;
       d += (bbep.height() - 1) * iPitch;
       d += (y / 8);
       ucMask = 0x80 >> (y & 7); // destination mask
-      for (x = 0; x < pDraw->iWidth; x++) {
+      for (x = 0; x < iWidth; x++) {
         if ((x & 7) == 0) uc = *s++;
         ucPixel = d[0] & ~ucMask; // unset old pixel
         if (uc & 0x80) ucPixel |= ucMask;
@@ -425,19 +428,19 @@ int png_draw(PNGDRAW *pDraw) {
     }
   } else {
     if (iBpp == 2) { // expand 2-bit grayscale to 4-bit for calibrated refresh
-      Expand2bppLineTo4bpp(s, bbep.tempBuffer(), pDraw->iWidth);
+      Expand2bppLineTo4bpp(s, bbep.tempBuffer(), iWidth);
       s = bbep.tempBuffer();
       iBpp = 4;
     }
         // 4-bit native format (includes expanded 2-bit)
-    if (bbep.width() == pDraw->iWidth) { // normal orientation
+    if (!rotated) { // normal orientation
       d += y * iPitch; // point to the correct line
-      memcpy(d, s, (pDraw->iWidth + 1) / 2);
+      memcpy(d, s, (iWidth + 1) / 2);
     } else { // rotated
       d += (bbep.height() - 1) * iPitch;
       d += (y / 2);
       if (y & 1) { // odd line (column)
-        for (x = 0; x < pDraw->iWidth; x += 2) {
+        for (x = 0; x < iWidth; x += 2) {
           uc = (d[0] & 0xf0) | (s[0] >> 4);
           *d = uc;
           d -= iPitch;
@@ -447,7 +450,7 @@ int png_draw(PNGDRAW *pDraw) {
           s++;
         } // for x
       } else {
-        for (x = 0; x < pDraw->iWidth; x += 2) {
+        for (x = 0; x < iWidth; x += 2) {
           uc = (d[0] & 0xf) | (s[0] & 0xf0);
           *d = uc;
           d -= iPitch;
