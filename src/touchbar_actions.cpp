@@ -10,6 +10,7 @@
 #include <trmnl_log.h>
 
 #include "IQS323.h"
+#include "cached_images.h"
 #include "displayed_image.h"
 #include "iqs323_task.h"
 #include "menu.h"
@@ -83,9 +84,19 @@ static const menu_tutorial_t touchbar_tutorial = {
     PREFERENCES_TOUCHBAR_TUTORIAL_KEY,
 };
 
+static bool touchbar_menu_select_down(void) {
+  touchbar_snapshot_t snap;
+  iqs323_task_read_snapshot(&snap);
+  return snap.ch1_touch;
+}
+
 static const menu_controls_t touchbar_menu_controls = {
-    touchbar_menu_hints, touchbar_menu_begin, touchbar_menu_end, touchbar_menu_read, &touchbar_tutorial,
+    touchbar_menu_hints, touchbar_menu_begin,       touchbar_menu_end,
+    touchbar_menu_read,  touchbar_menu_select_down, &touchbar_tutorial,
 };
+
+// The wake stub can read too early to see the middle touched
+#define TOUCHBAR_LOCKED_WAKE_WAIT_MS 500
 
 // The factory's check that each zone works before the device ships, from the setup portal
 static const menu_tutorial_t touchbar_ship_check = {
@@ -105,6 +116,41 @@ static const menu_tutorial_t touchbar_ship_check = {
 
 #define TOUCHBAR_SHIP_CHECK_HOLD_MS 2000
 #define TOUCHBAR_STAY_AWAKE_MS      20000
+
+static bool touchbar_locked(void) { return preferences.getBool(PREFERENCES_TOUCHBAR_LOCKED_KEY, false); }
+
+// Whether the middle stays held for MENU_UNLOCK_HOLD_MS from boot
+static bool touchbar_unlock_held(void) {
+  TouchbarHoldTracker hold(1 << 1, MENU_UNLOCK_HOLD_MS, startup_time);
+  const unsigned long start = millis();
+  bool touched = false;
+  while (true) {
+    const bool down = touchbar_menu_select_down();
+    if (hold.poll(down ? 1 << 1 : 0)) return true;
+    if (down) {
+      touched = true;
+    } else if (touched || millis() - start >= TOUCHBAR_LOCKED_WAKE_WAIT_MS) {
+      return false;
+    }
+    delay(20);
+  }
+}
+
+// Ignores the touch unless the middle is held to unlock. Returns only if a refresh is due, for the
+// wake to fetch it.
+static void touchbar_locked_wake(void) {
+  iqs323_task_set_streaming_mode(true);
+  const bool unlock = touchbar_unlock_held();
+  iqs323_task_set_streaming_mode(false);
+  if (!unlock) {
+    Log_info("Touch bar locked - ignoring the touch");
+    goToSleepKeepingTimer();
+    return;
+  }
+  Log_info("Touch bar locked - asking to unlock");
+  if (menu_run_unlock_prompt(touchbar_menu_controls)) Log_info("Touch bar unlocked");
+  show_last_image_and_sleep();
+}
 
 // Single dispatch point for the resolved navigation intent. Returns false if the screen needs no
 // fetching: the menu closed, with the current image back up.
@@ -132,7 +178,10 @@ static bool dispatch_touchbar_intent(const touchbar_resolution_t &resolved) {
   case touchbar_intent_t::MIDDLE:
     if (!resolved.held) {
       Log_info("Middle button tapped - opening the menu");
-      if (!menu_open(touchbar_menu_controls)) return false;
+      if (!menu_open(touchbar_menu_controls)) {
+        if (touchbar_locked()) goToSleep(); // taps would be ignored
+        return false;
+      }
       if (staying_awake) showWakeLogo(); // over the menu
       break;
     }
@@ -182,6 +231,10 @@ static touchbar_intent_t wait_for_tap(uint32_t screen_shown_ms, uint32_t refresh
 }
 
 void process_iqs323_data(void) {
+  if (touchbar_locked()) {
+    touchbar_locked_wake();
+    return;
+  }
   touchbar_resolution_t resolved = touchbar_resolve_intent();
   // The menu closed before the wake went online: a tap from here goes on with the wake like the
   // one that woke the device
@@ -224,6 +277,7 @@ void touchbar_stay_awake(void (*show_screen)(void)) {
 }
 
 bool touchbar_poll_ship_check(void) {
+  if (touchbar_locked()) return false;
   static TouchbarHoldTracker middle_hold(1 << 1, TOUCHBAR_SHIP_CHECK_HOLD_MS);
   touchbar_snapshot_t snap;
   iqs323_task_read_snapshot(&snap);
