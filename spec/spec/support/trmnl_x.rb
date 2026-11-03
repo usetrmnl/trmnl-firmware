@@ -36,6 +36,7 @@ module TrmnlX
     s.dock(true)
     s.wait(portal: true, timeout: 180)
     s.dock(false)
+    s.portal_enable_verbose_logging
     s.portal_connect(ssid, "password", server: mock.device_url)
     mock.wait_for_request("/api/display", timeout: 240)
     s.wait(state: "deep_sleep", timeout: 240)
