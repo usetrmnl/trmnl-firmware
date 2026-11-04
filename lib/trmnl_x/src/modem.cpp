@@ -710,7 +710,7 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, const String& saveToFil
 // ---------------------------------------------------------------------------
 // httpGet() — chunk-callback overload: calls chunkCb(data, len) per chunk
 // ---------------------------------------------------------------------------
-Modem::ModemHttpResult Modem::httpGet(const String& url, std::function<bool(const uint8_t*, size_t)> chunkCb, size_t contentLength, const String& reqHeaders, unsigned long timeoutMs) {
+Modem::ModemHttpResult Modem::httpGet(const String& url, std::function<bool(const uint8_t*, size_t)> chunkCb, size_t contentLength, const String& reqHeaders, unsigned long idleTimeoutMs) {
   while (ModemSerial.available()) ModemSerial.read();  // flush
 
   if (!reqHeaders.isEmpty()) {
@@ -775,7 +775,7 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, std::function<bool(cons
 
   unsigned long downloadStart  = 0;
   unsigned long lastProgressMs = 0;
-  unsigned long deadline = millis() + timeoutMs;
+  unsigned long deadline = millis() + idleTimeoutMs;
 
   while (!done && !error && !cbAbort && millis() < deadline) {
     esp_task_wdt_reset();
@@ -800,6 +800,7 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, std::function<bool(cons
 
     uint8_t batch[256];
     int got = ModemSerial.readBytes(batch, min(avail, (int)sizeof(batch)));
+    deadline = millis() + idleTimeoutMs;
 
     for (int i = 0; i < got && !done && !error && !cbAbort; i++) {
       uint8_t b = batch[i];
