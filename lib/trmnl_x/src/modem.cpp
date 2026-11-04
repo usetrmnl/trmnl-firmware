@@ -713,28 +713,7 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, const String& saveToFil
 Modem::ModemHttpResult Modem::httpGet(const String& url, std::function<bool(const uint8_t*, size_t)> chunkCb, size_t contentLength, const String& reqHeaders, unsigned long timeoutMs) {
   while (ModemSerial.available()) ModemSerial.read();  // flush
 
-  if (!reqHeaders.isEmpty()) {
-    sendCommand("AT+HTTPCHEAD=0");
-    if (waitForResponse("OK", 3000).isEmpty()) {
-      Log_info_serial("[HTTP] HTTPCHEAD=0 failed");
-      return {false, 0, "", 0};
-    }
-    int pos = 0;
-    while (pos <= (int)reqHeaders.length()) {
-      int nl = reqHeaders.indexOf('\n', pos);
-      String hdr = (nl < 0) ? reqHeaders.substring(pos) : reqHeaders.substring(pos, nl);
-      hdr.trim();
-      if (!hdr.isEmpty()) {
-        sendCommand(("AT+HTTPCHEAD=" + String(hdr.length())).c_str());
-        if (waitForResponse(">", 3000).isEmpty()) return {false, 0, "", 0};
-        ModemSerial.write((const uint8_t*)hdr.c_str(), hdr.length());
-        ModemSerial.flush();
-        if (waitForResponse("OK", 3000).isEmpty()) return {false, 0, "", 0};
-      }
-      if (nl < 0) break;
-      pos = nl + 1;
-    }
-  }
+  if (!reqHeaders.isEmpty() && !setRequestHeaders(reqHeaders)) return {false, 0, "", 0};
 
   String urlParam = escape_modem_param(url);
 
@@ -992,4 +971,32 @@ int32_t Modem::getSignalRssi() {
   Log_info_serial("[MODEM] RSSI: %d dBm", rssi);
   return rssi;
 }
+
+// ---------------------------------------------------------------------------
+// setRequestHeaders(): clears the modem's headers, then sets each "Key: Value" line of reqHeaders
+// ---------------------------------------------------------------------------
+bool Modem::setRequestHeaders(const String& reqHeaders) {
+  sendCommand("AT+HTTPCHEAD=0");
+  if (waitForResponse("OK", 3000).isEmpty()) {
+    Log_info_serial("[HTTP] HTTPCHEAD=0 failed");
+    return false;
+  }
+  int pos = 0;
+  while (pos <= (int)reqHeaders.length()) {
+    int nl = reqHeaders.indexOf('\n', pos);
+    String hdr = (nl < 0) ? reqHeaders.substring(pos) : reqHeaders.substring(pos, nl);
+    hdr.trim();
+    if (!hdr.isEmpty()) {
+      sendCommand(("AT+HTTPCHEAD=" + String(hdr.length())).c_str());
+      if (waitForResponse(">", 3000).isEmpty()) return false;
+      ModemSerial.write((const uint8_t*)hdr.c_str(), hdr.length());
+      ModemSerial.flush();
+      if (waitForResponse("OK", 3000).isEmpty()) return false;
+    }
+    if (nl < 0) break;
+    pos = nl + 1;
+  }
+  return true;
+}
+
 #endif // BOARD_TRMNL_X

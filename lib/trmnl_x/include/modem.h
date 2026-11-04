@@ -16,6 +16,7 @@ private:
   uint32_t baudRate;
   bool _initialized = false;
   String waitForResponse(const String& expected, unsigned long timeoutMs);
+  bool setRequestHeaders(const String& reqHeaders); // AT+HTTPCHEAD, one "Key: Value" per line
 
 public:
   Modem(uint32_t baudRate);
