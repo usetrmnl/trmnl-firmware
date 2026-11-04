@@ -262,7 +262,7 @@ static void draw_fw_update_message(void) {
 static void draw_fw_update_failed_message(void) {
   BB_RECT rect;
 
-  const char string1[] = "Firmware update failed. Device will restart...";
+  const char string1[] = "Firmware update failed. Will try again tomorrow.";
   bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
   bbep.setCursor((bbep.width() - rect.w) / 2, 400);
