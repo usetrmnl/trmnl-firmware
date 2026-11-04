@@ -1,11 +1,11 @@
 name: publish-release-firmware
 
 # Publishes a tagged release: builds the selected environments via
-# scripts/prepare_release.sh, uploads the full-flash bins (plus OTA bins for
-# the models in OTA_SLUGS; BYOD builds are flash-only) to S3, and records draft
+# scripts/prepare_release.sh, uploads the full-flash bins and ELFs (plus OTA bins
+# for the models in OTA_SLUGS; BYOD builds are flash-only) to S3, and records draft
 # Firmware/FlashFirmware releases in the TRMNL web app for an admin to
 # promote/publish. Variant builds (VARIANT_SUFFIXES) share another env's model
-# and are published as FW<version><suffix>.bin.
+# and are published as FW<version><suffix>.bin/.elf.
 #
 # Idempotent: already-uploaded S3 objects are skipped (unless overwrite is
 # set) and the admin API upserts, so a failed run can safely be re-run.
@@ -235,18 +235,22 @@ jobs:
             FILE="FW${VERSION}${suffix}.bin"
             flash_src=".pio/release/${pio_env}/flash/${SRC_FILE}"
             flash_key="${slug}/flash/${FILE}"
+            elf_src=".pio/build/${pio_env}/firmware.elf"
+            elf_key="${slug}/flash/${FILE%.bin}.elf"
 
             upload "$flash_src" "$flash_key"
+            upload "$elf_src" "$elf_key"
 
             jq -n \
               --arg version "${VERSION}${suffix}" \
               --arg tag "$TAG" \
               --arg flash_url "${S3_BASE_URL}/${flash_key}" \
+              --arg flash_elf_url "${S3_BASE_URL}/${elf_key}" \
               --argjson flash_size "$(stat -c%s "$flash_src")" \
               '{
                 version: $version,
                 tag: $tag,
-                flash: { url: $flash_url, size: $flash_size }
+                flash: { url: $flash_url, size: $flash_size, elf_url: $flash_elf_url }
               }' > payload.json
 
             summary="### ${slug}${suffix}"$'\n'
@@ -266,7 +270,8 @@ jobs:
               summary+="- OTA: \`${S3_BASE_URL}/${ota_key}\` ($(stat -c%s "$ota_src") bytes)"$'\n'
             fi
 
-            summary+="- Flash: \`${S3_BASE_URL}/${flash_key}\` ($(stat -c%s "$flash_src") bytes)"
+            summary+="- Flash: \`${S3_BASE_URL}/${flash_key}\` ($(stat -c%s "$flash_src") bytes)"$'\n'
+            summary+="- ELF: \`${S3_BASE_URL}/${elf_key}\` ($(stat -c%s "$elf_src") bytes)"
 
             echo "Recording draft release for ${slug}${suffix}:"
             curl --fail-with-body -sS -X POST \
