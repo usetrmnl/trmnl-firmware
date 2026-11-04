@@ -14,6 +14,7 @@
 #include <string_utils.h>
 #include <trmnl_log.h>
 #include <wifi-helpers.h>
+#include <wifi_network.h>
 
 enum LogAction { LOG_ACTION_STORE, LOG_ACTION_SUBMIT, LOG_ACTION_SUBMIT_OR_STORE };
 
@@ -54,7 +55,7 @@ static bool storeLogString(const char *log_buffer) {
 }
 
 void submitStoredLogs(void) {
-  if (WiFi.isConnected() == false) {
+  if (!WiFi.isConnected() && !usesModemNetwork()) {
     Log_info("WiFi not connected; not submitting stored logs.");
     return;
   }

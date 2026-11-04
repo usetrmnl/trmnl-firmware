@@ -6,6 +6,12 @@
 #include <device_id.h>
 #include <memory>
 #include <stdio.h>
+#include <wifi_network.h>
+
+#ifdef BOARD_TRMNL_X
+#include <globals.h>
+#include <modem.h>
+#endif
 
 #include "http_client.h"
 #include "trmnl_log.h"
@@ -17,6 +23,13 @@ bool submitLogToApi(LogApiInput &input, const char *api_url) {
   char new_url[200];
   strcpy(new_url, api_url);
   strcat(new_url, "/api/log");
+
+#ifdef BOARD_TRMNL_X
+  if (usesModemNetwork()) {
+    Log_info("[MODEM] POST /api/log ...");
+    return g_modem->httpPost(new_url, payload, formatHeaders(buildLogHeaders({device_mac_address(), input.api_key})));
+  }
+#endif
 
   return withHttp(
     new_url,

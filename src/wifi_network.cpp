@@ -50,6 +50,14 @@ WiFiStatus getWiFiStatus(void) {
   return status;
 }
 
+bool usesModemNetwork(void) {
+#ifdef BOARD_TRMNL_X
+  return g_modem && WifiCaptivePortal.getLastCredentials().is5GHz;
+#else
+  return false;
+#endif
+}
+
 bool connectWithSavedCredentials(void) {
   if (!WifiCaptivePortal.isSaved()) return false;
 

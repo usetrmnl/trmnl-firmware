@@ -56,6 +56,10 @@ public:
   // Chunk-callback overload: chunkCb is called for each received chunk; return false to abort
   ModemHttpResult httpGet(const String& url, std::function<bool(const uint8_t*, size_t)> chunkCb, size_t contentLength = 0, const String& reqHeaders = "", unsigned long timeoutMs = 60000);
 
+  // AT+HTTPCPOST with reqHeaders in the httpGet format. True once the modem says SEND OK; the
+  // modem does not report the server's status.
+  bool httpPost(const String& url, const String& body, const String& reqHeaders = "");
+
   // Configures modem SNTP and returns Unix timestamp (UTC), or 0 on failure.
   time_t getSntpTime();
 

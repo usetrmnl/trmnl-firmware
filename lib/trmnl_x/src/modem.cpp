@@ -999,4 +999,35 @@ bool Modem::setRequestHeaders(const String& reqHeaders) {
   return true;
 }
 
+// ---------------------------------------------------------------------------
+// httpPost(): AT+HTTPCPOST, the body sent after the '>' prompt
+// ---------------------------------------------------------------------------
+bool Modem::httpPost(const String& url, const String& body, const String& reqHeaders) {
+  while (ModemSerial.available()) ModemSerial.read();  // flush
+
+  if (!setRequestHeaders(reqHeaders)) return false;
+
+  bool sent = false;
+  sendCommand(("AT+HTTPCPOST=\"" + escape_modem_param(url) + "\"," + String(body.length())).c_str());
+  if (!waitForResponse(">", 5000).isEmpty()) {
+    ModemSerial.write((const uint8_t*)body.c_str(), body.length());
+    ModemSerial.flush();
+    unsigned long deadline = millis() + 30000;
+    String acc;
+    while (millis() < deadline && !sent) {
+      while (ModemSerial.available()) acc += (char)ModemSerial.read();
+      sent = acc.indexOf("SEND OK") >= 0;
+      if (acc.indexOf("SEND FAIL") >= 0 || acc.indexOf("ERROR") >= 0) break;
+      delay(5);
+    }
+    if (!sent) Log_info_serial("[HTTP] HTTPCPOST failed: %s", acc.c_str());
+  } else {
+    Log_info_serial("[HTTP] HTTPCPOST: no '>' prompt");
+  }
+
+  sendCommand("AT+HTTPCHEAD=0");
+  waitForResponse("OK", 2000);
+  return sent;
+}
+
 #endif // BOARD_TRMNL_X

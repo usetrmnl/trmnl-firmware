@@ -18,6 +18,9 @@ String getWifiClientHostname(void);
 /// @brief Connect using credentials saved in WifiCaptivePortal
 bool connectWithSavedCredentials(void);
 
+/// @brief True when the TRMNL X's modem holds the network link (5 GHz), so requests go through it
+bool usesModemNetwork(void);
+
 /// @brief Ensure WiFi is connected, reconnecting with saved credentials if needed.
 bool ensureWifiConnected(void);
 
