@@ -5,6 +5,7 @@
 #include <trmnl_log.h>
 
 #include "Group5.h"
+#include "displayed_image.h"
 #include "fonts.h"
 #include "messages.h"
 #include "wifi_connect_qr.h"
@@ -388,6 +389,8 @@ static void draw_captive_wifi_timeout_message(void) {
 
 // Message screens are 1-bit
 static void begin_message_screen(void) {
+  DisplayedImage::cover(); // the next wake redraws the screen the message replaces
+  need_to_refresh_display = 1;
 #ifdef BB_EPAPER
   display_prepare_message();
 #else

@@ -114,5 +114,27 @@ RSpec.describe "TRMNL X images", env: "TRMNL_X" do
         expect(s.status["display_refreshes"]).to eq(refreshes)
       end
     end
+
+    it "redraws a cached image that an error screen covered" do
+      m = dev.mock
+      m.set_png("one", TrmnlX.digits("1"))
+      m.display = { image: "one", refresh_rate: 300 }
+      dev.boot_asleep do |s|
+        s.wait(state: "deep_sleep", timeout: 15)
+        s.wake
+        m.wait_for_request("/images/one.png", timeout: 15)
+        s.wait(state: "deep_sleep", timeout: 15, settle_ms: 300)
+        m.display = { image_url: "#{m.device_url}/img/missing.png", filename: "plugin-two", refresh_rate: 300 }
+        c = s.status["console_total"]
+        m.next_request("/img/missing.png", timeout: 15) { s.wake }
+        s.wait(console: /Image download failed/, since: c, timeout: 15)
+        s.wait(state: "deep_sleep", timeout: 15, settle_ms: 300)
+        refreshes = s.status["display_refreshes"]
+        m.display = { image: "one", refresh_rate: 300 }
+        m.next_request("/api/display", timeout: 15) { s.wake }
+        s.wait(state: "deep_sleep", timeout: 15, settle_ms: 300)
+        expect(s.status["display_refreshes"]).to be > refreshes
+      end
+    end
   end
 end
