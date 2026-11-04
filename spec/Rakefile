@@ -74,6 +74,26 @@ namespace :firmware do
       sh "pio", "run", "-d", Builds::FIRMWARE, "-e", env
     end
   end
+
+  desc "Build a release for the TRMNL X (argument: its tag; default: Builds.factory_release) into tmp/releases"
+  task :build_release, [:tag] do |_, args|
+    tag = args[:tag] || Builds.factory_release
+    next unless Builds.release_missing(tag)
+
+    checkout = File.join(Builds::HERE, "tmp/releases", tag, "checkout")
+    git = ["git", "-C", Builds::FIRMWARE]
+    unless system(*git, "rev-parse", "-q", "--verify", "refs/tags/#{tag}", out: File::NULL)
+      sh(*git, "fetch", "--depth", "1", "origin", "tag", tag)
+    end
+    sh(*git, "worktree", "add", "--force", "--detach", checkout, tag) unless File.directory?(checkout)
+    sh "pio", "pkg", "install", "-d", checkout, "-e", "TRMNL_X"
+    sh "pio", "run", "-d", checkout, "-e", "TRMNL_X"
+    built = File.join(checkout, ".pio/build/TRMNL_X")
+    out = Builds.release(tag)
+    mkdir_p out
+    cp File.join(built, "merged_firmware.bin"), out
+    cp File.join(built, "firmware.elf"), File.join(out, "merged_firmware.elf") # 1.8.17 writes no merged_firmware.elf
+  end
 end
 
 desc "Rebuild the last run's coverage report (out/cov/html) and print its summary"
