@@ -395,7 +395,8 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse) {
           Log.error("%s [%d]: send_to_me failed\r\n", __FILE__, __LINE__);
         }
       } break;
-      case SF_GUEST_MODE: {
+      case SF_GUEST_MODE:
+      case SF_TOGGLE_HOLD: { // the server answers toggle_hold as guest_mode
         String action = apiResponse.action;
         if (action.equals("guest_mode")) {
           Log.info("%s [%d]:Guest Mode success\r\n", __FILE__, __LINE__);

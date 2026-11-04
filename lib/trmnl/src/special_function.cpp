@@ -15,6 +15,7 @@ static const SpecialFunctionMap specialFunctionMap[] = {
     {"rewind", SF_REWIND},
     {"send_to_me", SF_SEND_TO_ME},
     {"guest_mode", SF_GUEST_MODE},
+    {"toggle_hold", SF_TOGGLE_HOLD},
 };
 
 SPECIAL_FUNCTION parseSpecialFunction(String &special_function_str) {
