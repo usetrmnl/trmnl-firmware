@@ -28,6 +28,14 @@ RSpec.describe "TRMNL X", env: "TRMNL_X" do
       st["console_total"]
     end
 
+    # The charger ends shipment mode, and the X restarts into the setup portal.
+    def dock_into_portal(s)
+      boots = s.status["boot_count"]
+      s.set_portal_client(true) # so turbo can't run the new portal to its timeout
+      s.dock(true)
+      s.wait(min_boots: boots + 1, portal: true, timeout: 180)
+    end
+
     it "unattended portal goes back to shipment mode" do
       shipped.boot do |s|
         # Still docked: "ready to ship" until it comes off USB power, then shipment mode.
@@ -39,8 +47,7 @@ RSpec.describe "TRMNL X", env: "TRMNL_X" do
           s.status["display_generation"] != g
         end
         s.wait(display_idle: true, timeout: 90)
-        s.dock(true) # the charger ends shipment mode: it leaves light sleep, tries WiFi and sleeps
-        s.wait(state: "deep_sleep", timeout: 90)
+        dock_into_portal(s)
       end
     end
 
@@ -66,8 +73,7 @@ RSpec.describe "TRMNL X", env: "TRMNL_X" do
         eventually("the shipping screen was not drawn", within: 90, every: 0.05) do
           s.status["display_generation"] != g
         end
-        s.dock(true)
-        s.wait(state: "deep_sleep", timeout: 90) # out of shipment mode, the portal gives up
+        dock_into_portal(s)
       end
     end
   end
