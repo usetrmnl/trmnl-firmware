@@ -44,6 +44,10 @@ bool BQ27427::begin(int sda, int scl)
 	
 	if (deviceID == BQ27427_DEVICE_ID)
 	{
+#ifdef BQ27427_LED
+                pinMode(BQ27427_LED, OUTPUT); // Set up the LED for charge indicator 
+		digitalWrite(BQ27427_LED, LOW); // Start with the LED off
+#endif // LED
 		return true; // If device ID is valid, return true
 	}
 	

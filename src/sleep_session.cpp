@@ -27,6 +27,10 @@
 #include "rtc_wake_stub_trmnl_x.h"
 #endif
 
+#ifdef BOARD_TRMNL_GEN2
+uint32_t wait_batt_charging(uint32_t time_to_sleep);
+#endif // GEN2
+
 #define AWAKE_TIME_LIMIT_MS (20 * 60 * 1000) // longer than the 15 minute Wi-Fi portal
 
 /**
@@ -73,6 +77,9 @@ void goToSleep(void) {
   Log.info("%s [%d]: time to sleep - %d\r\n", __FILE__, __LINE__, time_to_sleep);
   preferences.putUInt(PREFERENCES_LAST_SLEEP_TIME, systemClock().getTime());
   preferences.end();
+#ifdef BOARD_TRMNL_GEN2
+//  time_to_sleep = wait_batt_charging(time_to_sleep); // Wait to turn off the charging LED (if currently charging)
+#endif
   esp_sleep_enable_timer_wakeup((uint64_t)time_to_sleep * SLEEP_uS_TO_S_FACTOR);
   // Configure GPIO pin for wakeup
 #if CONFIG_IDF_TARGET_ESP32

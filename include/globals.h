@@ -61,6 +61,8 @@ extern uint32_t panel_rev; // EPD revision read by get_panel_rev(); 0 = unknown/
 #ifdef BOARD_TRMNL_X
 // --- TRMNL X hardware ---
 extern Modem *g_modem;
+#endif
+#if defined( BOARD_TRMNL_X ) || defined( BOARD_TRMNL_GEN2 )
 extern battery_count_t battery_count;
 extern bool battery_charging;
-#endif // BOARD_TRMNL_X
+#endif // BOARD_TRMNL_X || BOARD_TRMNL_GEN2

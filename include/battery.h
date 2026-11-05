@@ -4,10 +4,13 @@
 
 #include "config.h"
 
+// This board's pins and panel, from the supported device list; NULL until hw_config_init()
+extern TRMNL_DEVICE *pDevice;
+
 //
 // derive device-specific battery flags
 //
-#if defined(BOARD_TRMNL_X)
+#if defined(BOARD_TRMNL_X) || defined (BOARD_TRMNL_GEN2)
 #define INCLUDE_BQ27427
 #endif
 

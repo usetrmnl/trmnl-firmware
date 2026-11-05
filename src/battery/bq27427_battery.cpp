@@ -10,7 +10,13 @@
 
 #include "BQ27427.h"
 #include "driver/gpio.h"
+#ifdef BOARD_TRMNL_X
 #include "iqs323_task.h"
+#else // TRMNL OG gen2
+// stub functions to make the code less cluttered
+extern void iqs323_task_i2c_unlock(void);
+extern void iqs323_task_i2c_lock(void);
+#endif
 
 /// @brief Per-cell pack capacity (mAh) assumed when BYPASS_BQ27427_SOC is enabled.
 #define BQ27427_BYPASS_CELL_CAPACITY_MAH 6000
@@ -18,7 +24,7 @@
 /// Connect to the BQ27427, run the golden-file/Impedance Track path, and
 /// fill in a validated snapshot of its readings.
 static bool connectAndRead(bool oneCellPack, BQ27427Snapshot &snap) {
-  bool ok = lipo.connectAndConfigure(PIN_INTERNAL_SDA, PIN_INTERNAL_SCL, oneCellPack) && lipo.readSnapshot(snap);
+  bool ok = lipo.connectAndConfigure(pDevice->sensor_sda, pDevice->sensor_scl, oneCellPack) && lipo.readSnapshot(snap);
 
   // Real gas-gauge values, kept for the Gauge-* comparison headers even when
   // BYPASS_BQ27427_SOC below overrides soc/capacity.
@@ -54,6 +60,60 @@ static bool connectAndRead(bool oneCellPack, BQ27427Snapshot &snap) {
   return ok;
 }
 
+//
+// Specific code needed for the TRMNL OG Gen2
+//
+#ifdef BOARD_TRMNL_GEN2
+//
+// The green LED on the OG Gen2 PCB is controlled by the ESP32, not the
+// battery management chip. We must explicitly turn it off when charging has
+// completed or the cable is unplugged.
+// We can let the ESP32 sit in a low power loop waiting for this to occur
+//
+uint32_t wait_batt_charging(uint32_t time_to_sleep)
+{
+BQ27427Snapshot snap;
+bool bCharging = true;
+long l = millis() + (time_to_sleep * 1000); // expiration time to restart 
+
+    Log_info("Entering wait_battery_charging, sleep time = %d", time_to_sleep);
+
+    while (millis() < l && bCharging) {
+        lipo.readSnapshot(snap); // keep an eye on the charge status
+        bCharging = (snap.current > 0);
+        if (!bCharging) {
+            digitalWrite(BQ27427_LED, LOW); // Turn off the charge LED
+        } else { // light sleep for 1 second while we wait for it to finish charging
+#ifdef DEV_FIRMWARE
+            Log_info("waiting for battery to charge: %d mA", snap.current);
+            delay(1000);
+#else
+            esp_sleep_enable_timer_wakeup(1000000L);
+            esp_light_sleep_start();
+#endif // DEV_FIRMWARE
+        }
+    }
+    time_to_sleep = (l - millis())/1000; // Convert remaining time back into seconds
+    if (time_to_sleep < 1 || time_to_sleep > 24*60*60) {
+        time_to_sleep = 1;
+    }
+    Log_info("Returning with %d seconds remaining to sleep in this period", time_to_sleep);
+    return time_to_sleep;
+} /* wait_batt_charging() */
+
+battery_count_t detect_battery_count(void) {
+    return BATTERY_ONE;
+}
+
+void BQ27427_reset() {
+  pinMode(7, OUTPUT); // BQ27427 INT/PWR
+  digitalWrite(7, LOW);
+  delay(10);
+  digitalWrite(7, HIGH);
+  Log_info("BQ27427 reset performed");
+}
+#endif // GEN2
+
 void BQ27427Battery::gaugeInit() {
   if (battery_count == BATTERY_NONE) {
     Log_info("No battery detected - skipping BQ27427 initialization");
@@ -79,8 +139,8 @@ void BQ27427Battery::gaugeInit() {
 
     if (!readingsValid) {
       Log_error("BQ27427: still not initialized or invalid readings after retry.");
-      gpio_dump_io_configuration(stdout, (1ULL << PIN_INTERNAL_SDA));
-      gpio_dump_io_configuration(stdout, (1ULL << PIN_INTERNAL_SCL));
+      gpio_dump_io_configuration(stdout, (1ULL << pDevice->sensor_sda));
+      gpio_dump_io_configuration(stdout, (1ULL << pDevice->sensor_scl));
     }
   }
 
@@ -127,12 +187,20 @@ void BQ27427Battery::gaugeInit() {
   if (snap.flags & BQ27427_FLAG_DSG) toPrint += " DSG"; // battery is discharging
   Serial.println(toPrint);
 
+#ifdef BQ27427_LED
+  digitalWrite(BQ27427_LED, LOW); // Assume the battery is not charging
+#endif // LED
   if (snap.flags & BQ27427_FLAG_FC) {
     Log_info("BATTERY IS FULL"); // full, charger connected but not drawing current
-  } else if (snap.flags & BQ27427_FLAG_CHG) {
+  } else if ((snap.flags & BQ27427_FLAG_CHG) && _current > 0) {
+#ifdef BQ27427_LED
+    digitalWrite(BQ27427_LED, HIGH);
+#endif // LED
     Log_info("BATTERY IS CHARGING");
   } else if (snap.flags & BQ27427_FLAG_DSG) {
     Log_info("BATTERY IS DISCHARGING");
+  } else {
+    Log_info("BATTERY NOT CONNECTED?");
   }
 }
 

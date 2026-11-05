@@ -67,9 +67,9 @@
 #define MS_TO_S_FACTOR       1000 /* Conversion factor for milliseconds to seconds */
 
 #if defined(BOARD_TRMNL_X)
-#define PIN_INTERRUPT      3
-#define PIN_INTERNAL_SDA   39
-#define PIN_INTERNAL_SCL   40
+//#define PIN_INTERRUPT      3
+//#define PIN_INTERNAL_SDA   39
+//#define PIN_INTERNAL_SCL   40
 #define PIN_INTERNAL_READY GPIO_NUM_3
 // TCA9535 expander pins for the BQ25616 charger (open-drain, LOW = active)
 #define TCA9535_PG_PIN     0 // P0_0 — LOW = VBUS OK

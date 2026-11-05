@@ -44,6 +44,9 @@ uint32_t panel_rev = 0;
 // --- TRMNL X hardware ---
 // Set once during bl_init, used by download helpers and getWiFiStatus()
 Modem *g_modem = nullptr;
+#endif // BOARD_TRMNL_X
+
+#if defined(BOARD_TRMNL_X) || defined(BOARD_TRMNL_GEN2)
 battery_count_t battery_count = BATTERY_NONE;
 bool battery_charging = false;
-#endif // BOARD_TRMNL_X
+#endif // BOARD_TRMNL_X || BOARD_TRMNL_GEN2

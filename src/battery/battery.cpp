@@ -1,7 +1,7 @@
 #include <battery.h>
 #include <config.h>
 
-#if defined(BOARD_TRMNL_X)
+#if defined(BOARD_TRMNL_X) || defined ( BOARD_TRMNL_GEN2 )
 static BQ27427Battery batteryInstance;
 #else
 static ADCBattery batteryInstance;

@@ -123,8 +123,20 @@ void startBoardHardware(const WakeContext &wake, uint32_t init_time) {
   }
 
   if (double_click) button_wake_run_special_function();
+#ifdef BOARD_TRMNL_GEN2
+  // Read the gauge before the panel draws load current, and before the logo
+  // is drawn so its battery icon has a snapshot to read.
+  battery_count = detect_battery_count();
+  battery_charging = (power().chargingStatus() == ChargingStatus::CHARGING);
+  Log_info("BATTERY COUNT: %d", battery_count);
+  Log_info("BATTERY CHARGING: %s", battery_charging ? "YES" : "NO");
+
+  battery().gaugeInit();
+  battery_voltage = battery().readVoltage(); // Read the battery voltage BEFORE WiFi is turned on
+#else
   // Read the battery voltage BEFORE the display or WiFi is turned on
   battery_voltage = battery().readVoltage(pDevice);
+#endif // !Gen2
 
   // EPD init
   // EPD clear
