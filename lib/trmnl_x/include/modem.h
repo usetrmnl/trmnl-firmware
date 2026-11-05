@@ -15,6 +15,7 @@ private:
   HardwareSerial ModemSerial;
   uint32_t baudRate;
   bool _initialized = false;
+  int32_t _lastSignalRssi = 0;
   String waitForResponse(const String& expected, unsigned long timeoutMs);
   bool setRequestHeaders(const String& reqHeaders); // AT+HTTPCHEAD, one "Key: Value" per line
 
@@ -68,4 +69,6 @@ public:
 
   // Returns the RSSI (dBm) of the currently joined AP, (replaces WiFi.RSSI() on TRMNL_X)
   int32_t getSignalRssi();
+  // getSignalRssi()'s last answer, without an AT command, so it is safe during a transfer.
+  int32_t lastSignalRssi() const { return _lastSignalRssi; }
 };

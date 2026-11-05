@@ -21,6 +21,9 @@ bool connectWithSavedCredentials(void);
 /// @brief True when the TRMNL X's modem holds the network link (5 GHz), so requests go through it
 bool usesModemNetwork(void);
 
+/// @brief The modem's last signal reading, 0 when it has none or off the TRMNL X
+int32_t modemLastSignalRssi(void);
+
 /// @brief Ensure WiFi is connected, reconnecting with saved credentials if needed.
 bool ensureWifiConnected(void);
 

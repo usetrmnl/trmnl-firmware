@@ -942,6 +942,7 @@ String Modem::getMacAddress() {
 // getSignalRssi(): AT+CWJAP? — RSSI (dBm) of the joined AP, 0 if not connected
 // ---------------------------------------------------------------------------
 int32_t Modem::getSignalRssi() {
+  _lastSignalRssi = 0;
   while (ModemSerial.available()) ModemSerial.read();  // flush
 
   sendCommand("AT+CWJAP?");
@@ -969,6 +970,7 @@ int32_t Modem::getSignalRssi() {
 
   int32_t rssi = resp.substring(cRssi + 1, cEnd >= 0 ? cEnd : resp.length()).toInt();
   Log_info_serial("[MODEM] RSSI: %d dBm", rssi);
+  _lastSignalRssi = rssi;
   return rssi;
 }
 

@@ -87,8 +87,13 @@ void submitStoredLogs(void) {
 static DeviceStatusStamp getDeviceStatusStamp() {
   DeviceStatusStamp deviceStatus = {};
 
+  const char *wifi_status = wifiStatusStr(WiFi.status());
   deviceStatus.wifi_rssi_level = WiFi.RSSI();
-  strncpy(deviceStatus.wifi_status, wifiStatusStr(WiFi.status()), sizeof(deviceStatus.wifi_status) - 1);
+  if (usesModemNetwork()) {
+    deviceStatus.wifi_rssi_level = modemLastSignalRssi();
+    wifi_status = deviceStatus.wifi_rssi_level != 0 ? "connected" : "disconnected";
+  }
+  strncpy(deviceStatus.wifi_status, wifi_status, sizeof(deviceStatus.wifi_status) - 1);
   deviceStatus.refresh_rate = refreshInterval.seconds(0);
   deviceStatus.time_since_last_sleep = time_since_sleep;
   snprintf(deviceStatus.current_fw_version, sizeof(deviceStatus.current_fw_version), "%s", FW_VERSION_STRING);

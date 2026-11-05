@@ -58,6 +58,14 @@ bool usesModemNetwork(void) {
 #endif
 }
 
+int32_t modemLastSignalRssi(void) {
+#ifdef BOARD_TRMNL_X
+  return g_modem ? g_modem->lastSignalRssi() : 0;
+#else
+  return 0;
+#endif
+}
+
 bool connectWithSavedCredentials(void) {
   if (!WifiCaptivePortal.isSaved()) return false;
 
