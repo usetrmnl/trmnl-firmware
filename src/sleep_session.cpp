@@ -24,17 +24,39 @@
 #include <iqs323_task.h>
 #include <touchbar_gesture.h>
 
+#include "esp_rtc_time.h"
 #include "rtc_wake_stub_trmnl_x.h"
 #endif
 
 #define AWAKE_TIME_LIMIT_MS (20 * 60 * 1000) // longer than the 15 minute Wi-Fi portal
 
+#ifdef BOARD_TRMNL_X
+#define KEPT_TIMER_MIN_SLEEP_US (1 * SLEEP_uS_TO_S_FACTOR) // if due while preparing for sleep
+
+// RTC time of the last sleep's timer, 0 if none
+RTC_DATA_ATTR static uint64_t next_timer_wake_rtc_us = 0;
+#endif
+
+// The refresh interval, or (keep_timer) the time left on the last sleep's timer
+static uint64_t timerSleepUs([[maybe_unused]] bool keep_timer) {
+  uint64_t sleep_us = (uint64_t)refreshInterval.seconds() * SLEEP_uS_TO_S_FACTOR;
+#ifdef BOARD_TRMNL_X
+  const uint64_t now = esp_rtc_get_time_us();
+  if (keep_timer && next_timer_wake_rtc_us != 0) {
+    const uint64_t remaining = next_timer_wake_rtc_us > now ? next_timer_wake_rtc_us - now : 0;
+    sleep_us = min(sleep_us, max(remaining, (uint64_t)KEPT_TIMER_MIN_SLEEP_US));
+  }
+  next_timer_wake_rtc_us = now + sleep_us;
+#endif
+  return sleep_us;
+}
+
 /**
  * @brief Function to sleep preparing and go to sleep
- * @param none
+ * @param keep_timer sleep until the last sleep's timer, not for the refresh interval
  * @return none
  */
-void goToSleep(void) {
+static void enterSleep(bool keep_timer) {
   Log.info("%s [%d]: go to sleep\r\n", __FILE__, __LINE__);
   submitStoredLogs();
 
@@ -67,13 +89,14 @@ void goToSleep(void) {
 #endif
 
   filesystem_deinit();
-  uint32_t time_to_sleep = refreshInterval.seconds();
+  const uint64_t sleep_us = timerSleepUs(keep_timer);
+  uint32_t time_to_sleep = sleep_us / SLEEP_uS_TO_S_FACTOR;
   iPrevWakeTime = millis() - startup_time; // save for statistics
   Log.info("%s [%d]: total awake time - %d ms\r\n", __FILE__, __LINE__, iPrevWakeTime);
   Log.info("%s [%d]: time to sleep - %d\r\n", __FILE__, __LINE__, time_to_sleep);
-  preferences.putUInt(PREFERENCES_LAST_SLEEP_TIME, systemClock().getTime());
+  if (!keep_timer) preferences.putUInt(PREFERENCES_LAST_SLEEP_TIME, systemClock().getTime());
   preferences.end();
-  esp_sleep_enable_timer_wakeup((uint64_t)time_to_sleep * SLEEP_uS_TO_S_FACTOR);
+  esp_sleep_enable_timer_wakeup(sleep_us);
   // Configure GPIO pin for wakeup
 #if CONFIG_IDF_TARGET_ESP32
 #define BUTTON_PIN_BITMASK(GPIO) (1ULL << GPIO)  // 2 ^ GPIO_NUMBER in hex
@@ -105,6 +128,18 @@ void goToSleep(void) {
 #endif
   esp_deep_sleep_start();
 }
+
+void goToSleep(void) { enterSleep(false); }
+
+#ifdef BOARD_TRMNL_X
+void goToSleepKeepingTimer(void) {
+  if (next_timer_wake_rtc_us != 0 && esp_rtc_get_time_us() >= next_timer_wake_rtc_us) {
+    Log_info("Sleep timer already due - not sleeping");
+    return;
+  }
+  enterSleep(true);
+}
+#endif
 
 void updateTimeSinceSleep(void) {
   if (systemClock().setTimeFromNTP()) {

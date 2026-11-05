@@ -46,6 +46,7 @@
 #define PREFERENCES_VERBOSE_LOG_KEY          "verbose_log"
 #define PREFERENCES_LAST_OTA                 "last_ota"
 #define PREFERENCES_TOUCHBAR_TUTORIAL_KEY    "touch_tutorial" // TRMNL X: the touch bar tutorial was finished
+#define PREFERENCES_TOUCHBAR_LOCKED_KEY      "touch_locked" // TRMNL X
 
 #define WIFI_CONNECTION_RSSI                 (-100)
 
