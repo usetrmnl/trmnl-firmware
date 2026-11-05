@@ -60,6 +60,16 @@ General.describe "OTA updates" do
       expect_a_redraw_on_the_next_wake(status: 202, refresh_rate: 300)
     end
 
+    it "wakes after 30 s to replace the failed update message" do
+      m = dev.mock
+      m.display = { image: "default", refresh_rate: 900, update_firmware: true,
+                    firmware_url: "#{m.device_url}/missing.bin" }
+      dev.boot do |s|
+        st = expect_to_keep_running_the_old_firmware(s, "/missing.bin")
+        expect(st["wake_at_s"] - st["sim_time_s"]).to be_within(5).of(30)
+      end
+    end
+
     it "survives a download cut short",
        skip: "slow: after the connection drops, Update.writeStream waits well over 20 s for the rest of the firmware" do
       update_from("/firmware.bin", File.binread(File.join(dev.build, "firmware.bin")))
