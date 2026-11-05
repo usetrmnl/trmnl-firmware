@@ -4,6 +4,7 @@
 
 #include <config.h>
 #include <display.h>
+#include <esp_system.h>
 #include <globals.h>
 #include <status_screens.h>
 #include <touchbar_indicator.h>
@@ -313,6 +314,13 @@ void touchbar_log_wake_stub_status(void) {
 }
 
 void touchbar_start(esp_sleep_wakeup_cause_t wakeup_reason, bool gpio_wakeup) {
+  // Only sleep wakes and deliberate restarts (e.g. OTA) keep the lock: better unlocked than locked out
+  const esp_reset_reason_t reset_reason = esp_reset_reason();
+  if (reset_reason != ESP_RST_DEEPSLEEP && reset_reason != ESP_RST_SW && touchbar_locked()) {
+    Log_info("Reset (reason %d) - unlocking the touch bar", (int)reset_reason);
+    preferences.remove(PREFERENCES_TOUCHBAR_LOCKED_KEY);
+  }
+
   // Notify IQS323 task about wakeup type BEFORE starting the task
   if (gpio_wakeup) {
     Log_info("GPIO wakeup detected (%d) - using wake stub data", wakeup_reason);

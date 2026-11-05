@@ -9,6 +9,7 @@
 // Closing the menu keeps the device awake until 20 s pass without a touch, for the next tap.
 // Until the user finishes the touch bar tutorial, any touch shows it instead. While locked (Settings)
 // touches are ignored, except a 5 s middle hold, which asks to confirm with a 3 s hold, then unlocks.
+// Any reset but a deliberate restart (e.g. OTA) also unlocks it.
 
 // Logs the touch bar status the wake stub read before the app started. Called once per wake.
 void touchbar_log_wake_stub_status(void);

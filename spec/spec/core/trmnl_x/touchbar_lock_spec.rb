@@ -162,6 +162,46 @@ RSpec.describe "TRMNL X touch bar: lock", env: "TRMNL_X" do
       end
     end
 
+    { "a reset" => :reset, "a power cycle" => :power_cycle }.each do |name, action|
+      it "unlocks on #{name}" do
+        boot_two_images do |s|
+          lock(s)
+          c = s.status["console_total"]
+          s.public_send(action)
+          s.wait(console: /Reset \(reason \d+\) - unlocking the touch bar/, since: c, timeout: 30)
+          s.wait(state: "deep_sleep", timeout: 60, settle_ms: 500)
+          expect(s.preferences["touch_locked"]).to be_nil
+        end
+      end
+    end
+
+    it "unlocks when the server resets the device" do
+      boot_two_images do |s|
+        lock(s)
+        dev.mock.display = { image: "two", reset_firmware: true, refresh_rate: 300 }
+        s.wake
+        s.wait(portal: true, timeout: 60)
+        expect(s.preferences["touch_locked"]).to be_nil
+      end
+    end
+
+    it "unlocks on the portal's soft reset" do
+      boot_two_images do |s|
+        lock(s)
+        s.set_preference("wifi_0_ssid", "string", "", namespace: "wificaptive") # so the wake opens the portal
+        s.wake
+        boots = s.wait(portal: true, timeout: 60)["status"]["boot_count"]
+        expect(s.preferences["touch_locked"]).to eq("1")
+        begin
+          s.portal_request("/soft-reset", retry_for: 0)
+        rescue *TrmnlSim::Simulator::CONNECTION_ERRORS
+          nil # the device may restart before it answers
+        end
+        s.wait(min_boots: boots + 1, portal: true, timeout: 60)
+        expect(s.preferences["touch_locked"]).to be_nil
+      end
+    end
+
     it "stays locked and goes back to the image on a timeout" do
       boot_two_images do |s, _one, two|
         lock(s)
