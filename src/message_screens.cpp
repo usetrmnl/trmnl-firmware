@@ -149,11 +149,12 @@ static void draw_image_download_failed_message(void) {
   draw_centered_line(string1, 340);
 #ifndef BOARD_TRMNL_X
   const char string2[] = "Short click the button on back";
+  const char string3[] = "to advance to the next screen.";
 #else
-  const char string2[] = "Tap the middle of touch bar for Next Screen";
+  const char string2[] = "Tap the middle of touch bar";
+  const char string3[] = "and choose Next Screen to advance.";
 #endif
   draw_centered_line(string2, -1);
-  const char string3[] = "to advance to the next screen.";
   draw_centered_line(string3, -1);
 }
 
