@@ -12,6 +12,11 @@
 /** Prepare peripherals, enable timer + GPIO wake, enter deep sleep. */
 void goToSleep(void);
 
+#ifdef BOARD_TRMNL_X
+/** Sleeps until the last sleep's timer. Returns without sleeping if it is already due. */
+void goToSleepKeepingTimer(void);
+#endif
+
 /** Sync the clock from NTP and set time_since_sleep from the time goToSleep saved (0 when unsynced). */
 void updateTimeSinceSleep(void);
 
@@ -27,3 +32,6 @@ void config_gpio_for_lp(void);
  * WIFI_FAILED and reset the count (still a timed sleep). Does not return.
  */
 void wifiErrorDeepSleep(void);
+
+/** Restart the device if this wake has not reached deep sleep within 20 minutes. Not used on the X. */
+void awake_time_limit_start(void);

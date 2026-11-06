@@ -32,7 +32,7 @@ public:
     int32_t rssi;
     bool    open;        // true if no encryption (ecn == 0)
     bool    is5GHz;      // true if channel >= 36
-    bool    enterprise;  // true if WPA2-Enterprise (ecn == 5)
+    bool    enterprise;  // true if WPA2/WPA3 Enterprise, including transition mode
   };
   std::vector<ModemNetwork> scanNetworks();
 

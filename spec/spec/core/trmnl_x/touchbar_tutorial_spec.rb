@@ -11,15 +11,18 @@ RSpec.describe "TRMNL X touch bar: tutorial", env: "TRMNL_X" do
     include_context "provisioned X"
 
     # Tap the left, center and right of the touch bar in turn on the tutorial screen (from the
-    # `from`th), then close it with a tap anywhere (the left, here).
+    # `from`th), wait out the fireworks (taps during them don't count, tutorial_celebrate in
+    # src/menu.cpp), then close it with a tap anywhere (the left, here).
     def practice_and_close(s, from: 0)
+      c = s.status["console_total"]
       practice = [["left", /Tutorial: tried Previous/], ["center", /Tutorial: tried Menu/],
                   ["right", /Tutorial: tried Next/]]
       practice.drop(from).each { |zone, log| TrmnlX.menu_tap(s, zone, log) }
+      s.wait(console: /Tutorial: fireworks end/, since: c, timeout: 60)
       c = s.status["console_total"]
       s.touch("left", ms: 150)
       s.wait(console: /Tutorial: done/, since: c, timeout: 15)
-      s.wait(state: "deep_sleep", timeout: 15, settle_ms: 500)
+      s.wait(state: "deep_sleep", timeout: 60, settle_ms: 500)
     end
 
     it "shows on the first touch, until it is finished" do

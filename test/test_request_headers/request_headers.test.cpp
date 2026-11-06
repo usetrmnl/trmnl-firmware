@@ -38,6 +38,7 @@ static ApiDisplayInputs makeDisplayInputs() {
   inputs.usbStatus = UsbStatus::UNKNOWN;
   inputs.imageCached = false;
   inputs.prevWakeTime = 42;
+  inputs.resetReason = "ESP_RST_PANIC";
   return inputs;
 }
 
@@ -124,6 +125,7 @@ void test_display_headers_core_values(void) {
   TEST_ASSERT_EQUAL_STRING("og", valueOf(headers, "Model").c_str());
   TEST_ASSERT_EQUAL_STRING("false", valueOf(headers, "Image-Cached").c_str());
   TEST_ASSERT_EQUAL_STRING("42", valueOf(headers, "Wake-Time").c_str());
+  TEST_ASSERT_EQUAL_STRING("ESP_RST_PANIC", valueOf(headers, "Reset-Reason").c_str());
   TEST_ASSERT_EQUAL_STRING("-55", valueOf(headers, "RSSI").c_str());
   TEST_ASSERT_EQUAL_STRING("true", valueOf(headers, "Temperature-Profile").c_str());
   TEST_ASSERT_EQUAL_STRING("800", valueOf(headers, "Width").c_str());

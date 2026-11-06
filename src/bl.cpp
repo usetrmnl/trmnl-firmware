@@ -13,21 +13,36 @@
 #include <wake_init.h>
 #include <wifi_session.h>
 
+#ifdef BOARD_TRMNL_X
+#include <touchbar_actions.h>
+#endif
+
+// Fetches the screen from /api/display, shows it (or the error), then handles what the response asks for
+static void showScreen(bool should_show_error_now) {
+  https_request_err_e request_result = downloadAndShow(battery_voltage);
+  Log.info("%s [%d]: request result - %s\r\n", __FILE__, __LINE__, https_request_err_str(request_result));
+  showImageTooBigIfNeeded(request_result);
+  applyRetryPolicy(request_result, should_show_error_now); // may sleep
+  submitStoredLogs();
+  showFriendlyIdIfUnregistered(request_result);
+  resetIfRequested(request_result);
+  updateFirmwareIfDue();
+  showRequestResult(request_result);
+}
+
 /**
  * @brief Function to init business logic module
  * @param none
  * @return none
  */
-void bl_init(void)
-{
+void bl_init(void) {
   uint32_t init_time = bootEarly();
   wifiSessionInit();
   initPeripherals();
   WakeContext wake = readWakeContext();
   openPreferences();
   startBoardHardware(wake, init_time);
-  if (wake.reason != ESP_SLEEP_WAKEUP_TIMER)
-    showWakeLogo();
+  if (wake.reason != ESP_SLEEP_WAKEUP_TIMER) showWakeLogo();
   logVersions();
 
   wifiSessionConnect(wake.showErrorsNow);
@@ -37,15 +52,10 @@ void bl_init(void)
   log_retry = true;
 
   // OTA checking, image checking and drawing
-  https_request_err_e request_result = downloadAndShow(battery_voltage);
-  Log.info("%s [%d]: request result - %s\r\n", __FILE__, __LINE__, https_request_err_str(request_result));
-  showImageTooBigIfNeeded(request_result);
-  applyRetryPolicy(request_result, wake.showErrorsNow); // may sleep
-  submitStoredLogs();
-  showFriendlyIdIfUnregistered(request_result);
-  resetIfRequested(request_result);
-  updateFirmwareIfDue();
-  showRequestResult(request_result);
+  showScreen(wake.showErrorsNow);
+#ifdef BOARD_TRMNL_X
+  touchbar_stay_awake([] { showScreen(true); });
+#endif
 
   // display go to sleep
   Log_info("%s [%d]: BL done, going to sleep...", __FILE__, __LINE__);
@@ -58,6 +68,4 @@ void bl_init(void)
  * @param none
  * @return none
  */
-void bl_process(void)
-{
-}
+void bl_process(void) {}

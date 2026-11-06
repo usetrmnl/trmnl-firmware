@@ -9,8 +9,6 @@
 //
 #if defined(BOARD_TRMNL_X)
 #define INCLUDE_CLOCK_X
-#elif defined(BOARD_TRMNL_GEN2)
-#define INCLUDE_CLOCK_GEN2
 #endif
 
 /// @brief System clock: epoch time reads and NTP synchronization.
@@ -29,16 +27,6 @@ public:
 protected:
   /// @brief Perform the synchronization and save `last_sync` on success.
   virtual bool sync(Preferences &prefs, const String &ntpServer);
-
-  /// @brief Wait hook between starting SNTP and checking the result.
-  virtual void waitForSync() {}
-};
-
-/// @brief gen2 (ESP32-C5): NTP never succeeds unless we busy-wait for a valid
-///        time after configTime().
-class ClockGen2 : public Clock {
-protected:
-  void waitForSync() override;
 };
 
 #ifdef INCLUDE_CLOCK_X
