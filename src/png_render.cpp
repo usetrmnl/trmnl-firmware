@@ -408,10 +408,11 @@ int png_draw(PNGDRAW *pDraw) {
   }
   iPitch = bbep.width() / 2;
   if (iBpp == 1) {
+    iPitch = (bbep.width() + 7) / 8; // 1-bit lines, turned or not
     if (!rotated) { // normal orientation
-      iPitch = (bbep.width() + 7) / 8;
       d += y * iPitch; // point to the correct line
       memcpy(d, s, (iWidth + 7) / 8);
+      if (iWidth & 7) d[iWidth / 8] |= 0xff >> (iWidth & 7); // pad bits past the image are white
     } else { // rotated
       uint8_t ucPixel, ucMask, j;
       d += (bbep.height() - 1) * iPitch;
@@ -436,6 +437,7 @@ int png_draw(PNGDRAW *pDraw) {
     if (!rotated) { // normal orientation
       d += y * iPitch; // point to the correct line
       memcpy(d, s, (iWidth + 1) / 2);
+      if (iWidth & 1) d[iWidth / 2] |= 0x0f; // pad pixel past the image is white
     } else { // rotated
       d += (bbep.height() - 1) * iPitch;
       d += (y / 2);
@@ -658,6 +660,11 @@ int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious) {
         break;
       }
       Log_info("%s [%d]: FastEPD graphics mode set to: %d\n", __FILE__, __LINE__, bbep.getMode());
+      { // an image smaller than the panel leaves the rest white (0xff at 1 and 4 bpp)
+        uint8_t *pBuffer = (bPrevious) ? bbep.previousBuffer() : bbep.currentBuffer();
+        int iPitch = (png->getBpp() == 1) ? (bbep.width() + 7) / 8 : bbep.width() / 2;
+        memset(pBuffer, 0xff, iPitch * bbep.height());
+      }
       png->decode((void *)bPrevious, 0);
       png->close();
 #endif
