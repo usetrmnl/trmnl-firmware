@@ -279,6 +279,22 @@ RSpec.describe "TRMNL X touch bar: tap mode", env: "TRMNL_X" do
       end
     end
 
+    # run_menu_screen drops taps made while its screen is drawn
+    it "ignores a double tap's second tap, made while the menu is drawn" do
+      boot_two_images do |s, _one, two|
+        n = dev.mock.cursor
+        c = s.status["console_total"]
+        s.touch("center", ms: 150)
+        s.wait(console: /menu_show_screen start/, since: c, timeout: 30)
+        s.touch("center", ms: 150)
+        s.wait(console: /Menu: timeout - closing/, since: c, timeout: 30)
+        s.wait(state: "deep_sleep", timeout: 60, settle_ms: 500)
+        expect(s.console(c).join("\n")).not_to match(/Menu: chose/)
+        expect(s).to show_image(two, tolerance: 64, max_ratio: 0)
+        expect(dev.mock.paths.drop(n)).to eq([])
+      end
+    end
+
     [1, 2].each do |profile|
       it "Close preserves saved temperature profile #{profile} without an API response" do
         boot_two_images do |s, _one, two|

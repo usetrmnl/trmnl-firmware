@@ -65,8 +65,8 @@ struct menu_controls_t {
   void (*begin)(void);
   void (*end)(void);
   // Polled while a menu screen is up: an input as it starts, then NONE until the next one starts.
-  // The menu draws its response (moves the arrow, shows the next screen) before polling again, so
-  // an input that starts (and ends) during a display update should still be reported after it.
+  // The menu moves the arrow before polling again, so an input that starts (and ends) during that
+  // update should still be reported after it. The menu discards inputs made while a screen is drawn.
   menu_input_t (*read)(void);
   // Whether SELECT is down now
   bool (*select_down)(void);
