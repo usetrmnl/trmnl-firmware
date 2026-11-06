@@ -336,11 +336,10 @@ void touchbar_start(esp_sleep_wakeup_cause_t wakeup_reason, bool gpio_wakeup) {
     ESP.restart();
   }
 
-  // Wait for IQS323 initialization to complete
+  // Without the touch bar the X still refreshes on its timer; restarting would only loop
   if (!iqs323_task_wait_ready(5000)) {
-    Log_error("IQS323 Task: Initialization timeout - rebooting");
-    delay(1000);
-    ESP.restart();
+    Log_error("IQS323 Task: Initialization timeout - running without the touch bar");
+    return;
   }
 
   if (gpio_wakeup) {
