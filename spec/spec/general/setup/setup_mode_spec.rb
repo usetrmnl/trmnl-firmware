@@ -53,7 +53,7 @@ General.describe "Setup mode" do
         # (a slow panel is still showing the message when the chip sleeps)
         st = s.wait_for_deep_sleep(display_idle: true, timeout: 120)
         expect(st["sim_time_s"]).to be >= 15 * 60
-        # "Wifi Captive Portal timed out" / "Press button to try again"
+        # "Wi-Fi setup portal timed out." / "Press the button to try again."
         expect(s).to match_golden("portal_timed_out.png", region: region(:timed_out))
         if device.button?
           s.set_portal_client(true)
