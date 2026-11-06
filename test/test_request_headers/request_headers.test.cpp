@@ -170,6 +170,14 @@ void test_display_headers_special_function_named_when_chosen(void) {
   TEST_ASSERT_EQUAL_STRING("rewind", valueOf(headers, "special_function").c_str());
 }
 
+void test_display_headers_toggle_hold_named_when_chosen(void) {
+  auto inputs = makeDisplayInputs();
+  inputs.specialFunction = SF_TOGGLE_HOLD;
+  inputs.specialFunctionChosen = true;
+  auto headers = buildDisplayHeaders(inputs);
+  TEST_ASSERT_EQUAL_STRING("toggle_hold", valueOf(headers, "special_function").c_str());
+}
+
 void test_display_headers_panel_id_omitted_when_empty(void) {
   auto headers = buildDisplayHeaders(makeDisplayInputs());
   TEST_ASSERT_EQUAL_INT(-1, indexOf(headers, "Panel-Rev"));
@@ -265,6 +273,7 @@ void process() {
   RUN_TEST(test_display_headers_special_function_omitted_when_none);
   RUN_TEST(test_display_headers_special_function_present_when_set);
   RUN_TEST(test_display_headers_special_function_named_when_chosen);
+  RUN_TEST(test_display_headers_toggle_hold_named_when_chosen);
   RUN_TEST(test_display_headers_panel_id_omitted_when_empty);
   RUN_TEST(test_display_headers_panel_id_present_when_set);
   RUN_TEST(test_display_headers_wifi_band_2_4);

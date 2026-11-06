@@ -346,6 +346,29 @@ RSpec.describe "TRMNL X touch bar: tap mode", env: "TRMNL_X" do
         expect(s).to show_image(two, tolerance: 64, max_ratio: 0)
       end
     end
+
+    it "Toggle Hold Screen asks the server for it by name and shows its answer" do
+      boot_two_images do |s|
+        three = set_digits(dev.mock, "three", "3")
+        dev.mock.display = { image: "three", action: "guest_mode", refresh_rate: 300, special_function: nil }
+        c = s.status["console_total"]
+        s.touch("center", ms: 150)
+        s.wait(console: /menu_show_screen end/, since: c, timeout: 30)
+        TrmnlX.menu_tap(s, "right", /Next Screen -> Previous Screen/)
+        TrmnlX.menu_tap(s, "right", /Previous Screen -> Touchbar Tutorial/)
+        TrmnlX.menu_tap(s, "right", /Touchbar Tutorial -> Special/)
+        TrmnlX.menu_tap(s, "center", /chose Special/, screen: true)
+        TrmnlX.menu_tap(s, "right", /Identify -> Restart Playlist/)
+        TrmnlX.menu_tap(s, "right", /Restart Playlist -> Send to Me/)
+        TrmnlX.menu_tap(s, "right", /Send to Me -> Guest Mode/)
+        TrmnlX.menu_tap(s, "right", /Guest Mode -> Toggle Hold Screen/)
+        req = dev.mock.next_request("/api/display", timeout: 30) { s.touch("center", ms: 150) }
+        expect(req).to have_header("special_function", "toggle_hold")
+        dev.mock.wait_for_request("/images/three.png", timeout: 30)
+        s.wait(state: "deep_sleep", timeout: 60, settle_ms: 500)
+        expect(s).to show_image(three, tolerance: 64, max_ratio: 0)
+      end
+    end
   end
 
   describe "WifiResetConfirmation" do

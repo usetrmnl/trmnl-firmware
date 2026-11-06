@@ -292,11 +292,8 @@ struct special_menu_item_t {
 };
 
 static const special_menu_item_t special_menu_items[] = {
-    {"Identify", SF_IDENTIFY},
-    {"Restart Playlist", SF_RESTART_PLAYLIST},
-    {"Send to Me", SF_SEND_TO_ME},
-    {"Guest Mode", SF_GUEST_MODE},
-    {"Back", SF_NONE},
+    {"Identify", SF_IDENTIFY},     {"Restart Playlist", SF_RESTART_PLAYLIST}, {"Send to Me", SF_SEND_TO_ME},
+    {"Guest Mode", SF_GUEST_MODE}, {"Toggle Hold Screen", SF_TOGGLE_HOLD},    {"Back", SF_NONE},
 };
 #define SPECIAL_MENU_COUNT ((int)(sizeof(special_menu_items) / sizeof(special_menu_items[0])))
 
