@@ -241,6 +241,9 @@ static int run_menu_screen(const char *const *labels, int count, bool replace, c
                            bool battery = false) {
   menu_view_t view = {labels, count, selected, body, body_count, menu_controls->hints, battery};
   menu_show_screen(view, replace);
+  // Drop taps made before the screen was up, such as the second tap of a double tap
+  while (menu_controls->read() != menu_input_t::NONE) {
+  }
 
   int chosen = -1;
   unsigned long last_input = millis();
