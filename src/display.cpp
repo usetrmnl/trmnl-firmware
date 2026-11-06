@@ -354,6 +354,8 @@ static bool draw_image(uint8_t *image_buffer, int data_size, int *pRefreshMode, 
 
 // Saves the temperature profile the server asked for, when it changed
 static void save_temp_profile_from_api(void) {
+  // Cached/menu redraws can happen before this wake has fetched a display response.
+  if (!apiDisplayResult.received) return;
   if (iTempProfile != apiDisplayResult.response.temp_profile) {
     iTempProfile = apiDisplayResult.response.temp_profile;
     Log_info("Saving new temperature profile (%" PRIu32 ") to FLASH", iTempProfile);

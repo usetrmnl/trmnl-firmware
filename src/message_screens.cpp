@@ -5,6 +5,7 @@
 #include <trmnl_log.h>
 
 #include "Group5.h"
+#include "displayed_image.h"
 #include "fonts.h"
 #include "messages.h"
 #include "wifi_connect_qr.h"
@@ -35,10 +36,10 @@ static void draw_modem_flashing_message(void) {
 }
 
 static void draw_modem_flash_failed_message(const char *message_text) {
-  const char string1[] = "Failed to flash modem firmware,";
+  const char string1[] = "Failed to flash modem firmware.";
   draw_centered_line(string1, 430);
 
-  const char string2[] = "device would only operate with 2.4Ghz WiFi.";
+  const char string2[] = "The device will only support 2.4 GHz Wi-Fi.";
   draw_centered_line(string2, 500);
   if (message_text) {
     draw_centered_line(message_text, 570);
@@ -49,7 +50,7 @@ static void draw_ready_to_ship_message(void) {
   const char string1[] = "Device is ready to ship!";
   draw_centered_line(string1, 430);
 
-  const char string2[] = "Unplug the USB-C to complete shutdown.";
+  const char string2[] = "Unplug the USB-C cable to finish shutting down.";
   draw_centered_line(string2, 500);
 }
 
@@ -57,12 +58,12 @@ static void draw_shipping_mode_message(void) {
   const char string1[] = "Welcome to TRMNL.";
   draw_centered_line(string1, 430);
 
-  const char string2[] = "Attach the dock and a USB-C to get started.";
+  const char string2[] = "Attach the dock and a USB-C cable to get started.";
   draw_centered_line(string2, 500);
 }
 
 static void draw_wifi_connect_message(void) {
-  const char string1[] = "Connect to TRMNL WiFi";
+  const char string1[] = "Connect to TRMNL Wi-Fi";
   draw_centered_line(string1, 430);
   const char string2[] = "on your phone or computer";
   draw_centered_line(string2, -1);
@@ -79,14 +80,14 @@ static void draw_wifi_failed_message(void) {
   bbep.setCursor(80, 104); // place in upper left corner
 #endif
   bbep.println(string0);
-  const char string1[] = "Can't establish WiFi connection. Will keep trying.";
+  const char string1[] = "Can't connect to Wi-Fi. Will keep trying.";
   bbep.getStringBox(string1, &rect);
   bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - (rect.h * 2) - 140);
   bbep.println(string1);
 #ifndef BOARD_TRMNL_X
-  const char string2[] = "Hold button on the back to reset WiFi, or scan QR Code for help.";
+  const char string2[] = "Hold the button on the back to reset Wi-Fi, or scan the QR code for help.";
 #else
-  const char string2[] = "Hold left and right corner of touch bar to reset WiFi, or scan QR Code for help.";
+  const char string2[] = "Tap the middle of the touch bar for Settings > Reset Wi-Fi, or scan the QR code for help.";
 #endif
   draw_centered_line(string2, -1);
 #ifdef __BB_EPAPER__
@@ -99,7 +100,7 @@ static void draw_wifi_failed_message(void) {
 static void draw_wifi_internal_error_message(void) {
   BB_RECT rect;
 
-  const char string1[] = "WiFi connected, but";
+  const char string1[] = "Wi-Fi connected, but";
 #ifdef __BB_EPAPER__
   int x = 132;
 #else
@@ -112,15 +113,15 @@ static void draw_wifi_internal_error_message(void) {
   bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - (rect.h * 2) - 140);
 #endif
   bbep.println(string1);
-  const char string2[] = "API connection cannot be";
+  const char string2[] = "can't connect to the API.";
   bbep.getStringBox(string2, &rect);
   bbep.setCursor((bbep.width() - x - rect.w) / 2, -1);
   bbep.println(string2);
-  const char string3[] = "established. Try to refresh,";
+  const char string3[] = "Try refreshing, or scan";
   bbep.getStringBox(string3, &rect);
   bbep.setCursor((bbep.width() - x - rect.w) / 2, -1);
   bbep.println(string3);
-  const char string4[] = "or scan QR Code for help.";
+  const char string4[] = "the QR code for help.";
   bbep.getStringBox(string4, &rect);
   bbep.setCursor((bbep.width() - x - rect.w) / 2, -1);
   bbep.print(string4);
@@ -134,7 +135,7 @@ static void draw_wifi_internal_error_message(void) {
 static void draw_wifi_weak_message(void) {
   BB_RECT rect;
 
-  const char string1[] = "WiFi connected but signal is weak";
+  const char string1[] = "Wi-Fi connected, but the signal is weak.";
   bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
   bbep.setCursor((bbep.width() - rect.w) / 2, 400);
@@ -145,35 +146,36 @@ static void draw_wifi_weak_message(void) {
 }
 
 static void draw_image_download_failed_message(void) {
-  const char string1[] = "API responded, but image download failed.";
+  const char string1[] = "API responded, but the image download failed.";
   draw_centered_line(string1, 340);
 #ifndef BOARD_TRMNL_X
-  const char string2[] = "Short click the button on back";
+  const char string2[] = "Press the button on the back";
+  const char string3[] = "to advance to the next screen.";
 #else
-  const char string2[] = "Tap the middle of touch bar";
+  const char string2[] = "Tap the middle of the touch bar";
+  const char string3[] = "and choose Next Screen to advance.";
 #endif
   draw_centered_line(string2, -1);
-  const char string3[] = "to advance to the next screen.";
   draw_centered_line(string3, -1);
 }
 
 static void draw_api_unable_to_connect_message(void) {
-  const char string1[] = "WiFi connected, unable connect to API.";
+  const char string1[] = "Wi-Fi connected, but can't reach the API.";
   draw_centered_line(string1, 340);
 #ifndef BOARD_TRMNL_X
-  const char string2[] = "Short click the button on back,";
+  const char string2[] = "Press the button on the back to retry,";
 #else
-  const char string2[] = "Tap the middle of touch bar,";
+  const char string2[] = "Tap the right side of the touch bar to try again,";
 #endif
   draw_centered_line(string2, -1);
-  const char string3[] = "otherwise check your internet.";
+  const char string3[] = "or check your internet connection.";
   draw_centered_line(string3, -1);
 }
 
 static void draw_api_setup_failed_message(void) {
   BB_RECT rect;
 
-  const char string1[] = "WiFi connected, /api/setup returned error.";
+  const char string1[] = "Wi-Fi connected, but /api/setup returned an error.";
   bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
   bbep.setCursor((bbep.width() - rect.w) / 2, 340);
@@ -182,19 +184,19 @@ static void draw_api_setup_failed_message(void) {
 #endif
   bbep.println(string1);
 #ifndef BOARD_TRMNL_X
-  const char string2[] = "Short click the button on back,";
+  const char string2[] = "Press the button on the back to retry,";
 #else
-  const char string2[] = "Tap the middle of touch bar,";
+  const char string2[] = "Tap the right side of the touch bar to try again,";
 #endif
   draw_centered_line(string2, -1);
-  const char string3[] = "otherwise check your internet.";
+  const char string3[] = "or check your internet connection.";
   draw_centered_line(string3, -1);
 }
 
 static void draw_api_size_error_message(void) {
   BB_RECT rect;
 
-  const char string1[] = "WiFi connected, TRMNL content malformed.";
+  const char string1[] = "Wi-Fi connected, but TRMNL content is malformed.";
   bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
   bbep.setCursor((bbep.width() - rect.w) / 2, 400);
@@ -203,20 +205,20 @@ static void draw_api_size_error_message(void) {
 #endif
   bbep.println(string1);
 #ifndef BOARD_TRMNL_X
-  const char string2[] = "Wait or reset by holding button on back.";
+  const char string2[] = "Wait, or hold the button on the back to reset.";
 #else
-  const char string2[] = "Wait or reset by holding left and right corner of touch bar.";
+  const char string2[] = "Wait, or tap the middle of the touch bar for Settings > Reset Wi-Fi.";
 #endif
   draw_centered_line(string2, -1);
 }
 
 static void draw_api_firmware_update_error_message(void) {
-  const char string1[] = "WiFi connected, could not get firmware update from api.";
+  const char string1[] = "Wi-Fi connected, but the firmware update download failed.";
   draw_centered_line(string1, 400);
 #ifndef BOARD_TRMNL_X
-  const char string2[] = "Wait or reset by holding button on back.";
+  const char string2[] = "Wait, or hold the button on the back to reset.";
 #else
-  const char string2[] = "Wait or reset by holding left and right corner of touch bar.";
+  const char string2[] = "Wait, or tap the middle of the touch bar for Settings > Reset Wi-Fi.";
 #endif
   draw_centered_line(string2, -1);
 }
@@ -224,7 +226,7 @@ static void draw_api_firmware_update_error_message(void) {
 static void draw_wifi_image_timeout_message(void) {
   BB_RECT rect;
 
-  const char string1[] = "Image download timed out; check your network status.";
+  const char string1[] = "Image download timed out. Check your network connection.";
   bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
   bbep.setCursor((bbep.width() - rect.w) / 2, 400);
@@ -235,12 +237,12 @@ static void draw_wifi_image_timeout_message(void) {
 }
 
 static void draw_api_image_download_error_message(void) {
-  const char string1[] = "WiFi connected, API could not deliver image to device.";
+  const char string1[] = "Wi-Fi connected, but the API couldn't deliver the image.";
   draw_centered_line(string1, 400);
 #ifndef BOARD_TRMNL_X
-  const char string2[] = "Wait or reset by holding button on back.";
+  const char string2[] = "Wait, or hold the button on the back to reset.";
 #else
-  const char string2[] = "Wait or reset by holding left and right corner of touch bar.";
+  const char string2[] = "Wait, or tap the middle of the touch bar for Settings > Reset Wi-Fi.";
 #endif
   draw_centered_line(string2, -1);
 }
@@ -261,7 +263,7 @@ static void draw_fw_update_message(void) {
 static void draw_fw_update_failed_message(void) {
   BB_RECT rect;
 
-  const char string1[] = "Firmware update failed. Device will restart...";
+  const char string1[] = "Firmware update failed. Will try again tomorrow.";
   bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
   bbep.setCursor((bbep.width() - rect.w) / 2, 400);
@@ -274,7 +276,7 @@ static void draw_fw_update_failed_message(void) {
 static void draw_fw_update_success_message(void) {
   BB_RECT rect;
 
-  const char string1[] = "Firmware update success. Device will restart...";
+  const char string1[] = "Firmware update complete. Device will restart...";
   bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
   bbep.setCursor((bbep.width() - rect.w) / 2, 400);
@@ -306,12 +308,12 @@ static void draw_msg_too_big_message(void) {
   }
   draw_centered_line(filename, -1);
 
-  const char string2[] = "PNG images can be a maximum of";
+  const char string2[] = "PNG images must be at most";
   draw_centered_line(string2, -1);
 #ifdef __BB_EPAPER__
-  String string3 = String(MAX_IMAGE_SIZE) + String(" bytes each and 1 or 2-bpp");
+  String string3 = String(MAX_IMAGE_SIZE) + String(" bytes and 1 or 2 bpp.");
 #else
-  String string3 = String(MAX_IMAGE_SIZE) + String(" bytes each");
+  String string3 = String(MAX_IMAGE_SIZE) + String(" bytes.");
 #endif
   draw_centered_line(string3.c_str(), -1);
 }
@@ -319,7 +321,7 @@ static void draw_msg_too_big_message(void) {
 static void draw_msg_format_error_message(void) {
   BB_RECT rect;
 
-  const char string1[] = "The image format is incorrect";
+  const char string1[] = "The image format is not supported.";
   bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
   bbep.setCursor((bbep.width() - rect.w) / 2, 400);
@@ -353,7 +355,7 @@ static void draw_fill_white_message(void) {
 static void draw_wifi_retry_limit_message(void) {
   BB_RECT rect;
 
-  const char string1[] = "Maximum WiFi retries reached.";
+  const char string1[] = "Wi-Fi retry limit reached.";
   bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
   bbep.setCursor((bbep.width() - rect.w) / 2, 340);
@@ -361,16 +363,16 @@ static void draw_wifi_retry_limit_message(void) {
   bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 140 - (rect.h * 3));
 #endif
   bbep.println(string1);
-  const char string2[] = "Press button to manually refresh.";
+  const char string2[] = "Press the button to refresh manually.";
   draw_centered_line(string2, -1);
-  const char string3[] = "Hold button to reset WiFi and try another network.";
+  const char string3[] = "Hold the button to reset Wi-Fi and pick another network.";
   draw_centered_line(string3, -1);
 }
 
 static void draw_captive_wifi_timeout_message(void) {
   BB_RECT rect;
 
-  const char string1[] = "Wifi Captive Portal timed out";
+  const char string1[] = "Wi-Fi setup portal timed out.";
   bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
   bbep.setCursor((bbep.width() - rect.w) / 2, 340);
@@ -379,15 +381,17 @@ static void draw_captive_wifi_timeout_message(void) {
 #endif
   bbep.println(string1);
 #ifdef BOARD_TRMNL_X
-  const char string2[] = "Tap touchbar to try again";
+  const char string2[] = "Tap the touch bar to try again.";
 #else
-  const char string2[] = "Press button to try again";
+  const char string2[] = "Press the button to try again.";
 #endif
   draw_centered_line(string2, -1);
 }
 
 // Message screens are 1-bit
 static void begin_message_screen(void) {
+  DisplayedImage::cover(); // the next wake redraws the screen the message replaces
+  need_to_refresh_display = 1;
 #ifdef BB_EPAPER
   display_prepare_message();
 #else
@@ -402,7 +406,7 @@ static void draw_centered_logo(uint8_t *image_buffer) {
   UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
 
   if (image_buffer && *(uint16_t *)image_buffer == BB_BITMAP_MARKER) {
-        // G5 compressed image
+    // G5 compressed image
     BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
     int x = (width - pBBB->width) / 2;
     int y = (height - pBBB->height) / 2; // center it
@@ -569,9 +573,8 @@ void display_show_msg_qa(const float *voltage, const float *temperature, bool qa
 
   draw_centered_line(temperatureString.c_str(), 370);
 
-  String qaResultInstruction = (qa_result)
-                                 ? "QA passed, press button to clear screen"
-                                 : "QA failed, please use another board and put in failure pile for investigation";
+  String qaResultInstruction = (qa_result) ? "QA passed. Press the button to clear the screen."
+                                           : "QA failed. Put this board in the failure pile and use another.";
 
   draw_centered_line(qaResultInstruction.c_str(), 400);
 
@@ -590,10 +593,10 @@ void display_show_msg_qa(const float *voltage, const float *temperature, bool qa
   bbep.fullUpdate();
 #endif
   Log_info("display_show_msg end");
-    /*
-const char string2[] = "PNG images can be a maximum of";
+  /*
+const char string2[] = "PNG images must be at most";
 draw_centered_line(string2, -1);
-String string3 = String(MAX_IMAGE_SIZE) + String(" bytes each and 1 or 2-bpp");
+String string3 = String(MAX_IMAGE_SIZE) + String(" bytes and 1 or 2 bpp.");
 draw_centered_line(string3.c_str(), -1);
 */
 }
@@ -605,7 +608,7 @@ static bool clear_for_wifi_connect_setup(void) {
 #ifdef BB_EPAPER
   if (!display_update_epaper(apiDisplayResult.response.maximum_compatibility ? REFRESH_FULL : REFRESH_FAST, true, true,
                              PLANE_0)) {
-    Log_error("display_show_msg: WiFi connect update failed");
+    Log_error("display_show_msg: Wi-Fi connect update failed");
     bbep.freeBuffer();
     return false;
   }

@@ -33,9 +33,46 @@ module Builds
     "no #{env} merged_firmware.bin + .elf at #{for_env(env)} (pio run -e #{env})" unless built?(env)
   end
 
+  # The newest release tag below this firmware's version: the stable release the fleet updates from
+  # (nil: no tags).
+  def previous_release = releases_below.last
+
+  # The release before that: the one most TRMNL X are unboxed on in shipment mode.
+  def factory_release = releases_below[-2]
+
+  # Release tags below this firmware's version, oldest first. A shallow checkout (CI) has no tags:
+  # then origin's.
+  def releases_below
+    @releases_below ||= begin
+      current = Gem::Version.new(fw_version)
+      tags = `git -C #{FIRMWARE} tag -l "v*"`.split
+      tags = `git -C #{FIRMWARE} ls-remote --tags --refs origin "v*"`.scan(%r{refs/tags/(\S+)}).flatten if tags.empty?
+      tags.grep(/\Av\d+\.\d+\.\d+\z/).select { Gem::Version.new(_1[1..]) < current }.sort_by { Gem::Version.new(_1[1..]) }
+    end
+  end
+
+  # The TRMNL_X build of release `tag` (rake "firmware:build_release[<tag>]").
+  def release(tag) = File.join(HERE, "tmp/releases", tag, "TRMNL_X")
+
+  # Why the tests that boot release `tag` can't run (nil: they can).
+  def release_missing(tag)
+    return "not enough release tags below #{fw_version} in #{FIRMWARE}" if tag.nil?
+    return if %w[merged_firmware.bin merged_firmware.elf].all? { File.exist?(File.join(release(tag), _1)) }
+
+    "no #{tag} build at #{release(tag)} (rake \"firmware:build_release[#{tag}]\")"
+  end
+
   # The environment of one of these builds (`for_env`).
   def env_of(build) = File.basename(File.expand_path(build.to_s))
 
   # The device a build directory is for (nil: unknown).
   def device_of(build) = Devices::BY_ENV[env_of(build)]
+
+  # The firmware's version ("1.8.19"), as FW_VERSION_STRING in include/config.h makes it.
+  def fw_version
+    config = File.read(File.join(FIRMWARE, "include/config.h"))
+    %w[MAJOR MINOR PATCH].map do |part|
+      config[/^#define FW_#{part}_VERSION\s+(\d+)/, 1] or raise "no FW_#{part}_VERSION"
+    end.join(".")
+  end
 end

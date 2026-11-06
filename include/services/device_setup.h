@@ -51,6 +51,11 @@ public:
   DeviceSetupResult perform();
 
 protected:
+  // True when bytes (at least 4 of them) start with the PNG signature.
+  static bool isPng(const uint8_t *bytes) {
+    return bytes[0] == 0x89 && bytes[1] == 'P' && bytes[2] == 'N' && bytes[3] == 'G';
+  }
+
   /// @brief Call the /api/setup endpoint.
   virtual ApiSetupResult callSetupApi(ApiSetupInputs &inputs);
 

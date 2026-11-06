@@ -38,6 +38,7 @@ struct ApiDisplayResponse {
   bool reset_firmware;
   SPECIAL_FUNCTION special_function;
   String action;
+  String verbose_logging;
 };
 
 struct ApiDisplayInputs {
@@ -77,6 +78,7 @@ struct ApiDisplayInputs {
   UsbStatus usbStatus;
   bool imageCached;
   int prevWakeTime;
+  String resetReason; // esp_reset_reason_t name of this boot, e.g. ESP_RST_PANIC
 };
 
 using ApiSetupInputs = ApiDisplayInputs;

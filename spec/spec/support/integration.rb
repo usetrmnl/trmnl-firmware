@@ -20,13 +20,14 @@ module Integration
     # A simulator (see Sims.start); with a block, closed after it.
     def sim(build = self.build, **, &) = Sims.start(build, **, &)
 
-    # A factory-fresh device, offline, with its setup portal up (and then `settled`, e.g. the
-    # screen drawn: display_idle:, min_refreshes:). `sim_kw` go to `sim` (networks:...). With a
-    # block: closed after it.
+    # A factory-fresh device, offline, with its setup portal up and serial logging on (and then
+    # `settled`, e.g. the screen drawn: display_idle:, min_refreshes:). `sim_kw` go to `sim`
+    # (networks:...). With a block: closed after it.
     def fresh_device(settled: {}, **sim_kw, &block)
       s = sim(erase: true, extra_args: ["--offline"], **sim_kw)
       begin
         s.wait(portal: true, timeout: 90)
+        s.portal_enable_verbose_logging
         s.wait(**settled, timeout: 60) if settled.any?
       rescue Exception # rubocop:disable Lint/RescueException -- don't leave the simulator behind
         s.close
