@@ -19,6 +19,94 @@ void showMessageWithLogo(MSG message_type);
 // 15 minute timeout to prevent dead batteries
 #define PORTAL_TIMEOUT (15 * 60 * 1000)
 
+ESP_EVENT_DEFINE_BASE(WIFI_CAPTIVE_FLUSH_EVENT);
+
+static bool apStarted() {
+#if ESP_ARDUINO_VERSION_MAJOR >= 3
+  return WiFi.AP.started();
+#else
+  return (WiFi.getStatusBits() & AP_STARTED_BIT) != 0;
+#endif
+}
+
+// Waits for the AP start or stop to reach Arduino, then for the default event
+// loop to finish every handler queued before now, including ESP-IDF's own netif
+// handler for that start or stop event.
+static bool waitForApStarted(bool started, uint32_t timeout_ms) {
+  uint32_t start = millis();
+  while (apStarted() != started) {
+    if (millis() - start > timeout_ms) {
+      return false;
+    }
+    delay(10);
+  }
+
+  SemaphoreHandle_t done = xSemaphoreCreateBinary();
+  if (done == NULL) {
+    return false;
+  }
+  esp_event_handler_instance_t instance;
+  esp_err_t err = esp_event_handler_instance_register(
+    WIFI_CAPTIVE_FLUSH_EVENT, 0,
+    [](void *arg, esp_event_base_t, int32_t, void *) { xSemaphoreGive(static_cast<SemaphoreHandle_t>(arg)); }, done,
+    &instance);
+  bool flushed = false;
+  if (err == ESP_OK) {
+    if (esp_event_post(WIFI_CAPTIVE_FLUSH_EVENT, 0, NULL, 0, pdMS_TO_TICKS(timeout_ms)) == ESP_OK) {
+      flushed = xSemaphoreTake(done, pdMS_TO_TICKS(timeout_ms)) == pdTRUE;
+    }
+    esp_event_handler_instance_unregister(WIFI_CAPTIVE_FLUSH_EVENT, 0, instance);
+  }
+  vSemaphoreDelete(done);
+  return flushed;
+}
+
+// Restarts the Wi-Fi driver in AP mode with AMPDU RX disabled, which fixes
+// captive portal connections from some Android phones.
+//
+// Each start and stop must be fully handled before the next step. If
+// esp_wifi_stop() runs while WIFI_EVENT_AP_START is still queued, ESP-IDF's
+// handler for it fails with ESP_ERR_WIFI_STOP_STATE (12308, "netstack cb reg
+// failed") and the AP has no network stack.
+static void restartApWithoutAmpduRx() {
+  if (!waitForApStarted(true, 1000)) {
+    Log_error("WiFi: AP did not start before the AMPDU RX restart");
+  }
+
+  esp_err_t err = esp_wifi_stop();
+  if (err != ESP_OK) {
+    Log_error("WiFi: esp_wifi_stop failed: %s", esp_err_to_name(err));
+    return;
+  }
+  if (!waitForApStarted(false, 1000)) {
+    Log_error("WiFi: AP did not stop before the AMPDU RX restart");
+  }
+
+  err = esp_wifi_deinit();
+  if (err != ESP_OK) {
+    Log_error("WiFi: esp_wifi_deinit failed: %s", esp_err_to_name(err));
+    esp_wifi_start();
+    return;
+  }
+
+  wifi_init_config_t config = WIFI_INIT_CONFIG_DEFAULT();
+  config.ampdu_rx_enable = false;
+  err = esp_wifi_init(&config);
+  if (err != ESP_OK) {
+    Log_error("WiFi: esp_wifi_init without AMPDU RX failed: %s", esp_err_to_name(err));
+    return;
+  }
+  esp_wifi_set_mode(WIFI_MODE_AP);
+  err = esp_wifi_start();
+  if (err != ESP_OK) {
+    Log_error("WiFi: esp_wifi_start without AMPDU RX failed: %s", esp_err_to_name(err));
+    return;
+  }
+  if (!waitForApStarted(true, 1000)) {
+    Log_error("WiFi: AP did not restart without AMPDU RX");
+  }
+}
+
 void WifiCaptive::setUpDNSServer(DNSServer &dnsServer, const IPAddress &localIP) {
   dnsServer.setTTL(3600);
   dnsServer.start(53, "*", localIP);
@@ -39,6 +127,8 @@ bool WifiCaptive::startPortal() {
 
     // Set the WiFi mode to access point and station
   WiFi.mode(WIFI_MODE_AP);
+
+  restartApWithoutAmpduRx();
 
     // Define the subnet mask for the WiFi network
   const IPAddress subnetMask(255, 255, 255, 0);
