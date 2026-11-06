@@ -37,6 +37,39 @@ General.describe "OTA updates" do
       end
     end
 
+    # The failure message covers the screen; an answer that hasn't changed must still redraw it.
+    def expect_a_redraw_on_the_next_wake(answer)
+      m = dev.mock
+      m.display = answer.merge(update_firmware: true, firmware_url: "#{m.device_url}/missing.bin")
+      dev.boot do |s|
+        expect_to_keep_running_the_old_firmware(s, "/missing.bin")
+        n = m.cursor
+        refreshes = s.status["display_refreshes"]
+        s.wake
+        m.wait_for_request("/api/display", after: n, timeout: 20)
+        s.wait_for_deep_sleep(timeout: 20)
+        expect(s.status["display_refreshes"]).to be > refreshes
+      end
+    end
+
+    it "redraws the screen on the next wake after a failed update" do
+      expect_a_redraw_on_the_next_wake(image: "default", filename: "plugin-a1b2c3", refresh_rate: 300)
+    end
+
+    it "redraws the friendly id on the next wake after a failed update while not added to an account" do
+      expect_a_redraw_on_the_next_wake(status: 202, refresh_rate: 300)
+    end
+
+    it "wakes after 30 s to replace the failed update message" do
+      m = dev.mock
+      m.display = { image: "default", refresh_rate: 900, update_firmware: true,
+                    firmware_url: "#{m.device_url}/missing.bin" }
+      dev.boot do |s|
+        st = expect_to_keep_running_the_old_firmware(s, "/missing.bin")
+        expect(st["wake_at_s"] - st["sim_time_s"]).to be_within(5).of(30)
+      end
+    end
+
     it "survives a download cut short",
        skip: "slow: after the connection drops, Update.writeStream waits well over 20 s for the rest of the firmware" do
       update_from("/firmware.bin", File.binread(File.join(dev.build, "firmware.bin")))

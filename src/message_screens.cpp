@@ -5,6 +5,7 @@
 #include <trmnl_log.h>
 
 #include "Group5.h"
+#include "displayed_image.h"
 #include "fonts.h"
 #include "messages.h"
 #include "wifi_connect_qr.h"
@@ -261,7 +262,7 @@ static void draw_fw_update_message(void) {
 static void draw_fw_update_failed_message(void) {
   BB_RECT rect;
 
-  const char string1[] = "Firmware update failed. Device will restart...";
+  const char string1[] = "Firmware update failed. Will try again tomorrow.";
   bbep.getStringBox(string1, &rect);
 #ifdef __BB_EPAPER__
   bbep.setCursor((bbep.width() - rect.w) / 2, 400);
@@ -388,6 +389,8 @@ static void draw_captive_wifi_timeout_message(void) {
 
 // Message screens are 1-bit
 static void begin_message_screen(void) {
+  DisplayedImage::cover(); // the next wake redraws the screen the message replaces
+  need_to_refresh_display = 1;
 #ifdef BB_EPAPER
   display_prepare_message();
 #else
