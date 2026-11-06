@@ -47,7 +47,8 @@ echo "⚡ Flashing firmware (chip: $CHIP, mode: $MODE_LABEL)..."
 if PYTHONIOENCODING=utf-8 $ESPTOOL --chip "$CHIP" --baud "$BAUD_RATE" "${EXTRA_OPTS[@]}" write_flash "${WRITE_OPTS[@]}" 0x0000 "$FIRMWARE_FILE"; then
     echo ""
     echo "✅ Flash completed successfully!"
-    echo "🔄 Device will reboot automatically"
+    echo "If the device does not restart, reset it manually."
+    echo "TRMNL X: perform a soft reset after flashing so the modem firmware can be updated."
     echo ""
 else
     echo ""
