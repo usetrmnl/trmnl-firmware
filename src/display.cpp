@@ -153,6 +153,12 @@ void display_init(void) {
     panel_rev = get_panel_rev();
     panel_rev_read = true;
     Log_info("Panel ID = 0x%08x\n", panel_rev);
+#ifdef BOARD_XTEINK_X3
+        // Xteink ships the X3 with a UC8253 or a UC8279d on the same board; the UC8279d reports 0x66 in REV
+    if ((panel_rev & 0xff) == 0x66) {
+      pDevice = find_device("xteink_x3_uc8279");
+    }
+#endif
   }
   if (pDevice->epd_mosi_pin != 0 || pDevice->epd_sck_pin != 0) {
     bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit); // must be set BEFORE calling initio

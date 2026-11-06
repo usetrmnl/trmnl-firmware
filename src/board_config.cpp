@@ -37,6 +37,7 @@ const TRMNL_DEVICE device_list[] =
   "og_gen2_4clr",  6,    1,     4,   2,    5,   0,    23,   10,   3,     0xff, 0xff,    0xff,   BATT_BQ27427,  EPD_75_4CLR, // fake battery == 0xff
   "xteink_x4",     8,    10,    21,  5,    4,   6,    0xff, 0xff, 3,     0,    0xff,    0xff,   BATT_ADC,  EPD_426,
   "xteink_x3",     8,    10,    21,  5,    4,   6,    20,   0,    3,     0xff, 0xff,    0xff,   BATT_BQ27220,  EPD_368,
+  "xteink_x3_uc8279", 8,    10,    21,  5,    4,   6,    20,   0,    3,     0xff, 0xff,    0xff,   BATT_BQ27220,  EPD_368_UC8279,
   "waveshare",     13,   14,    15,  26,   27,  25,   0xff, 0xff, 33,    0xff, 0xff,    0xff,   BATT_ADC,  EPD_75,
   "waveshare_397", 11,   12,    10,  46,   9,   3,    41,   42,   0,     0xff, 0xff,    0xff,   BATT_AXP2101,  EPD_397,
   "seeed_sticky",  13,   14,    15,  17,   16,  18,   1,    0,    4,     0xff, 0xff,    0xff,   BATT_BQ27220,  EPD_397,  
@@ -60,7 +61,7 @@ const TRMNL_DEVICE device_list[] =
 // TRMNL SPI ePaper panel types list. The list order is fixed and based on enumerated values
 // N.B. ALWAYS ADD NEW PANELS TO THE END OF THE LIST
 // clang-format off
-const DISPLAY_PROFILE dpList[12][3] = { // 1-bit and 2-bit display types for each profile
+const DISPLAY_PROFILE dpList[13][3] = { // 1-bit and 2-bit display types for each profile
     {{EP75_800x480, EP75_800x480_4GRAY}, {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, {EP75_800x480, EP75_800x480_4GRAY_V2}},
     {{EP426_800x480, EP426_800x480_4GRAY}, {EP426_800x480, EP426_800x480_4GRAY}, {EP426_800x480, EP426_800x480_4GRAY}},
     {{EP397_800x480, EP397_800x480_4GRAY}, {EP397_800x480, EP397_800x480_4GRAY}, {EP397_800x480, EP397_800x480_4GRAY}},
@@ -73,20 +74,29 @@ const DISPLAY_PROFILE dpList[12][3] = { // 1-bit and 2-bit display types for eac
     {{EPD_M5_PAPER_COLOR, EPD_M5_PAPER_COLOR},{EPD_M5_PAPER_COLOR, EPD_M5_PAPER_COLOR},{EPD_M5_PAPER_COLOR, EPD_M5_PAPER_COLOR}},
     {{EPD_SEEED_E1004, EPD_SEEED_E1004},{EPD_SEEED_E1004, EPD_SEEED_E1004},{EPD_SEEED_E1004, EPD_SEEED_E1004}},
     {{EP368_792x528, EP368_792x528_4GRAY}, {EP368_792x528, EP368_792x528_4GRAY}, {EP368_792x528, EP368_792x528_4GRAY}},
+#ifdef BOARD_XTEINK_X3 // the other envs pin bb_epaper versions without the UC8279 panels
+    {{EP368_792x528_UC8279, EP368_792x528_UC8279_4GRAY}, {EP368_792x528_UC8279, EP368_792x528_UC8279_4GRAY}, {EP368_792x528_UC8279, EP368_792x528_UC8279_4GRAY}},
+#endif
 };
 // clang-format on
 #endif // !PARALLEL_EPD
 
-void hw_config_init(void) {
+TRMNL_DEVICE *find_device(const char *szName) {
   int i = 0;
-    // Match the device name with the configuration in the list
-  while (device_list[i].device_name && strcmp(device_list[i].device_name, DEVICE_MODEL) != 0) {
+  while (device_list[i].device_name && strcmp(device_list[i].device_name, szName) != 0) {
     i++;
   }
-  if (device_list[i].device_name) {
-    Log_info("Found device model at index %d\n", i);
-    pDevice = (TRMNL_DEVICE *)&device_list[i];
-  } else {
+  if (!device_list[i].device_name) {
+    return NULL;
+  }
+  Log_info("Found device model %s at index %d\n", szName, i);
+  return (TRMNL_DEVICE *)&device_list[i];
+} /* find_device() */
+
+void hw_config_init(void) {
+    // Match the device name with the configuration in the list
+  pDevice = find_device(DEVICE_MODEL);
+  if (pDevice == NULL) {
     Log_info("Device name (%s) not found in supported list!", DEVICE_MODEL);
   }
 } /* hw_config_init() */
