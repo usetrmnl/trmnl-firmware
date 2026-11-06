@@ -246,9 +246,14 @@ General.describe "Images" do
     it "temperature profile is saved" do
       level = digit(0, 1)
       show("temp.png", png(level), "image/png", temperature_profile: "a") do |s|
+        expect(s.preferences.fetch("temp_profile")).to eq("1")
         expect(s).to show_image(expected(level, 1), tolerance: 64, max_ratio: 0)
         show_next(s, "temp2.png", png(digit(0, 1, "8")), temperature_profile: "b")
+        expect(s.preferences.fetch("temp_profile")).to eq("2")
         expect(s).to show_image(expected(digit(0, 1, "8"), 1), tolerance: 64, max_ratio: 0)
+        show_next(s, "temp-default.png", png(level), temperature_profile: "default")
+        expect(s.preferences.fetch("temp_profile")).to eq("0")
+        expect(s).to show_image(expected(level, 1), tolerance: 64, max_ratio: 0)
       end
     end
 
