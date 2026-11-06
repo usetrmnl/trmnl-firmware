@@ -18,25 +18,25 @@ module Golden
       "setup_screen_top_right.png" => [640, 0, 1232, 64],
       # 'Connect your phone or computer to "TRMNL-000001" Wi-Fi'
       "setup_ssid_line.png" => [400, 1236, 1072, 48],
-      # "Can't establish WiFi connection. Will keep trying." (the X's font has the apostrophe) and
-      # how to reset Wi-Fi from the menu
-      "wifi_failed_message.png" => [240, 1160, 1392, 96],
-      # "WiFi connected, unable connect to API." and how to retry (Next Screen in the menu)
-      "api_unable_to_connect.png" => [544, 304, 784, 136],
-      # "API responded, but image download failed." and how to advance (Next Screen in the menu)
-      "image_download_failed.png" => [544, 304, 784, 136],
-      # "WiFi connected, could not get firmware update from api." and how to reset Wi-Fi
-      "firmware_update_error.png" => [392, 360, 1088, 104],
-      # "The image format is incorrect"
-      "format_error.png" => [640, 1184, 592, 64],
+      # "Can't connect to Wi-Fi. Will keep trying." (the X's font has the apostrophe) and how to
+      # reset Wi-Fi from the menu
+      "wifi_failed_message.png" => [176, 1160, 1520, 96],
+      # "Wi-Fi connected, but can't reach the API." and how to retry (Next Screen in the menu)
+      "api_unable_to_connect.png" => [528, 304, 816, 136],
+      # "API responded, but the image download failed." and how to advance (Next Screen in the menu)
+      "image_download_failed.png" => [528, 304, 816, 136],
+      # "Wi-Fi connected, but the firmware update download failed." and how to reset Wi-Fi
+      "firmware_update_error.png" => [368, 360, 1136, 104],
+      # "The image format is not supported."
+      "format_error.png" => [624, 1184, 624, 64],
       # "Please visit trmnl.com/start" / "with Friendly ID SIMTST to finish setup"
       "friendly_id_message.png" => [560, 1156, 752, 112],
-      # "WiFi connected, but API connection cannot be established." and the QR code hint
+      # "Wi-Fi connected, but can't connect to the API." and the QR code hint
       "wifi_internal_error.png" => [688, 1160, 496, 184],
-      # "WiFi connected but signal is weak"
-      "wifi_weak.png" => [640, 1192, 592, 56],
-      # "Image download timed out; check your network status"
-      "image_timeout.png" => [464, 1192, 944, 56]
+      # "Wi-Fi connected, but the signal is weak."
+      "wifi_weak.png" => [584, 1192, 704, 56],
+      # "Image download timed out. Check your network connection."
+      "image_timeout.png" => [416, 1192, 1040, 56]
     },
     # the 960x540 FastEPD panels: Inter_18 at the OG's rows (the centred logo runs into them)
     "TRMNL_X_PAPERS3" => { "api_unable_to_connect.png" => [0, 304, 960, 144] },

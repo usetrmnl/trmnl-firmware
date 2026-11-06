@@ -360,7 +360,7 @@ General.describe "Images" do
     it "html served as png shows the format error on power-on" do
       path = serve("error.png", html, "image/png")
       boot_and_fetch(path) do |s|
-        # "The image format is incorrect"
+        # "The image format is not supported."
         expect(s).to show_message("format_error.png", [240, 380, 320, 32])
 
         # WiFi is already off when the body is checked: the refusal goes up on the next wake,
