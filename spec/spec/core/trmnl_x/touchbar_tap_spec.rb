@@ -295,6 +295,22 @@ RSpec.describe "TRMNL X touch bar: tap mode", env: "TRMNL_X" do
       end
     end
 
+    [1, 2].each do |profile|
+      it "Close preserves saved temperature profile #{profile} without an API response" do
+        boot_two_images do |s, _one, two|
+          s.set_preference("temp_profile", "u32", profile)
+          n = dev.mock.cursor
+          c = s.status["console_total"]
+          close_menu(s)
+          s.wait(state: "deep_sleep", timeout: 30, settle_ms: 500)
+          expect(s.console(c).join("\n")).to include("Saved temperature profile: #{profile}")
+          expect(s.preferences.fetch("temp_profile")).to eq(profile.to_s)
+          expect(s).to show_image(two, tolerance: 64, max_ratio: 0)
+          expect(dev.mock.paths.drop(n)).to eq([])
+        end
+      end
+    end
+
     it "a tap after Close goes on with the wake" do
       boot_two_images do |s|
         three = set_digits(dev.mock, "three", "3")

@@ -42,7 +42,7 @@ ApiDisplayResult fetchApiDisplay(ApiDisplayInputs &apiDisplayInputs) {
   HttpRetryRequest request(config);
   https_request_err_e err = request.execute();
   if (err != HTTPS_NO_ERR) {
-    return ApiDisplayResult{.error = err, .response = {}, .error_detail = request.errorDetail()};
+    return ApiDisplayResult{.error = err, .response = {}, .error_detail = request.errorDetail(), .received = false};
   }
 
   String payload = request.bodyAsString();
@@ -56,7 +56,9 @@ ApiDisplayResult fetchApiDisplay(ApiDisplayInputs &apiDisplayInputs) {
     return ApiDisplayResult{
         .error = https_request_err_e::HTTPS_JSON_PARSING_ERR,
         .response = {},
-        .error_detail = "JSON parse failed with error: " + apiResponse.error_detail};
+        .error_detail = "JSON parse failed with error: " + apiResponse.error_detail,
+        .received = false};
   }
-  return ApiDisplayResult{.error = https_request_err_e::HTTPS_NO_ERR, .response = apiResponse, .error_detail = ""};
+  return ApiDisplayResult{
+      .error = https_request_err_e::HTTPS_NO_ERR, .response = apiResponse, .error_detail = "", .received = true};
 }
