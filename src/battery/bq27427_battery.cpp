@@ -1,4 +1,5 @@
 #include <battery.h>
+#include <battery_curve.h>
 #include <config.h>
 
 #ifdef INCLUDE_BQ27427
@@ -29,22 +30,7 @@ static bool connectAndRead(bool oneCellPack, BQ27427Snapshot &snap) {
 
 #ifdef BYPASS_BQ27427_SOC
   if (ok) {
-  // Estimate SoC from the voltage just read. Mirrors the server's
-  // percent_charged_calculation: map 3.0 V onto 0 % at 0.012 V per percent,
-  // with plateaus near full charge (4.08 V follows a full charge) and a
-  // 1 % floor.
-    float voltage = snap.voltage / 1000.0f;
-    float pct = (voltage - 3.0f) / 0.012f;
-    if (pct >= 88.0f)
-      snap.soc = 100;
-    else if (pct >= 85.0f)
-      snap.soc = 95;
-    else if (pct >= 83.0f)
-      snap.soc = 90;
-    else if (pct >= 10.0f)
-      snap.soc = (int)(pct + 0.5f);
-    else
-      snap.soc = 1;
+    snap.soc = estimate_soc_from_voltage(snap.voltage / 1000.0f);
     snap.capacityFull = battery_count * BQ27427_BYPASS_CELL_CAPACITY_MAH;
     snap.capacityRemain = snap.capacityFull * snap.soc / 100;
     snap.health = -1; // State-of-health unavailable without gauging
