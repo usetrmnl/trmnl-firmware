@@ -1,7 +1,8 @@
 #pragma once
 
-enum ButtonPressResult { LongPress, DoubleClick, ShortPress, SoftReset, NoAction };
-constexpr const char *ButtonPressResultNames[] = {"LongPress", "DoubleClick", "ShortPress", "SoftReset", "NoAction"};
+enum ButtonPressResult { LongPress, DoubleClick, ShortPress, SoftReset, ShipMode, NoAction };
+constexpr const char *ButtonPressResultNames[] = {"LongPress", "DoubleClick", "ShortPress",
+                                                  "SoftReset", "ShipMode",    "NoAction"};
 static_assert(sizeof(ButtonPressResultNames) / sizeof(ButtonPressResultNames[0]) == NoAction + 1,
               "one name per ButtonPressResult, in enum order");
 
