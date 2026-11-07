@@ -36,12 +36,14 @@ uint32_t get_panel_rev(void) {
   if (pDevice->epd_mosi_pin == 0 && pDevice->epd_sck_pin == 0) { // pre-defined PCB+display in bb_epaper; pins unknown
     return 0;
   }
-  if (pDevice->panel_set != EPD_75) { // REV (0x70) is only known to be a harmless read on the 7.5" B/W UC8179
+  if (pDevice->panel_set != EPD_75 &&
+      pDevice->panel_set != EPD_368) { // REV (0x70) is only known to be a harmless read on the 7.5" B/W UC8179 and the
+                                       // X3 (the stock X3 firmware reads it too)
     return 0;
   }
 
-    // Initialize the SPI bus in 'bit-bang' mode before running the normal init sequence
-    // This will allow us to use MOSI as a bidirectional line for reading data from the panel
+  // Initialize the SPI bus in 'bit-bang' mode before running the normal init sequence
+  // This will allow us to use MOSI as a bidirectional line for reading data from the panel
   pinMode(pDevice->epd_sck_pin, OUTPUT);
   pinMode(pDevice->epd_cs_pin, OUTPUT);
   digitalWrite(pDevice->epd_cs_pin, 1);
@@ -49,7 +51,7 @@ uint32_t get_panel_rev(void) {
   pinMode(pDevice->epd_dc_pin, OUTPUT);
   pinMode(pDevice->epd_busy_pin, INPUT);
 
-    // Reset the panel
+  // Reset the panel
   digitalWrite(pDevice->epd_rst_pin, 0);
   delay(20);
   digitalWrite(pDevice->epd_rst_pin, 1);
