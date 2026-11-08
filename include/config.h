@@ -46,6 +46,7 @@
 #define PREFERENCES_VERBOSE_LOG_KEY          "verbose_log"
 #define PREFERENCES_LAST_OTA                 "last_ota"
 #define PREFERENCES_TOUCHBAR_TUTORIAL_KEY    "touch_tutorial" // TRMNL X: the touch bar tutorial was finished
+#define PREFERENCES_TOUCHBAR_LOCKED_KEY      "touch_locked" // TRMNL X
 
 #define WIFI_CONNECTION_RSSI                 (-100)
 
@@ -133,7 +134,7 @@
 #define API_BASE_URL                       "https://trmnl.app"
 
 // Abort an image download when the stream goes this long with no data.
-#define IMAGE_STREAM_INACTIVITY_TIMEOUT_MS 15000
+#define IMAGE_STREAM_INACTIVITY_TIMEOUT_MS 30000
 
 // Battery measurement types
 // BATT_NONE = use fake voltage

@@ -34,8 +34,6 @@
 
 /* Private Global Variables */
 bool iqs323_deviceRDY = false;
-time_t last_rdy_time = 0;
-time_t prev_rdy_time = 0;
 uint8_t iqs323_ready_pin;
 
 /* Private Functions */
@@ -306,8 +304,6 @@ void IQS323::run(void)
     case IQS323_STATE_RUN:
       if (iqs323_deviceRDY)
       {
-        Serial.println("RDY time: " + String(last_rdy_time) + " us, " + "time delta: " + String(micros() - last_rdy_time) + " us, " + "time between RDYs: " + String(last_rdy_time - prev_rdy_time) + " us");
-        prev_rdy_time = last_rdy_time;
         queueValueUpdates();
         iqs323_deviceRDY = false;
         new_data_available = true;
@@ -334,7 +330,6 @@ void iqs323_ready_interrupt(void)
   else
   {
     iqs323_deviceRDY = true;
-    last_rdy_time = micros();
   }
 }
 
@@ -372,7 +367,6 @@ bool IQS323::getRDYStatus(void)
   */
 void IQS323::queueValueUpdates(void)
 {
-  Serial.printf("Queue value updates...\n");
   uint8_t transferBytes[18];	// The array which will hold the bytes to be transferred.
 
 	/* Read the info flags. */

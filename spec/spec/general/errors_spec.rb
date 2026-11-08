@@ -55,12 +55,15 @@ General.describe "Errors" do
     it "image cut short on weak wifi" do
       dev.mock.set_fault("/images/*", truncate: 1000)
       # a cut-short image ends as HTTPS_TIMED_OUT, which has no weak wifi variant
-      boot_with_error(networks: weak) { |s| expect(s).to show_message("image_timeout.png", [160, 380, 480, 32]) }
+      boot_with_error(networks: weak) { |s| expect(s).to show_message("image_timeout.png", [140, 380, 520, 32]) }
     end
 
     it "image host unreachable" do
       dev.mock.set_fault("/images/*", close: true)
-      boot_with_error
+      boot_with_error do |s|
+        # "API responded, but the image download failed." and how to advance (only the X has a golden of it)
+        expect(s).to match_golden("image_download_failed.png") if Golden.own_region("image_download_failed.png", device)
+      end
     end
 
     it "image url that can't be fetched" do
@@ -69,7 +72,7 @@ General.describe "Errors" do
       # host get the "image download failed" screen).
       dev.mock.display = { image_url: "ftp://10.0.2.2/image.bmp", filename: "plugin-bbbbbb-1", refresh_rate: 300 }
       boot_with_error do |s|
-        # "WiFi connected, unable connect to API." and how to retry (on the 960x540 parallel
+        # "Wi-Fi connected, but can't reach the API." and how to retry (on the 960x540 parallel
         # panels the logo, centred, runs into the text's fixed rows)
         expect(s).to show_message("api_unable_to_connect.png", [200, 320, 400, 64])
       end
@@ -81,7 +84,7 @@ General.describe "Errors" do
       # HTTPS_UNABLE_TO_CONNECT at or below WIFI_CONNECTION_RSSI blames the signal: WIFI_WEAK
       # (requestErrorScreen, src/http_result_handling.cpp:31)
       dev.mock.display = { image_url: "ftp://10.0.2.2/image.bmp", filename: "plugin-bbbbbb-1", refresh_rate: 300 }
-      boot_with_error(networks: weak) { |s| expect(s).to show_message("wifi_weak.png", [250, 380, 300, 32]) }
+      boot_with_error(networks: weak) { |s| expect(s).to show_message("wifi_weak.png", [220, 380, 360, 32]) }
     end
 
     it "image too large" do
@@ -200,7 +203,7 @@ General.describe "Errors" do
         expect(st["wake_at_s"]).not_to be_nil, "the timer must still wake it"
         expect(sleep_s(st)).to be_within(15).of(900)
         expect(s).not_to show_image(screen, tolerance: 0, max_ratio: 0)
-        # "Can't establish WiFi connection. Will keep trying." (only the X has a golden of it)
+        # "Can't connect to Wi-Fi. Will keep trying." and the reset hint (only the X has a golden of it)
         expect(s).to match_golden("wifi_failed_message.png") if Golden.own_region("wifi_failed_message.png", device)
         # the count starts over, back on the 5-minute retries
         expect(sleep_s(wifi_failure(s, 1))).to be_within(15).of(300)

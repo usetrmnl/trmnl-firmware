@@ -314,9 +314,15 @@ static void iqs323_publish_snapshot(void)
     if (g_touchbar_snapshot.ch1_touch && !before.ch1_touch) g_touch_starts |= 1 << 1;
     if (g_touchbar_snapshot.ch2_touch && !before.ch2_touch) g_touch_starts |= 1 << 2;
 
-    Log_info_serial("IQS323 Task: publish snapshot at t=%lu ch0=%d ch1=%d ch2=%d STATUS=0x%02X 0x%02X",
-        (unsigned long)millis(), g_touchbar_snapshot.ch0_touch, g_touchbar_snapshot.ch1_touch, g_touchbar_snapshot.ch2_touch,
-        iqs323.IQSMemoryMap.SYSTEM_STATUS[0], iqs323.IQSMemoryMap.SYSTEM_STATUS[1]);
+    // Streaming mode publishes on every RDY, so only its touch changes are worth a line
+    if (!fast_poll_requested ||
+        g_touchbar_snapshot.ch0_touch != before.ch0_touch ||
+        g_touchbar_snapshot.ch1_touch != before.ch1_touch ||
+        g_touchbar_snapshot.ch2_touch != before.ch2_touch) {
+        Log_info_serial("IQS323 Task: publish snapshot at t=%lu ch0=%d ch1=%d ch2=%d STATUS=0x%02X 0x%02X",
+            (unsigned long)millis(), g_touchbar_snapshot.ch0_touch, g_touchbar_snapshot.ch1_touch, g_touchbar_snapshot.ch2_touch,
+            iqs323.IQSMemoryMap.SYSTEM_STATUS[0], iqs323.IQSMemoryMap.SYSTEM_STATUS[1]);
+    }
 
     g_touchbar_snapshot.last_updated_ms = millis();
 }
@@ -615,6 +621,9 @@ static bool iqs323_do_init(bool use_wake_stub)
         iqs323.SW_Reset(true);  // STOP
         vTaskDelay(pdMS_TO_TICKS(100));
 
+        // A reinit comes straight from the run loop's health checks, with this still set from that read
+        iqs323.new_data_available = false;
+
         // Run initialization state machine with timeout
         uint32_t start_time = millis();
         uint32_t timeout = task_config.init_timeout_ms;
@@ -637,6 +646,11 @@ static bool iqs323_do_init(bool use_wake_stub)
 
         if (!success && (millis() - start_time) >= timeout) {
             Log_info_serial("IQS323 Task: Initialization timeout");
+        }
+
+        // Init ends in event mode; a reinit mid-streaming has to go back
+        if (success && fast_poll_requested) {
+            iqs323.clearEventMode(STOP);
         }
     }
 

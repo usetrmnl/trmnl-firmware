@@ -39,3 +39,35 @@ RSpec.shared_context "OTA updates" do
     dev.boot { |s| expect_to_keep_running_the_old_firmware(s, path) }
   end
 end
+
+# Updates of a TRMNL X running an older release (a TrmnlX::ProvisionedX of Builds.release) to this
+# firmware, for groups that boot one:
+#
+#   include_context "X updates to this firmware"
+#   it("...") { expect_update(dev, from: "1.8.18") }
+RSpec.shared_context "X updates to this firmware" do
+  let(:firmware) { File.binread(File.join(TrmnlX.build, "firmware.bin")) }
+  # The simulator binds its hooks to the running app's ELF: after the update, this build's.
+  let(:elf_dir) { ["--elf-dir", TrmnlX.build] }
+
+  def offer_update(device, path)
+    m = device.mock
+    url = m.device_url + path
+    m.display_queue = [{ image: device.image, refresh_rate: 300, update_firmware: true, firmware_url: url }]
+  end
+
+  # Boot `device` with this firmware offered, and expect it to come back on it, still onboarded.
+  def expect_update(device, from:)
+    device.mock.set_file("/firmware.bin", "application/octet-stream", firmware)
+    offer_update(device, "/firmware.bin")
+    device.boot(extra_args: elf_dir) do |s|
+      before = device.mock.wait_for_request("/api/display", timeout: 60)
+      expect(before).to have_header("FW-Version", from)
+      device.mock.wait_for_request("/firmware.bin", timeout: 60)
+      after = device.mock.wait_for_request("/api/display", after: device.mock.cursor, timeout: 120)
+      expect(after).to have_header("FW-Version", Builds.fw_version)
+      expect(after).to have_header("Access-Token", before.headers["Access-Token"])
+      expect(s.wait_for_deep_sleep(timeout: 60)["boot_count"]).to eq(2)
+    end
+  end
+end

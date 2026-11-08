@@ -12,6 +12,11 @@
 /** Prepare peripherals, enable timer + GPIO wake, enter deep sleep. */
 void goToSleep(void);
 
+#ifdef BOARD_TRMNL_X
+/** Sleeps until the last sleep's timer. Returns without sleeping if it is already due. */
+void goToSleepKeepingTimer(void);
+#endif
+
 /** Sync the clock from NTP and set time_since_sleep from the time goToSleep saved (0 when unsynced). */
 void updateTimeSinceSleep(void);
 

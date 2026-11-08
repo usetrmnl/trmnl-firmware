@@ -45,11 +45,42 @@ RSpec.describe "TRMNL X images", env: "TRMNL_X" do
       end
     end
 
+    it "png one pixel narrower than the panel is drawn, not turned (#724)" do
+      level = levels(0, 255)
+      show("narrow.png", TrmnlSim::Images.png_image(level, w - 1, h, bits: 8), "image/png") do |s|
+        expect(s).to show_image(TrmnlSim::Images.expected_gray(level, w, h, bits: 8), tolerance: 64, max_ratio: 0.001)
+      end
+    end
+
+    { 1 => 1, 4 => 15, 8 => 255 }.each do |bits, white|
+      it "#{bits}bit png smaller than the panel is drawn on white" do
+        iw = (w / 2) + 3 # odd and not a multiple of 8, so the last byte of each line is part padding
+        ih = h / 2
+        level = levels(0, white)
+        padded = ->(x, y) { x < iw && y < ih ? level.(x, y) : white }
+        show("small#{bits}.png", TrmnlSim::Images.png_image(level, iw, ih, bits:), "image/png") do |s|
+          expect(s).to show_image(TrmnlSim::Images.expected_gray(padded, w, h, bits:), tolerance: 64, max_ratio: 0.001)
+        end
+      end
+    end
+
     { 1 => 1, 4 => 15 }.each do |bits, white|
+      it "portrait #{bits}bit png taller than the panel is cropped" do
+        px = TrmnlX.digits("7")
+        level = ->(x, y) { y < w && px.(y, h - 1 - x).zero? ? 0 : white }
+        upright = ->(x, y) { px.(x, y).zero? ? 0 : white }
+        show("tall_portrait#{bits}.png", TrmnlSim::Images.png_image(level, h, w + 128, bits:), "image/png") do |s|
+          expect(s).to show_image(TrmnlSim::Images.expected_gray(upright, w, h, bits:), tolerance: 64, max_ratio: 0.001)
+        end
+      end
+
       it "portrait #{bits}bit png" do
         px = TrmnlX.digits("7")
-        level = ->(x, y) { px.(y, w - 1 - x).zero? ? 0 : white }
-        show("portrait#{bits}.png", TrmnlSim::Images.png_image(level, h, w, bits:), "image/png")
+        level = ->(x, y) { px.(y, h - 1 - x).zero? ? 0 : white }
+        upright = ->(x, y) { px.(x, y).zero? ? 0 : white }
+        show("portrait#{bits}.png", TrmnlSim::Images.png_image(level, h, w, bits:), "image/png") do |s|
+          expect(s).to show_image(TrmnlSim::Images.expected_gray(upright, w, h, bits:), tolerance: 64, max_ratio: 0.001)
+        end
       end
     end
   end
@@ -112,6 +143,28 @@ RSpec.describe "TRMNL X images", env: "TRMNL_X" do
         s.wait(state: "deep_sleep", timeout: 15, settle_ms: 300)
         expect(m.paths.drop(n)).to eq(["/api/display"])
         expect(s.status["display_refreshes"]).to eq(refreshes)
+      end
+    end
+
+    it "redraws a cached image that an error screen covered" do
+      m = dev.mock
+      m.set_png("one", TrmnlX.digits("1"))
+      m.display = { image: "one", refresh_rate: 300 }
+      dev.boot_asleep do |s|
+        s.wait(state: "deep_sleep", timeout: 15)
+        s.wake
+        m.wait_for_request("/images/one.png", timeout: 15)
+        s.wait(state: "deep_sleep", timeout: 15, settle_ms: 300)
+        m.display = { image_url: "#{m.device_url}/img/missing.png", filename: "plugin-two", refresh_rate: 300 }
+        c = s.status["console_total"]
+        m.next_request("/img/missing.png", timeout: 15) { s.wake }
+        s.wait(console: /Image download failed/, since: c, timeout: 15)
+        s.wait(state: "deep_sleep", timeout: 15, settle_ms: 300)
+        refreshes = s.status["display_refreshes"]
+        m.display = { image: "one", refresh_rate: 300 }
+        m.next_request("/api/display", timeout: 15) { s.wake }
+        s.wait(state: "deep_sleep", timeout: 15, settle_ms: 300)
+        expect(s.status["display_refreshes"]).to be > refreshes
       end
     end
   end

@@ -2,6 +2,7 @@
 
 #include <WiFi.h>
 #include <trmnl_log.h>
+#include <wifi_auth.h>
 #define _NO_DEV_CONFIG_
 #define UWORD uint16_t
 
@@ -567,7 +568,7 @@ std::vector<WifiNetwork> WifiCaptive::getScannedUniqueNetworks(bool runScan) {
       wifi_auth_mode_t encType = WiFi.encryptionType(i);
       bool bIs5GHz = (WiFi.channel(i) >= 36);
       bool open = WiFi.encryptionType(i) == WIFI_AUTH_OPEN;
-      bool enterprise = (encType == WIFI_AUTH_WPA2_ENTERPRISE);
+      bool enterprise = isEnterpriseWifiAuthMode(encType);
 
       bool found = false;
       for (auto &network : uniqueWifiNetworks) {

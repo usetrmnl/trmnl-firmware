@@ -246,9 +246,14 @@ General.describe "Images" do
     it "temperature profile is saved" do
       level = digit(0, 1)
       show("temp.png", png(level), "image/png", temperature_profile: "a") do |s|
+        expect(s.preferences.fetch("temp_profile")).to eq("1")
         expect(s).to show_image(expected(level, 1), tolerance: 64, max_ratio: 0)
         show_next(s, "temp2.png", png(digit(0, 1, "8")), temperature_profile: "b")
+        expect(s.preferences.fetch("temp_profile")).to eq("2")
         expect(s).to show_image(expected(digit(0, 1, "8"), 1), tolerance: 64, max_ratio: 0)
+        show_next(s, "temp-default.png", png(level), temperature_profile: "default")
+        expect(s.preferences.fetch("temp_profile")).to eq("0")
+        expect(s).to show_image(expected(level, 1), tolerance: 64, max_ratio: 0)
       end
     end
 
@@ -360,7 +365,7 @@ General.describe "Images" do
     it "html served as png shows the format error on power-on" do
       path = serve("error.png", html, "image/png")
       boot_and_fetch(path) do |s|
-        # "The image format is incorrect"
+        # "The image format is not supported."
         expect(s).to show_message("format_error.png", [240, 380, 320, 32])
 
         # WiFi is already off when the body is checked: the refusal goes up on the next wake,

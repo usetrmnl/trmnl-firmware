@@ -1,9 +1,9 @@
 # frozen_string_literal: true
 
-# The TRMNL X's playlist order: the NVS list of cached images ("playlist_order") the touch bar
-# browses. Each download updates it (update_playlist_order in src/filesystem.cpp): a new version
-# of a plugin keeps its place, a new plugin goes in after the image shown before it. Shared
-# helpers: spec/support/touchbar.rb.
+# The TRMNL X's playlist order: the NVS list of cached images ("playlist_order"). Each download
+# updates it (update_playlist_order in src/filesystem.cpp): a new version of a plugin keeps its
+# place, a new plugin goes in after the image shown before it. Shared helpers:
+# spec/support/touchbar.rb.
 
 RSpec.describe "TRMNL X playlist order", env: "TRMNL_X" do
   fixture(:shipped) { TrmnlX::ShippedX.new }
@@ -49,20 +49,6 @@ RSpec.describe "TRMNL X playlist order", env: "TRMNL_X" do
         expect(order(s)).to eq([plugin("one"), plugin("three"), plugin("two")])
         expect(s).to show_image(three, tolerance: 64, max_ratio: 0)
         expect(s.preferences["browse_path"]).to start_with(plugin("three"))
-      end
-    end
-
-    # Browsing shows cached images without asking the server, then sleeps
-    # (show_cached_image_by_offset in src/cached_images.cpp).
-    it "browsing walks the playlist order" do
-      three_images do |s, one, two, three|
-        n = dev.mock.cursor
-        [["right", two], ["right", one], ["left", two], ["left", three]].each do |zone, image|
-          touch_and_sleep(s, zone, 150, zone == "right" ? /Next button tapped/ : /Back button tapped/)
-          expect(s).to show_image(image, tolerance: 64, max_ratio: 0)
-        end
-        expect(dev.mock.cursor).to eq(n)
-        expect(order(s)).to eq([plugin("one"), plugin("three"), plugin("two")])
       end
     end
   end

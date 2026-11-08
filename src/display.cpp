@@ -74,7 +74,7 @@ static void display_apply_light_sleep(uint8_t enabled) {
 }
 
 bool display_update_epaper(int refreshMode, bool wait, bool writePlane, uint8_t plane) {
-#if defined(BOARD_SEEED_RETERMINAL_E1002) || defined(BOARD_SEEED_RETERMINAL_E1004)
+#if defined(BOARD_SEEED_RETERMINAL_E1002) || defined(BOARD_SEEED_RETERMINAL_E1004) || defined(BOARD_TRMNL_GEN2)
     // Light sleep with the WiFi radio running is unsupported
   if (bLightSleepWanted && WiFi.getMode() != WIFI_MODE_NULL) {
     display_apply_light_sleep(false);
@@ -88,7 +88,7 @@ bool display_update_epaper(int refreshMode, bool wait, bool writePlane, uint8_t 
   if (refreshMode == REFRESH_PARTIAL && !bCanDoPartial) {
     refreshMode = REFRESH_FAST;
     Log_info("Can't do partial refresh, no previous image");
-  } else {
+  } else if (refreshMode == REFRESH_PARTIAL) {
     Log_info("Have valid previous image in EPD memory, doing partial refresh");
   }
   bbep.refresh(refreshMode, wait);
@@ -239,7 +239,13 @@ void display_sleep(uint32_t u32Millis) {
 #else
     // Runtime control for light sleep (true = enabled, false = disabled)
   static bool light_sleep_enabled = true;
-  if (!light_sleep_enabled) {
+#ifdef BOARD_TRMNL_GEN2
+  // Light sleep with the WiFi radio running hangs the ESP32-C5
+  bool wifi_on = WiFi.getMode() != WIFI_MODE_NULL;
+#else
+  bool wifi_on = false;
+#endif
+  if (!light_sleep_enabled || wifi_on) {
     delay(u32Millis);
   } else {
     esp_sleep_enable_timer_wakeup(u32Millis * 1000L);
@@ -354,6 +360,8 @@ static bool draw_image(uint8_t *image_buffer, int data_size, int *pRefreshMode, 
 
 // Saves the temperature profile the server asked for, when it changed
 static void save_temp_profile_from_api(void) {
+  // Cached/menu redraws can happen before this wake has fetched a display response.
+  if (!apiDisplayResult.received) return;
   if (iTempProfile != apiDisplayResult.response.temp_profile) {
     iTempProfile = apiDisplayResult.response.temp_profile;
     Log_info("Saving new temperature profile (%" PRIu32 ") to FLASH", iTempProfile);

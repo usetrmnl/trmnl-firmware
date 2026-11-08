@@ -25,6 +25,7 @@ trmnl/
 bundle install
 rake sim:build                  # build ../../trmnl-sim
 rake "firmware:build[trmnl]"    # pio run -e trmnl in the firmware checkout (default: the core devices)
+rake "firmware:build_release[v1.8.18]"  # a release the X specs update from (default: the factory's; tmp/releases)
 rake check                      # rubocop, and every spec loads for every device (no firmware needed)
 ```
 

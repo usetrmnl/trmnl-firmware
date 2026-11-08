@@ -1,10 +1,12 @@
 #ifndef MENU_H
 #define MENU_H
 
+#include <stdint.h>
+
 // The device menu: next/previous screen, the control scheme's tutorial, Special (the special functions), Settings
-// (diagnostics, Wi-Fi reset, shut down). It knows nothing of how it is driven: a control scheme (menu_controls_t) turns
-// a board's inputs into up/down/select, and says what to draw as hints for them. The TRMNL X touch bar's is in
-// touchbar_actions.cpp.
+// (diagnostics, Wi-Fi reset, shut down, touchbar lock). It knows nothing of how it is driven: a control
+// scheme (menu_controls_t) turns a board's inputs into up/down/select, and says what to draw as hints for them. The
+// TRMNL X touch bar's is in touchbar_actions.cpp.
 
 // The icon left of a menu hint's label
 typedef enum {
@@ -63,23 +65,33 @@ struct menu_controls_t {
   void (*begin)(void);
   void (*end)(void);
   // Polled while a menu screen is up: an input as it starts, then NONE until the next one starts.
-  // The menu draws its response (moves the arrow, shows the next screen) before polling again, so
-  // an input that starts (and ends) during a display update should still be reported after it.
+  // The menu moves the arrow before polling again, so an input that starts (and ends) during that
+  // update should still be reported after it. The menu discards inputs made while a screen is drawn.
   menu_input_t (*read)(void);
+  // Whether SELECT is down now
+  bool (*select_down)(void);
   // The controls' tutorial, or nullptr
   const menu_tutorial_t *tutorial;
 };
 
 // Opens the menu with `controls` and does what is chosen. Next Screen and the special functions
-// return, for the wake to go on and fetch the next screen (with the special function, if chosen);
-// everything else sleeps or restarts and does not return.
-void menu_open(const menu_controls_t &controls);
+// return true, for the wake to go on and fetch the next screen (with the special function, if
+// chosen). Closing it, or a timeout, shows the current image again and returns false. Everything
+// else restarts and does not return.
+bool menu_open(const menu_controls_t &controls);
 
 // Whether the user finished the tutorial of `controls` (true without one)
 bool menu_tutorial_done(const menu_controls_t &controls);
 
 // Shows the tutorial of `controls`, then the current image again, and sleeps: does not return
 void menu_open_tutorial(const menu_controls_t &controls);
+
+// The hold on a locked wake that opens the unlock prompt
+#define MENU_UNLOCK_HOLD_MS 5000
+
+// Shows the unlock prompt over the image; once it is held and released, clears the lock and returns
+// true. The prompt stays on the screen for the caller to replace.
+bool menu_run_unlock_prompt(const menu_controls_t &controls);
 
 // The factory's last check before shipping: has the user try each control of `controls` in order, on
 // a screen laid out like a tutorial with `check`'s text (its item and done_key unused), then shuts

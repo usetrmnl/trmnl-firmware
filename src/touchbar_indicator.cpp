@@ -8,22 +8,12 @@
 #include <epd_driver.h>
 #endif // BOARD_TRMNL_X
 
-#ifdef PARALLEL_EPD
-// partialUpdate() only sends hardware refresh commands where the software
-// previousBuffer/currentBuffer actually differ - it has no idea the physical
-// panel still shows a stale full-color/grayscale image underneath (e-paper
-// keeps its last image through deep sleep; fillScreen() below only touches
-// the software buffer, never the panel). The very first indicator drawn each
-// boot gets a real diff for free from the mode-switch block below, so its
-// region gets correctly cleared - but a second (or third) indicator, drawn
-// moments later in the same boot with prev_mode already BB_MODE_1BPP, would
-// otherwise be judged "unchanged" against that same white software baseline
-// and never get a hardware command for its own region at all, leaving the
-// old image showing through. So every side gets this same forced-diff
-// treatment on its own first draw, not just whichever side happens to draw
-// first.
-static bool touchbar_side_seeded[3] = {false, false, false};
-#endif // PARALLEL_EPD
+// partialUpdate() only works in 1-bit mode against a 1-bit previous buffer, and only drives the pixels
+// where the software previousBuffer/currentBuffer differ - it has no idea what the physical panel shows
+// (e-paper keeps its last image through deep sleep, and fillScreen() only touches the software buffer).
+// So each draw starts from a 1-bit buffer (a white one if the last image was grayscale) and seeds the
+// previous buffer with the exact inverse of the indicator: every one of its pixels, border included,
+// gets driven, whatever was under it and however many indicators were drawn before.
 
 #ifdef BOARD_TRMNL_X
 #define TOUCHBAR_INDICATOR_MARGIN_BOTTOM 52 // from the bottom of the screen to the indicators' bottom edge
@@ -108,22 +98,16 @@ void display_draw_touchbar_indicator(touchbar_side_t side) {
   int cx = touchbar_indicator_center_x(side);
   if (cx < 0) return;
   int cy = bbep.height() - TOUCHBAR_INDICATOR_MARGIN_BOTTOM - TOUCHBAR_PILL_H / 2;
-  if (bbep.getPreviousMode() == BB_MODE_NONE) {
+  const int sz = bbep.width() * bbep.height() / 8; // 1-bit per pixel
+  if (bbep.getMode() != BB_MODE_1BPP || bbep.getPreviousMode() != BB_MODE_1BPP) {
     bbep.setMode(BB_MODE_1BPP);
     bbep.fillScreen(BBEP_WHITE);
-    int sz = bbep.width() * bbep.height() / 8; // 1-bit per pixel
-    memcpy(bbep.previousBuffer(), bbep.currentBuffer(), sz);
     bbep.setPreviousMode(BB_MODE_1BPP);
   }
-  if (!touchbar_side_seeded[side]) {
-    touchbar_side_seeded[side] = true;
-        // Seed with the exact per-pixel inverse of what we're about to draw so the real draw
-        // right after always produces a full diff for partialUpdate() to push.
-    touchbar_draw_indicator(side, cx, cy, true);
-    int sz = bbep.width() * bbep.height() / 8;
-    memcpy(bbep.previousBuffer(), bbep.currentBuffer(), sz);
-  }
+  touchbar_draw_indicator(side, cx, cy, true);
+  memcpy(bbep.previousBuffer(), bbep.currentBuffer(), sz);
   touchbar_draw_indicator(side, cx, cy, false);
-  bbep.partialUpdate(true); // avoid the costly power-cycle each call
+  int rc = bbep.partialUpdate(true); // avoid the costly power-cycle each call
+  if (rc != BBEP_SUCCESS) Log_warn("Touchbar indicator update failed: %d", rc);
 #endif // BOARD_TRMNL_X
 }
