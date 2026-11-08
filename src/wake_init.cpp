@@ -113,9 +113,32 @@ void startBoardHardware(const WakeContext &wake, uint32_t init_time) {
   bool double_click = false;
   if (wake.gpio) {
     Log_info("GPIO wakeup detected (%d)", wake.reason);
+#if defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002)
+    // Physical button mapping on reTerminal E1001 / E-Series:
+    // KEY2 (Left): GPIO 5 -> Previous screen (SF_REWIND)
+    // KEY1 (Right): GPIO 4 -> Next screen (advances playlist)
+    // KEY0 (Center / Green): GPIO 3 -> Standard button handling (Refresh / Menu / SF)
+    uint64_t ext1_pins = esp_sleep_get_ext1_wakeup_status();
+    Log_info("ext1 wakeup pin status: 0x%llx", ext1_pins);
+    if ((ext1_pins & (1ULL << 5)) != 0 || digitalRead(5) == LOW) {
+      Log_info("Left button (GPIO 5) pressed -> Previous screen (SF_REWIND)");
+      buzzer().beep(100);
+      special_function = SF_REWIND;
+      special_function_chosen = true;
+    } else if ((ext1_pins & (1ULL << 4)) != 0 || digitalRead(4) == LOW) {
+      Log_info("Right button (GPIO 4) pressed -> Next screen");
+      buzzer().beep(100);
+      // special_function is SF_NONE; normal display check-in advances playlist
+    } else {
+      ButtonPressResult button = read_button_presses();
+      wait_for_serial();
+      double_click = button_wake_act(button);
+    }
+#else
     ButtonPressResult button = read_button_presses();
     wait_for_serial();
     double_click = button_wake_act(button);
+#endif
   } else {
     wait_for_serial();
     Log_info("Non-GPIO wakeup (%d) -> didn't read buttons", wake.reason);
