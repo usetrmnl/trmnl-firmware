@@ -11,6 +11,7 @@
 #include <Arduino.h>
 #include <trmnl_log.h>
 #include <SPI.h>
+#include <SD.h>
 #include <stdio.h>
 #include <string.h>
 #include "battery.h"
@@ -283,6 +284,17 @@ void scanI2C()
   Serial.println("====================================\n");
 } /* scanI2C() */
 
+void FrameSDInit(void)
+{
+   expander1.write1(EXP1_CS_SD_CARD, LOW);
+   expander1.pinMode1(EXP1_CS_SD_CARD, OUTPUT);
+   while (!SD.begin(7)) {
+    Serial.println("Card Mount Failed");
+    delay(1000);
+   }
+  Serial.println("Card mount succeeded!");
+} /* FrameSDInit() */
+
 void frameInit(void)
 {
   if (!Wire.begin(I2C_SDA, I2C_SCL, 100000))
@@ -434,6 +446,9 @@ void frameInit(void)
 
   // Initialize the RGB LED
   FrameLEDInit();
+
+  // Initialize SD card
+  FrameSDInit();
 } /* frameInit() */
 /**
  * @brief Set EPD reset pin level
