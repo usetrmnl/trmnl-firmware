@@ -39,6 +39,7 @@ struct ApiDisplayResponse {
   SPECIAL_FUNCTION special_function;
   String action;
   String verbose_logging;
+  uint32_t live_mode_seconds; // "live_mode": {"seconds"}; 0 = no live session
 };
 
 struct ApiDisplayInputs {

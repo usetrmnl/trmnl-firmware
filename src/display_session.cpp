@@ -60,6 +60,11 @@ static void writeSpecialFunction(SPECIAL_FUNCTION function) {
 
 https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse) {
   https_request_err_e result = HTTPS_NO_ERR;
+#ifdef LIVE_MODE_API_URL // a local test server must never wipe, update or reconfigure the device
+  apiResponse.reset_firmware = false;
+  apiResponse.update_firmware = false;
+  apiResponse.special_function = (SPECIAL_FUNCTION)preferences.getUInt(PREFERENCES_SF_KEY, apiResponse.special_function);
+#endif
   int file_size = 0;
 
   if (apiResponse.verbose_logging.length() > 0) {
@@ -476,6 +481,9 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse) {
 static ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences, float batteryVoltage) {
   ApiDisplayInputs inputs = createApiHeaders();
   inputs.baseUrl = preferences.getString(PREFERENCES_API_URL, API_BASE_URL);
+#ifdef LIVE_MODE_API_URL
+  inputs.baseUrl = LIVE_MODE_API_URL; // spike only: a local server
+#endif
   inputs.batteryVoltage = batteryVoltage; // read before the display and WiFi were turned on
   last_wifi_rssi = inputs.rssi;
   Log.info("%s [%d]: baseUrl from preferences: %s\r\n", __FILE__, __LINE__, inputs.baseUrl.c_str());
@@ -610,8 +618,8 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
 
   submitStoredLogs();
 
-  if (stay_awake_for_touchbar) {
-    Log.info("Received successfully; staying awake for touch bar taps");
+  if (stay_awake_for_touchbar || apiDisplayResult.response.live_mode_seconds > 0) {
+    Log.info("Received successfully; keeping Wi-Fi up");
   } else {
     WiFi.disconnect(true); // no need for WiFi, save power starting here
     Log.info("%s [%d]: Received successfully; WiFi off.\r\n", __FILE__, __LINE__);

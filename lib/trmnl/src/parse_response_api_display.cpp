@@ -26,7 +26,8 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
         .reset_firmware = false,
         .special_function = SF_NONE,
         .action = "",
-        .verbose_logging = ""};
+        .verbose_logging = "",
+        .live_mode_seconds = 0};
   }
   String special_function_str = doc["special_function"];
   // Convert the temperature profile ("default", "a", "b", "c")
@@ -55,5 +56,6 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
       .reset_firmware = doc["reset_firmware"],
       .special_function = parseSpecialFunction(special_function_str),
       .action = doc["action"] | "",
-      .verbose_logging = doc["verbose_logging"] | ""};
+      .verbose_logging = doc["verbose_logging"] | "",
+      .live_mode_seconds = doc["live_mode"]["seconds"] | 0u};
 }

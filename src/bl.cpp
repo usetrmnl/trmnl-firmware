@@ -30,6 +30,24 @@ static void showScreen(bool should_show_error_now) {
   showRequestResult(request_result);
 }
 
+#ifdef LIVE_MODE
+uint32_t live_loop_ms = 0;
+// Keeps Wi-Fi up and checks in again straight away while the server keeps the session open
+static void runLiveSession(void) {
+  const uint32_t seconds = apiDisplayResult.response.live_mode_seconds;
+  if (seconds == 0) return;
+  Log_info("Live session for %u s", seconds);
+  const uint32_t ends_at = millis() + seconds * 1000;
+  while (millis() < ends_at && apiDisplayResult.response.live_mode_seconds > 0) {
+    const uint32_t started = millis();
+    https_request_err_e result = downloadAndShow(battery_voltage);
+    live_loop_ms = millis() - started;
+    if (result != HTTPS_SUCCESS && result != HTTPS_NO_ERR) delay(2000);
+  }
+  Log_info("Live session over");
+}
+#endif
+
 /**
  * @brief Function to init business logic module
  * @param none
@@ -53,6 +71,9 @@ void bl_init(void) {
 
   // OTA checking, image checking and drawing
   showScreen(wake.showErrorsNow);
+#ifdef LIVE_MODE
+  runLiveSession();
+#endif
 #ifdef BOARD_TRMNL_X
   touchbar_stay_awake([] { showScreen(true); });
 #endif

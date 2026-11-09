@@ -460,7 +460,15 @@ static void refresh_fastepd(bool bSkipClear) {
  * @param reverse shows if the color scheme is reverse
  * @return none
  */
+#ifdef LIVE_MODE
+uint32_t live_draw_ms = 0;
+int live_refresh_mode = -1;
+#endif
 void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool bSkipClear) {
+#ifdef LIVE_MODE
+  const uint32_t draw_started = millis();
+  struct DrawTimer { uint32_t s; ~DrawTimer() { live_draw_ms = millis() - s; } } draw_timer{draw_started};
+#endif
   int iRefreshMode;
   bool bAlloc;
 
@@ -473,6 +481,9 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
   save_temp_profile_from_api();
 #ifdef BB_EPAPER
   iRefreshMode = choose_refresh_mode(iRefreshMode, &bWait);
+#ifdef LIVE_MODE
+  live_refresh_mode = iRefreshMode;
+#endif
   if (!refresh_epaper(iRefreshMode, bWait, bAlloc)) {
     return;
   }

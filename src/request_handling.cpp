@@ -62,6 +62,10 @@ void showFriendlyIdIfUnregistered(https_request_err_e request_result) {
 void resetIfRequested(https_request_err_e request_result) {
   // reset checking
   if (request_result == HTTPS_RESET) {
+#ifdef LIVE_MODE_API_URL // a local test server must never wipe the device's credentials
+    Log_info("Ignoring a reset from the local test server");
+    return;
+#endif
     Log.info("%s [%d]: Device reseting...\r\n", __FILE__, __LINE__);
     resetDeviceCredentials();
   }

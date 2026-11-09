@@ -29,6 +29,13 @@ HttpHeaderList buildDisplayRequestHeaders(ApiDisplayInputs &inputs) {
     Log_info("%s [%d] Sensor data not available", __FILE__, __LINE__);
   }
 
+#ifdef LIVE_MODE
+  headers.push_back({"Live-Mode", "1"}); // the server may answer with a live session and then hold requests
+  extern uint32_t live_loop_ms, live_draw_ms;
+  extern int live_refresh_mode;
+  headers.push_back({"Live-Filename", apiDisplayResult.response.filename});
+  headers.push_back({"Live-Timing", "loop=" + String(live_loop_ms) + ";draw=" + String(live_draw_ms) + ";mode=" + String(live_refresh_mode)});
+#endif
   return headers;
 }
 
@@ -37,6 +44,9 @@ ApiDisplayResult fetchApiDisplay(ApiDisplayInputs &apiDisplayInputs) {
   config.url = apiDisplayInputs.baseUrl + "/api/display";
   config.apiBaseUrl = apiDisplayInputs.baseUrl;
   config.headers = buildDisplayRequestHeaders(apiDisplayInputs);
+#ifdef LIVE_MODE
+  config.readTimeoutSeconds = 45; // a live server holds the request for up to 30 s
+#endif
 
   // Retries, redirects and transport selection (Wi-Fi vs. TRMNL X modem) live in HttpRetryRequest.
   HttpRetryRequest request(config);
