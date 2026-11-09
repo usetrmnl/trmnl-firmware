@@ -90,6 +90,69 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
 void display_set_light_sleep(uint8_t enabled);
 
 /**
+ * @brief Shows a whole 1-bit frame (1 = white, rows (width + 7) / 8 bytes) the caller keeps; for live mode's
+ *        region pushes, which compose onto the frame on screen and redraw it with a partial refresh
+ * @param frame the frame, display_width() × display_height()
+ * @param iRefreshMode REFRESH_PARTIAL, REFRESH_FAST or REFRESH_FULL
+ * @return false when the panel can't do a partial refresh (it isn't showing a 1-bit image) or the update failed
+ */
+bool display_show_1bit_frame(uint8_t *frame, int iRefreshMode);
+
+/**
+ * @brief Starts a partial refresh of just some rows of the 1-bit frame on screen (the TRMNL OG's panel), so the rest
+ *        isn't driven: sends those rows' current pixels. Call before changing the frame there, then
+ *        display_window_refresh() with the changed frame.
+ * @return false when the panel can't (another panel, or it isn't showing a 1-bit image); refresh the whole frame
+ */
+// A dithered hold (live_region.h): a rotating 1-in-`every` subset of the pixels outside the region, marked as
+// changing in the old image so the panel re-drives them to their own color; every 0 is off
+struct DitherHold {
+  uint8_t every;
+  uint32_t phase;
+  int x, y, w, h; // the region, whose pixels are left alone
+};
+bool display_window_begin(const uint8_t *frame, int y, int h, const DitherHold &hold);
+
+/**
+ * @brief Gets the panel ready for display_window_begin() even after a gray image (the TRMNL OG's panel)
+ * @return false on other panels
+ */
+bool display_window_ready(void);
+
+/**
+ * @brief Like display_window_begin() when what's on screen isn't known: the old image is the new one inverted, so every
+ *        pixel is driven to its new color; pass the new frame
+ */
+bool display_window_begin_unknown(const uint8_t *frame, int y, int h);
+// The TRMNL OG's partial waveform for live mode regions, in frames (about 20 ms each)
+struct PartialWaveform {
+  uint8_t drive; // twice, for pixels that change
+  uint8_t keep; // toward their color, for pixels that don't
+  uint8_t vcom; // VDCS: 0 = -0.1 V, each step -0.05 V more
+  bool otp; // the panel's own partial waveform from its OTP instead (the settings above don't apply)
+  uint8_t pll; // frame rate (0x30): 0x06 = 50 Hz (the default), 0x0B about 100 Hz, 0x0F about 200 Hz; back to 0x06 after
+  uint8_t tcon; // gate/source non-overlap (0x60), 0x22 by default
+  bool border; // the border from its own table (CDI 0x39), held like white pixels, instead of the black-to-white one
+};
+bool display_window_refresh(const uint8_t *frame, int y, int h, const PartialWaveform &waveform);
+
+/**
+ * @brief Before a whole-frame partial refresh with display_show_1bit_frame(), sends the frame on screen as the panel's
+ *        old image, so unchanged pixels stay as they are (the TRMNL OG's panel; does nothing on others)
+ */
+void display_frame_begin(const uint8_t *frame);
+
+/**
+ * @brief Powers the panel off between live mode draws (the TRMNL OG's panel; does nothing on others)
+ */
+void display_power_off(void);
+
+/**
+ * @brief The refresh mode of the panel's last update
+ */
+int display_last_refresh_mode(void); // bb_epaper panels only
+
+/**
  * @brief Function to got the display to the sleep
  * @param none
  * @return none

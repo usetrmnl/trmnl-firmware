@@ -18,6 +18,7 @@
 #include "battery.h"
 #include "config.h"
 #include "messages.h"
+#include <live_region.h>
 #ifdef PARALLEL_EPD
 FASTEPD bbep;
 #else
@@ -64,6 +65,7 @@ const uint8_t u8_graytable[] = {
 
 #ifdef BB_EPAPER
 static uint8_t bLightSleepWanted = 0;
+static int iLastRefreshMode = REFRESH_FULL;
 
 static void display_apply_light_sleep(uint8_t enabled) {
 #ifdef CMD_CS1_CS2
@@ -92,6 +94,7 @@ bool display_update_epaper(int refreshMode, bool wait, bool writePlane, uint8_t 
     Log_info("Have valid previous image in EPD memory, doing partial refresh");
   }
   bbep.refresh(refreshMode, wait);
+  iLastRefreshMode = refreshMode;
     // The next update can be a partial update because the current is 1-bpp and stays in the EPD RAM
   bCanDoPartial = (bbep.getPanelType() == dpList[pDevice->panel_set][iTempProfile].OneBit);
   return true;
@@ -110,6 +113,11 @@ static void display_select_one_bit_panel(bool only_if_changed = false) {
   } else {
     bbep.begin(one_bit);
   }
+}
+
+int display_last_refresh_mode(void)
+{
+    return iLastRefreshMode;
 }
 
 // Message screens are 1-bit
@@ -427,6 +435,239 @@ static bool refresh_epaper(int iRefreshMode, bool bWait, bool bAlloc) {
     bbep.freeBuffer();
   }
   return true;
+}
+
+bool display_show_1bit_frame(uint8_t *frame, int iRefreshMode)
+{
+    if (!bCanDoPartial && iRefreshMode == REFRESH_PARTIAL) {
+        return false; // the panel isn't showing a 1-bit image to change
+    }
+    display_select_one_bit_panel(true);
+    bbep.setMemoryMode(BB_MODE_1BPP);
+    bbep.setBuffer(frame);
+    bbep.writePlane();
+    bbep.setBuffer(NULL); // the frame is the caller's; don't let freeBuffer() take it
+    if (!refresh_epaper(iRefreshMode, true, false)) {
+        return false;
+    }
+    iUpdateCount++;
+    return true;
+}
+
+// The OG's UC8179 partial window. bb_epaper's partial refresh always redraws the whole panel, and the panel drives
+// every pixel against its "old" image memory, which bb_epaper leaves to the controller to keep up: when it doesn't match
+// the screen (after a full refresh, say), unchanged pixels drift darker. So these write both the old and the new image.
+// A window only limits the rows (gates) that are driven, not the columns, so it spans the screen's width.
+static bool can_refresh_window(void)
+{
+    int panel = bbep.getPanelType();
+    return bbep.getChip() == BBEP_CHIP_UC81xx && (panel == EP75_800x480 || panel == EP75_800x480_GEN2);
+}
+
+static void select_rows(int y, int h)
+{
+    int x1 = bbep.width();
+    uint8_t ptl[9] = {
+        0, 0, (uint8_t)((x1 - 1) >> 8), (uint8_t)((x1 - 1) | 7),
+        (uint8_t)(y >> 8), (uint8_t)y, (uint8_t)((y + h - 1) >> 8), (uint8_t)(y + h - 1),
+        0x00, // PT_SCAN: only inside the window
+    };
+    bbep.writeCmd(UC8151_PTIN);
+    bbep.writeCmd(UC8151_PTL);
+    bbep.writeData(ptl, sizeof(ptl));
+}
+
+static void write_rows(uint8_t command, const uint8_t *frame, int y, int h)
+{
+    int pitch = (bbep.width() + 7) / 8;
+    bbep.writeCmd(command);
+    for (int row = y; row < y + h; row++) {
+        bbep.writeData((uint8_t *)frame + row * pitch, pitch);
+    }
+}
+
+// Sends the rows' current pixels as the old image, with the dithered hold's subset outside the region flipped
+static void write_old_rows(const uint8_t *frame, int y, int h, const DitherHold &hold)
+{
+    int pitch = (bbep.width() + 7) / 8;
+    uint8_t *row = bbep.getCache(); // scratch, as png_draw() uses it
+    int first = hold.x / 8, last = (hold.x + hold.w + 7) / 8; // the region's bytes
+    bbep.writeCmd(UC8151_DTM1);
+    for (int r = y; r < y + h; r++) {
+        const uint8_t *pixels = frame + r * pitch;
+        uint8_t mask = liveRegionDitherMask(r, hold.every, hold.phase);
+        if (!mask) {
+            bbep.writeData((uint8_t *)pixels, pitch);
+            continue;
+        }
+        bool inRegion = r >= hold.y && r < hold.y + hold.h;
+        for (int i = 0; i < pitch; i++) {
+            row[i] = inRegion && i >= first && i < last ? pixels[i] : pixels[i] ^ mask;
+        }
+        bbep.writeData(row, pitch);
+    }
+}
+
+bool display_window_ready(void)
+{
+    display_select_one_bit_panel(true); // after a gray image the panel is set up for 2 bits
+    if (!can_refresh_window()) {
+        return false;
+    }
+    bCanDoPartial = true; // the window refresh sends both the old and the new image itself
+    return true;
+}
+
+bool display_window_begin_unknown(const uint8_t *frame, int y, int h)
+{
+    if (!can_refresh_window() || !bCanDoPartial) {
+        return false;
+    }
+    int pitch = (bbep.width() + 7) / 8;
+    uint8_t *row = bbep.getCache();
+    select_rows(y, h);
+    bbep.writeCmd(UC8151_DTM1);
+    for (int r = y; r < y + h; r++) {
+        for (int i = 0; i < pitch; i++) {
+            row[i] = ~frame[r * pitch + i]; // every pixel "changes", so each is driven to its new color
+        }
+        bbep.writeData(row, pitch);
+    }
+    return true;
+}
+
+bool display_window_begin(const uint8_t *frame, int y, int h, const DitherHold &hold)
+{
+    if (!can_refresh_window() || !bCanDoPartial) {
+        return false;
+    }
+    select_rows(y, h);
+    write_old_rows(frame, y, h, hold); // what's on screen now
+    return true;
+}
+
+// A partial waveform that drives pixels that change for `drive` frames twice (with a 5-frame rest after each) and can
+// hold pixels that don't for `keep` frames toward their color. bb_epaper's OG partial table drives unchanged pixels as
+// long as changing ones, every refresh, which darkens the screen; with VCOM near 0 V a short hold keeps them white
+// (it shows as a slight white flash of the panel; without it they darken). Each table: groups of level select (2 bits
+// a phase: 00 GND, 01 VDH = black, 10 VDL = white), four phase lengths in frames and a repeat count; all tables last
+// as many frames.
+static void send_partial_lut(const PartialWaveform &waveform)
+{
+    const struct {
+        uint8_t command;
+        uint8_t length;
+        uint8_t changeLevels; // during the drive
+        uint8_t keepLevels; // during the keep
+    } tables[] = {
+        {UC8151_LUT_VCOM, 44, 0x00, 0x00}, // VCOM stays at its DC level
+        {UC8151_LUT_WW, 42, 0x00, 0x80},   // unchanged white
+        {UC8151_LUT_BW, 42, 0x88, 0x00},   // black to white
+        {UC8151_LUT_WB, 42, 0x44, 0x00},   // white to black
+        {UC8151_LUT_BB, 42, 0x00, 0x40},   // unchanged black
+        {UC8151_LUT_VCOM2, 42, 0x00, 0x80}, // the border (with CDI 0x39; 00 is VCOM here, 10 VDL)
+    };
+    uint8_t lut[44];
+    for (const auto &table : tables) {
+        memset(lut, 0, sizeof(lut));
+        uint8_t *group = lut;
+        const uint8_t driveGroup[6] = {table.changeLevels, waveform.drive, 5, waveform.drive, 5, 0x01};
+        memcpy(group, driveGroup, sizeof(driveGroup));
+        group += 6;
+        if (waveform.keep) {
+            const uint8_t keepGroup[6] = {table.keepLevels, waveform.keep, 0, 0, 0, 0x01};
+            memcpy(group, keepGroup, sizeof(keepGroup));
+        }
+        bbep.writeCmd(table.command);
+        bbep.writeData(lut, table.length);
+    }
+}
+
+// The panel's own partial waveform, as Waveshare, GoodDisplay and GxEPD2 use it on the UC8179: the waveform and VCOM
+// from the glass's OTP, its differential bank picked by a fixed temperature of 110, the border floating
+static void send_otp_partial_settings(void)
+{
+    const uint8_t psr = 0x1f, tsfix = 0x02, temperature = 0x6e, cdi[2] = {0xa9, 0x07};
+    bbep.writeCmd(UC8151_PSR); // waveform from the panel's OTP
+    bbep.writeData((uint8_t *)&psr, 1);
+    bbep.writeCmd(0xe0); // cascade setting: use the temperature below instead of the sensor
+    bbep.writeData((uint8_t *)&tsfix, 1);
+    bbep.writeCmd(0xe5); // force temperature
+    bbep.writeData((uint8_t *)&temperature, 1);
+    bbep.writeCmd(UC8151_CDI);
+    bbep.writeData((uint8_t *)cdi, sizeof(cdi));
+}
+
+// The device's own partial waveform from the registers
+static void send_register_partial_settings(const PartialWaveform &waveform)
+{
+    // The partial mode's settings (as in bb_epaper's OG partial sequence); a full refresh sets its own
+    // CDI 0x29: the border follows the black-to-white table; 0x39: its own
+    const uint8_t pwr[5] = {0x07, 0x07, 0x3f, 0x3f, 0x03}, psr = 0x3f;
+    const uint8_t cdi[2] = {(uint8_t)(waveform.border ? 0x39 : 0x29), 0x07}, tcon = waveform.tcon, pll = waveform.pll;
+    bbep.writeCmd(0x30); // frame rate
+    bbep.writeData((uint8_t *)&pll, 1);
+    bbep.writeCmd(UC8151_PWR);
+    bbep.writeData((uint8_t *)pwr, sizeof(pwr));
+    bbep.writeCmd(UC8151_PSR); // waveform from the registers below, not the panel's OTP
+    bbep.writeData((uint8_t *)&psr, 1);
+    bbep.writeCmd(UC8151_CDI);
+    bbep.writeData((uint8_t *)cdi, sizeof(cdi));
+    bbep.writeCmd(UC8151_TCON);
+    bbep.writeData((uint8_t *)&tcon, 1);
+    send_partial_lut(waveform);
+    // VCOM's DC level (VDCS 0x00 = -0.1 V, each step -0.05 V more): it should cancel the pixels' TFT kickback, which
+    // other drivers for this panel do at about -2 V
+    uint8_t vdcs = waveform.vcom;
+    bbep.writeCmd(0x82);
+    bbep.writeData(&vdcs, 1);
+}
+
+bool display_window_refresh(const uint8_t *frame, int y, int h, const PartialWaveform &waveform)
+{
+    select_rows(y, h);
+    write_rows(UC8151_DTM2, frame, y, h); // what it becomes
+    if (waveform.otp) {
+        send_otp_partial_settings();
+    } else {
+        send_register_partial_settings(waveform);
+    }
+    bbep.writeCmd(UC8151_PON);
+    bbep.wait();
+    bbep.writeCmd(UC8151_DRF);
+    bbep.wait();
+    bbep.writeCmd(UC8151_PTOU);
+    const uint8_t normalPll = 0x06, normalTcon = 0x22; // what full refreshes run at
+    bbep.writeCmd(0x30);
+    bbep.writeData((uint8_t *)&normalPll, 1);
+    bbep.writeCmd(UC8151_TCON);
+    bbep.writeData((uint8_t *)&normalTcon, 1);
+    if (waveform.otp) {
+        const uint8_t sensor = 0x00;
+        bbep.writeCmd(0xe0); // back to the temperature sensor, so full refreshes pick their usual waveform
+        bbep.writeData((uint8_t *)&sensor, 1);
+    }
+    iLastRefreshMode = REFRESH_PARTIAL;
+    iUpdateCount++;
+    return true;
+}
+
+void display_power_off(void)
+{
+    if (!can_refresh_window()) {
+        return;
+    }
+    bbep.writeCmd(UC8151_POFF); // keeps the registers, unlike display_sleep(), which also floats the border
+    bbep.wait();
+}
+
+void display_frame_begin(const uint8_t *frame)
+{
+    if (!can_refresh_window()) {
+        return;
+    }
+    bbep.writeCmd(UC8151_PTOU);
+    write_rows(UC8151_DTM1, frame, 0, bbep.height()); // what's on screen now
 }
 #else
 // Pushes the drawn image to the panel with the right clearing passes
