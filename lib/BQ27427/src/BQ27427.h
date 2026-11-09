@@ -27,9 +27,6 @@ See LICENSE.txt for full license terms.
 #include "Arduino.h"
 #include "BQ27427_Definitions.h"
 
-// GPIO used for the charge/status LED on the trmnl_gen2 PCB
-#define BQ27427_LED 8
-
 #define BQ72441_I2C_TIMEOUT 2000
 
 // Chemistry profiles

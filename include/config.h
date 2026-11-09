@@ -209,6 +209,12 @@ enum {
 #define EPD_VCC_EN   21
 #endif
 
+#ifdef BOARD_TRMNL_GEN2
+// This input pin goes low when USB power is charging the battery
+#define BATT_STATUS 24
+#define GEN2_LED 8
+#endif // GEN2
+
 #define GPIO_PIN_SET                    1
 
 /**

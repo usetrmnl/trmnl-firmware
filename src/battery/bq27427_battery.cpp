@@ -68,38 +68,12 @@ static bool connectAndRead(bool oneCellPack, BQ27427Snapshot &snap) {
 // The green LED on the OG Gen2 PCB is controlled by the ESP32, not the
 // battery management chip. We must explicitly turn it off when charging has
 // completed or the cable is unplugged.
-// We can let the ESP32 sit in a low power loop waiting for this to occur
 //
-uint32_t wait_batt_charging(uint32_t time_to_sleep)
+void IRAM_ATTR statChange(void)
 {
-BQ27427Snapshot snap;
-bool bCharging = true;
-long l = millis() + (time_to_sleep * 1000); // expiration time to restart 
+  digitalWrite(GEN2_LED, 1-digitalRead(BATT_STATUS));
+} /* statChange() */
 
-    Log_info("Entering wait_battery_charging, sleep time = %d", time_to_sleep);
-
-    while (millis() < l && bCharging) {
-        lipo.readSnapshot(snap); // keep an eye on the charge status
-        bCharging = (snap.current > 0);
-        if (!bCharging) {
-            digitalWrite(BQ27427_LED, LOW); // Turn off the charge LED
-        } else { // light sleep for 1 second while we wait for it to finish charging
-#ifdef DEV_FIRMWARE
-            Log_info("waiting for battery to charge: %d mA", snap.current);
-            delay(1000);
-#else
-            esp_sleep_enable_timer_wakeup(1000000L);
-            esp_light_sleep_start();
-#endif // DEV_FIRMWARE
-        }
-    }
-    time_to_sleep = (l - millis())/1000; // Convert remaining time back into seconds
-    if (time_to_sleep < 1 || time_to_sleep > 24*60*60) {
-        time_to_sleep = 1;
-    }
-    Log_info("Returning with %d seconds remaining to sleep in this period", time_to_sleep);
-    return time_to_sleep;
-} /* wait_batt_charging() */
 
 battery_count_t detect_battery_count(void) {
     return BATTERY_ONE;
@@ -187,15 +161,15 @@ void BQ27427Battery::gaugeInit() {
   if (snap.flags & BQ27427_FLAG_DSG) toPrint += " DSG"; // battery is discharging
   Serial.println(toPrint);
 
-#ifdef BQ27427_LED
-  digitalWrite(BQ27427_LED, LOW); // Assume the battery is not charging
-#endif // LED
+#ifdef BOARD_TRMNL_GEN2
+// Set up an interrupt to monitor the battery charge status
+// We need this to manually control the green LED
+  pinMode(GEN2_LED, OUTPUT);
+  attachInterrupt(digitalPinToInterrupt(BATT_STATUS), statChange, CHANGE);
+#endif // GEN2
   if (snap.flags & BQ27427_FLAG_FC) {
     Log_info("BATTERY IS FULL"); // full, charger connected but not drawing current
   } else if ((snap.flags & BQ27427_FLAG_CHG) && _current > 0) {
-#ifdef BQ27427_LED
-    digitalWrite(BQ27427_LED, HIGH);
-#endif // LED
     Log_info("BATTERY IS CHARGING");
   } else if (snap.flags & BQ27427_FLAG_DSG) {
     Log_info("BATTERY IS DISCHARGING");
