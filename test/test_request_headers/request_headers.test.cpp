@@ -190,6 +190,18 @@ void test_display_headers_panel_id_present_when_set(void) {
   TEST_ASSERT_EQUAL_STRING("0012ab34", valueOf(headers, "Panel-Rev").c_str());
 }
 
+void test_display_headers_panel_vcom_omitted_when_empty(void) {
+  auto headers = buildDisplayHeaders(makeDisplayInputs());
+  TEST_ASSERT_EQUAL_INT(-1, indexOf(headers, "Panel-Vcom"));
+}
+
+void test_display_headers_panel_vcom_present_when_set(void) {
+  ApiDisplayInputs inputs = makeDisplayInputs();
+  inputs.panelVcom = "-1";
+  auto headers = buildDisplayHeaders(inputs);
+  TEST_ASSERT_EQUAL_STRING("-1", valueOf(headers, "Panel-Vcom").c_str());
+}
+
 void test_display_headers_wifi_band_2_4(void) {
   auto inputs = makeDisplayInputs();
   inputs.wifiBand = "2.4";
@@ -276,6 +288,8 @@ void process() {
   RUN_TEST(test_display_headers_toggle_hold_named_when_chosen);
   RUN_TEST(test_display_headers_panel_id_omitted_when_empty);
   RUN_TEST(test_display_headers_panel_id_present_when_set);
+  RUN_TEST(test_display_headers_panel_vcom_omitted_when_empty);
+  RUN_TEST(test_display_headers_panel_vcom_present_when_set);
   RUN_TEST(test_display_headers_wifi_band_2_4);
   RUN_TEST(test_display_headers_wifi_band_5);
   RUN_TEST(test_display_headers_wifi_band_omitted_when_empty);

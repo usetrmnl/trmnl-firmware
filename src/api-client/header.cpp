@@ -75,6 +75,7 @@ ApiDisplayInputs createApiHeaders() {
   inputs.displayHeight = display_height();
   inputs.model = DEVICE_MODEL;
   inputs.panelId = display_panel_rev_string();
+  inputs.panelVcom = display_panel_vcom_string();
   inputs.specialFunction = special_function;
   inputs.specialFunctionChosen = special_function_chosen;
   inputs.imageCached = bUsedCachedImage;

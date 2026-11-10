@@ -47,6 +47,8 @@
 #define PREFERENCES_LAST_OTA                 "last_ota"
 #define PREFERENCES_TOUCHBAR_TUTORIAL_KEY    "touch_tutorial" // TRMNL X: the touch bar tutorial was finished
 #define PREFERENCES_TOUCHBAR_LOCKED_KEY      "touch_locked" // TRMNL X
+#define PREFERENCES_PANEL_VCOM               "panel_vcom" // VCOM_DC code read from the panel's OTP; -1 = none
+#define PREFERENCES_PANEL_VCOM_ID            "panel_vcom_id" // panel ID that VCOM was read from
 
 #define WIFI_CONNECTION_RSSI                 (-100)
 

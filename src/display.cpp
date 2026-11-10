@@ -153,6 +153,7 @@ void display_init(void) {
     panel_rev = get_panel_rev();
     panel_rev_read = true;
     Log_info("Panel ID = 0x%08x\n", panel_rev);
+    read_panel_vcom(panel_rev);
   }
   if (strcmp(DEVICE_MODEL, "xiao_epaper_mini") == 0 && panel_rev == 0x40000000) {
     // New 4.26" panel needs a different ePaper configuration
