@@ -150,38 +150,11 @@
       }
     }
 
-    .mode {
-      font-family: var(--mono);
-      font-size: 10px;
-      letter-spacing: .12em;
-      text-transform: uppercase;
-      color: var(--ink-2);
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .mode .dot {
-      width: 6px;
-      height: 6px;
-      background: var(--spark);
-      border-radius: 50%;
-      animation: pulse 2s steps(2, end) infinite;
-    }
-
-    @keyframes pulse {
-      50% {
-        opacity: .25;
-      }
-    }
-
     .p-body {
       padding: 22px 20px 32px;
       display: flex;
       flex-direction: column;
       gap: 26px;
-      max-width: 480px;
-      margin: 0 auto;
     }
 
     .p-title {
@@ -201,8 +174,6 @@
       display: flex;
       flex-direction: column;
       gap: 6px;
-      padding-top: 14px;
-      border-top: 1px solid var(--rule);
     }
 
     .mac-line {
@@ -254,7 +225,8 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding-bottom: 8px;
+      margin: 0 -20px;
+      padding: 0 20px 8px;
       border-bottom: 1px solid var(--rule);
     }
 
@@ -277,19 +249,22 @@
       cursor: default;
     }
 
+    /* Lists run the full page width: they cancel .p-body's 20px gutter and
+       their rows carry it as their only padding. */
     .netlist {
       display: flex;
       flex-direction: column;
+      margin: 0 -20px;
     }
 
     .net {
       display: flex;
       align-items: center;
       gap: 10px;
+      position: relative;
       min-height: 48px;
-      padding: 0 10px;
-      margin: 0 -10px;
-      width: calc(100% + 20px);
+      padding: 0 20px;
+      width: 100%;
       border: 0;
       border-bottom: 1px solid var(--rule-soft);
       background: transparent;
@@ -356,7 +331,9 @@
       font-family: var(--mono);
       font-size: 12px;
       opacity: 0;
-      flex: 0 0 8px;
+      /* in the gutter, so network names line up with the rest of the page */
+      position: absolute;
+      left: 7px;
     }
 
     .badge {
@@ -418,6 +395,8 @@
     }
 
     .skel {
+      margin: 0 -20px;
+      padding: 0 20px;
       height: 48px;
       border-bottom: 1px solid var(--rule-soft);
       display: flex;
@@ -655,7 +634,8 @@
     /* Two views in one document. Only one is ever visible - the global
        [hidden] { display: none !important } rule from Task 2 does the hiding,
        so no extra display rule is needed here. */
-    .view {
+    .view,
+    .stack {
       display: flex;
       flex-direction: column;
       gap: 26px;
@@ -682,8 +662,8 @@
       letter-spacing: .14em;
       text-transform: uppercase;
       color: var(--ink-3);
-      margin: 0;
-      padding-bottom: 8px;
+      margin: 0 -20px;
+      padding: 0 20px 8px;
       border-bottom: 1px solid var(--rule);
     }
 
@@ -700,20 +680,6 @@
       height: 18px;
       accent-color: var(--spark);
       flex: 0 0 auto;
-    }
-
-    .danger-zone {
-      border: 1px solid var(--rule);
-      border-radius: 2px;
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .danger-zone p {
-      margin: 0;
-      color: var(--ink-2);
     }
 
     .modal {
@@ -746,8 +712,408 @@
     .modal-content p {
       margin: 0;
     }
+
+    /* The landing menu: one row per settings page (see PAGES in the script). */
+    .menu {
+      display: flex;
+      flex-direction: column;
+      border-top: 1px solid var(--rule);
+      margin: 0 -20px;
+    }
+
+    /* The landing menu sits flush under the header, whose bottom rule is its top line */
+    .menu-flush {
+      border-top: 0;
+      margin-top: -22px;
+    }
+
+    .menu-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 68px;
+      padding: 12px 20px;
+      width: 100%;
+      border: 0;
+      border-bottom: 1px solid var(--rule);
+      background: transparent;
+      color: var(--ink);
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+      transition: background-color .12s steps(3);
+    }
+
+    .menu-item:hover {
+      background: var(--rule-soft);
+    }
+
+    .menu-item:focus-visible {
+      outline-offset: -2px;
+    }
+
+    .menu-text {
+      flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .menu-title {
+      font-family: var(--mono);
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .menu-desc {
+      color: var(--ink-2);
+      font-size: 12.5px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .menu-tag {
+      border-color: var(--spark);
+      color: var(--spark);
+      text-transform: uppercase;
+    }
+
+    .chev {
+      color: var(--ink-3);
+      font-family: var(--mono);
+      font-size: 11px;
+      flex: 0 0 auto;
+    }
+
+    /* A saved network: its name with its labels on a line below */
+    .net-main {
+      flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      padding: 10px 0;
+    }
+
+    .net-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .net-act {
+      font-family: var(--mono);
+      font-size: 10.5px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--spark);
+      background: none;
+      border: 0;
+      cursor: pointer;
+      min-height: 48px;
+      padding: 0 0 0 8px;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      flex: 0 0 auto;
+    }
   </style>
   <script>
+    // ---- Pages ---------------------------------------------------------------
+    // Every screen but the landing menu is a page. To add one: put a
+    // <div class="view" id="view-NAME" hidden> in the body and an entry here.
+    // A page without `parent` gets a row in the landing menu; one with `parent`
+    // gets a row in that page's menu (<nav class="menu" data-parent="PARENT">
+    // in the parent's view) and its Back button goes there. `desc` (the line
+    // under the title) and `tag` (a small highlighted label, or '') may be
+    // strings or functions; functions are evaluated again whenever the device
+    // state changes (renderMenus).
+    var PAGES = [
+      {
+        id: 'wifi',
+        title: 'Wi-Fi',
+        desc: function () {
+          if (!savedLoaded) return 'Networks your TRMNL can join';
+          if (!saved.length) return 'Not connected yet';
+          return saved.length === 1 ? saved[0].ssid : saved.length + ' saved networks';
+        },
+        tag: function () { return savedLoaded && !saved.length ? 'Start here' : ''; }
+      },
+      {
+        id: 'advanced',
+        title: 'Advanced Settings',
+        desc: 'Server, hostname, time, diagnostics, reset'
+      },
+      {
+        id: 'server',
+        parent: 'advanced',
+        title: 'Server',
+        desc: function () { return deviceSettings.api_url || 'trmnl.app'; }
+      },
+      {
+        id: 'hostname',
+        parent: 'advanced',
+        title: 'Hostname',
+        desc: function () { return deviceSettings.hostname || 'Default'; }
+      },
+      {
+        id: 'time',
+        parent: 'advanced',
+        title: 'Time Source',
+        desc: function () { return deviceSettings.ntp_server || 'time.google.com'; }
+      },
+      {
+        id: 'diagnostics',
+        parent: 'advanced',
+        title: 'Diagnostics',
+        desc: 'Sensor test, serial logs'
+      },
+      {
+        id: 'reset',
+        parent: 'advanced',
+        title: 'Reset',
+        desc: 'Erase Wi-Fi, device ID and API key'
+      }
+    ];
+
+    // Device state shared by the pages
+    var saved = [], savedLoaded = false, maxSaved = 5; // GET /saved-networks
+    var scanned = [];                                   // GET /scan
+    var deviceSettings = {};                            // GET /device-settings
+
+    function currentPage() {
+      var id = location.hash.replace('#', '');
+      for (var i = 0; i < PAGES.length; i++) if (PAGES[i].id === id) return PAGES[i];
+      return null; // anything else is the landing menu
+    }
+
+    function evaluate(value) {
+      return (typeof value === 'function' ? value() : value) || '';
+    }
+
+    // Fills every menu on the page: the landing menu (data-parent="") and each
+    // parent page's menu, with a row per page whose parent it is.
+    function renderMenus() {
+      Array.prototype.forEach.call(document.querySelectorAll('nav.menu'), function (menu) {
+        var parent = menu.dataset.parent || '';
+        menu.innerHTML = '';
+        PAGES.forEach(function (page) {
+          if ((page.parent || '') !== parent) return;
+          var item = document.createElement('button');
+          item.type = 'button';
+          item.className = 'menu-item';
+          item.onclick = function () { location.hash = '#' + page.id; };
+          item.innerHTML =
+            '<span class="menu-text"><span class="menu-title"></span><span class="menu-desc"></span></span>' +
+            '<span class="badge menu-tag" hidden></span>' +
+            '<span class="chev" aria-hidden="true">&#9654;</span>';
+          item.querySelector('.menu-title').textContent = page.title;
+          item.querySelector('.menu-desc').textContent = evaluate(page.desc);
+          var tag = evaluate(page.tag);
+          var tagEl = item.querySelector('.menu-tag');
+          tagEl.textContent = tag;
+          tagEl.hidden = !tag;
+          menu.appendChild(item);
+        });
+      });
+
+      // Done needs a saved network to go back to
+      var actions = document.getElementById('home-actions');
+      if (actions) actions.hidden = saved.length === 0;
+    }
+
+    // Back goes up one level: to the parent page, or the landing menu
+    function goBack() {
+      var page = currentPage();
+      location.hash = '#' + ((page && page.parent) || 'home');
+    }
+
+    function showView() {
+      closeModal();
+      var page = currentPage();
+      var active = 'view-' + (page ? page.id : 'home');
+      Array.prototype.forEach.call(document.querySelectorAll('.view'), function (view) {
+        view.hidden = view.id !== active;
+      });
+      document.getElementById('headBack').hidden = !page;
+      addOpen = reopenAdd;
+      reopenAdd = false;
+      renderAddForm();
+      window.scrollTo(0, 0);
+      var title = document.querySelector('#' + active + ' .p-title');
+      if (title) title.focus();
+    }
+
+    // The message box of the page being shown (its .page-msg)
+    function pageMsg(text, warn) {
+      var page = currentPage();
+      var box = document.querySelector('#view-' + (page ? page.id : 'home') + ' .page-msg');
+      if (!box) return;
+      box.classList.toggle('msg-warn', !!warn);
+      box.textContent = text;
+      box.hidden = false;
+    }
+
+    function showMsg(id, text, warn) {
+      var box = document.getElementById(id);
+      box.classList.toggle('msg-warn', !!warn);
+      box.textContent = text;
+      box.hidden = false;
+    }
+
+    function postJSON(path, body) {
+      return fetch(path, {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify(body || {})
+      });
+    }
+
+    // ---- Confirmation dialog -------------------------------------------------
+    var confirmAction = null;
+
+    function askConfirm(title, text, actionLabel, action) {
+      document.getElementById('confirmTitle').textContent = title;
+      document.getElementById('confirmText').textContent = text;
+      document.getElementById('confirmYes').textContent = actionLabel;
+      confirmAction = action;
+      document.getElementById('confirmationModal').setAttribute('open', '');
+      document.getElementById('confirmNo').focus();
+    }
+
+    function confirmYes() {
+      var action = confirmAction;
+      closeModal();
+      if (action) action();
+    }
+
+    function closeModal() {
+      confirmAction = null;
+      var modal = document.getElementById('confirmationModal');
+      if (modal) modal.removeAttribute('open');
+    }
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && document.getElementById('confirmationModal').hasAttribute('open')) {
+        closeModal();
+      }
+    });
+
+    // ---- Landing page --------------------------------------------------------
+    // Done: the device closes the portal and restarts onto a saved network.
+    function finish() {
+      var btn = document.getElementById('btnDone');
+      btn.disabled = true;
+      fetch('/exit', { method: 'POST' })
+        .then(function (response) {
+          if (!response.ok) throw new Error('refused');
+          btn.textContent = 'Restarting\u2026';
+          showMsg('home-message', 'Your TRMNL is restarting and will reconnect to Wi-Fi. You can close this page.');
+        })
+        .catch(function () {
+          btn.disabled = false;
+          showMsg('home-message', 'Could not reach your TRMNL. Check that you are still on its Wi-Fi network, then try again.', true);
+        });
+    }
+
+    // ---- Wi-Fi: saved networks -----------------------------------------------
+    async function loadSaved() {
+      try {
+        var response = await fetch('/saved-networks');
+        if (!response.ok) throw new Error('request failed');
+        var json = await response.json();
+        saved = json.networks || [];
+        maxSaved = json.max || maxSaved;
+        // First-time setup: a portal that opens with nothing saved goes straight to
+        // Wi-Fi. Only on launch and only from the bare URL, so Back still reaches the menu.
+        if (!savedLoaded && !saved.length && !location.hash) location.hash = '#wifi';
+        savedLoaded = true;
+      } catch (_) { }
+      renderSaved();
+      renderMenus();
+    }
+
+    function isSavedNetwork(ssid, band) {
+      return saved.some(function (n) { return n.ssid === ssid && (!band || n.band === band); });
+    }
+
+    // The add form is the whole page while nothing is saved; with 1 to 4 networks
+    // saved it opens from the Add a network button, and a full list has neither.
+    var addOpen = false;
+
+    function openAddForm(open) {
+      addOpen = open;
+      hideAlert();
+      renderAddForm();
+      if (open) document.getElementById('add-form').scrollIntoView();
+    }
+
+    // Brings the add form into view from wherever the page is (for a join that failed)
+    var reopenAdd = false;
+
+    function showAddForm() {
+      var page = currentPage();
+      if (page && page.id === 'wifi') {
+        addOpen = true;
+        renderAddForm();
+      } else {
+        reopenAdd = true; // showView closes the form on every page change
+        location.hash = '#wifi';
+      }
+    }
+
+    function renderAddForm() {
+      var full = saved.length >= maxSaved;
+      var formShown = !full && (saved.length === 0 || addOpen);
+      document.getElementById('add-form').hidden = !formShown;
+      document.getElementById('add-actions').hidden = full || formShown;
+      document.getElementById('btnCancelAdd').hidden = saved.length === 0;
+    }
+
+    function renderSaved() {
+      renderAddForm();
+      var table = document.getElementById('table-saved');
+      table.innerHTML = '';
+      document.getElementById('saved-networks').hidden = saved.length === 0;
+      document.getElementById('saved-hint').hidden = saved.length < 2;
+      document.getElementById('full-note').hidden = saved.length < maxSaved;
+
+      saved.forEach(function (n) {
+        var inRange = scanned.filter(function (s) { return s.name === n.ssid && s.band === n.band; })[0];
+        var tags =
+          (n.enterprise ? '<span class="badge">ENT</span>' : '') +
+          (n.static_ip ? '<span class="badge">STATIC IP</span>' : '');
+        var row = document.createElement('div');
+        row.className = 'net';
+        row.innerHTML =
+          '<span class="net-main"><span class="ssid"></span>' + (tags ? '<span class="net-tags">' + tags + '</span>' : '') + '</span>' +
+          '<span class="badge">' + (n.band === '5GHz' ? '5G' : '2.4G') + '</span>' +
+          (inRange ? barsHTML(inRange.rssi) : '') +
+          '<button class="net-act" type="button">Forget</button>';
+        row.querySelector('.ssid').textContent = n.ssid;
+        var btn = row.querySelector('.net-act');
+        btn.setAttribute('aria-label', 'Forget ' + n.ssid);
+        btn.onclick = function () { forgetNetwork(n); };
+        table.appendChild(row);
+      });
+    }
+
+    function forgetNetwork(n) {
+      var text = saved.length === 1
+        ? 'This is the only saved network. Your TRMNL stays in setup mode until you add another.'
+        : 'Your TRMNL will no longer join this network.';
+      askConfirm('Forget ' + n.ssid + '?', text, 'Forget', function () {
+        hideAlert();
+        postJSON('/forget-network', { index: n.index, ssid: n.ssid })
+          .then(function (response) { if (!response.ok) throw new Error('refused'); })
+          .catch(function () { showMsg('wifi-message', 'Could not forget ' + n.ssid + '. Please try again.', true); })
+          .then(loadSaved)
+          .then(renderScanned);
+      });
+    }
+
+    // ---- Wi-Fi: networks in range --------------------------------------------
     function setRefreshButtonState(scanning) {
       var btn = document.getElementById('btnRefresh');
       if (scanning && document.activeElement === btn) btn.blur();
@@ -758,16 +1124,117 @@
     async function refresh() {
       setRefreshButtonState(true);
 
-      document.getElementById('table-saved').innerHTML = '';
       document.getElementById('table-others').innerHTML = '';
-      document.getElementById('saved-networks').hidden = true;
-
       document.getElementById('scanning-info').hidden = false;
       document.getElementById('scanning-loader').hidden = false;
 
       await getInfo(true);
     }
 
+    function showScanError() {
+      document.getElementById('scanning-loader').hidden = true;
+      document.getElementById('scanning-info').hidden = true;
+      document.getElementById('scan-error').hidden = false;
+      setRefreshButtonState(false);
+    }
+
+    async function getInfo(force) {
+      setRefreshButtonState(true);
+      document.getElementById('scan-error').hidden = true;
+      document.getElementById('no-networks').hidden = true;
+      let response = await fetch('/scan' + (force ? '?force=1' : ''), {
+        method: 'GET',
+      })
+        .catch(_ => null);
+
+      if (!response) {
+        showScanError(); // network-level failure
+        return;
+      }
+
+      if (response.status == 200) {
+        var json = await response.json();
+        document.getElementById('scanning-info').hidden = true;
+        document.getElementById('scanning-loader').hidden = true;
+        setRefreshButtonState(false);
+
+        displayInfo(json.mac, json.mac_5ghz);
+        // The device also lists its saved networks that are out of range (rssi -200):
+        // those are shown under Saved, from /saved-networks.
+        scanned = json.networks.filter(function (item) { return Number(item.rssi) > -150; });
+        renderScanned();
+        renderSaved();
+      } else if (response.status == 202) {
+        setTimeout(() => getInfo(false), 2000); // poll only - force would restart the scan
+      } else {
+        showScanError(); // any HTTP error status
+      }
+    }
+
+    function renderScanned() {
+      var selected = document.getElementById('ssid').value;
+      var band = document.getElementById('band').value;
+      document.getElementById('table-others').innerHTML = '';
+      scanned.forEach(function (item) {
+        // a saved network (same name and band) is listed under Saved Networks only
+        if (isSavedNetwork(item.name, item.band)) return;
+        var row = appendWifiToTable(item);
+        if (item.name === selected && (item.band || '') === band) row.setAttribute('aria-checked', 'true');
+      });
+      document.getElementById('no-networks').hidden = scanned.length !== 0;
+    }
+
+    var LOCK_SVG = '<svg class="lock" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2m3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2M5 8h6a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1"/></svg>';
+
+    function barsHTML(rssi) {
+      var n = rssi > -55 ? 3 : (rssi > -70 ? 2 : 1);
+      var s = '<span class="bars" aria-hidden="true">';
+      for (var i = 1; i <= 3; i++) s += '<i class="bar' + (i <= n ? ' on' : '') + '"></i>';
+      return s + '</span>';
+    }
+
+    function appendWifiToTable(item) {
+      var row = document.createElement('button');
+      row.className = 'net';
+      row.type = 'button';
+      row.setAttribute('role', 'radio');
+      row.setAttribute('aria-checked', 'false');
+      row.onclick = function () { selectNetwork(this); };
+      row.dataset.ssid = item.name;
+      row.dataset.band = item.band || '';
+      row.dataset.ent = item.enterprise ? '1' : '';
+
+      var label = item.band === '5GHz' ? '5G' : (item.band ? '2.4G' : '');
+      row.innerHTML =
+        '<span class="caret" aria-hidden="true">&#9654;</span>' +
+        '<span class="ssid"></span>' +
+        (label ? '<span class="badge">' + label + '</span>' : '') +
+        (item.enterprise ? '<span class="badge">ENT</span>' : '') +
+        (item.open ? '' : LOCK_SVG) +
+        barsHTML(item.rssi);
+      row.querySelector('.ssid').textContent = item.name;
+
+      document.getElementById('table-others').appendChild(row);
+      return row;
+    }
+
+    function selectNetwork(el) {
+      var group = document.getElementById('table-others');
+      Array.prototype.forEach.call(group.children, function (row) {
+        row.setAttribute('aria-checked', String(row === el));
+      });
+
+      document.getElementById('ssid').value = el.dataset.ssid;
+      document.getElementById('band').value = el.dataset.band || '';
+
+      var isEnterprise = el.dataset.ent === '1';
+      var pw = document.getElementById('password');
+      pw.value = '';
+      toggleEnterpriseFields(isEnterprise);
+      focusField(isEnterprise ? document.getElementById('identity') : pw);
+    }
+
+    // ---- Wi-Fi: adding a network ---------------------------------------------
     function toggleEnterpriseFields(isEnterprise) {
       document.getElementById('isEnterpriseHidden').value = isEnterprise ? 'true' : 'false';
       document.getElementById('enterprise_fields').hidden = !isEnterprise;
@@ -775,66 +1242,56 @@
       document.getElementById('enterprise_indicator').hidden = !isEnterprise;
     }
 
-    function connect() {
+    function toggleStaticIP() {
+      document.getElementById('static_ip_fields').hidden = !document.getElementById('useStaticIP').checked;
+    }
+
+    function togglePassword() {
+      var btn = document.getElementById("toggler");
+      var input = document.getElementById("password");
+      var showing = input.type === "text";
+      input.type = showing ? "password" : "text";
+      btn.textContent = showing ? "Show" : "Hide";
+    }
+
+    // The network the form describes, or null (with the problem shown) when it is incomplete.
+    function networkFromForm() {
       hideAlert();
       var ssid = document.getElementById('ssid').value;
-      var pswd = document.getElementById('password').value;
-      var server = document.getElementById('server').value;
-      var band = document.getElementById('band').value;
       var isEnterprise = document.getElementById('isEnterpriseHidden').value === 'true';
 
       if (!ssid) {
         displayAlert('Please enter your Wi-Fi name');
-        return;
+        return null;
       }
 
-      if (isEnterprise) {
-        var identity = document.getElementById('identity').value;
-        if (!identity) {
-          displayAlert('Please enter your identity for WPA2 Enterprise');
-          return;
-        }
+      if (saved.length >= maxSaved && !isSavedNetwork(ssid)) {
+        displayAlert('All ' + maxSaved + ' network slots are in use. Forget a saved network first.');
+        return null;
       }
-
-      // if the server field carries a value, validate the url
-      if (server) {
-        try {
-          new URL(server);
-
-          if (!server.startsWith('http://') && !server.startsWith('https://')) {
-            throw new Error();
-          }
-        } catch (_) {
-          location.hash = '#advanced';
-          displayAdvancedAlert('Please enter a valid URL for your custom server');
-          return;
-        }
-      }
-
-      server = server.trim();
-      server = server.replace(/\/+$/, '');
 
       var body = {
         ssid: ssid,
-        pswd: pswd,
-        server: server,
-        band: band,
+        pswd: document.getElementById('password').value,
+        band: document.getElementById('band').value,
         isEnterprise: isEnterprise
       };
 
       if (isEnterprise) {
         body.identity = document.getElementById('identity').value;
         body.username = document.getElementById('username').value;
+        if (!body.identity) {
+          displayAlert('Please enter your identity for WPA2 Enterprise');
+          return null;
+        }
       }
 
-      var useStaticIP = document.getElementById('useStaticIP').checked;
-      if (useStaticIP) {
+      if (document.getElementById('useStaticIP').checked) {
         var staticIP = document.getElementById('staticIP').value.trim();
         var ipPattern = /^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.){3}(25[0-5]|(2[0-4]|1\d|[1-9]|)\d)$/;
         if (!staticIP || !ipPattern.test(staticIP)) {
-          location.hash = '#advanced';
-          displayAdvancedAlert('Enter a valid static IP address, like 192.168.1.100');
-          return;
+          displayAlert('Enter a valid static IP address, like 192.168.1.100');
+          return null;
         }
         body.useStaticIP = true;
         body.staticIP = staticIP;
@@ -843,36 +1300,23 @@
         body.dns1 = document.getElementById('dns1').value.trim();
       }
 
-      var hostname = document.getElementById('customHostname').value.trim();
-      if (hostname) {
-        if (!/^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/.test(hostname)) {
-          location.hash = '#advanced';
-          displayAdvancedAlert('Hostname can use letters, numbers and hyphens only, and cannot start or end with a hyphen.');
-          return;
-        }
-        body.hostname = hostname;
-      }
+      return body;
+    }
 
-      var ntp = document.getElementById('ntpServer1').value.trim();
-      if (ntp) body.ntpServer1 = ntp;
+    function connect() {
+      var body = networkFromForm();
+      if (!body) return;
 
       var btn = document.getElementById("btnConnect");
       btn.disabled = true;
       btn.textContent = "Connecting\u2026";
       document.getElementById('connect-status').hidden = false;
 
-      fetch('/connect', {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(body)
-      })
+      postJSON('/connect', body)
         .then(response => response.json())
         .then(response => {
           displayWifiInfo(response);
-          pollConnectionStatus(isEnterprise);
+          pollConnectionStatus(body.isEnterprise);
         })
         .catch(_ => {
           document.getElementById('connect-status').hidden = true;
@@ -910,6 +1354,7 @@
       }
 
       resetConnectButton();
+      showAddForm(); // the result may come back after a reload, on another page or with the form closed
       if (status === 'authentication_failed') {
         var message = isEnterprise
           ? 'Wi-Fi authentication failed. Check your credentials and try again.'
@@ -932,120 +1377,13 @@
             displayConnectionResult(response.status, isEnterprise);
           }
         })
-        .catch(_ => {});
+        .catch(_ => { });
     }
 
     function resetConnectButton() {
       var btn = document.getElementById('btnConnect');
       btn.disabled = false;
-      btn.textContent = 'Connect';
-    }
-
-    function togglePassword() {
-      var btn = document.getElementById("toggler");
-      var input = document.getElementById("password");
-      var showing = input.type === "text";
-      input.type = showing ? "password" : "text";
-      btn.textContent = showing ? "Show" : "Hide";
-    }
-
-    function showScanError() {
-      document.getElementById('scanning-loader').hidden = true;
-      document.getElementById('scanning-info').hidden = true;
-      document.getElementById('scan-error').hidden = false;
-      setRefreshButtonState(false);
-    }
-
-    async function getInfo(force) {
-      setRefreshButtonState(true);
-      document.getElementById('scan-error').hidden = true;
-      document.getElementById('no-networks').hidden = true;
-      let scanningInfoBox = document.getElementById('scanning-info');
-      let scanningLoader = document.getElementById('scanning-loader');
-      let response = await fetch('/scan' + (force ? '?force=1' : ''), {
-        method: 'GET',
-      })
-        .catch(_ => null);
-
-      if (!response) {
-        showScanError(); // network-level failure
-        return;
-      }
-
-      if (response.status == 200) {
-        var json = await response.json();
-        scanningInfoBox.hidden = true;
-        scanningLoader.hidden = true;
-        setRefreshButtonState(false);
-
-        displayInfo(json.mac, json.mac_5ghz);
-        var knownNetworks = json.networks.filter((item) => item.saved);
-        var otherNetworks = json.networks.filter((item) => !item.saved);
-        document.getElementById('saved-networks').hidden = knownNetworks.length === 0;
-        knownNetworks.forEach((item, row) => {
-          appendWifiToTable("table-saved", item.name, item.open, item.rssi, item.enterprise, false, item.band);
-        });
-        otherNetworks.forEach((item, row) => {
-          appendWifiToTable("table-others", item.name, item.open, item.rssi, item.enterprise, true, item.band);
-        });
-        var noneFound = otherNetworks.length === 0;
-        document.getElementById('no-networks').hidden = !noneFound;
-      } else if (response.status == 202) {
-        setTimeout(() => getInfo(false), 2000); // poll only - force would restart the scan
-      } else {
-        showScanError(); // any HTTP error status
-      }
-    }
-
-    var LOCK_SVG = '<svg class="lock" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2m3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2M5 8h6a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1"/></svg>';
-
-    function barsHTML(rssi) {
-      var n = rssi > -55 ? 3 : (rssi > -70 ? 2 : 1);
-      var s = '<span class="bars" aria-hidden="true">';
-      for (var i = 1; i <= 3; i++) s += '<i class="bar' + (i <= n ? ' on' : '') + '"></i>';
-      return s + '</span>';
-    }
-
-    function appendWifiToTable(table, name, open, rssi, enterprise, onClick, band) {
-      var row = document.createElement(onClick ? 'button' : 'div');
-      row.className = 'net';
-      if (onClick) {
-        row.type = 'button';
-        row.setAttribute('role', 'radio');
-        row.setAttribute('aria-checked', 'false');
-        row.onclick = function () { selectNetwork(this); };
-      }
-      row.dataset.ssid = name;
-      row.dataset.band = band || '';
-      row.dataset.ent = enterprise ? '1' : '';
-
-      var label = band === '5GHz' ? '5G' : (band ? '2.4G' : '');
-      row.innerHTML =
-        '<span class="caret" aria-hidden="true">&#9654;</span>' +
-        '<span class="ssid"></span>' +
-        (label ? '<span class="badge">' + label + '</span>' : '') +
-        (enterprise ? '<span class="badge">ENT</span>' : '') +
-        (open ? '' : LOCK_SVG) +
-        barsHTML(rssi);
-      row.querySelector('.ssid').textContent = name;
-
-      document.getElementById(table).appendChild(row);
-    }
-
-    function selectNetwork(el) {
-      var group = document.getElementById('table-others');
-      Array.prototype.forEach.call(group.children, function (row) {
-        row.setAttribute('aria-checked', String(row === el));
-      });
-
-      document.getElementById('ssid').value = el.dataset.ssid;
-      document.getElementById('band').value = el.dataset.band || '';
-
-      var isEnterprise = el.dataset.ent === '1';
-      var pw = document.getElementById('password');
-      pw.value = '';
-      toggleEnterpriseFields(isEnterprise);
-      focusField(isEnterprise ? document.getElementById('identity') : pw);
+      btn.textContent = 'Save and Connect';
     }
 
     function displayWifiInfo(response) {
@@ -1070,35 +1408,76 @@
     }
 
     function displayAlert(message) {
-      var box = document.getElementById('message');
-      box.textContent = message;
-      box.hidden = false;
+      showMsg('message', message, true);
     }
 
     function hideAlert() {
       document.getElementById('message').hidden = true;
-      document.getElementById('adv-message').hidden = true;
+      document.getElementById('wifi-message').hidden = true;
+      Array.prototype.forEach.call(document.querySelectorAll('.page-msg'), function (box) { box.hidden = true; });
+      document.getElementById('home-message').hidden = true;
     }
 
-    // Advanced-field validation errors surface here rather than in #message:
-    // #message lives inside #view-setup, which is hidden the moment connect()
-    // switches the route to #advanced to show the offending field.
-    function displayAdvancedAlert(message) {
-      var box = document.getElementById('adv-message');
-      box.textContent = message;
-      box.hidden = false;
-    }
-
-    async function loadServerFromDevice() {
+    // ---- Advanced settings ---------------------------------------------------
+    async function loadSettings() {
       try {
         const response = await fetch('/device-settings');
-        const settings = await response.json();
-        if (settings.api_url) document.getElementById('server').value = settings.api_url;
-        document.getElementById('verboseLogging').checked = !!settings.verbose_logging;
+        deviceSettings = await response.json();
+        document.getElementById('server').value = deviceSettings.api_url || '';
+        document.getElementById('customHostname').value = deviceSettings.hostname || '';
+        document.getElementById('ntpServer1').value = deviceSettings.ntp_server || '';
+        document.getElementById('verboseLogging').checked = !!deviceSettings.verbose_logging;
       } catch (_) { }
+      renderMenus();
     }
 
-    // Saved right away, unlike the other advanced fields, which apply on Connect
+    // Each settings page saves its own field: `which` is 'server', 'hostname' or 'time'.
+    function saveSetting(which, btn) {
+      hideAlert();
+      var body = {}, loaded = {};
+
+      if (which === 'server') {
+        var server = document.getElementById('server').value.trim().replace(/\/+$/, '');
+        if (server) {
+          try {
+            new URL(server);
+            if (!server.startsWith('http://') && !server.startsWith('https://')) throw new Error();
+          } catch (_) {
+            pageMsg('Please enter a valid URL for your custom server', true);
+            return;
+          }
+        }
+        // The device pairs again when its server changes, so only send it when it did
+        if (server !== (deviceSettings.api_url || '')) body.server = server;
+        loaded.api_url = server;
+      } else if (which === 'hostname') {
+        var hostname = document.getElementById('customHostname').value.trim();
+        if (hostname && !/^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/.test(hostname)) {
+          pageMsg('Hostname can use letters, numbers and hyphens only, and cannot start or end with a hyphen.', true);
+          return;
+        }
+        body.hostname = hostname;
+        loaded.hostname = hostname;
+      } else {
+        body.ntpServer1 = document.getElementById('ntpServer1').value.trim();
+        loaded.ntp_server = body.ntpServer1;
+      }
+
+      btn.disabled = true;
+      postJSON('/settings', body)
+        .then(function (response) {
+          if (!response.ok) throw new Error('refused');
+          for (var key in loaded) deviceSettings[key] = loaded[key];
+          renderMenus();
+          goBack(); // back to the settings menu, which shows the new value
+        })
+        .catch(function () {
+          pageMsg('Could not save. Check that you are still on your TRMNL\'s Wi-Fi network, then try again.', true);
+        })
+        .then(function () { btn.disabled = false; });
+    }
+
+    // Saved right away, without the Save button
     async function saveVerboseLogging() {
       var box = document.getElementById('verboseLogging');
       var out = document.getElementById('verbose-output');
@@ -1120,30 +1499,19 @@
       out.hidden = false;
     }
 
-    function toggleStaticIP() {
-      document.getElementById('static_ip_fields').hidden = !document.getElementById('useStaticIP').checked;
-    }
-
     function confirmSoftReset() {
-      document.getElementById('confirmationModal').setAttribute('open', '');
-      document.querySelector('#confirmationModal .btn-quiet').focus();
+      askConfirm('Soft reset this TRMNL?',
+        'This erases saved Wi-Fi networks, the device ID and the API key. It can\u2019t be undone.',
+        'Soft reset', softReset);
     }
-    function closeModal() { document.getElementById('confirmationModal').removeAttribute('open'); }
-
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && document.getElementById('confirmationModal').hasAttribute('open')) {
-        closeModal();
-      }
-    });
 
     function softReset() {
-      closeModal();
       var btn = document.getElementById('btnReset');
       btn.disabled = true;
       btn.textContent = 'Resetting\u2026';
       fetch('/soft-reset', { method: 'GET' })
-        .then(_ => displayAdvancedAlert('Soft reset complete. Your TRMNL is back to its default settings.'))
-        .catch(_ => displayAdvancedAlert('The reset did not complete. Try again, or contact support if it keeps failing.'))
+        .then(_ => pageMsg('Soft reset complete. Your TRMNL is back to its default settings.', true))
+        .catch(_ => pageMsg('The reset did not complete. Try again, or contact support if it keeps failing.', true))
         .finally(() => { btn.disabled = false; btn.textContent = 'Soft reset this TRMNL'; });
     }
 
@@ -1170,20 +1538,6 @@
           out.hidden = false;
         })
         .finally(() => { btn.disabled = false; btn.textContent = 'Run sensor test'; });
-    }
-
-    function showView() {
-      closeModal();
-      var advanced = location.hash === '#advanced';
-      document.getElementById('view-setup').hidden = advanced;
-      document.getElementById('view-advanced').hidden = !advanced;
-      document.getElementById('modeText').textContent = advanced ? 'Advanced' : 'Setup mode';
-      document.getElementById('modeDot').hidden = advanced;
-      document.getElementById('headBack').hidden = !advanced;
-      window.scrollTo(0, 0);
-      var title = (advanced ? document.getElementById('view-advanced') : document.getElementById('view-setup'))
-        .querySelector('.p-title');
-      if (title) title.focus();
     }
 
     // The iOS captive-portal sheet focuses the page's first text field (Network
@@ -1237,15 +1591,18 @@
     });
 
     window.addEventListener('hashchange', showView);
-    // This script runs in <head>, before <body> exists, so the initial call
-    // has to wait for the DOM rather than run inline like the listener
-    // registration above - otherwise #view-setup/#view-advanced are still
-    // null and a direct load of /#advanced throws instead of opening it.
-    document.addEventListener('DOMContentLoaded', showView);
+    // This script runs in <head>, before <body> exists, so the initial calls
+    // have to wait for the DOM rather than run inline like the listener
+    // registration above - otherwise the views are still null and a direct
+    // load of /#advanced throws instead of opening it.
+    document.addEventListener('DOMContentLoaded', function () {
+      renderMenus();
+      showView();
+    });
 
     setTimeout(getInfo, 500);
-    setTimeout(loadServerFromDevice, 100);
-    setTimeout(restoreConnectionStatus, 100);
+    setTimeout(loadSaved, 100);
+    setTimeout(loadSettings, 100);
     setTimeout(restoreConnectionStatus, 100);
   </script>
 </head>
@@ -1254,7 +1611,7 @@
   <header class="p-head">
     <div class="p-head-row">
       <div class="p-head-lead">
-        <button class="head-back" id="headBack" type="button" onclick="location.hash = '#setup'" hidden>&larr;
+        <button class="head-back" id="headBack" type="button" onclick="goBack()" hidden>&larr;
           Back</button>
         <svg class="logo" viewBox="0 0 216 45" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="TRMNL">
           <g fill-rule="evenodd" clip-rule="evenodd">
@@ -1278,170 +1635,229 @@
           </g>
         </svg>
       </div>
-      <span class="mode"><i class="dot" id="modeDot"></i> <span id="modeText">Setup mode</span></span>
     </div>
   </header>
   <div class="p-body">
-    <div class="view" id="view-setup">
-      <div>
-        <h1 class="p-title" tabindex="-1">Connect your TRMNL</h1>
+    <div class="view" id="view-home">
+      <nav class="menu menu-flush" id="menu" data-parent="" aria-label="Settings"></nav>
+
+      <div class="msg" id="home-message" role="status" hidden></div>
+
+      <div class="actions" id="home-actions" hidden>
+        <button id="btnDone" class="btn btn-primary" type="button" onclick="finish()">Save and Connect</button>
       </div>
+
+      <footer class="mac-footer" id="info-message" hidden>
+        <div class="mac-line" id="mac24-row" hidden>
+          <span class="mac-label" id="mac24-label">MAC address</span>
+          <span class="mac-alt" id="mac24"></span>
+        </div>
+        <div class="mac-line" id="mac5-row" hidden>
+          <span class="mac-label">5 GHz MAC</span>
+          <span class="mac-alt" id="mac5"></span>
+        </div>
+      </footer>
+    </div>
+
+    <div class="view" id="view-wifi" hidden>
+      <div>
+        <h1 class="p-title" tabindex="-1">Wi-Fi</h1>
+      </div>
+
       <div id="saved-networks" hidden>
-        <div class="grp-label"><span>Saved</span></div>
+        <div class="grp-label"><span>Saved Networks</span></div>
         <div class="netlist" id="table-saved"></div>
+        <p class="hint" id="saved-hint" style="margin-top:10px" hidden>The strongest network will automatically be
+          used.</p>
       </div>
 
-      <div>
-        <div class="grp-label">
-          <span>In range</span>
-          <button id="btnRefresh" type="button" onclick="refresh()">Scan again</button>
-        </div>
-        <div id="scan-error" class="msg msg-warn" role="alert" hidden>
-          <strong>Couldn't scan for networks</strong>
-          Type your network name below, or tap Scan again.
-        </div>
-        <div id="scanning-info" class="scanning">
-          <span class="spinner" aria-hidden="true">
-            <svg class="spark" viewBox="0 0 30 30" xmlns="http://www.w3.org/2000/svg">
-              <g fill-rule="evenodd" clip-rule="evenodd">
-                <path d="M8.02188 2.11328L15.8862 5.07445L14.4258 8.98481L6.56146 6.02364L8.02188 2.11328Z" />
-                <path d="M20.6315 1.14647L23.2291 9.16642L19.2738 10.458L16.6761 2.43807L20.6315 1.14647Z" />
-                <path d="M29.244 10.4452L24.6188 17.4848L21.147 15.185L25.7722 8.14549L29.244 10.4452Z" />
-                <path d="M27.374 23.0034L19.0089 23.7616L18.6349 19.6023L27 18.8441L27.374 23.0034Z" />
-                <path d="M16.4297 29.3638L10.6237 23.2697L13.6293 20.3828L19.4352 26.4769L16.4297 29.3638Z" />
-                <path d="M4.65232 24.7423L5.77753 16.3849L9.89932 16.9443L8.77411 25.3017L4.65232 24.7423Z" />
-                <path d="M0.910558 12.6074L8.11961 8.28L10.2539 11.8645L3.04481 16.192L0.910558 12.6074Z" />
-              </g>
-            </svg>
-          </span>
-          <p>Scanning for networks</p>
-        </div>
-        <div id="scanning-loader">
-          <div class="skel"><span class="dither" style="width:58%"></span></div>
-          <div class="skel"><span class="dither" style="width:41%"></span></div>
-          <div class="skel"><span class="dither" style="width:66%"></span></div>
-        </div>
-        <div class="netlist" id="table-others" role="radiogroup" aria-label="Networks in range"></div>
-        <div id="no-networks" class="msg" hidden>
-          <strong>No networks found</strong>
-          Move closer to your router, or type your network name below.
-        </div>
+      <div id="full-note" class="msg" hidden>
+        <strong>All network slots are in use</strong>
+        Forget a saved network to add a new one.
       </div>
-      <div class="fields">
-        <div class="field">
-          <label for="ssid">Network name</label>
-          <input class="inp" type="text" id="ssid" name="ssid" placeholder="Tap a network above"
-            oninput="document.getElementById('band').value = ''">
-        </div>
 
-        <input type="hidden" id="isEnterpriseHidden" value="false">
-        <input type="hidden" id="band" name="band" value="">
+      <div class="msg" id="wifi-message" role="status" hidden></div>
 
-        <div class="msg" id="enterprise_indicator" hidden>
-          <strong>This network uses WPA2 Enterprise</strong>
-          If you only have a username and password, put the username in Identity.
-        </div>
-        <div class="field" id="enterprise_fields" hidden>
-          <label for="identity">Identity</label>
-          <input class="inp" type="text" id="identity" name="identity" placeholder="you@company.com">
-        </div>
-        <div class="field" id="enterprise_username_group" hidden>
-          <label for="username">Username <span class="opt">&mdash; optional</span></label>
-          <input class="inp" type="text" id="username" name="username" placeholder="Only if different from identity">
-        </div>
+      <div class="actions" id="add-actions" hidden>
+        <button id="btnAdd" class="btn btn-quiet" type="button" onclick="openAddForm(true)">Add a network</button>
+      </div>
 
-        <div class="field">
-          <label for="password">Password</label>
-          <div class="pw-wrap">
-            <input class="inp" type="password" id="password" name="password" placeholder="Network password"
-              autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false">
-            <button class="pw-toggle" id="toggler" type="button" onclick="togglePassword()">Show</button>
+      <div class="stack" id="add-form">
+        <div>
+          <div class="grp-label">
+            <span>Add a network</span>
+            <button id="btnRefresh" type="button" onclick="refresh()">Refresh</button>
+          </div>
+          <div id="scan-error" class="msg msg-warn" role="alert" hidden>
+            <strong>Couldn't scan for networks</strong>
+            Type your network name below, or Refresh.
+          </div>
+          <div id="scanning-info" class="scanning">
+            <span class="spinner" aria-hidden="true">
+              <svg class="spark" viewBox="0 0 30 30" xmlns="http://www.w3.org/2000/svg">
+                <g fill-rule="evenodd" clip-rule="evenodd">
+                  <path d="M8.02188 2.11328L15.8862 5.07445L14.4258 8.98481L6.56146 6.02364L8.02188 2.11328Z" />
+                  <path d="M20.6315 1.14647L23.2291 9.16642L19.2738 10.458L16.6761 2.43807L20.6315 1.14647Z" />
+                  <path d="M29.244 10.4452L24.6188 17.4848L21.147 15.185L25.7722 8.14549L29.244 10.4452Z" />
+                  <path d="M27.374 23.0034L19.0089 23.7616L18.6349 19.6023L27 18.8441L27.374 23.0034Z" />
+                  <path d="M16.4297 29.3638L10.6237 23.2697L13.6293 20.3828L19.4352 26.4769L16.4297 29.3638Z" />
+                  <path d="M4.65232 24.7423L5.77753 16.3849L9.89932 16.9443L8.77411 25.3017L4.65232 24.7423Z" />
+                  <path d="M0.910558 12.6074L8.11961 8.28L10.2539 11.8645L3.04481 16.192L0.910558 12.6074Z" />
+                </g>
+              </svg>
+            </span>
+            <p>Scanning for networks</p>
+          </div>
+          <div id="scanning-loader">
+            <div class="skel"><span class="dither" style="width:58%"></span></div>
+            <div class="skel"><span class="dither" style="width:41%"></span></div>
+            <div class="skel"><span class="dither" style="width:66%"></span></div>
+          </div>
+          <div class="netlist" id="table-others" role="radiogroup" aria-label="Networks in range"></div>
+          <div id="no-networks" class="msg" hidden>
+            <strong>No networks found</strong>
+            Move closer to your router, or type your network name below.
+          </div>
+        </div>
+        <div class="fields">
+          <div class="field">
+            <label for="ssid">Network name</label>
+            <input class="inp" type="text" id="ssid" name="ssid" placeholder="Tap a network above"
+              oninput="document.getElementById('band').value = ''">
+          </div>
+
+          <input type="hidden" id="isEnterpriseHidden" value="false">
+          <input type="hidden" id="band" name="band" value="">
+
+          <div class="msg" id="enterprise_indicator" hidden>
+            <strong>This network uses WPA2 Enterprise</strong>
+            If you only have a username and password, put the username in Identity.
+          </div>
+          <div class="field" id="enterprise_fields" hidden>
+            <label for="identity">Identity</label>
+            <input class="inp" type="text" id="identity" name="identity" placeholder="you@company.com">
+          </div>
+          <div class="field" id="enterprise_username_group" hidden>
+            <label for="username">Username <span class="opt">&mdash; optional</span></label>
+            <input class="inp" type="text" id="username" name="username" placeholder="Only if different from identity">
+          </div>
+
+          <div class="field">
+            <label for="password">Password</label>
+            <div class="pw-wrap">
+              <input class="inp" type="password" id="password" name="password" placeholder="Network password"
+                autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false">
+              <button class="pw-toggle" id="toggler" type="button" onclick="togglePassword()">Show</button>
+            </div>
+          </div>
+
+          <label class="switch">
+            <input type="checkbox" id="useStaticIP" onchange="toggleStaticIP()">
+            Use a static IP on this network
+          </label>
+          <div id="static_ip_fields" class="fields" hidden>
+            <div class="field">
+              <label for="staticIP">IP address</label>
+              <input class="inp" type="text" id="staticIP" placeholder="192.168.1.100">
+            </div>
+            <div class="field">
+              <label for="gateway">Gateway <span class="opt">&mdash; optional</span></label>
+              <input class="inp" type="text" id="gateway" placeholder="Default: x.x.x.1 based on your IP">
+            </div>
+            <div class="field">
+              <label for="subnet">Subnet mask <span class="opt">&mdash; optional</span></label>
+              <input class="inp" type="text" id="subnet" placeholder="Default: 255.255.255.0">
+            </div>
+            <div class="field">
+              <label for="dns1">DNS server <span class="opt">&mdash; optional</span></label>
+              <input class="inp" type="text" id="dns1" placeholder="Default: 8.8.8.8">
+            </div>
+          </div>
+
+          <div class="msg msg-warn" id="message" role="alert" hidden></div>
+
+          <div class="msg msg-live" id="connect-status" role="status" hidden>
+            <strong id="connect-status-title">Connecting</strong>
+            <span>Keep this page open. Your TRMNL restarts when it's connected.</span>
+            <div class="progress"><i class="dither"></i></div>
           </div>
         </div>
 
-        <div class="msg msg-warn" id="message" role="alert" hidden></div>
-
-        <div class="msg msg-live" id="connect-status" role="status" hidden>
-          <strong id="connect-status-title">Connecting</strong>
-          <span>Keep this page open. Your TRMNL restarts when it's connected.</span>
-          <div class="progress"><i class="dither"></i></div>
+        <div class="actions">
+          <button id="btnConnect" class="btn btn-primary" type="button" onclick="connect()">Save and
+            Connect</button>
+          <button id="btnCancelAdd" class="btn btn-quiet" type="button" onclick="openAddForm(false)"
+            hidden>Cancel</button>
         </div>
-      </div>
-
-      <div class="actions">
-        <button id="btnConnect" class="btn btn-primary" type="button" onclick="connect()">Connect</button>
-        <button id="btnAdvanced" class="btn btn-quiet" type="button" onclick="location.hash = '#advanced'">Advanced
-          settings</button>
       </div>
     </div>
 
     <div class="view" id="view-advanced" hidden>
-
       <div>
-        <h1 class="p-title" tabindex="-1">Advanced settings</h1>
-        <p class="p-sub">Most people never need anything here. Values apply when you tap Connect.</p>
+        <h1 class="p-title" tabindex="-1">Advanced Settings</h1>
+        <p class="p-sub">Most people never need anything here.</p>
       </div>
 
-      <div class="msg msg-warn" id="adv-message" role="alert" hidden></div>
+      <nav class="menu" data-parent="advanced" aria-label="Advanced settings"></nav>
+    </div>
 
-      <div class="adv-sec">
-        <h3>Server</h3>
-        <div class="field">
-          <label for="server">API server</label>
-          <input class="inp" type="url" id="server" name="server" placeholder="https://trmnl.app">
-          <p class="hint">Point your TRMNL at your own server (BYOS).</p>
-        </div>
+    <div class="view" id="view-server" hidden>
+      <div>
+        <h1 class="p-title" tabindex="-1">Server</h1>
       </div>
-
-      <div class="adv-sec">
-        <h3>Network address</h3>
-        <label class="switch">
-          <input type="checkbox" id="useStaticIP" onchange="toggleStaticIP()">
-          Assign a static IP instead of using DHCP
-        </label>
-        <div id="static_ip_fields" class="fields" hidden>
-          <div class="field">
-            <label for="staticIP">IP address</label>
-            <input class="inp" type="text" id="staticIP" placeholder="192.168.1.100">
-          </div>
-          <div class="field">
-            <label for="gateway">Gateway <span class="opt">&mdash; optional</span></label>
-            <input class="inp" type="text" id="gateway" placeholder="Default: x.x.x.1 based on your IP">
-          </div>
-          <div class="field">
-            <label for="subnet">Subnet mask <span class="opt">&mdash; optional</span></label>
-            <input class="inp" type="text" id="subnet" placeholder="Default: 255.255.255.0">
-          </div>
-          <div class="field">
-            <label for="dns1">DNS server <span class="opt">&mdash; optional</span></label>
-            <input class="inp" type="text" id="dns1" placeholder="Default: 8.8.8.8">
-          </div>
-        </div>
+      <div class="field">
+        <label for="server">API server</label>
+        <input class="inp" type="url" id="server" name="server" placeholder="https://trmnl.app">
+        <p class="hint">Point your TRMNL at your own server (BYOS). Changing it pairs the device again.</p>
       </div>
-
-      <div class="adv-sec">
-        <h3>Name on your network</h3>
-        <div class="field">
-          <label for="customHostname">Hostname</label>
-          <input class="inp" type="text" id="customHostname" placeholder="trmnl-living-room">
-          <p class="hint">Letters, numbers and hyphens. Leave empty for the default (trmnl-xxxx).</p>
-        </div>
+      <div class="actions">
+        <button class="btn btn-primary" type="button" onclick="saveSetting('server', this)">Save</button>
+        <div class="msg page-msg" role="alert" hidden></div>
       </div>
+    </div>
 
-      <div class="adv-sec">
-        <h3>Time source</h3>
-        <div class="field">
-          <label for="ntpServer1">NTP server</label>
-          <input class="inp" type="text" id="ntpServer1" placeholder="time.nist.gov">
-          <p class="hint">Leave empty to use time.google.com.</p>
-        </div>
+    <div class="view" id="view-hostname" hidden>
+      <div>
+        <h1 class="p-title" tabindex="-1">Hostname</h1>
       </div>
+      <div class="field">
+        <label for="customHostname">Name on your network</label>
+        <input class="inp" type="text" id="customHostname" placeholder="trmnl-living-room">
+        <p class="hint">Letters, numbers and hyphens. Leave empty for the default (trmnl-xxxx).</p>
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary" type="button" onclick="saveSetting('hostname', this)">Save</button>
+        <div class="msg page-msg" role="alert" hidden></div>
+      </div>
+    </div>
 
+    <div class="view" id="view-time" hidden>
+      <div>
+        <h1 class="p-title" tabindex="-1">Time Source</h1>
+      </div>
+      <div class="field">
+        <label for="ntpServer1">NTP server</label>
+        <input class="inp" type="text" id="ntpServer1" placeholder="time.nist.gov">
+        <p class="hint">Leave empty to use time.google.com.</p>
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary" type="button" onclick="saveSetting('time', this)">Save</button>
+        <div class="msg page-msg" role="alert" hidden></div>
+      </div>
+    </div>
+
+    <div class="view" id="view-diagnostics" hidden>
+      <div>
+        <h1 class="p-title" tabindex="-1">Diagnostics</h1>
+      </div>
       <div class="adv-sec">
-        <h3>Diagnostics</h3>
+        <h3>Sensor test</h3>
         <p class="hint">Runs the panel through a refresh cycle and reports the temperature before and after.</p>
         <button id="btnTest" class="btn btn-quiet" type="button" onclick="runTest()">Run sensor test</button>
         <div class="msg" id="test-output" role="status" hidden></div>
+      </div>
+      <div class="adv-sec">
+        <h3>Serial logs</h3>
         <label class="switch">
           <input type="checkbox" id="verboseLogging" onchange="saveVerboseLogging()">
           Send logs to serial
@@ -1449,42 +1865,33 @@
         <p class="hint">Saved right away. Detailed logs over USB, for troubleshooting.</p>
         <div class="msg" id="verbose-output" role="status" hidden></div>
       </div>
-
-      <div class="adv-sec">
-        <h3>Reset</h3>
-        <div class="danger-zone">
-          <p>A soft reset erases saved Wi-Fi networks, the device ID and the API key. You'll set the device up again
-            from scratch.</p>
-          <button id="btnReset" class="btn btn-danger" type="button" onclick="confirmSoftReset()">Soft reset this
-            TRMNL</button>
-        </div>
-      </div>
-
-      <div class="actions">
-        <button class="btn btn-quiet" type="button" onclick="location.hash = '#setup'">&larr; Back to Wi-Fi</button>
-      </div>
-
     </div>
 
-    <footer class="mac-footer" id="info-message" hidden>
-      <div class="mac-line" id="mac24-row" hidden>
-        <span class="mac-label" id="mac24-label">MAC address</span>
-        <span class="mac-alt" id="mac24"></span>
+    <div class="view" id="view-reset" hidden>
+      <div>
+        <h1 class="p-title" tabindex="-1">Reset</h1>
       </div>
-      <div class="mac-line" id="mac5-row" hidden>
-        <span class="mac-label">5 GHz MAC</span>
-        <span class="mac-alt" id="mac5"></span>
+      <div class="msg msg-warn">
+        <strong>This can't be undone</strong>
+        A soft reset erases saved Wi-Fi networks, the device ID and the API key. You'll set the device up again
+        from scratch.
       </div>
-    </footer>
+      <div class="actions">
+        <button id="btnReset" class="btn btn-danger" type="button" onclick="confirmSoftReset()">Soft reset this
+          TRMNL</button>
+        <div class="msg page-msg" role="alert" hidden></div>
+      </div>
+    </div>
+
   </div>
 
   <div id="confirmationModal" class="modal">
-    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="resetTitle">
-      <p id="resetTitle"><strong>Soft reset this TRMNL?</strong></p>
-      <p>This erases saved Wi-Fi networks, the device ID and the API key. It can't be undone.</p>
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+      <p><strong id="confirmTitle"></strong></p>
+      <p id="confirmText"></p>
       <div class="row2">
-        <button class="btn btn-danger" type="button" onclick="softReset()">Soft reset</button>
-        <button class="btn btn-quiet" type="button" onclick="closeModal()">Cancel</button>
+        <button id="confirmYes" class="btn btn-danger" type="button" onclick="confirmYes()"></button>
+        <button id="confirmNo" class="btn btn-quiet" type="button" onclick="closeModal()">Cancel</button>
       </div>
     </div>
   </div>

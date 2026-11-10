@@ -128,7 +128,7 @@ General.describe "Refresh cycle" do
       end
     end
 
-    it "resets WiFi on a long press", needs: :button do
+    it "opens the settings portal on a long press", needs: :button do
       dev.boot_asleep do |s|
         s.wait_for_deep_sleep
         s.press(6000)
@@ -138,7 +138,7 @@ General.describe "Refresh cycle" do
 
     it "forgets the device on the portal's soft reset",
        needs: :button do
-      # A long press only forgets WiFi; the portal's Soft Reset also clears the API key, so the
+      # A long press only opens the portal; its Soft Reset clears WiFi and the API key, so the
       # next onboarding has to register with /api/setup again.
       dev.boot_asleep do |s|
         s.wait_for_deep_sleep

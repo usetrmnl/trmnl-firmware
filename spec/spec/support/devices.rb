@@ -19,7 +19,7 @@ module Devices
       # Battery-Voltage it reports at the simulator's default 4.1 V battery (nil: varies)
       battery_v: 4.1,
       # Has a button the simulator can press (and that wakes it from deep sleep): `press` wakes
-      # it, a 5 s press forgets WiFi. On the X, its touch bar equivalents (TrmnlX::XSim).
+      # it, a 5 s press opens the settings portal. On the X, its touch bar equivalents (TrmnlX::XSim).
       button: true,
       # A double click (or a 1-5 s press) runs the special function the server assigned.
       double_click: true,
