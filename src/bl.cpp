@@ -6,6 +6,9 @@
 #include <display_session.h>
 #include <globals.h>
 #include <request_handling.h>
+#ifdef BOARD_TRMNL_X
+#include <services/modem_update.h>
+#endif
 #include <setup_session.h>
 #include <sleep_session.h>
 #include <status_screens.h>
@@ -45,9 +48,15 @@ void bl_init(void) {
   if (wake.reason != ESP_SLEEP_WAKEUP_TIMER) showWakeLogo();
   logVersions();
 
+#ifdef BOARD_TRMNL_X
+  modemUpdateApplyPending(); // before wifiSessionConnect() claims the modem
+#endif // BOARD_TRMNL_X
   wifiSessionConnect(wake.showErrorsNow);
   updateTimeSinceSleep();
   ensureDeviceSetUp(); // may sleep
+#ifdef BOARD_TRMNL_X
+  modemUpdateStage(); // restarts into the flash once an image is staged
+#endif // BOARD_TRMNL_X
   submitStoredLogs();
   log_retry = true;
 

@@ -64,6 +64,7 @@ struct ApiDisplayInputs {
   int gaugeHealth;
   int gaugeCapacityRemain;
   int gaugeCapacityFull;
+  String modemFirmwareVersion; // as last read from the modem, empty if unknown
 #endif
   String firmwareVersion;
   String firmwareCommit;
