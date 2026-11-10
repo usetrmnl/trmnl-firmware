@@ -287,7 +287,7 @@ uint16_t display_height() { return bbep.height(); }
 uint16_t display_width() { return bbep.width(); }
 
 // Draws a PNG, JPEG, Group5 or BMP image into the panel driver and picks the refresh mode it needs;
-// false when there was no memory to draw it
+// false when it could not be drawn (no memory, or the decoder rejected it)
 static bool draw_image(uint8_t *image_buffer, int data_size, int *pRefreshMode, bool *pAlloc) {
   bool isPNG = data_size >= 4 && MOTOLONG(image_buffer) == (int32_t)0x89504e47;
   auto width = display_width();
@@ -352,6 +352,10 @@ static bool draw_image(uint8_t *image_buffer, int data_size, int *pRefreshMode, 
     iRefreshMode = REFRESH_PARTIAL;
 #endif // BB_EPAPER
     iUpdateCount = 1; // use partial update
+  }
+  if (iRefreshMode < 0) { // the decoder drew nothing; a refresh would only repeat the old image
+    Log_error("Image not drawn (decoder returned %d)", iRefreshMode);
+    return false;
   }
   *pRefreshMode = iRefreshMode;
   *pAlloc = bAlloc;
