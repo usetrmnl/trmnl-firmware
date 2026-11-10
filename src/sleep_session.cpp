@@ -137,7 +137,11 @@ void goToSleepButtonOnly(void) {
 #define BUTTON_PIN_BITMASK_BTN(GPIO) (1ULL << GPIO)
   esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK_BTN(pDevice->interrupt_pin), ESP_EXT1_WAKEUP_ALL_LOW);
 #elif defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C5)
+#ifdef BOARD_TRMNL_GEN2
+  esp_deep_sleep_enable_gpio_wakeup((1 << pDevice->interrupt_pin) | (1 << 7), ESP_GPIO_WAKEUP_GPIO_LOW);
+#else
   esp_deep_sleep_enable_gpio_wakeup(1 << pDevice->interrupt_pin, ESP_GPIO_WAKEUP_GPIO_LOW);
+#endif // !GEN2
 #elif CONFIG_IDF_TARGET_ESP32S3
 #ifdef BOARD_TRMNL_X
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
