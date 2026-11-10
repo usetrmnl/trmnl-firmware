@@ -27,8 +27,7 @@ RSpec.describe "TRMNL BWRY", env: "trmnl_4clr" do
         expect(s.status["board"]["name"]).to eq("TRMNL BWRY")
         req = dev.mock.wait_for_request("/api/display", timeout: 120)
         expect(req).to have_header("Model", "og_4clr")
-        # the REV read is only known to be safe on the black and white panel
-        expect(req).not_to have_header("Panel-Rev")
+        expect(req).to have_header("Panel-Rev", "0a0c1b2c")
         expect(req.headers.values_at("Width", "Height")).to eq(%w[800 480])
         s.wait_for_deep_sleep(timeout: 120)
       end
