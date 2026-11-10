@@ -448,7 +448,7 @@ void frameInit(void)
   FrameLEDInit();
 
   // Initialize SD card
-  FrameSDInit();
+  //FrameSDInit();
 } /* frameInit() */
 /**
  * @brief Set EPD reset pin level
