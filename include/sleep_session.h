@@ -12,6 +12,9 @@
 /** Prepare peripherals, enable timer + GPIO wake, enter deep sleep. */
 void goToSleep(void);
 
+/** The wakeup cause a button press wakes this chip with (what goToSleep enables). */
+esp_sleep_wakeup_cause_t button_wakeup_cause(void);
+
 #ifdef BOARD_TRMNL_X
 /** Sleeps until the last sleep's timer. Returns without sleeping if it is already due. */
 void goToSleepKeepingTimer(void);
