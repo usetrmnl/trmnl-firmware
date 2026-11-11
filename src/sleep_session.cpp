@@ -131,6 +131,16 @@ static void enterSleep(bool keep_timer) {
 
 void goToSleep(void) { enterSleep(false); }
 
+esp_sleep_wakeup_cause_t button_wakeup_cause(void) {
+#if CONFIG_IDF_TARGET_ESP32
+  return ESP_SLEEP_WAKEUP_EXT1;
+#elif defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C5)
+  return ESP_SLEEP_WAKEUP_GPIO;
+#else
+  return ESP_SLEEP_WAKEUP_EXT0;
+#endif
+}
+
 #ifdef BOARD_TRMNL_X
 void goToSleepKeepingTimer(void) {
   if (next_timer_wake_rtc_us != 0 && esp_rtc_get_time_us() >= next_timer_wake_rtc_us) {

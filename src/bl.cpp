@@ -2,6 +2,8 @@
 #include <ArduinoLog.h>
 #include <app_logger.h>
 #include <bl.h>
+#include <board_config.h>
+#include <button.h>
 #include <display.h>
 #include <display_session.h>
 #include <globals.h>
@@ -30,6 +32,29 @@ static void showScreen(bool should_show_error_now) {
   showRequestResult(request_result);
 }
 
+#ifndef BOARD_TRMNL_X
+static volatile bool button_pressed_while_awake = false;
+static void IRAM_ATTR latch_button_press(void) { button_pressed_while_awake = true; }
+
+// Waits refresh_rate seconds from the last answer. The check-in after it reads as a timer wake, or as a
+// button wake after a press, even one made during a check-in, which is handled as on a button wake.
+static void waitAwakeForNextCheckIn(void) {
+  const uint32_t wait_ms = max<uint32_t>(apiDisplayResult.response.refresh_rate, 1) * 1000; // 0 would hammer the API
+  wakeup_reason = ESP_SLEEP_WAKEUP_TIMER;
+  while (millis() - apiDisplayResult.received_ms < wait_ms) {
+    if (button_pressed_while_awake) {
+      button_pressed_while_awake = false;
+      wakeup_reason = button_wakeup_cause();
+      // read_button_presses() waits for a new press when the button is already up
+      ButtonPressResult press = digitalRead(pDevice->interrupt_pin) == LOW ? read_button_presses() : ShortPress;
+      if (button_wake_act(press)) button_wake_run_special_function();
+      return;
+    }
+    delay(20);
+  }
+}
+#endif
+
 /**
  * @brief Function to init business logic module
  * @param none
@@ -53,12 +78,17 @@ void bl_init(void) {
 
   // OTA checking, image checking and drawing
   showScreen(wake.showErrorsNow);
+#ifndef BOARD_TRMNL_X // the X stays awake for short refreshes and taps in touchbar_stay_awake
+  if (apiDisplayResult.response.keep_wifi_on) {
+    pinMode(pDevice->interrupt_pin, INPUT);
+    attachInterrupt(digitalPinToInterrupt(pDevice->interrupt_pin), latch_button_press, FALLING);
+  }
   while (apiDisplayResult.response.keep_wifi_on) { // a failed check-in clears it, so errors sleep as usual
-    const uint32_t since_answer_ms = millis() - apiDisplayResult.received_ms;
-    const uint32_t wait_ms = apiDisplayResult.response.refresh_rate * 1000;
-    if (since_answer_ms < wait_ms) delay(wait_ms - since_answer_ms);
+    waitAwakeForNextCheckIn();
     showScreen(true);
   }
+  detachInterrupt(digitalPinToInterrupt(pDevice->interrupt_pin));
+#endif
 #ifdef BOARD_TRMNL_X
   touchbar_stay_awake([] { showScreen(true); });
 #endif

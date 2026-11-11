@@ -3,13 +3,13 @@
 # An answer with keep_wifi_on keeps the device awake with Wi-Fi connected until its next check-in,
 # refresh_rate seconds after the answer arrived, instead of deep sleeping (src/bl.cpp, bl_init).
 
-General.describe "Keep Wi-Fi on" do
+General.describe "Keep Wi-Fi on", skip_if: :touchbar,
+                                  why: "the X stays awake for short refreshes in its touch bar loop" do
   fixture(:dev) { ProvisionedDevice.new(build) }
 
   before { dev.reset }
 
   def wifi_joins(sim) = sim.console(0).count { _1.include?("[sim] wifi: connecting to") }
-  def wifi_stops(sim) = sim.console(0).count { _1.include?("[sim] wifi: esp_wifi_stop()") }
 
   # A PNG is cached under its filename (display_session.cpp), so a repeated filename skips the
   # download; a BMP is kept only as /current.bmp and downloaded again.
@@ -27,6 +27,8 @@ General.describe "Keep Wi-Fi on" do
       st = s.wait_for_deep_sleep(timeout: 180)
       expect(dev.mock.count("/api/display")).to eq(4)
       expect(wifi_joins(s)).to eq(1)
+      check_ins = dev.mock.requests.select { _1.path == "/api/display" }
+      expect(check_ins.drop(1)).to all(have_header("Update-Source", "timer"))
       expect(st["wake_at_s"] - st["sim_time_s"]).to be_within(15).of(600)
     end
   end
@@ -41,7 +43,7 @@ General.describe "Keep Wi-Fi on" do
     dev.boot do |s|
       s.wait_for_deep_sleep(timeout: 180)
       expect(dev.mock.paths.count(path)).to eq(1)
-      expect(wifi_stops(s)).to eq(1)
+      expect(wifi_joins(s)).to eq(1)
       expect(s).to show_image(expected, tolerance: 64, max_ratio: 0)
     end
   end
@@ -94,13 +96,31 @@ General.describe "Keep Wi-Fi on" do
     dev.mock.display = { image: "default", refresh_rate: 5, keep_wifi_on: true }
     dev.boot do |s|
       dev.mock.wait_for_request("/api/display", timeout: 90)
+      s.wait(display_idle: true, settle_ms: 500, timeout: 60)
       req = dev.mock.next_request("/api/display", timeout: 30) { s.press(150) }
       expect(req).to have_header("Update-Source", device.button_source)
+      expect(dev.mock.next_request("/api/display", timeout: 30)).to have_header("Update-Source", "timer")
     end
   end
 
-  # Measured on the paced clock (the simulator runs ahead of it otherwise).
-  it "checks in refresh_rate seconds after the answer, not after the draw" do
+  # The press interrupt stays attached through the loop's check-ins, which take most of a 1 s round.
+  it "answers a button press made during a check-in", needs: :button do
+    dev.mock.display = { image: "default", refresh_rate: 2, keep_wifi_on: true }
+    dev.mock.set_fault("/api/display", delay: 1)
+    dev.boot do |s|
+      dev.mock.wait_for_request("/api/display", timeout: 90)
+      s.wait(display_idle: true, settle_ms: 500, timeout: 60)
+      cursor = dev.mock.requests.size
+      dev.mock.wait_for_request("/api/display", after: cursor, timeout: 30)
+      s.press(150)
+      s.wait(settle_ms: 4000, timeout: 60)
+      sources = dev.mock.requests.drop(cursor).select { _1.path == "/api/display" }.map { _1.headers["Update-Source"] }
+      expect(sources.first(2)).to eq(["timer", device.button_source])
+    end
+  end
+
+  it "checks in refresh_rate seconds after the answer, not after the draw",
+     slow: "wall-clock timing needs REALTIME=1, which paces the simulator" do
     serve_png("one", device_number("1"))
     serve_png("two", device_number("2"))
     dev.mock.display_queue = [{ image: "one", refresh_rate: 4, keep_wifi_on: true },
