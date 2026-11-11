@@ -53,6 +53,12 @@ void bl_init(void) {
 
   // OTA checking, image checking and drawing
   showScreen(wake.showErrorsNow);
+  while (apiDisplayResult.response.keep_wifi_on) { // a failed check-in clears it, so errors sleep as usual
+    const uint32_t since_answer_ms = millis() - apiDisplayResult.received_ms;
+    const uint32_t wait_ms = apiDisplayResult.response.refresh_rate * 1000;
+    if (since_answer_ms < wait_ms) delay(wait_ms - since_answer_ms);
+    showScreen(true);
+  }
 #ifdef BOARD_TRMNL_X
   touchbar_stay_awake([] { showScreen(true); });
 #endif
