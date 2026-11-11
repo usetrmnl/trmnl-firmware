@@ -34,6 +34,8 @@ HttpHeaderList buildDisplayRequestHeaders(ApiDisplayInputs &inputs) {
   extern uint32_t live_loop_ms, live_draw_ms;
   extern int live_refresh_mode;
   headers.push_back({"Live-Filename", apiDisplayResult.response.filename});
+  extern String live_wifi_summary(void);
+  headers.push_back({"Live-Wifi", live_wifi_summary()});
   headers.push_back({"Live-Timing", "loop=" + String(live_loop_ms) + ";draw=" + String(live_draw_ms) + ";mode=" + String(live_refresh_mode)});
 #endif
   return headers;
