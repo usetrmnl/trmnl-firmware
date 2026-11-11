@@ -10,6 +10,7 @@ struct ApiDisplayResult {
   ApiDisplayResponse response;
   String error_detail;
   bool received; // false before a request, or when transport/JSON parsing failed
+  uint32_t received_ms; // millis() when the answer arrived
 };
 
 // Display headers plus the optional SENSORS header.

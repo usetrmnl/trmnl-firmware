@@ -53,19 +53,20 @@ static void runLiveSession(void) {
   }, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
   Log_info("Staying awake between check-ins");
   uint32_t check_in_ms = apiDisplayResult.response.refresh_rate * 1000;
-  uint32_t last_check_in = millis();
+  uint32_t last_answer_ms = apiDisplayResult.received_ms;
   int failures = 0;
   while (failures < 3) { // a failed check-in has no answer to say otherwise, so it keeps the last one
-    if (millis() - last_check_in < check_in_ms) delay(check_in_ms - (millis() - last_check_in));
-    last_check_in = millis();
+    if (millis() - last_answer_ms < check_in_ms) delay(check_in_ms - (millis() - last_answer_ms));
+    const uint32_t started = millis();
     https_request_err_e result = downloadAndShow(battery_voltage);
-    live_loop_ms = millis() - last_check_in;
+    live_loop_ms = millis() - started;
     if (result != HTTPS_SUCCESS && result != HTTPS_NO_ERR) {
       failures++;
       Log_error("Live check-in failed (%d), Wi-Fi %s", result, live_wifi_summary().c_str());
       continue;
     }
     failures = 0;
+    last_answer_ms = apiDisplayResult.received_ms;
     if (!apiDisplayResult.response.keep_wifi_on) break;
     check_in_ms = apiDisplayResult.response.refresh_rate * 1000;
   }
