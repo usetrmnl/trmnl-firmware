@@ -23,7 +23,8 @@ public:
   bool isInitialized() const { return _initialized; }
   bool sendCommand(const char* command);
   String readResponse(unsigned long timeout);
-  bool flashFromFile(const char* filename, String& errorOut);
+  // progressCb: called with 0..100 while flashing (optional)
+  bool flashFromFile(const char* filename, String& errorOut, void (*progressCb)(int percent) = nullptr);
   bool eraseFlash();
   void setSerialBaud(uint32_t baud);
 
@@ -61,6 +62,10 @@ public:
 
   // Returns the MAC address of the ESP32-C5 station, or empty string on failure.
   String getMacAddress();
+
+  // Returns the version of the modem firmware, or empty string if the modem doesn't answer
+  // (old firmware without the command, or no firmware at all).
+  String getFirmwareVersion();
 
   // Returns the RSSI (dBm) of the currently joined AP, (replaces WiFi.RSSI() on TRMNL_X)
   int32_t getSignalRssi();

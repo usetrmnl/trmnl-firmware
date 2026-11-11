@@ -11,7 +11,7 @@
 #include "filesystem.h"
 #include "logo_medium.h"
 #include "message_screens.h"
-#include "modem.h"
+#include "services/modem_update.h"
 
 // TRMNL X setup (quite different from OG)
 void setup() {
@@ -35,17 +35,13 @@ void setup() {
       bool modemFlashed = checkIfModemFlashed();
 
       if (!modemFlashed) {
-        Serial.println("[MODEM] Resetting modem...");
-        modem_reset_target();
-        delay(500);  // let modem reach bootloader
-
         display_show_msg(const_cast<uint8_t *>(logo_medium), MODEM_FLASHING);
 
-        Modem modem(115200);
         String flashError;
-        if (modem.flashFromFile("/system/factory_ESP32C5-4MB.bin", flashError)) {
+        if (modemFlash(MODEM_IMAGE_PATH, flashError)) {
           Serial.println("[MODEM] Factory flash complete.");
           saveModemFlashed();
+          filesystem_file_delete(MODEM_IMAGE_PATH);
         } else {
           Serial.println("[MODEM] Factory flash FAILED.");
           display_show_msg(const_cast<uint8_t *>(logo_medium), MODEM_FLASH_FAILED, flashError.c_str());

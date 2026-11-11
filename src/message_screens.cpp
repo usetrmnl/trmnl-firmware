@@ -30,9 +30,50 @@ static void draw_otg_turned_off_message(void) {
   draw_centered_line(string1, 430);
 }
 
+#ifdef BOARD_TRMNL_X
+#define PROGRESS_BAR_W      800
+#define PROGRESS_BAR_H      36
+#define PROGRESS_BAR_Y      490 // between the text and the logo
+#define PROGRESS_BAR_BORDER 4
+#define PROGRESS_BAR_STEP   5 // percent between refreshes of the bar
+
+static int s_progress_drawn = -1; // last percent on the panel
+
+static void draw_progress_bar_frame(void) {
+  int x = (bbep.width() - PROGRESS_BAR_W) / 2;
+  for (int i = 0; i < PROGRESS_BAR_BORDER; i++)
+    bbep.drawRect(x + i, PROGRESS_BAR_Y + i, PROGRESS_BAR_W - 2 * i, PROGRESS_BAR_H - 2 * i, BBEP_BLACK);
+  s_progress_drawn = 0;
+}
+
+void display_update_progress(int percent) {
+  if (percent > 100) percent = 100;
+  percent -= percent % PROGRESS_BAR_STEP;
+  if (percent == s_progress_drawn || s_progress_drawn < 0) return;
+  s_progress_drawn = percent;
+
+  int x = (bbep.width() - PROGRESS_BAR_W) / 2 + PROGRESS_BAR_BORDER + 2;
+  int w = (PROGRESS_BAR_W - 2 * (PROGRESS_BAR_BORDER + 2)) * percent / 100;
+  bbep.fillRect(x, PROGRESS_BAR_Y + PROGRESS_BAR_BORDER + 2, w, PROGRESS_BAR_H - 2 * (PROGRESS_BAR_BORDER + 2),
+                BBEP_BLACK);
+  bbep.partialUpdate(true, PROGRESS_BAR_Y, PROGRESS_BAR_Y + PROGRESS_BAR_H);
+}
+#endif // BOARD_TRMNL_X
+
+static void draw_modem_downloading_message(void) {
+  const char string1[] = "Downloading modem firmware...";
+  draw_centered_line(string1, 430);
+#ifdef BOARD_TRMNL_X
+  draw_progress_bar_frame();
+#endif
+}
+
 static void draw_modem_flashing_message(void) {
   const char string1[] = "Flashing modem firmware...";
   draw_centered_line(string1, 430);
+#ifdef BOARD_TRMNL_X
+  draw_progress_bar_frame();
+#endif
 }
 
 static void draw_modem_flash_failed_message(const char *message_text) {
@@ -392,6 +433,9 @@ static void draw_captive_wifi_timeout_message(void) {
 static void begin_message_screen(void) {
   DisplayedImage::cover(); // the next wake redraws the screen the message replaces
   need_to_refresh_display = 1;
+#ifdef BOARD_TRMNL_X
+  s_progress_drawn = -1; // no bar until the frame is drawn
+#endif
 #ifdef BB_EPAPER
   display_prepare_message();
 #else
@@ -447,6 +491,19 @@ static void present_status_message(void) {
   Log_info("display_show_msg end");
 }
 
+#ifdef BOARD_TRMNL_X
+#define MODEM_STATUS_BAND_TOP    400
+#define MODEM_STATUS_BAND_BOTTOM 480 // above the progress bar
+
+void display_show_modem_up_to_date(void) {
+  use_message_font();
+  bbep.fillRect(0, MODEM_STATUS_BAND_TOP, bbep.width(), MODEM_STATUS_BAND_BOTTOM - MODEM_STATUS_BAND_TOP, BBEP_WHITE);
+  const char string1[] = "You're caught up!";
+  draw_centered_line(string1, 430);
+  bbep.partialUpdate(true, MODEM_STATUS_BAND_TOP, MODEM_STATUS_BAND_BOTTOM);
+}
+#endif // BOARD_TRMNL_X
+
 /**
  * @brief Function to show the image with message on the display
  * @param image_buffer pointer to the uint8_t image buffer
@@ -465,6 +522,9 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
     break;
   case OTG_TURNED_OFF:
     draw_otg_turned_off_message();
+    break;
+  case MODEM_DOWNLOADING:
+    draw_modem_downloading_message();
     break;
   case MODEM_FLASHING:
     draw_modem_flashing_message();

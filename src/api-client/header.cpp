@@ -96,6 +96,7 @@ ApiDisplayInputs createApiHeaders() {
   inputs.gaugeHealth = battery().readGaugeHealth();
   inputs.gaugeCapacityRemain = battery().readGaugeCapacityRemain();
   inputs.gaugeCapacityFull = battery().readGaugeCapacityFull();
+  inputs.modemFirmwareVersion = preferences.getString(PREFERENCES_MODEM_FW_VERSION, "");
 #endif // BOARD_TRMNL_X
 
   return inputs;

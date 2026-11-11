@@ -47,6 +47,9 @@
 #define PREFERENCES_LAST_OTA                 "last_ota"
 #define PREFERENCES_TOUCHBAR_TUTORIAL_KEY    "touch_tutorial" // TRMNL X: the touch bar tutorial was finished
 #define PREFERENCES_TOUCHBAR_LOCKED_KEY      "touch_locked" // TRMNL X
+#define PREFERENCES_MODEM_FW_VERSION         "modem_fw_ver" // as last read from the modem, "" if unknown
+#define PREFERENCES_MODEM_PENDING_VERSION    "modem_pend" // staged in LittleFS, waiting to be flashed
+#define PREFERENCES_MODEM_LAST_FAILURE       "modem_fail" // epoch of the last failed download or flash
 
 #define WIFI_CONNECTION_RSSI                 (-100)
 
@@ -132,6 +135,8 @@
 #define BUTTON_DOUBLE_CLICK_WINDOW         800
 
 #define API_BASE_URL                       "https://trmnl.app"
+#define MODEM_FW_VERSION                   "1.0.1" // modem firmware this release is built for
+#define MODEM_FW_BASE_URL                  "http://192.168.50.161:8080/modem" // image: <base>/<version>.bin
 
 // Abort an image download when the stream goes this long with no data.
 #define IMAGE_STREAM_INACTIVITY_TIMEOUT_MS 30000
