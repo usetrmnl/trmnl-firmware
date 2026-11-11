@@ -80,7 +80,6 @@ void bl_init(void) {
   showScreen(wake.showErrorsNow);
 #ifndef BOARD_TRMNL_X // the X stays awake for short refreshes and taps in touchbar_stay_awake
   if (apiDisplayResult.response.keep_wifi_on) {
-    pinMode(pDevice->interrupt_pin, INPUT);
     attachInterrupt(digitalPinToInterrupt(pDevice->interrupt_pin), latch_button_press, FALLING);
   }
   while (apiDisplayResult.response.keep_wifi_on) { // a failed check-in clears it, so errors sleep as usual
