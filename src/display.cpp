@@ -411,29 +411,7 @@ static int choose_refresh_mode(int iRefreshMode, bool *pWait) {
 }
 
 // Refreshes the panel with the drawn image; false when the update failed
-// Spike: a copy of a bb_epaper init list with VCOM_DC (0x82) set first, which the stock lists leave at -0.10 V
-static const uint8_t *with_vcom(const uint8_t *list, uint8_t vcom, uint8_t *copy, size_t capacity) {
-  size_t n = 0;
-  if (list == copy) return list; // already patched in this wake
-  while (list[n] != 0x00) {
-    const uint8_t t = list[n];
-    if (t == EPD_DELAY) n += 2;
-    else if (t == BUSY_WAIT || t == EPD_RESET || t == MAKE_LUTS || t == SET_ORIENTATION || t == CMD_CS1 || t == CMD_CS2 || t == CMD_CS1_CS2) n += 1;
-    else n += t + 1;
-  }
-  if (n + 4 > capacity) return list;
-  copy[0] = 0x02, copy[1] = 0x82, copy[2] = vcom;
-  memcpy(copy + 3, list, n + 1);
-  return copy;
-}
-
 static bool refresh_epaper(int iRefreshMode, bool bWait, bool bAlloc) {
-  if (apiDisplayResult.response.test_vcom >= 0) {
-    static uint8_t fastCopy[600], partCopy[600];
-    const uint8_t vcom = (uint8_t)apiDisplayResult.response.test_vcom;
-    if (bbep._bbep.pInitFast) bbep._bbep.pInitFast = with_vcom(bbep._bbep.pInitFast, vcom, fastCopy, sizeof(fastCopy));
-    if (bbep._bbep.pInitPart) bbep._bbep.pInitPart = with_vcom(bbep._bbep.pInitPart, vcom, partCopy, sizeof(partCopy));
-  }
   static int i426Workaround = 0;
 #ifdef DO_NOT_LIGHT_SLEEP
   display_set_light_sleep(false);
@@ -469,7 +447,7 @@ bool display_show_1bit_frame(uint8_t *frame, int iRefreshMode)
         return false; // the panel isn't showing a 1-bit image to change
     }
     display_select_one_bit_panel(true);
-    bbep.setMemoryMode(BB_MODE_1BPP);
+    bbep.setMemoryMode(BBEP_MODE_1BPP);
     bbep.setBuffer(frame);
     bbep.writePlane();
     bbep.setBuffer(NULL); // the frame is the caller's; don't let freeBuffer() take it

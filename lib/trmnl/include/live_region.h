@@ -17,7 +17,7 @@
 // The OG's partial waveform for regions: frames (twice) that drive changing pixels, frames that hold the others
 #define LIVE_REGION_DRIVE_FRAMES 100  // at 200 Hz: 0.5 s twice; 80 left blacks a little gray in places
 #define LIVE_REGION_KEEP_FRAMES  1    // at 200 Hz the shortest hold: enough against darkening, no visible flash
-#define LIVE_REGION_VCOM         0    // VDCS: -0.1 V, the closest to 0 V (-2 V darkens the OG much faster)
+#define LIVE_REGION_VCOM         0x1E // VDCS: -1.6 V, the OG panel's factory VCOM (-0.1 V fades black)
 #define LIVE_REGION_PLL          0x0F // about 200 Hz (0x06 = 50 Hz, the panel's default)
 #define LIVE_REGION_TCON         0x00 // no gate/source non-overlap: rows are only about 10 us at 200 Hz
 

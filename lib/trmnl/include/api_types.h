@@ -44,7 +44,6 @@ struct ApiDisplayResponse {
   int live_keep;               // hold frames on unchanged pixels; -1 = the default
   bool live_balanced;          // an equal opposite push before every push
   bool live_stock;             // draw live frames with the stock partial refresh
-  int test_vcom;               // spike: VDCS code added to the stock fast/partial init; -1 = none
   String test_refresh;         // spike: "fast" or "partial" to force the stock refresh type
   int test_full_every;         // spike: full refresh every N updates; 0 = never; -1 = the default 8
 };

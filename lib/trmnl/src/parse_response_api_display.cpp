@@ -32,7 +32,6 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
         .live_keep = -1,
         .live_balanced = false,
         .live_stock = false,
-        .test_vcom = -1,
         .test_refresh = "",
         .test_full_every = -1};
   }
@@ -69,7 +68,6 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
       .live_keep = doc["live_mode"]["keep"] | -1,
       .live_balanced = doc["live_mode"]["balanced"] | false,
       .live_stock = doc["live_mode"]["stock"] | false,
-      .test_vcom = doc["test_vcom"] | -1,
       .test_refresh = doc["test_refresh"] | "",
       .test_full_every = doc["test_full_every"] | -1};
 }
