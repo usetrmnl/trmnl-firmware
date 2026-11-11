@@ -115,7 +115,7 @@ static void display_select_one_bit_panel(bool only_if_changed = false) {
 // Message screens are 1-bit
 void display_prepare_message(void) {
   display_select_one_bit_panel(true);
-  bbep.setMemoryMode(BB_MODE_1BPP); // use 1-bit mode to save memory
+  bbep.setMemoryMode(BBEP_MODE_1BPP); // use 1-bit mode to save memory
   bbep.allocBuffer(false);
 }
 
@@ -320,7 +320,7 @@ static bool draw_image(uint8_t *image_buffer, int data_size, int *pRefreshMode, 
             // G5 compressed image
       BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
 #ifdef BB_EPAPER
-      bbep.setMemoryMode(BB_MODE_1BPP); // use 1-bit mode to save memory
+      bbep.setMemoryMode(BBEP_MODE_1BPP); // use 1-bit mode to save memory
       if (bbep.allocBuffer(false) != BBEP_SUCCESS) {
         Log_info("Error allocating bb_epaper frame buffer");
         return false;
@@ -349,7 +349,7 @@ static bool draw_image(uint8_t *image_buffer, int data_size, int *pRefreshMode, 
                            (iBmpWidth / 8) * iBmpHeight); // palette may be [white, black]
       flip_image(image_buffer + 62, iBmpWidth, iBmpHeight, false); // fix bottom-up bitmap images
 #ifdef BB_EPAPER
-      bbep.setMemoryMode(BB_MODE_1BPP);
+      bbep.setMemoryMode(BBEP_MODE_1BPP);
       bbep.setBuffer(image_buffer + 62); // uncompressed 1-bpp bitmap
 #endif // BB_EPAPER
     }
