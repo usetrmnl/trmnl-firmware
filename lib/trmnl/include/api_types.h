@@ -39,7 +39,7 @@ struct ApiDisplayResponse {
   SPECIAL_FUNCTION special_function;
   String action;
   String verbose_logging;
-  uint32_t live_mode_seconds; // "live_mode": {"seconds"}; 0 = no live session
+  bool keep_wifi_on; // stay awake with Wi-Fi connected until the next check-in instead of deep sleeping
   int live_vcom;               // VDCS code for live frames; -1 = the waveform default
   int live_keep;               // hold frames on unchanged pixels; -1 = the default
   bool live_balanced;          // an equal opposite push before every push

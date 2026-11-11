@@ -43,27 +43,31 @@ String live_wifi_summary(void) {
          ";ago_ms=" + String(live_wifi_disconnects ? millis() - live_wifi_last_disconnect_ms : 0);
 }
 
-// Keeps Wi-Fi up and checks in every refresh_rate seconds while the server keeps the session open
+// While the server answers keep_wifi_on, waits refresh_rate seconds with Wi-Fi connected and checks in again
 static void runLiveSession(void) {
-  const uint32_t seconds = apiDisplayResult.response.live_mode_seconds;
-  if (seconds == 0) return;
+  if (!apiDisplayResult.response.keep_wifi_on) return;
   WiFi.onEvent([](WiFiEvent_t, WiFiEventInfo_t info) {
     live_wifi_disconnects++;
     live_wifi_last_reason = info.wifi_sta_disconnected.reason;
     live_wifi_last_disconnect_ms = millis();
   }, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
-  Log_info("Live session for %u s", seconds);
-  const uint32_t ends_at = millis() + seconds * 1000;
-  while (millis() < ends_at && apiDisplayResult.response.live_mode_seconds > 0) {
-    const uint32_t started = millis();
+  Log_info("Staying awake between check-ins");
+  uint32_t check_in_ms = apiDisplayResult.response.refresh_rate * 1000;
+  uint32_t last_check_in = millis();
+  int failures = 0;
+  while (failures < 3) { // a failed check-in has no answer to say otherwise, so it keeps the last one
+    if (millis() - last_check_in < check_in_ms) delay(check_in_ms - (millis() - last_check_in));
+    last_check_in = millis();
     https_request_err_e result = downloadAndShow(battery_voltage);
-    live_loop_ms = millis() - started;
+    live_loop_ms = millis() - last_check_in;
     if (result != HTTPS_SUCCESS && result != HTTPS_NO_ERR) {
-      Log_error("Live frame fetch failed (%d), Wi-Fi %s", result, live_wifi_summary().c_str());
-      delay(2000);
+      failures++;
+      Log_error("Live check-in failed (%d), Wi-Fi %s", result, live_wifi_summary().c_str());
+      continue;
     }
-    const uint32_t check_in_ms = apiDisplayResult.response.refresh_rate * 1000;
-    if (millis() - started < check_in_ms) delay(check_in_ms - (millis() - started));
+    failures = 0;
+    if (!apiDisplayResult.response.keep_wifi_on) break;
+    check_in_ms = apiDisplayResult.response.refresh_rate * 1000;
   }
   Log_info("Live session over");
 }

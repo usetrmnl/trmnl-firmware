@@ -619,7 +619,7 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
 
   submitStoredLogs();
 
-  if (stay_awake_for_touchbar || apiDisplayResult.response.live_mode_seconds > 0) {
+  if (stay_awake_for_touchbar || apiDisplayResult.response.keep_wifi_on) {
     Log.info("Received successfully; keeping Wi-Fi up");
   } else {
     WiFi.disconnect(true); // no need for WiFi, save power starting here
@@ -636,7 +636,7 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
     filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
     Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
 #ifdef LIVE_MODE
-    if (!(isPNG && apiDisplayResult.response.live_mode_seconds > 0 && live_frame_draw(buffer, content_size)))
+    if (!(isPNG && apiDisplayResult.response.keep_wifi_on && live_frame_draw(buffer, content_size)))
 #endif
       display_show_image(buffer, content_size, true); // PNG and JPEG decoders leave the buffer intact
     Log.info("%s [%d]: Writing %s to SPIFFS\r\n", __FILE__, __LINE__, szTemp);
