@@ -43,7 +43,7 @@ String live_wifi_summary(void) {
          ";ago_ms=" + String(live_wifi_disconnects ? millis() - live_wifi_last_disconnect_ms : 0);
 }
 
-// Keeps Wi-Fi up and checks in again straight away while the server keeps the session open
+// Keeps Wi-Fi up and checks in every refresh_rate seconds while the server keeps the session open
 static void runLiveSession(void) {
   const uint32_t seconds = apiDisplayResult.response.live_mode_seconds;
   if (seconds == 0) return;
@@ -62,6 +62,8 @@ static void runLiveSession(void) {
       Log_error("Live frame fetch failed (%d), Wi-Fi %s", result, live_wifi_summary().c_str());
       delay(2000);
     }
+    const uint32_t check_in_ms = apiDisplayResult.response.refresh_rate * 1000;
+    if (millis() - started < check_in_ms) delay(check_in_ms - (millis() - started));
   }
   Log_info("Live session over");
 }
