@@ -133,6 +133,7 @@ struct PartialWaveform {
   uint8_t pll; // frame rate (0x30): 0x06 = 50 Hz (the default), 0x0B about 100 Hz, 0x0F about 200 Hz; back to 0x06 after
   uint8_t tcon; // gate/source non-overlap (0x60), 0x22 by default
   bool border; // the border from its own table (CDI 0x39), held like white pixels, instead of the black-to-white one
+  bool balanced; // an equal opposite push before every push, so each transition nets zero
 };
 bool display_window_refresh(const uint8_t *frame, int y, int h, const PartialWaveform &waveform);
 

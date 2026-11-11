@@ -386,7 +386,8 @@ static void save_temp_profile_from_api(void) {
 // Adjusts the image's refresh mode for the refresh count, the server's settings and the panel
 static int choose_refresh_mode(int iRefreshMode, bool *pWait) {
   bool bWait = *pWait;
-  if ((iUpdateCount & 7) == 0 || apiDisplayResult.response.maximum_compatibility == true) {
+  const int fullEvery = apiDisplayResult.response.test_full_every >= 0 ? apiDisplayResult.response.test_full_every : 8;
+  if ((fullEvery > 0 && iUpdateCount % fullEvery == 0) || apiDisplayResult.response.maximum_compatibility == true) {
     Log_info("%s [%d]: Forcing full refresh; desired refresh mode was: %d\r\n", __FILE__, __LINE__, iRefreshMode);
     iRefreshMode = REFRESH_FULL; // force full refresh every 8 partials
   }
@@ -401,13 +402,38 @@ static int choose_refresh_mode(int iRefreshMode, bool *pWait) {
   if (!bWait) {
     iRefreshMode = REFRESH_FAST; // fast update when showing loading screen
   }
+  const String &forced = apiDisplayResult.response.test_refresh; // spike: compare refresh types without waiting 30 min
+  if (forced == "fast" && iRefreshMode == REFRESH_PARTIAL) iRefreshMode = REFRESH_FAST;
+  if (forced == "partial" && iRefreshMode == REFRESH_FAST && bWait) iRefreshMode = REFRESH_PARTIAL;
   Log_info("%s [%d]: EPD refresh mode: %d\r\n", __FILE__, __LINE__, iRefreshMode);
   *pWait = bWait;
   return iRefreshMode;
 }
 
 // Refreshes the panel with the drawn image; false when the update failed
+// Spike: a copy of a bb_epaper init list with VCOM_DC (0x82) set first, which the stock lists leave at -0.10 V
+static const uint8_t *with_vcom(const uint8_t *list, uint8_t vcom, uint8_t *copy, size_t capacity) {
+  size_t n = 0;
+  if (list == copy) return list; // already patched in this wake
+  while (list[n] != 0x00) {
+    const uint8_t t = list[n];
+    if (t == EPD_DELAY) n += 2;
+    else if (t == BUSY_WAIT || t == EPD_RESET || t == MAKE_LUTS || t == SET_ORIENTATION || t == CMD_CS1 || t == CMD_CS2 || t == CMD_CS1_CS2) n += 1;
+    else n += t + 1;
+  }
+  if (n + 4 > capacity) return list;
+  copy[0] = 0x02, copy[1] = 0x82, copy[2] = vcom;
+  memcpy(copy + 3, list, n + 1);
+  return copy;
+}
+
 static bool refresh_epaper(int iRefreshMode, bool bWait, bool bAlloc) {
+  if (apiDisplayResult.response.test_vcom >= 0) {
+    static uint8_t fastCopy[600], partCopy[600];
+    const uint8_t vcom = (uint8_t)apiDisplayResult.response.test_vcom;
+    if (bbep._bbep.pInitFast) bbep._bbep.pInitFast = with_vcom(bbep._bbep.pInitFast, vcom, fastCopy, sizeof(fastCopy));
+    if (bbep._bbep.pInitPart) bbep._bbep.pInitPart = with_vcom(bbep._bbep.pInitPart, vcom, partCopy, sizeof(partCopy));
+  }
   static int i426Workaround = 0;
 #ifdef DO_NOT_LIGHT_SLEEP
   display_set_light_sleep(false);
@@ -559,23 +585,27 @@ static void send_partial_lut(const PartialWaveform &waveform)
         uint8_t length;
         uint8_t changeLevels; // during the drive
         uint8_t keepLevels; // during the keep
+        uint8_t balancedChangeLevels; // the opposite color first, then the target
+        uint8_t balancedKeepLevels;
     } tables[] = {
-        {UC8151_LUT_VCOM, 44, 0x00, 0x00}, // VCOM stays at its DC level
-        {UC8151_LUT_WW, 42, 0x00, 0x80},   // unchanged white
-        {UC8151_LUT_BW, 42, 0x88, 0x00},   // black to white
-        {UC8151_LUT_WB, 42, 0x44, 0x00},   // white to black
-        {UC8151_LUT_BB, 42, 0x00, 0x40},   // unchanged black
-        {UC8151_LUT_VCOM2, 42, 0x00, 0x80}, // the border (with CDI 0x39; 00 is VCOM here, 10 VDL)
+        {UC8151_LUT_VCOM, 44, 0x00, 0x00, 0x00, 0x00}, // VCOM stays at its DC level
+        {UC8151_LUT_WW, 42, 0x00, 0x80, 0x00, 0x60},   // unchanged white
+        {UC8151_LUT_BW, 42, 0x88, 0x00, 0x48, 0x00},   // black to white
+        {UC8151_LUT_WB, 42, 0x44, 0x00, 0x84, 0x00},   // white to black
+        {UC8151_LUT_BB, 42, 0x00, 0x40, 0x00, 0x90},   // unchanged black
+        {UC8151_LUT_VCOM2, 42, 0x00, 0x80, 0x00, 0x60}, // the border (with CDI 0x39; 00 is VCOM here, 10 VDL)
     };
     uint8_t lut[44];
     for (const auto &table : tables) {
         memset(lut, 0, sizeof(lut));
         uint8_t *group = lut;
-        const uint8_t driveGroup[6] = {table.changeLevels, waveform.drive, 5, waveform.drive, 5, 0x01};
+        const uint8_t driveGroup[6] = {waveform.balanced ? table.balancedChangeLevels : table.changeLevels,
+                                       waveform.drive, 5, waveform.drive, 5, 0x01};
         memcpy(group, driveGroup, sizeof(driveGroup));
         group += 6;
         if (waveform.keep) {
-            const uint8_t keepGroup[6] = {table.keepLevels, waveform.keep, 0, 0, 0, 0x01};
+const uint8_t keepGroup[6] = {waveform.balanced ? table.balancedKeepLevels : table.keepLevels, waveform.keep,
+                                         (uint8_t)(waveform.balanced ? waveform.keep : 0), 0, 0, 0x01};
             memcpy(group, keepGroup, sizeof(keepGroup));
         }
         bbep.writeCmd(table.command);

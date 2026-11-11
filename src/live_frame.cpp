@@ -3,6 +3,7 @@
 #include <display.h>
 #include <live_frame.h>
 #include <live_region.h>
+#include <globals.h>
 #include <trmnl_log.h>
 
 #include <Arduino.h>
@@ -47,13 +48,15 @@ bool composePng(uint8_t *png, size_t size) {
 }
 
 PartialWaveform liveWaveform() {
+  const ApiDisplayResponse &r = apiDisplayResult.response;
   return PartialWaveform{.drive = LIVE_REGION_DRIVE_FRAMES,
-                         .keep = LIVE_REGION_KEEP_FRAMES,
-                         .vcom = LIVE_REGION_VCOM,
+                         .keep = (uint8_t)(r.live_keep >= 0 ? r.live_keep : LIVE_REGION_KEEP_FRAMES),
+                         .vcom = (uint8_t)(r.live_vcom >= 0 ? r.live_vcom : LIVE_REGION_VCOM),
                          .otp = false,
                          .pll = LIVE_REGION_PLL,
                          .tcon = LIVE_REGION_TCON,
-                         .border = true};
+                         .border = true,
+                         .balanced = r.live_balanced};
 }
 } // namespace
 
@@ -69,17 +72,22 @@ bool live_frame_draw(uint8_t *png, size_t size) {
 
   const int rows = display_height();
   const bool full = liveRegionRefresh(partialsSinceFull, false, false) == LiveRegionRefresh::Full;
-  const bool known = screenFrameValid && !full;
+  if (apiDisplayResult.response.live_stock) screenFrameValid = false;
+  if (!screenFrameValid || full) {
+    // The usual (balanced) refresh draws it; keep a copy so the next frames can drive only what changes
+    screenFrameValid = composePng(png, size);
+    partialsSinceFull = 0;
+    return false;
+  }
   DitherHold none = {};
-  if (known && !display_window_begin(screenFrame, 0, rows, none)) return false;
+  if (!display_window_begin(screenFrame, 0, rows, none)) return false;
   if (!composePng(png, size)) {
     screenFrameValid = false; // the copy is half new; the usual path redraws the whole screen
     return false;
   }
-  if (!known) display_window_begin_unknown(screenFrame, 0, rows); // drives every pixel to its color
   display_window_refresh(screenFrame, 0, rows, liveWaveform());
-  screenFrameValid = true;
-  partialsSinceFull = known ? partialsSinceFull + 1 : 0;
+  partialsSinceFull++;
+  const bool known = true;
   live_draw_ms = millis() - started;
   live_refresh_mode = known ? 3 : 4; // 3 = changed pixels only, 4 = every pixel driven
   Log_info("Live frame drawn in %u ms (%s), %u partials since a full one", live_draw_ms, known ? "changes" : "all",

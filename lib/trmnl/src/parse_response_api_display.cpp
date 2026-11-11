@@ -27,7 +27,14 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
         .special_function = SF_NONE,
         .action = "",
         .verbose_logging = "",
-        .live_mode_seconds = 0};
+        .live_mode_seconds = 0,
+        .live_vcom = -1,
+        .live_keep = -1,
+        .live_balanced = false,
+        .live_stock = false,
+        .test_vcom = -1,
+        .test_refresh = "",
+        .test_full_every = -1};
   }
   String special_function_str = doc["special_function"];
   // Convert the temperature profile ("default", "a", "b", "c")
@@ -57,5 +64,12 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
       .special_function = parseSpecialFunction(special_function_str),
       .action = doc["action"] | "",
       .verbose_logging = doc["verbose_logging"] | "",
-      .live_mode_seconds = doc["live_mode"]["seconds"] | 0u};
+      .live_mode_seconds = doc["live_mode"]["seconds"] | 0u,
+      .live_vcom = doc["live_mode"]["vcom"] | -1,
+      .live_keep = doc["live_mode"]["keep"] | -1,
+      .live_balanced = doc["live_mode"]["balanced"] | false,
+      .live_stock = doc["live_mode"]["stock"] | false,
+      .test_vcom = doc["test_vcom"] | -1,
+      .test_refresh = doc["test_refresh"] | "",
+      .test_full_every = doc["test_full_every"] | -1};
 }
