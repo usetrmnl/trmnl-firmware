@@ -24,6 +24,19 @@ static uint8_t ReadSPIByte(void) {
   }
   return u8;
 }
+
+// The UC8179 drives each bit while SCK is high; ReadSPIByte() samples after the fall and shifts every byte left by one
+static uint8_t ReadSPIByteWhileClockHigh(void) {
+  uint8_t u8 = 0;
+  for (int i = 0; i < 8; i++) {
+    delayMicroseconds(2);
+    digitalWrite(pDevice->epd_sck_pin, 1);
+    delayMicroseconds(2);
+    u8 = (u8 << 1) | digitalRead(pDevice->epd_mosi_pin);
+    digitalWrite(pDevice->epd_sck_pin, 0);
+  }
+  return u8;
+}
 /**
  * @brief Function to read the EPD revision to know what temperature profile to use
  * @param none
@@ -65,7 +78,8 @@ uint32_t get_panel_rev(void) {
   digitalWrite(pDevice->epd_dc_pin, 1); // data mode
   pinMode(pDevice->epd_mosi_pin, INPUT);
   for (int i = 0; i < 7; i++) {
-    u8 = ReadSPIByte();
+    // SSD16xx panels keep the old timing: the 4.26" panel check in display_init() matches a value read with it
+    u8 = bSolomon ? ReadSPIByte() : ReadSPIByteWhileClockHigh();
     if (i >= 3) { // first 3 bytes are 0xff
       u32 <<= 8;
       u32 |= u8;
