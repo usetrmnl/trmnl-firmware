@@ -446,7 +446,7 @@ static bool can_refresh_window(void) {
 struct LiveLut {
   uint8_t groups[12];
 };
-static const uint8_t DRIVE = 60, REST = 5, DARK_GRAY_FRAMES = 5, LIGHT_GRAY_FRAMES = 13;
+static const uint8_t DRIVE = 60, REST = 5, DARK_GRAY_FRAMES = 6, LIGHT_GRAY_FRAMES = 10; // tuned on the desk OG 11-12
 static uint8_t tuned(int value, uint8_t fallback) { return value >= 1 && value <= 255 ? value : fallback; } // experiment
 static const LiveLut NOTHING = {{0}};
 static const LiveLut HOLD_WHITE = {{0x60, 1, 1, 0, 0, 1}};          // unchanged white: 1 frame black, 1 white
