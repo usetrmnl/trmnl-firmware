@@ -8,6 +8,8 @@
 #include <epd_panel_rev.h>
 #include <globals.h>
 #include <power.h>
+
+extern String lastUpdateTimings; // display_session.cpp
 #include <wifi_network.h>
 
 #include "logging_parcers.h"
@@ -80,6 +82,7 @@ ApiDisplayInputs createApiHeaders() {
   inputs.specialFunctionChosen = special_function_chosen;
   inputs.imageCached = bUsedCachedImage;
   inputs.prevWakeTime = iPrevWakeTime;
+  inputs.updateTimings = lastUpdateTimings;
   inputs.resetReason = resetReasonName(esp_reset_reason());
   inputs.usbStatus = power().usbStatus();
   inputs.chargingStatus = power().chargingStatus();

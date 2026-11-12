@@ -18,6 +18,8 @@
 #include <power.h>
 #include <refresh_interval.h>
 #include <services/http_retry_request.h>
+#include <mbedtls/base64.h>
+#include <memory>
 #include <special_function.h>
 #include <status_screens.h>
 #include <trmnl_log.h>
@@ -482,7 +484,23 @@ static ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences, float bat
   return inputs;
 }
 
+// Live mode sends a new frame inside the answer; decoding it skips the second connection for the download.
+static size_t decodeInlineImage(String &base64, std::unique_ptr<uint8_t[]> &image) {
+  if (base64.isEmpty()) return 0;
+  size_t size = 0;
+  const auto *text = reinterpret_cast<const unsigned char *>(base64.c_str());
+  mbedtls_base64_decode(nullptr, 0, &size, text, base64.length()); // only reports the size
+  image.reset(new (std::nothrow) uint8_t[size]);
+  bool decoded = image && mbedtls_base64_decode(image.get(), size, &size, text, base64.length()) == 0;
+  base64 = String(); // frees the text before the decode needs the heap
+  if (!decoded) Log_error("Inline image is not valid base64; downloading it instead");
+  return decoded ? size : 0;
+}
+
+String lastUpdateTimings; // milliseconds per step of the last download and draw, sent as the Timing header
+
 https_request_err_e downloadAndShow(float batteryVoltage) {
+  const unsigned long started_ms = millis();
   image_err_e png_res = PNG_DECODE_ERR;
   bmp_err_e bmp_res = BMP_NOT_BMP;
   auto apiDisplayInputs = loadApiDisplayInputs(preferences, batteryVoltage);
@@ -491,6 +509,7 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
   // HttpRetryRequest, via fetchApiDisplay(). The result stays in the global for display.cpp
   // and the OTA check.
   apiDisplayResult = fetchApiDisplay(apiDisplayInputs);
+  const unsigned long api_ms = millis() - started_ms;
   if (apiDisplayResult.error != HTTPS_NO_ERR) return apiDisplayResult.error;
 
   https_request_err_e result = handleApiDisplayResponse(apiDisplayResult.response);
@@ -585,7 +604,11 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
   imageConfig.readTimeoutSeconds = apiDisplayResult.response.image_url_timeout;
 
   HttpRetryRequest imageRequest(imageConfig);
-  https_request_err_e fetchResult = imageRequest.execute();
+  const unsigned long download_started_ms = millis();
+  std::unique_ptr<uint8_t[]> inlineImage;
+  const size_t inline_size = decodeInlineImage(apiDisplayResult.response.image_data, inlineImage);
+  https_request_err_e fetchResult = inline_size > 0 ? HTTPS_NO_ERR : imageRequest.execute();
+  const unsigned long download_ms = millis() - download_started_ms;
   if (fetchResult == HTTPS_RESPONSE_CODE_INVALID)
     fetchResult = HTTPS_IMAGE_DOWNLOAD_FAILED; // dedicated screen: the API answered, the image host did not
   if (fetchResult != HTTPS_NO_ERR) {
@@ -595,20 +618,22 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
 
   // imageRequest owns the body; the global `buffer` only borrows it for the decode tail below and
   // must not outlive this function. The guard nulls it on every exit path.
-  buffer = imageRequest.body();
-  uint32_t content_size = imageRequest.bodySize();
+  buffer = inline_size > 0 ? inlineImage.get() : imageRequest.body();
+  uint32_t content_size = inline_size > 0 ? inline_size : imageRequest.bodySize();
   struct BufferGuard {
     ~BufferGuard() { buffer = nullptr; }
   } bufferGuard;
 
-  bool isPNG = imageRequest.contentType() == "image/png";
+  bool isPNG = imageRequest.contentType() == "image/png" || (inline_size >= 2 && buffer[0] == 0x89 && buffer[1] == 'P');
   bool isJPEG = imageRequest.contentType() == "image/jpeg";
   if (content_size >= 2 && buffer[0] == 'B' && buffer[1] == 'M') {
     isPNG = false;
     Log.info("BMP file detected");
   }
 
+  const unsigned long logs_started_ms = millis();
   submitStoredLogs();
+  const unsigned long logs_ms = millis() - logs_started_ms;
 
   if (stay_awake_for_touchbar || apiDisplayResult.response.keep_wifi_on) {
     Log.info("Received successfully; keeping Wi-Fi on");
@@ -626,7 +651,9 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
     char szTemp[36];
     filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
     Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
+    const unsigned long draw_started_ms = millis();
     display_show_image(buffer, content_size, true); // PNG and JPEG decoders leave the buffer intact
+    const unsigned long draw_ms = millis() - draw_started_ms;
     Log.info("%s [%d]: Writing %s to SPIFFS\r\n", __FILE__, __LINE__, szTemp);
     filesystem_purge_old_file(szTemp); // try to delete the old version or older than 24h
     writeImageToFile(szTemp, buffer, content_size);
@@ -640,6 +667,8 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
     update_playlist_order(preferences, szTemp, _curPath.c_str());
 #endif
     preferences.putString(PREFERENCES_BROWSE_PATH_KEY, String(szTemp));
+    lastUpdateTimings = "api=" + String(api_ms) + ";download=" + String(download_ms) + ";logs=" + String(logs_ms) +
+                        ";draw=" + String(draw_ms) + ";save=" + String(millis() - draw_started_ms - draw_ms);
   } else if (!isPNG && !isJPEG) {
     bmp_res = parseBMPHeader(buffer, image_reverse);
     Log.info("%s [%d]: BMP Parsing result: %d\r\n", __FILE__, __LINE__, bmp_res);
