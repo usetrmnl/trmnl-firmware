@@ -451,7 +451,7 @@ static uint8_t tuned(int value, uint8_t fallback) { return value >= 1 && value <
 static const LiveLut NOTHING = {{0}};
 static const LiveLut HOLD_WHITE = {{0x60, 1, 1, 0, 0, 1}};          // unchanged white: 1 frame black, 1 white
 static const LiveLut HOLD_BLACK = {{0x90, 1, 1, 0, 0, 1}};          // unchanged black: 1 frame white, 1 black
-static LiveLut TO_WHITE, TO_BLACK, BLACK_TO_DARK_GRAY, WHITE_TO_LIGHT_GRAY;
+static LiveLut TO_WHITE, TO_BLACK, BLACK_TO_DARK_GRAY, WHITE_TO_LIGHT_GRAY, PASS1_HOLD_WHITE, PASS1_HOLD_BLACK;
 static void build_live_luts(void) {
   const ApiDisplayResponse &r = apiDisplayResult.response;
   const uint8_t drive = tuned(r.live_drive, DRIVE), rest = r.live_rest >= 1 ? tuned(r.live_rest, REST) : REST;
@@ -460,7 +460,13 @@ static void build_live_luts(void) {
   TO_BLACK = {{0x84, drive, rest, drive, rest, 1}}; // white first, then black
   BLACK_TO_DARK_GRAY = {{0x60, dark, dark, 0, 0, 1}};
   WHITE_TO_LIGHT_GRAY = {{0x90, light, light, 0, 0, 1}};
-  Log_info("Live LUT drive=%u rest=%u dark=%u light=%u", drive, rest, dark, light);
+  if (r.live_hold_last) { // experiment: hold pulse after the drive, as on keep-wifi-on
+    PASS1_HOLD_WHITE = {{0x00, drive, rest, drive, rest, 1, 0x60, 1, 1, 0, 0, 1}};
+    PASS1_HOLD_BLACK = {{0x00, drive, rest, drive, rest, 1, 0x90, 1, 1, 0, 0, 1}};
+  } else {
+    PASS1_HOLD_WHITE = HOLD_WHITE, PASS1_HOLD_BLACK = HOLD_BLACK;
+  }
+  Log_info("Live LUT drive=%u rest=%u dark=%u light=%u hold_last=%d", drive, rest, dark, light, r.live_hold_last);
 }
 
 // WW, BW, WB, BB (by plane bits), then the border
@@ -524,7 +530,7 @@ void display_live_refresh(int pass, bool gray) {
   if (pass == 1) {
     build_live_luts();
     send_live_partial_settings();
-    send_live_luts(&HOLD_WHITE, &TO_WHITE, &TO_BLACK, gray ? &NOTHING : &HOLD_BLACK, &HOLD_WHITE);
+    send_live_luts(&PASS1_HOLD_WHITE, &TO_WHITE, &TO_BLACK, gray ? &NOTHING : &PASS1_HOLD_BLACK, &PASS1_HOLD_WHITE);
     bbep.writeCmd(UC8151_PON);
     bbep.wait();
   } else {

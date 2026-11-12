@@ -31,7 +31,7 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
         .full_refresh_every = DEFAULT_FULL_REFRESH_EVERY,
         .refresh_rate_ms = 0,
         .live_stock = false,
-        .live_drive = 0, .live_rest = 0, .live_dark = 0, .live_light = 0,
+        .live_drive = 0, .live_rest = 0, .live_dark = 0, .live_light = 0, .live_hold_last = 0,
         .image_data = ""};
   }
   String special_function_str = doc["special_function"];
@@ -70,5 +70,6 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
       .live_stock = doc["live_stock"] | false,
       .live_drive = doc["live_tuning"]["drive"] | 0, .live_rest = doc["live_tuning"]["rest"] | 0,
       .live_dark = doc["live_tuning"]["dark"] | 0, .live_light = doc["live_tuning"]["light"] | 0,
+      .live_hold_last = doc["live_tuning"]["hold_last"] | 0,
       .image_data = doc["image_data"] | ""};
 }
