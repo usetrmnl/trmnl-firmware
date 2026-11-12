@@ -139,7 +139,11 @@ static bool display_update_epaper(int refreshMode, bool wait, bool writePlane = 
     }
     bbep.refresh(refreshMode, wait);
     // The next update can be a partial update because the current is 1-bpp and stays in the EPD RAM
+#if defined(BOARD_SEEED_STICKY)
+    bCanDoPartial = (bbep.getPanelType() == dpList[pDevice->panel_set][iTempProfile].TwoBit); // SSD2677 port: 4-gray path
+#else
     bCanDoPartial = (bbep.getPanelType() == dpList[pDevice->panel_set][iTempProfile].OneBit);
+#endif
     return true;
 #endif
 }
@@ -180,11 +184,19 @@ void display_init(void)
     spectra6_init_spi();
 #else
     if (pDevice->epd_mosi_pin != 0 || pDevice->epd_sck_pin != 0) {
+#if defined(BOARD_SEEED_STICKY)
+        bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].TwoBit); // SSD2677 port: drive the panel via the 4-gray SSD2677 path
+#else
         bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit); // must be set BEFORE calling initio
+#endif
         bbep.initIO(pDevice->epd_dc_pin, pDevice->epd_rst_pin, pDevice->epd_busy_pin, pDevice->epd_cs_pin,
         pDevice->epd_mosi_pin, pDevice->epd_sck_pin, 8000000);
     } else { // it's a pre-defined PCB+display in bb_epaper
+#if defined(BOARD_SEEED_STICKY)
+        bbep.begin(EPD_SEEED_STICKY_4GRAY); // SSD2677 port: the begin() switch handles this type (Sticky pins + EP397_800x480_4GRAY)
+#else
         bbep.begin(dpList[pDevice->panel_set][0].OneBit);
+#endif
     }
 #endif
 #else
@@ -1581,6 +1593,56 @@ int iPlane = 0;
  * @param size of the PNG file
  * @return refresh mode based on image type and presence of old image
  */
+#if defined(BOARD_SEEED_STICKY)
+static uint8_t *pSticky2bpp = NULL;
+// SSD2677: decode PNG rows straight into the panel's 2bpp framebuffer.
+// Level convention (bb_epaper 4-gray): 0 = white, 3 = black.
+static int png_draw_sticky(PNGDRAW *pDraw)
+{
+    int iWidth = pDraw->iWidth;
+    if (!pSticky2bpp || pDraw->y >= bbep.height()) return 0;
+    if (iWidth > bbep.width()) iWidth = bbep.width();
+    uint8_t *d = pSticky2bpp + (size_t)pDraw->y * (bbep.width() >> 2);
+    if (pDraw->iBpp == 1) {
+        // SSD2677 2bpp codes: 0 = black, 3 = white (validated on glass 2026-11-12;
+        // the mid codes are crossed on this panel: 1 renders light, 2 dark).
+        uint8_t level[2] = {0, 3};
+        if (pDraw->iPixelType == PNG_PIXEL_INDEXED && pDraw->pPalette) {
+            int g0 = (pDraw->pPalette[0] + pDraw->pPalette[1]*2 + pDraw->pPalette[2]) / 4;
+            int g1 = (pDraw->pPalette[3] + pDraw->pPalette[4]*2 + pDraw->pPalette[5]) / 4;
+            level[0] = (g0 >= 128) ? 3 : 0;
+            level[1] = (g1 >= 128) ? 3 : 0;
+        }
+        // The panel scans each row in reverse column order, so the pixels are
+        // mirrored on the way in (Seeed's stock firmware mirrors in software too).
+        int rowW = (iWidth < bbep.width()) ? iWidth : bbep.width();
+        for (int x = 0; x < rowW; x++) {
+            int tx = rowW - 1 - x;
+            if ((x & 3) == 0) d[tx >> 2] = 0;
+            uint8_t bit = (pDraw->pPixels[x >> 3] >> (7 - (x & 7))) & 1;
+            d[tx >> 2] |= (uint8_t)(level[bit] << ((3 - (tx & 3)) * 2));
+        }
+    } else {
+        ReduceBpp(2, pDraw->iPixelType, pDraw->pPalette, pDraw->pPixels, d, iWidth, pDraw->iBpp);
+        // ReduceBpp emits 2bpp codes inverted (3 ^ level: 0 = white, 3 = black), while
+        // this panel wants 0 = black, 3 = white with the mid codes crossed. Inverting
+        // each code lands the mids on the crossed slots by itself, so a plain code
+        // flip plus the row mirror is the whole transform. Untested until a 2bpp PNG
+        // arrives from Terminus (the bw palette sends 1-bit).
+        int rowW = (iWidth < bbep.width()) ? iWidth : bbep.width();
+        int rowBytes = (rowW + 3) >> 2;
+        for (int i = 0, j = rowBytes - 1; i <= j; i++, j--) {
+            uint8_t bi = d[i], bj = d[j];
+            uint8_t si = (uint8_t)(((bi & 0x03) << 6) | (bi & 0x0c) | (bi & 0x30) | ((bi & 0xc0) >> 6));
+            uint8_t sj = (uint8_t)(((bj & 0x03) << 6) | (bj & 0x0c) | (bj & 0x30) | ((bj & 0xc0) >> 6));
+            d[i] = (uint8_t)(sj ^ 0xff);
+            if (i != j) d[j] = (uint8_t)(si ^ 0xff);
+        }
+    }
+    return 1;
+}
+#endif
+
 int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious)
 {
 int iPlane = PNG_1_BIT, rc = -1;
@@ -1602,6 +1664,31 @@ PNG *png = new PNG();
         }
         if (rc == PNG_SUCCESS) { // okay to decode
             Log_info("%s [%d]: Decoding %d-bpp png (current)\r\n", __FILE__, __LINE__, png->getBpp());
+#ifdef BOARD_SEEED_STICKY
+            // SSD2677: decode into the 2bpp framebuffer and stream it with the
+            // validated 2bpp sequence (bb_ep.inl). This replaces the SSD16xx
+            // plane writes (0x24/0x26), which the SSD2677 does not use.
+            {
+                bbep.begin(EPD_SEEED_STICKY_4GRAY);
+                if (bbep.allocBuffer() != BBEP_SUCCESS) {
+                    Log_error("sticky: allocBuffer failed");
+                    delete(png);
+                    return PNG_MEM_ERROR;
+                }
+                pSticky2bpp = (uint8_t *)bbep.getBuffer();
+                png->openRAM((uint8_t *)pPNG, iDataSize, png_draw_sticky);
+                rc = png->decode(NULL, 0);
+                png->close();
+                pSticky2bpp = NULL;
+                if (rc == PNG_SUCCESS) {
+                    bbep.writePlane(); // 2bpp stream + gray waveform latch
+                } else {
+                }
+                bbep.freeBuffer();
+                delete(png);
+                return REFRESH_FULL;
+            }
+#endif
             // Prepare target memory window (entire display)
 #ifdef BB_EPAPER
             if (bbep.capabilities() & BBEP_7COLOR) { // Spectra6 panels
@@ -1743,11 +1830,19 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
 #endif
 #ifdef BB_EPAPER
     if (pDevice->epd_mosi_pin != 0 || pDevice->epd_sck_pin != 0) {
+#if defined(BOARD_SEEED_STICKY)
+        bbep.setPanelType(EPD_SEEED_STICKY_4GRAY); // SSD2677 port: keep the 4-gray type
+#else
         bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit);
+#endif
         bbep.initIO(pDevice->epd_dc_pin, pDevice->epd_rst_pin, pDevice->epd_busy_pin, pDevice->epd_cs_pin,
             pDevice->epd_mosi_pin, pDevice->epd_sck_pin, 8000000);
     } else {
+#if defined(BOARD_SEEED_STICKY)
+        bbep.begin(EPD_SEEED_STICKY_4GRAY); // SSD2677 port: the begin() switch handles this type (Sticky pins + EP397_800x480_4GRAY)
+#else
         bbep.begin(dpList[pDevice->panel_set][0].OneBit);
+#endif
     }
 #endif // BB_EPAPER
     if (isPNG == true && data_size < MAX_IMAGE_SIZE)
