@@ -37,10 +37,12 @@ static void showScreen(bool should_show_error_now) {
 static volatile bool button_pressed_while_awake = false;
 static void IRAM_ATTR latch_button_press(void) { button_pressed_while_awake = true; }
 
-// Waits refresh_rate seconds from the last answer. The check-in after it reads as a timer wake, or as a
+// Waits refresh_rate_ms, or else refresh_rate seconds, from the last answer. The check-in after it reads as a timer wake, or as a
 // button wake after a press, even one made during a check-in, which is handled as on a button wake.
 static void waitAwakeForNextCheckIn(void) {
-  const uint32_t wait_ms = max<uint32_t>(apiDisplayResult.response.refresh_rate, 1) * 1000; // 0 would hammer the API
+  const ApiDisplayResponse &answer = apiDisplayResult.response;
+  // the floors stop a 0 from hammering the API
+  const uint32_t wait_ms = answer.refresh_rate_ms ? max<uint32_t>(answer.refresh_rate_ms, 250) : max<uint32_t>(answer.refresh_rate, 1) * 1000;
   wakeup_reason = ESP_SLEEP_WAKEUP_TIMER;
   while (millis() - apiDisplayResult.received_ms < wait_ms) {
     if (button_pressed_while_awake) {

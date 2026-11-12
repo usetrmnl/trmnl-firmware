@@ -43,6 +43,7 @@ struct ApiDisplayResponse {
   String verbose_logging;
   bool keep_wifi_on; // wait for the next check-in awake with Wi-Fi connected, not in deep sleep
   int full_refresh_every; // partial draws between full refreshes, which clear ghosting
+  uint32_t refresh_rate_ms; // overrides refresh_rate when set, so a live session can check in under a second
 };
 
 struct ApiDisplayInputs {

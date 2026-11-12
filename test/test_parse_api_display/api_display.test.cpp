@@ -13,6 +13,7 @@ void assert_response_equal(ApiDisplayResponse expected, ApiDisplayResponse actua
   TEST_ASSERT_EQUAL_STRING(expected.action.c_str(), actual.action.c_str());
   TEST_ASSERT_EQUAL(expected.keep_wifi_on, actual.keep_wifi_on);
   TEST_ASSERT_EQUAL(expected.full_refresh_every, actual.full_refresh_every);
+  TEST_ASSERT_EQUAL(expected.refresh_rate_ms, actual.refresh_rate_ms);
 }
 
 void test_parseResponse_apiDisplay_success(void) {
@@ -20,7 +21,7 @@ void test_parseResponse_apiDisplay_success(void) {
     "{\"status\":200,\"image_url\":\"http://example.com/"
     "foo.bmp\",\"filename\":\"empty_state\",\"update_firmware\":true,\"firmware_url\":\"https://example.com/"
     "firmware.bin\",\"refresh_rate\":123456,\"reset_firmware\":true,\"special_function\":\"identify\",\"action\":"
-    "\"special_action\",\"keep_wifi_on\":true,\"full_refresh_every\":30}";
+    "\"special_action\",\"keep_wifi_on\":true,\"full_refresh_every\":30,\"refresh_rate_ms\":500}";
 
   ApiDisplayResponse expected = {
       .outcome = ApiDisplayOutcome::Ok,
@@ -33,7 +34,8 @@ void test_parseResponse_apiDisplay_success(void) {
       .special_function = SPECIAL_FUNCTION::SF_IDENTIFY,
       .action = "special_action",
       .keep_wifi_on = true,
-      .full_refresh_every = 30};
+      .full_refresh_every = 30,
+      .refresh_rate_ms = 500};
 
   assert_response_equal(expected, parseResponse_apiDisplay(input));
 }
