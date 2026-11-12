@@ -369,13 +369,19 @@ static void save_temp_profile_from_api(void) {
   }
 }
 
+// Before a check-in answers, the server's interval is unknown and the default applies
+static bool full_refresh_due(void) {
+  const int every = apiDisplayResult.received ? apiDisplayResult.response.full_refresh_every : DEFAULT_FULL_REFRESH_EVERY;
+  return iUpdateCount % every == 0;
+}
+
 #ifdef BB_EPAPER
 // Adjusts the image's refresh mode for the refresh count, the server's settings and the panel
 static int choose_refresh_mode(int iRefreshMode, bool *pWait) {
   bool bWait = *pWait;
-  if ((iUpdateCount & 7) == 0 || apiDisplayResult.response.maximum_compatibility == true) {
+  if (full_refresh_due() || apiDisplayResult.response.maximum_compatibility == true) {
     Log_info("%s [%d]: Forcing full refresh; desired refresh mode was: %d\r\n", __FILE__, __LINE__, iRefreshMode);
-    iRefreshMode = REFRESH_FULL; // force full refresh every 8 partials
+    iRefreshMode = REFRESH_FULL;
   }
   int refresh_seconds = refreshInterval.seconds();
   if (refresh_seconds >= 30 * 60 && iRefreshMode == REFRESH_PARTIAL) {
@@ -439,9 +445,9 @@ static void refresh_fastepd(bool bSkipClear) {
     // bWait=false means loading screen: skip clearing passes so it appears
     // faster. Ghosting from the previous image is acceptable since the
     // real content refresh (bWait=true) immediately follows.
-    int iClearMode = bSkipClear                                        ? CLEAR_NONE
-                     : ((iUpdateCount & 7) == 0 || (iTempProfile > 0)) ? CLEAR_SLOW
-                                                                       : CLEAR_FAST;
+    int iClearMode = bSkipClear                                  ? CLEAR_NONE
+                     : (full_refresh_due() || (iTempProfile > 0)) ? CLEAR_SLOW
+                                                                  : CLEAR_FAST;
     Log_info("fullUpdate clear mode = %d\n", iClearMode);
     bbep.fullUpdate(iClearMode, false);
     //   }
