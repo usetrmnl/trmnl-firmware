@@ -29,7 +29,11 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
         .verbose_logging = "",
         .keep_wifi_on = false,
         .full_refresh_every = DEFAULT_FULL_REFRESH_EVERY,
-        .refresh_rate_ms = 0};
+        .refresh_rate_ms = 0,
+        .patch_url = "",
+        .patch_x = 0,
+        .patch_y = 0,
+        .patch_base = ""};
   }
   String special_function_str = doc["special_function"];
   // Convert the temperature profile ("default", "a", "b", "c")
@@ -63,5 +67,9 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
       .verbose_logging = doc["verbose_logging"] | "",
       .keep_wifi_on = doc["keep_wifi_on"] | false,
       .full_refresh_every = full_refresh_every >= 1 ? full_refresh_every : DEFAULT_FULL_REFRESH_EVERY,
-      .refresh_rate_ms = doc["refresh_rate_ms"] | 0u};
+      .refresh_rate_ms = doc["refresh_rate_ms"] | 0u,
+      .patch_url = doc["live_patch"]["url"] | "",
+      .patch_x = doc["live_patch"]["x"] | 0u,
+      .patch_y = doc["live_patch"]["y"] | 0u,
+      .patch_base = doc["live_patch"]["base"] | ""};
 }

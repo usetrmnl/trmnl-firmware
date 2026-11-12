@@ -84,6 +84,56 @@ General.describe "Keep Wi-Fi on", skip_if: :touchbar,
     end
   end
 
+  context "with the changed area of a live frame", only_on: %w[trmnl], why: "only the OG draws live patches" do
+    # A 128x44 area, the size of one changed value on a real dashboard, drawn over the number "2"
+    let(:patch) { { x: 448, y: 24, width: 128, height: 44 } }
+
+    def in_patch?(x, y)
+      (x - patch[:x]).between?(0, patch[:width] - 1) && (y - patch[:y]).between?(0, patch[:height] - 1)
+    end
+
+    def changed(level) = ->(x, y) { in_patch?(x, y) ? (x ^ y) & 1 : level.(x, y) }
+
+    def serve_patch(level)
+      shifted = ->(x, y) { level.(x + patch[:x], y + patch[:y]) }
+      dev.mock.images["patch.png"] = TrmnlSim::Images.png_image(shifted, patch[:width], patch[:height])
+      { url: "#{dev.mock.device_url}/images/patch.png", x: patch[:x], y: patch[:y] }
+    end
+
+    def frames(base:)
+      two = ->(x, y) { device_number("2").(x, y) ? 0 : 1 }
+      three = changed(two)
+      serve_png("one", device_number("1"))
+      serve_png("two", device_number("2"))
+      dev.mock.images["three.png"] = TrmnlSim::Images.png_image(three, *device.size)
+      dev.mock.stamp("three")
+      live_patch = serve_patch(three).merge(base: base == :two ? dev.mock.filenames["two"] : "plugin-gone")
+      dev.mock.display_queue = [{ image: "one", refresh_rate: 2, keep_wifi_on: true },
+                                { image: "two", refresh_rate: 2, keep_wifi_on: true },
+                                { image: "three", refresh_rate: 2, keep_wifi_on: true, live_patch: }]
+      dev.mock.display = { image: "three", refresh_rate: 600 }
+      TrmnlSim::Images.expected_gray(three, *device.size)
+    end
+
+    it "draws only the changed area over the frame it was made against" do
+      expected = frames(base: :two)
+      dev.boot do |s|
+        s.wait_for_deep_sleep(timeout: 180)
+        expect([dev.mock.paths.count("/images/three.png"), s])
+          .to match([0, show_image(expected, tolerance: 64, max_ratio: 0)])
+      end
+    end
+
+    # The full image then draws the usual live way, covered above
+    it "downloads the full image instead when the screen shows another frame" do
+      frames(base: :other)
+      dev.boot do |s|
+        s.wait_for_deep_sleep(timeout: 180)
+        expect(dev.mock.paths.grep(%r{/images/(three|patch)\.png})).to eq(["/images/three.png"])
+      end
+    end
+  end
+
   it "does not write live frames to flash" do
     serve_png("one", device_number("1"))
     serve_png("two", device_number("2"))

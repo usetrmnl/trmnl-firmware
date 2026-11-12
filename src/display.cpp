@@ -441,11 +441,14 @@ static bool can_refresh_window(void) {
   return bbep.getChip() == BBEP_CHIP_UC81xx && (panel == EP75_800x480 || panel == EP75_800x480_GEN2);
 }
 
+// The live window, in pixels; x and width are multiples of 8
+static int liveX, liveY, liveWidth, liveHeight;
+
 static void write_rows(uint8_t command, const uint8_t *frame) {
   const int pitch = (bbep.width() + 7) / 8;
   bbep.writeCmd(command);
-  for (int row = 0; row < bbep.height(); row++)
-    bbep.writeData((uint8_t *)frame + row * pitch, pitch);
+  for (int row = liveY; row < liveY + liveHeight; row++)
+    bbep.writeData((uint8_t *)frame + row * pitch + liveX / 8, liveWidth / 8);
 }
 
 // Each table: level select (2 bits a phase: 00 GND, 01 VDH = black, 10 VDL = white), four phase lengths in frames and a
@@ -499,10 +502,12 @@ bool display_live_supported(void) {
   return can_refresh_window();
 }
 
-bool display_live_begin(const uint8_t *on_screen) {
+bool display_live_begin(const uint8_t *on_screen, int x, int y, int width, int height) {
   if (!display_live_supported()) return false;
-  const int x1 = bbep.width() - 1, y1 = bbep.height() - 1;
-  const uint8_t ptl[9] = {0, 0, (uint8_t)(x1 >> 8), (uint8_t)(x1 | 7), 0, 0, (uint8_t)(y1 >> 8), (uint8_t)y1, 0x00};
+  liveX = x, liveY = y, liveWidth = width, liveHeight = height;
+  const int x1 = x + width - 1, y1 = y + height - 1;
+  const uint8_t ptl[9] = {(uint8_t)(x >> 8), (uint8_t)x,        (uint8_t)(x1 >> 8), (uint8_t)(x1 | 7), (uint8_t)(y >> 8),
+                          (uint8_t)y,        (uint8_t)(y1 >> 8), (uint8_t)y1,        0x00};
   bbep.writeCmd(UC8151_PTIN);
   bbep.writeCmd(UC8151_PTL);
   bbep.writeData((uint8_t *)ptl, sizeof(ptl));

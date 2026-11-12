@@ -69,6 +69,29 @@ void test_rows_flip_when_white_comes_first_in_the_palette(void) {
   TEST_ASSERT_EQUAL_HEX8(0x0F, out[0]);
 }
 
+void test_a_patch_on_byte_boundaries_inside_the_screen_fits(void) {
+  uint8_t png[33];
+  uint32_t width, height;
+  pngHeaderBytes(png, 128, 44, 1, 0);
+  TEST_ASSERT_TRUE(liveFramePatchFits(png, sizeof(png), 448, 23, 800, 480, &width, &height));
+  TEST_ASSERT_EQUAL_UINT32(128, width);
+  TEST_ASSERT_EQUAL_UINT32(44, height);
+  TEST_ASSERT_TRUE(liveFramePatchFits(png, sizeof(png), 672, 436, 800, 480, &width, &height)); // touches both edges
+}
+
+void test_a_patch_off_byte_boundaries_or_past_the_screen_does_not_fit(void) {
+  uint8_t png[33];
+  uint32_t width, height;
+  pngHeaderBytes(png, 128, 44, 1, 0);
+  TEST_ASSERT_FALSE(liveFramePatchFits(png, sizeof(png), 444, 23, 800, 480, &width, &height));
+  TEST_ASSERT_FALSE(liveFramePatchFits(png, sizeof(png), 680, 23, 800, 480, &width, &height));
+  TEST_ASSERT_FALSE(liveFramePatchFits(png, sizeof(png), 448, 437, 800, 480, &width, &height));
+  pngHeaderBytes(png, 124, 44, 1, 0);
+  TEST_ASSERT_FALSE(liveFramePatchFits(png, sizeof(png), 448, 23, 800, 480, &width, &height));
+  pngHeaderBytes(png, 128, 44, 2, 0);
+  TEST_ASSERT_FALSE(liveFramePatchFits(png, sizeof(png), 448, 23, 800, 480, &width, &height));
+}
+
 void setUp(void) {}
 void tearDown(void) {}
 
@@ -80,5 +103,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_truncated_or_unsigned_data_is_not_drawable);
   RUN_TEST(test_rows_keep_their_pixels_when_black_comes_first);
   RUN_TEST(test_rows_flip_when_white_comes_first_in_the_palette);
+  RUN_TEST(test_a_patch_on_byte_boundaries_inside_the_screen_fits);
+  RUN_TEST(test_a_patch_off_byte_boundaries_or_past_the_screen_does_not_fit);
   return UNITY_END();
 }

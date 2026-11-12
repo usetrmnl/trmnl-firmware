@@ -25,3 +25,11 @@ void liveFrameRow(const uint8_t *pixels, uint32_t width, const uint8_t *palette,
   for (uint32_t i = 0; i < (width + 7) / 8; i++)
     out[i] = flip ? ~pixels[i] : pixels[i];
 }
+
+bool liveFramePatchFits(const uint8_t *png, size_t size, uint32_t x, uint32_t y, uint32_t screenWidth,
+                        uint32_t screenHeight, uint32_t *width, uint32_t *height) {
+  if (size < 29) return false;
+  *width = bigEndian32(&png[16]), *height = bigEndian32(&png[20]);
+  return *width > 0 && *height > 0 && x % 8 == 0 && *width % 8 == 0 && x + *width <= screenWidth &&
+         y + *height <= screenHeight && liveFramePngDrawable(png, size, *width, *height);
+}

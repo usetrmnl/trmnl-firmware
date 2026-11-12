@@ -44,6 +44,11 @@ struct ApiDisplayResponse {
   bool keep_wifi_on; // wait for the next check-in awake with Wi-Fi connected, not in deep sleep
   int full_refresh_every; // partial draws between full refreshes, which clear ghosting
   uint32_t refresh_rate_ms; // overrides refresh_rate when set, so a live session can check in under a second
+  // A live frame's changed area: a PNG to draw at x, y over the frame named patch_base. Empty when there's none.
+  String patch_url;
+  uint32_t patch_x;
+  uint32_t patch_y;
+  String patch_base;
 };
 
 struct ApiDisplayInputs {

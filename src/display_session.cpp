@@ -486,6 +486,25 @@ static ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences, float bat
   return inputs;
 }
 
+// A live frame's changed area, drawn over the frame it was made against; false means download the full image
+static bool draw_live_patch(const ApiDisplayInputs &inputs) {
+  const ApiDisplayResponse &response = apiDisplayResult.response;
+  if (!response.keep_wifi_on || response.patch_url.isEmpty()) return false;
+  if (!live_frame_shows(response.patch_base.c_str())) {
+    Log_info("Live patch made against %s, not the screen; downloading the full image", response.patch_base.c_str());
+    return false;
+  }
+  HttpRetryRequestConfig config;
+  config.url = response.patch_url.c_str();
+  config.apiBaseUrl = inputs.baseUrl;
+  config.headers = buildImageHeaders(inputs);
+  config.readTimeoutSeconds = response.image_url_timeout;
+  HttpRetryRequest request(config);
+  return request.execute() == HTTPS_NO_ERR &&
+         live_frame_draw_patch(request.body(), request.bodySize(), response.patch_x, response.patch_y,
+                               response.filename.c_str());
+}
+
 https_request_err_e downloadAndShow(float batteryVoltage) {
   image_err_e png_res = PNG_DECODE_ERR;
   bmp_err_e bmp_res = BMP_NOT_BMP;
@@ -582,6 +601,13 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
   if (touchbar_has_pending_indicator()) showTouchbarLoading(); // the tapped screen isn't cached
 #endif
 
+  if (draw_live_patch(apiDisplayInputs)) {
+    char szTemp[36];
+    filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
+    DisplayedImage::remember(szTemp);
+    return result == HTTPS_PLUGIN_NOT_ATTACHED ? result : HTTPS_SUCCESS;
+  }
+
   HttpRetryRequestConfig imageConfig;
   imageConfig.url = filename;
   imageConfig.apiBaseUrl = apiDisplayInputs.baseUrl; // ID / Access-Token only go to the API server
@@ -630,7 +656,7 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
     char szTemp[36];
     filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
     Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
-    if (!(isPNG && apiDisplayResult.response.keep_wifi_on && live_frame_draw(buffer, content_size)))
+    if (!(isPNG && apiDisplayResult.response.keep_wifi_on && live_frame_draw(buffer, content_size, apiDisplayResult.response.filename.c_str())))
       display_show_image(buffer, content_size, true); // PNG and JPEG decoders leave the buffer intact
     DisplayedImage::remember(szTemp); // current image becomes the previous image
     if (!apiDisplayResult.response.keep_wifi_on) { // live frames change too often to be worth saving
