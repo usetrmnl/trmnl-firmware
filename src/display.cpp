@@ -523,6 +523,9 @@ void display_live_finish(const uint8_t *frame) {
   bbep.wait();
   bbep.writeCmd(UC8151_DRF);
   bbep.wait();
+  // unknown whether the UC8179 holds a DC level across the ink while powered and idle, so never leave it on
+  bbep.writeCmd(UC8151_POFF);
+  bbep.wait();
   bbep.writeCmd(UC8151_PTOU);
   const uint8_t normalPll = 0x06, normalTcon = 0x22; // what full refreshes run at
   bbep.writeCmd(0x30);
