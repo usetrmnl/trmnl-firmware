@@ -83,6 +83,7 @@ void bl_init(void) {
     attachInterrupt(digitalPinToInterrupt(pDevice->interrupt_pin), latch_button_press, FALLING);
   }
   while (apiDisplayResult.response.keep_wifi_on) { // a failed check-in clears it, so errors sleep as usual
+    awake_time_limit_restart(); // the limit catches a device stuck awake, not one the server keeps checking in
     waitAwakeForNextCheckIn();
     showScreen(true);
   }

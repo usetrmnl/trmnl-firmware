@@ -48,6 +48,16 @@ General.describe "Keep Wi-Fi on", skip_if: :touchbar,
     end
   end
 
+  it "stays awake past the 20 minute awake limit while check-ins keep working" do
+    dev.mock.display = { image: "default", refresh_rate: 60, keep_wifi_on: true }
+    dev.boot do |s|
+      started = dev.mock.wait_for_request("/api/display", timeout: 90) && s.status["sim_time_s"]
+      15.times { s.status["sim_time_s"] - started > 25 * 60 ? break : s.wait(settle_ms: 20_000, timeout: 60) }
+      expect([s.status["sim_time_s"] - started, dev.mock.requests.select { _1.path == "/api/display" }])
+        .to match([be > 25 * 60, all(have_header("Reset-Reason", "ESP_RST_POWERON"))])
+    end
+  end
+
   # HttpRetryRequest tries a failing check-in 5 times; the failed answer has no keep_wifi_on.
   it "deep sleeps when a check-in fails" do
     dev.mock.display = { image: "default", refresh_rate: 2, keep_wifi_on: true }
