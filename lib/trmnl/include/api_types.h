@@ -44,6 +44,7 @@ struct ApiDisplayResponse {
   bool keep_wifi_on; // wait for the next check-in awake with Wi-Fi connected, not in deep sleep
   int full_refresh_every; // partial draws between full refreshes, which clear ghosting
   uint32_t refresh_rate_ms; // overrides refresh_rate when set, so a live session can check in under a second
+  bool live_stock; // experiment: draw live frames with the stock partial refresh
   String image_data; // the image as base64, sent inline in live mode; empty = download image_url
 };
 
