@@ -74,12 +74,24 @@ static void display_apply_light_sleep(uint8_t enabled) {
 }
 
 static uint32_t iPanelDraws = 0;
-// The panel's draw count right after a live frame. While it still matches, the controller's old-image memory already
-// holds the frame on screen, so the next live frame can skip sending it (55 ms of 48 KB on the desk OG).
+// The panel's draw count right after a live frame. While it still matches, the controller still holds that frame in
+// its old-image memory and the live setup in its registers, so the next live frame sends neither again.
 static uint32_t drawsAfterLiveFrame = UINT32_MAX;
 uint32_t display_panel_draws(void) { return iPanelDraws; }
 
+// Live frames leave the 200 Hz frame rate and their gate timing set; every other draw runs at the panel's own
+static void leave_live_settings(void) {
+  if (iPanelDraws != drawsAfterLiveFrame) return;
+  const uint8_t normalPll = 0x06, normalTcon = 0x22;
+  bbep.writeCmd(0x30);
+  bbep.writeData((uint8_t *)&normalPll, 1);
+  bbep.writeCmd(UC8151_TCON);
+  bbep.writeData((uint8_t *)&normalTcon, 1);
+  drawsAfterLiveFrame = UINT32_MAX;
+}
+
 bool display_update_epaper(int refreshMode, bool wait, bool writePlane, uint8_t plane) {
+  leave_live_settings();
   // Light sleep with the WiFi radio running is unsupported: it hangs a Gen2 and fakes button presses on an OG
   display_apply_light_sleep(bLightSleepWanted && WiFi.getMode() == WIFI_MODE_NULL);
   if (writePlane) {
@@ -220,6 +232,7 @@ void display_wipe(void) {
   int refreshCount = 60;
 #endif
 
+  leave_live_settings();
   bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit);
   bbep.fillScreen(BBEP_WHITE);
   for (int i = 0; i < refreshCount; i++) {
@@ -508,35 +521,41 @@ bool display_live_supported(void) {
   return can_refresh_window();
 }
 
+static void power_off(void) {
+  // unknown whether the UC8179 holds a DC level across the ink while powered and idle, so never leave it on
+  wait_until_idle();
+  bbep.writeCmd(UC8151_POFF);
+  wait_until_idle();
+}
+
+// Starts the panel's power-on, which takes 130 ms, so the frame can be decoded and sent meanwhile
 bool display_live_begin(const uint8_t *on_screen) {
   if (!display_live_supported()) return false;
+  const bool lastDrawWasLive = iPanelDraws == drawsAfterLiveFrame; // the controller still holds that frame and setup
   const int x1 = bbep.width() - 1, y1 = bbep.height() - 1;
   const uint8_t ptl[9] = {0, 0, (uint8_t)(x1 >> 8), (uint8_t)(x1 | 7), 0, 0, (uint8_t)(y1 >> 8), (uint8_t)y1, 0x00};
   bbep.writeCmd(UC8151_PTIN);
   bbep.writeCmd(UC8151_PTL);
   bbep.writeData((uint8_t *)ptl, sizeof(ptl));
-  if (iPanelDraws != drawsAfterLiveFrame) write_frame(UC8151_DTM1, on_screen);
+  if (!lastDrawWasLive) {
+    write_frame(UC8151_DTM1, on_screen);
+    send_live_partial_settings();
+  }
+  bbep.writeCmd(UC8151_PON);
   return true;
 }
 
-void display_live_cancel(void) { bbep.writeCmd(UC8151_PTOU); }
+void display_live_cancel(void) {
+  power_off();
+  bbep.writeCmd(UC8151_PTOU);
+}
 
 void display_live_finish(const uint8_t *frame) {
   write_frame(UC8151_DTM2, frame);
-  send_live_partial_settings();
-  bbep.writeCmd(UC8151_PON);
-  wait_until_idle();
+  wait_until_idle(); // the power-on
   bbep.writeCmd(UC8151_DRF);
-  wait_until_idle();
-  // unknown whether the UC8179 holds a DC level across the ink while powered and idle, so never leave it on
-  bbep.writeCmd(UC8151_POFF);
-  wait_until_idle();
+  power_off();
   bbep.writeCmd(UC8151_PTOU);
-  const uint8_t normalPll = 0x06, normalTcon = 0x22; // what full refreshes run at
-  bbep.writeCmd(0x30);
-  bbep.writeData((uint8_t *)&normalPll, 1);
-  bbep.writeCmd(UC8151_TCON);
-  bbep.writeData((uint8_t *)&normalTcon, 1);
   bCanDoPartial = true;
   iUpdateCount++;
   iPanelDraws++;
@@ -605,6 +624,7 @@ void display_sleep(void) {
   Log_info("Goto Sleep...");
 #ifdef BB_EPAPER
   bbep.sleep(LIGHT_SLEEP);
+  drawsAfterLiveFrame = UINT32_MAX; // waking it resets the controller
 #else
   bbep.einkPower(0);
   bbep.deInit();
