@@ -488,7 +488,7 @@ static void send_balanced_partial_lut(void) {
   uint8_t lut[44];
   for (const auto &table : tables) {
     memset(lut, 0, sizeof(lut));
-    const uint8_t groups[12] = {table.changeLevels, drive, rest, drive, rest, 0x01,
+    const uint8_t groups[12] = {table.changeLevels, 0, 0, drive, rest, 0x01, // experiment: no opposite push
                                 table.keepLevels,   keep,  keep, 0,     0,    0x01};
     memcpy(lut, groups, sizeof(groups));
     bbep.writeCmd(table.command);
