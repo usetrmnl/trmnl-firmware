@@ -128,6 +128,28 @@ General.describe "Keep Wi-Fi on", skip_if: :touchbar,
     end
   end
 
+  it "checks in refresh_rate_ms after the answer when the server sends it" do
+    dev.mock.display = { image: "default", refresh_rate: 1, refresh_rate_ms: 300, keep_wifi_on: true }
+    dev.boot do |s|
+      first = dev.mock.wait_for_request("/api/display", timeout: 90)
+      started = s.status["sim_time_s"]
+      s.wait(settle_ms: 10_000, timeout: 120)
+      elapsed = s.status["sim_time_s"] - started
+      expect(dev.mock.requests.count { _1.path == "/api/display" && _1 != first }).to be > elapsed * 1.5
+    end
+  end
+
+  it "waits at least 250 ms between check-ins when refresh_rate_ms is lower" do
+    dev.mock.display = { image: "default", refresh_rate: 1, refresh_rate_ms: 1, keep_wifi_on: true }
+    dev.boot do |s|
+      first = dev.mock.wait_for_request("/api/display", timeout: 90)
+      started = s.status["sim_time_s"]
+      s.wait(settle_ms: 10_000, timeout: 120)
+      elapsed = s.status["sim_time_s"] - started
+      expect(dev.mock.requests.count { _1.path == "/api/display" && _1 != first }).to be <= (elapsed / 0.25).ceil + 1
+    end
+  end
+
   it "keeps checking in when an image download fails" do
     serve_png("one", device_number("1"))
     dev.mock.display = { image: "one", refresh_rate: 2, keep_wifi_on: true }
