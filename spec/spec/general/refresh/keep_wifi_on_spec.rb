@@ -71,6 +71,20 @@ General.describe "Keep Wi-Fi on", skip_if: :touchbar,
     end
   end
 
+  it "draws live frames in a row correctly without resending the frame on screen",
+     skip: "the released simulator fades held black after two 200 Hz live frames (trmnl-sim fix pending)" do
+    serve_png("one", device_number("1"))
+    serve_png("two", device_number("2"))
+    _, expected = serve_png("three", device_number("3"))
+    dev.mock.display_queue = %w[one two three].map { |name| { image: name, refresh_rate: 2, keep_wifi_on: true } }
+    dev.mock.display = { image: "three", refresh_rate: 600 }
+    dev.boot do |s|
+      s.wait_for_deep_sleep(timeout: 180)
+      drawn_live = s.console(0).grep(/Live frame drawn in/).size
+      expect([drawn_live, s]).to match([2, show_image(expected, tolerance: 64, max_ratio: 0)])
+    end
+  end
+
   it "draws a live frame in full after an error screen covered the last one" do
     serve_png("one", device_number("1"))
     serve_png("two", device_number("2"))
