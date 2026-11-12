@@ -277,15 +277,22 @@ void wifiErrorDeepSleep(void) {
 // A panic reset, so the next boot can report it.
 static void awake_time_limit_reached(void *arg) { esp_system_abort("Awake time limit reached"); }
 
+static esp_timer_handle_t awake_limit_timer = nullptr;
+
 void awake_time_limit_start(void) {
-  esp_timer_handle_t timer;
   esp_timer_create_args_t timerArgs = {};
 
   timerArgs.callback = awake_time_limit_reached;
   timerArgs.name = "awake_limit";
-  if (esp_timer_create(&timerArgs, &timer) == ESP_OK) {
-    esp_timer_start_once(timer, (uint64_t)AWAKE_TIME_LIMIT_MS * 1000);
+  if (esp_timer_create(&timerArgs, &awake_limit_timer) == ESP_OK) {
+    esp_timer_start_once(awake_limit_timer, (uint64_t)AWAKE_TIME_LIMIT_MS * 1000);
   } else {
     Log_error("Awake time limit timer not created");
   }
+}
+
+void awake_time_limit_restart(void) {
+  if (!awake_limit_timer) return;
+  esp_timer_stop(awake_limit_timer);
+  esp_timer_start_once(awake_limit_timer, (uint64_t)AWAKE_TIME_LIMIT_MS * 1000);
 }
