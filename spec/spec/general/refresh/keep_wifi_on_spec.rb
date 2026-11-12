@@ -58,6 +58,18 @@ General.describe "Keep Wi-Fi on", skip_if: :touchbar,
     end
   end
 
+  it "does not write live frames to flash" do
+    serve_png("one", device_number("1"))
+    serve_png("two", device_number("2"))
+    dev.mock.display_queue = [{ image: "one", refresh_rate: 2, keep_wifi_on: true },
+                              { image: "two", refresh_rate: 2, keep_wifi_on: true }]
+    dev.mock.display = { image: "two", refresh_rate: 600 }
+    dev.boot do |s|
+      s.wait_for_deep_sleep(timeout: 180)
+      expect(s.console(0).grep(/Writing .* to SPIFFS/).size).to eq(0)
+    end
+  end
+
   # HttpRetryRequest tries a failing check-in 5 times; the failed answer has no keep_wifi_on.
   it "deep sleeps when a check-in fails" do
     dev.mock.display = { image: "default", refresh_rate: 2, keep_wifi_on: true }
