@@ -451,8 +451,12 @@ static void write_rows(uint8_t command, const uint8_t *frame) {
 // Each table: level select (2 bits a phase: 00 GND, 01 VDH = black, 10 VDL = white), four phase lengths in frames and a
 // repeat count. Changing pixels get the opposite color first, then the target, so each change nets zero DC; unchanged
 // ones get a balanced 1-frame pair that keeps them from darkening.
+String liveSteps; // experiment: ms per step of the last live draw
+static uint8_t liveClearCycles = 0; // experiment: >0 drives every pixel, a balanced full clear
+static uint8_t knob(int v, uint8_t lo, uint8_t hi, uint8_t fallback) { return v >= lo && v <= hi ? v : fallback; }
 static void send_balanced_partial_lut(void) {
-  const uint8_t drive = 60, rest = 5, keep = 1; // at 200 Hz: 0.3 s twice, then the shortest hold
+  const uint8_t drive = knob(apiDisplayResult.response.knob_drive, 5, 200, 60), rest = 5, keep = 1;
+  const uint8_t bbKeep = knob(apiDisplayResult.response.knob_bb_keep, 1, 20, 1);
   const struct {
     uint8_t command, length, changeLevels, keepLevels;
   } tables[] = {
@@ -466,8 +470,12 @@ static void send_balanced_partial_lut(void) {
   uint8_t lut[44];
   for (const auto &table : tables) {
     memset(lut, 0, sizeof(lut));
-    const uint8_t groups[12] = {table.changeLevels, drive, rest, drive, rest, 0x01,
-                                table.keepLevels,   keep,  keep, 0,     0,    0x01};
+    const bool clear = liveClearCycles > 0, black = table.command == UC8151_LUT_BB;
+    const uint8_t holdFrames = black ? bbKeep : keep;
+    // a clear drives unchanged pixels like changed ones: opposite color, then their own
+    const uint8_t levels = clear && table.command == UC8151_LUT_WW ? 0x48 : clear && black ? 0x84 : table.changeLevels;
+    const uint8_t groups[12] = {levels, drive, rest, drive, rest, (uint8_t)(clear ? liveClearCycles : 0x01),
+                                (uint8_t)(clear ? 0 : table.keepLevels), holdFrames, holdFrames, 0, 0, 0x01};
     memcpy(lut, groups, sizeof(groups));
     bbep.writeCmd(table.command);
     bbep.writeData(lut, table.length);
@@ -506,20 +514,34 @@ bool display_live_begin(const uint8_t *on_screen) {
   bbep.writeCmd(UC8151_PTIN);
   bbep.writeCmd(UC8151_PTL);
   bbep.writeData((uint8_t *)ptl, sizeof(ptl));
-  write_rows(UC8151_DTM1, on_screen);
+  if (!apiDisplayResult.response.knob_skip_dtm1) write_rows(UC8151_DTM1, on_screen);
   return true;
 }
 
 void display_live_cancel(void) { bbep.writeCmd(UC8151_PTOU); }
 
+void display_live_set_clear(uint8_t cycles) { liveClearCycles = cycles; }
+
 void display_live_finish(const uint8_t *frame) {
+  uint32_t t = millis(), dtm2, settings, pon, drf;
   write_rows(UC8151_DTM2, frame);
+  dtm2 = millis() - t; t = millis();
   send_live_partial_settings();
+  settings = millis() - t; t = millis();
   bbep.writeCmd(UC8151_PON);
   bbep.wait();
+  pon = millis() - t; t = millis();
   bbep.writeCmd(UC8151_DRF);
   bbep.wait();
+  drf = millis() - t; t = millis();
+  if (apiDisplayResult.response.knob_pof) {
+    bbep.writeCmd(0x02); // power off
+    bbep.wait();
+  }
+  const uint32_t pof = millis() - t;
   bbep.writeCmd(UC8151_PTOU);
+  liveClearCycles = 0;
+  liveSteps = "dtm2=" + String(dtm2) + "/set=" + String(settings) + "/pon=" + String(pon) + "/drf=" + String(drf) + "/pof=" + String(pof);
   const uint8_t normalPll = 0x06, normalTcon = 0x22; // what full refreshes run at
   bbep.writeCmd(0x30);
   bbep.writeData((uint8_t *)&normalPll, 1);

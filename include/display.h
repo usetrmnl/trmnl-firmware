@@ -101,7 +101,9 @@ bool display_full_refresh_due(void);
 bool display_live_supported(void);
 bool display_live_begin(const uint8_t *on_screen);
 void display_live_finish(const uint8_t *frame);
-void display_live_cancel(void); // after begin, when there's no next frame to finish with
+void display_live_cancel(void);
+void display_live_set_clear(uint8_t cycles); // experiment
+extern String liveSteps; // experiment // after begin, when there's no next frame to finish with
 
 /**
  * @brief Function to got the display to the sleep

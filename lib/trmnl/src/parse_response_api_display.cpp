@@ -67,5 +67,10 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
       .full_refresh_every = full_refresh_every >= 1 ? full_refresh_every : DEFAULT_FULL_REFRESH_EVERY,
       .refresh_rate_ms = doc["refresh_rate_ms"] | 0u,
       .live_stock = doc["live_stock"] | false,
-      .image_data = doc["image_data"] | ""};
+      .image_data = doc["image_data"] | "",
+      .knob_pof = doc["live_knobs"]["pof"] | 0,
+      .knob_skip_dtm1 = doc["live_knobs"]["skip_dtm1"] | 0,
+      .knob_clear = doc["live_knobs"]["clear"] | 0,
+      .knob_bb_keep = doc["live_knobs"]["bb_keep"] | 1,
+      .knob_drive = doc["live_knobs"]["drive"] | 60};
 }

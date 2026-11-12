@@ -46,6 +46,9 @@ struct ApiDisplayResponse {
   uint32_t refresh_rate_ms; // overrides refresh_rate when set, so a live session can check in under a second
   bool live_stock; // experiment: draw live frames with the stock partial refresh
   String image_data; // the image as base64, sent inline in live mode; empty = download image_url
+  // experiment knobs (live_knobs in the answer): power off after a live frame, skip the old-image write,
+  // balanced full clear cycles instead of the stock full refresh, hold frames for unchanged black, drive frames
+  int knob_pof, knob_skip_dtm1, knob_clear, knob_bb_keep, knob_drive;
 };
 
 struct ApiDisplayInputs {
