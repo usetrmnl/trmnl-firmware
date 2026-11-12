@@ -146,7 +146,7 @@ General.describe "Keep Wi-Fi on", skip_if: :touchbar,
       s.wait_for_deep_sleep(timeout: 180)
       first, second = dev.mock.requests.select { _1.path == "/api/display" }
       expect([first.headers["Timing"], second]).to match(
-        [nil, have_header("Timing", /\Aapi=\d+;download=\d+;logs=\d+;draw=\d+;save=\d+\z/)]
+        [nil, have_header("Timing", /\Aapi=\d+;download=\d+;logs=\d+;draw=\d+;save=\d+;heap=\d+\z/)]
       )
     end
   end
