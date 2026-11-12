@@ -7,6 +7,7 @@
 #include <display.h>
 #include <display_session.h>
 #include <globals.h>
+#include <open_connections.h>
 #include <request_handling.h>
 #include <setup_session.h>
 #include <sleep_session.h>
@@ -82,11 +83,13 @@ void bl_init(void) {
   if (apiDisplayResult.response.keep_wifi_on) {
     attachInterrupt(digitalPinToInterrupt(pDevice->interrupt_pin), latch_button_press, FALLING);
   }
+  OpenConnections::keep(apiDisplayResult.response.keep_wifi_on);
   while (apiDisplayResult.response.keep_wifi_on) { // a failed check-in clears it, so errors sleep as usual
     awake_time_limit_restart(); // the limit catches a device stuck awake, not one the server keeps checking in
     waitAwakeForNextCheckIn();
     showScreen(true);
   }
+  OpenConnections::keep(false);
   detachInterrupt(digitalPinToInterrupt(pDevice->interrupt_pin));
 #endif
 #ifdef BOARD_TRMNL_X
