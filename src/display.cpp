@@ -452,7 +452,7 @@ static void write_rows(uint8_t command, const uint8_t *frame) {
 // repeat count. Changing pixels get the opposite color first, then the target, so each change nets zero DC; unchanged
 // ones get a balanced 1-frame pair that keeps them from darkening.
 static void send_balanced_partial_lut(void) {
-  const uint8_t drive = 100, rest = 5, keep = 1; // at 200 Hz: 0.5 s twice, then the shortest hold
+  const uint8_t drive = 60, rest = 5, keep = 1; // at 200 Hz: 0.3 s twice, then the shortest hold
   const struct {
     uint8_t command, length, changeLevels, keepLevels;
   } tables[] = {
