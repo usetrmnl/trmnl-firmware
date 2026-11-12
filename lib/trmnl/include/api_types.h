@@ -45,6 +45,7 @@ struct ApiDisplayResponse {
   int full_refresh_every; // partial draws between full refreshes, which clear ghosting
   uint32_t refresh_rate_ms; // overrides refresh_rate when set, so a live session can check in under a second
   bool live_stock; // experiment: draw live frames with the stock partial refresh
+  int live_drive, live_rest, live_dark, live_light; // experiment: live waveform frame counts, 0 = built in
   String image_data; // the image as base64, sent inline in live mode; empty = download image_url
 };
 

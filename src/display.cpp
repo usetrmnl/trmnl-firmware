@@ -447,13 +447,21 @@ struct LiveLut {
   uint8_t groups[12];
 };
 static const uint8_t DRIVE = 60, REST = 5, DARK_GRAY_FRAMES = 5, LIGHT_GRAY_FRAMES = 13;
+static uint8_t tuned(int value, uint8_t fallback) { return value >= 1 && value <= 255 ? value : fallback; } // experiment
 static const LiveLut NOTHING = {{0}};
 static const LiveLut HOLD_WHITE = {{0x60, 1, 1, 0, 0, 1}};          // unchanged white: 1 frame black, 1 white
 static const LiveLut HOLD_BLACK = {{0x90, 1, 1, 0, 0, 1}};          // unchanged black: 1 frame white, 1 black
-static const LiveLut TO_WHITE = {{0x48, DRIVE, REST, DRIVE, REST, 1}}; // black first, then white
-static const LiveLut TO_BLACK = {{0x84, DRIVE, REST, DRIVE, REST, 1}}; // white first, then black
-static const LiveLut BLACK_TO_DARK_GRAY = {{0x60, DARK_GRAY_FRAMES, DARK_GRAY_FRAMES, 0, 0, 1}};
-static const LiveLut WHITE_TO_LIGHT_GRAY = {{0x90, LIGHT_GRAY_FRAMES, LIGHT_GRAY_FRAMES, 0, 0, 1}};
+static LiveLut TO_WHITE, TO_BLACK, BLACK_TO_DARK_GRAY, WHITE_TO_LIGHT_GRAY;
+static void build_live_luts(void) {
+  const ApiDisplayResponse &r = apiDisplayResult.response;
+  const uint8_t drive = tuned(r.live_drive, DRIVE), rest = r.live_rest >= 1 ? tuned(r.live_rest, REST) : REST;
+  const uint8_t dark = tuned(r.live_dark, DARK_GRAY_FRAMES), light = tuned(r.live_light, LIGHT_GRAY_FRAMES);
+  TO_WHITE = {{0x48, drive, rest, drive, rest, 1}}; // black first, then white
+  TO_BLACK = {{0x84, drive, rest, drive, rest, 1}}; // white first, then black
+  BLACK_TO_DARK_GRAY = {{0x60, dark, dark, 0, 0, 1}};
+  WHITE_TO_LIGHT_GRAY = {{0x90, light, light, 0, 0, 1}};
+  Log_info("Live LUT drive=%u rest=%u dark=%u light=%u", drive, rest, dark, light);
+}
 
 // WW, BW, WB, BB (by plane bits), then the border
 static void send_live_luts(const LiveLut *ww, const LiveLut *bw, const LiveLut *wb, const LiveLut *bb,
@@ -514,6 +522,7 @@ void display_live_row(const uint8_t *row) { bbep.writeData((uint8_t *)row, (bbep
 
 void display_live_refresh(int pass, bool gray) {
   if (pass == 1) {
+    build_live_luts();
     send_live_partial_settings();
     send_live_luts(&HOLD_WHITE, &TO_WHITE, &TO_BLACK, gray ? &NOTHING : &HOLD_BLACK, &HOLD_WHITE);
     bbep.writeCmd(UC8151_PON);
