@@ -99,6 +99,7 @@ bool display_full_refresh_due(void);
 // mode's fast balanced waveform, which moves only the pixels that change. begin sends the frame on screen (false on
 // other panels), so the caller can then reuse its buffer for the next frame and pass it to finish.
 bool display_live_supported(void);
+extern String liveSteps; // experiment
 bool display_live_begin(const uint8_t *on_screen);
 void display_live_finish(const uint8_t *frame);
 void display_live_cancel(void); // after begin, when there's no next frame to finish with

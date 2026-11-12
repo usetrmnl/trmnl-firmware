@@ -46,6 +46,7 @@ struct ApiDisplayResponse {
   uint32_t refresh_rate_ms; // overrides refresh_rate when set, so a live session can check in under a second
   bool live_stock; // experiment: draw live frames with the stock partial refresh
   String image_data; // the image as base64, sent inline in live mode; empty = download image_url
+  int knob_overlap, knob_win_rows, knob_pre; // experiment (live_knobs): return before the refresh ends, window rows, opposite-push frames
 };
 
 struct ApiDisplayInputs {

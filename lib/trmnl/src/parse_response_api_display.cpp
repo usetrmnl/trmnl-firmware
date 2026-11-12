@@ -31,7 +31,8 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
         .full_refresh_every = DEFAULT_FULL_REFRESH_EVERY,
         .refresh_rate_ms = 0,
         .live_stock = false,
-        .image_data = ""};
+        .image_data = "",
+        .knob_overlap = 0, .knob_win_rows = 0, .knob_pre = 60};
   }
   String special_function_str = doc["special_function"];
   // Convert the temperature profile ("default", "a", "b", "c")
@@ -67,5 +68,8 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
       .full_refresh_every = full_refresh_every >= 1 ? full_refresh_every : DEFAULT_FULL_REFRESH_EVERY,
       .refresh_rate_ms = doc["refresh_rate_ms"] | 0u,
       .live_stock = doc["live_stock"] | false,
-      .image_data = doc["image_data"] | ""};
+      .image_data = doc["image_data"] | "",
+      .knob_overlap = doc["live_knobs"]["overlap"] | 0,
+      .knob_win_rows = doc["live_knobs"]["win_rows"] | 0,
+      .knob_pre = doc["live_knobs"]["pre"] | 60};
 }

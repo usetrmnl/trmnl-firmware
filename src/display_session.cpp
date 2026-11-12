@@ -676,7 +676,9 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
       preferences.putString(PREFERENCES_BROWSE_PATH_KEY, String(szTemp));
     }
     lastUpdateTimings = "api=" + String(api_ms) + ";download=" + String(download_ms) + ";logs=" + String(logs_ms) +
-                        ";draw=" + String(draw_ms) + ";save=" + String(millis() - draw_started_ms - draw_ms) + ";heap=" + String(ESP.getMaxAllocHeap());
+                        ";draw=" + String(draw_ms) + ";save=" + String(millis() - draw_started_ms - draw_ms) + ";heap=" + String(ESP.getMaxAllocHeap()) +
+                        ";steps=" + liveSteps;
+    liveSteps = "";
   } else if (!isPNG && !isJPEG) {
     bmp_res = parseBMPHeader(buffer, image_reverse);
     Log.info("%s [%d]: BMP Parsing result: %d\r\n", __FILE__, __LINE__, bmp_res);

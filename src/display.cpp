@@ -80,7 +80,13 @@ static uint32_t drawsAfterLiveFrame = UINT32_MAX;
 uint32_t display_panel_draws(void) { return iPanelDraws; }
 
 // Live frames leave the 200 Hz frame rate and their gate timing set; every other draw runs at the panel's own
+String liveSteps; // experiment
+static bool refreshPending = false; // experiment: overlap knob
+static uint32_t lastPendMs = 0;
+static int liveRows = 0; // experiment: window rows
+static void finish_pending(void);
 static void leave_live_settings(void) {
+  finish_pending();
   if (iPanelDraws != drawsAfterLiveFrame) return;
   const uint8_t normalPll = 0x06, normalTcon = 0x22;
   bbep.writeCmd(0x30);
@@ -460,7 +466,7 @@ static bool can_refresh_window(void) {
 
 static void write_frame(uint8_t command, const uint8_t *frame) {
   bbep.writeCmd(command);
-  bbep.writeData((uint8_t *)frame, (bbep.width() + 7) / 8 * bbep.height());
+  bbep.writeData((uint8_t *)frame, (bbep.width() + 7) / 8 * (liveRows > 0 ? liveRows : bbep.height()));
 }
 
 // bb_epaper's wait sleeps 11 ms before it looks at BUSY and then checks only every 20 ms
@@ -488,7 +494,8 @@ static void send_balanced_partial_lut(void) {
   uint8_t lut[44];
   for (const auto &table : tables) {
     memset(lut, 0, sizeof(lut));
-    const uint8_t groups[12] = {table.changeLevels, drive, rest, drive, rest, 0x01,
+    const int preK = apiDisplayResult.response.knob_pre; const uint8_t pre = preK >= 0 && preK <= 200 ? preK : 60;
+    const uint8_t groups[12] = {table.changeLevels, pre, (uint8_t)(pre ? rest : 0), drive, rest, 0x01,
                                 table.keepLevels,   keep,  keep, 0,     0,    0x01};
     memcpy(lut, groups, sizeof(groups));
     bbep.writeCmd(table.command);
@@ -517,6 +524,7 @@ static void send_live_partial_settings(void) {
 }
 
 bool display_live_supported(void) {
+  finish_pending();
   display_select_one_bit_panel(true); // after a gray image the panel is set up for 2 bits
   return can_refresh_window();
 }
@@ -532,7 +540,9 @@ static void power_off(void) {
 bool display_live_begin(const uint8_t *on_screen) {
   if (!display_live_supported()) return false;
   const bool lastDrawWasLive = iPanelDraws == drawsAfterLiveFrame; // the controller still holds that frame and setup
-  const int x1 = bbep.width() - 1, y1 = bbep.height() - 1;
+  const int wr = apiDisplayResult.response.knob_win_rows;
+  liveRows = wr > 0 && wr < bbep.height() ? wr : 0;
+  const int x1 = bbep.width() - 1, y1 = (liveRows > 0 ? liveRows : bbep.height()) - 1;
   const uint8_t ptl[9] = {0, 0, (uint8_t)(x1 >> 8), (uint8_t)(x1 | 7), 0, 0, (uint8_t)(y1 >> 8), (uint8_t)y1, 0x00};
   bbep.writeCmd(UC8151_PTIN);
   bbep.writeCmd(UC8151_PTL);
@@ -550,12 +560,34 @@ void display_live_cancel(void) {
   bbep.writeCmd(UC8151_PTOU);
 }
 
-void display_live_finish(const uint8_t *frame) {
-  write_frame(UC8151_DTM2, frame);
-  wait_until_idle(); // the power-on
-  bbep.writeCmd(UC8151_DRF);
+static void finish_pending(void) {
+  if (!refreshPending) return;
+  const uint32_t t = millis();
   power_off();
   bbep.writeCmd(UC8151_PTOU);
+  refreshPending = false;
+  lastPendMs = millis() - t;
+}
+
+void display_live_finish(const uint8_t *frame) {
+  uint32_t t = millis();
+  write_frame(UC8151_DTM2, frame);
+  const uint32_t dtm2 = millis() - t; t = millis();
+  wait_until_idle(); // the power-on
+  const uint32_t ponw = millis() - t; t = millis();
+  bbep.writeCmd(UC8151_DRF);
+  if (apiDisplayResult.response.knob_overlap) {
+    refreshPending = true;
+    liveSteps = "dtm2=" + String(dtm2) + "/ponwait=" + String(ponw) + "/overlap/prevpend=" + String(lastPendMs);
+  } else {
+    wait_until_idle();
+    const uint32_t drf = millis() - t; t = millis();
+    bbep.writeCmd(UC8151_POFF);
+    wait_until_idle();
+    const uint32_t pof = millis() - t;
+    bbep.writeCmd(UC8151_PTOU);
+    liveSteps = "dtm2=" + String(dtm2) + "/ponwait=" + String(ponw) + "/drf=" + String(drf) + "/pof=" + String(pof) + "/rows=" + String(liveRows);
+  }
   bCanDoPartial = true;
   iUpdateCount++;
   iPanelDraws++;
@@ -623,6 +655,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
 void display_sleep(void) {
   Log_info("Goto Sleep...");
 #ifdef BB_EPAPER
+  finish_pending();
   bbep.sleep(LIGHT_SLEEP);
   drawsAfterLiveFrame = UINT32_MAX; // waking it resets the controller
 #else
