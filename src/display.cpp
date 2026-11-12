@@ -441,36 +441,36 @@ static bool can_refresh_window(void) {
   return bbep.getChip() == BBEP_CHIP_UC81xx && (panel == EP75_800x480 || panel == EP75_800x480_GEN2);
 }
 
-static void write_rows(uint8_t command, const uint8_t *frame) {
-  const int pitch = (bbep.width() + 7) / 8;
-  bbep.writeCmd(command);
-  for (int row = 0; row < bbep.height(); row++)
-    bbep.writeData((uint8_t *)frame + row * pitch, pitch);
-}
-
 // Each table: level select (2 bits a phase: 00 GND, 01 VDH = black, 10 VDL = white), four phase lengths in frames and a
-// repeat count. Changing pixels get the opposite color first, then the target, so each change nets zero DC; unchanged
-// ones get a balanced 1-frame pair that keeps them from darkening.
-static void send_balanced_partial_lut(void) {
-  const uint8_t drive = 60, rest = 5, keep = 1; // at 200 Hz: 0.3 s twice, then the shortest hold
+// repeat count, two groups. Every pixel's waveform nets zero DC. At 200 Hz, drive 60 frames is 0.3 s.
+struct LiveLut {
+  uint8_t groups[12];
+};
+static const uint8_t DRIVE = 60, REST = 5, DARK_GRAY_FRAMES = 5, LIGHT_GRAY_FRAMES = 13;
+static const LiveLut NOTHING = {{0}};
+static const LiveLut HOLD_WHITE = {{0x60, 1, 1, 0, 0, 1}};          // unchanged white: 1 frame black, 1 white
+static const LiveLut HOLD_BLACK = {{0x90, 1, 1, 0, 0, 1}};          // unchanged black: 1 frame white, 1 black
+static const LiveLut TO_WHITE = {{0x48, DRIVE, REST, DRIVE, REST, 1}}; // black first, then white
+static const LiveLut TO_BLACK = {{0x84, DRIVE, REST, DRIVE, REST, 1}}; // white first, then black
+static const LiveLut BLACK_TO_DARK_GRAY = {{0x60, DARK_GRAY_FRAMES, DARK_GRAY_FRAMES, 0, 0, 1}};
+static const LiveLut WHITE_TO_LIGHT_GRAY = {{0x90, LIGHT_GRAY_FRAMES, LIGHT_GRAY_FRAMES, 0, 0, 1}};
+
+// WW, BW, WB, BB (by plane bits), then the border
+static void send_live_luts(const LiveLut *ww, const LiveLut *bw, const LiveLut *wb, const LiveLut *bb,
+                           const LiveLut *border) {
   const struct {
-    uint8_t command, length, changeLevels, keepLevels;
-  } tables[] = {
-    {UC8151_LUT_VCOM, 44, 0x00, 0x00},  // VCOM stays at its DC level
-    {UC8151_LUT_WW, 42, 0x00, 0x60},    // unchanged white
-    {UC8151_LUT_BW, 42, 0x48, 0x00},    // black to white
-    {UC8151_LUT_WB, 42, 0x84, 0x00},    // white to black
-    {UC8151_LUT_BB, 42, 0x00, 0x90},    // unchanged black
-    {UC8151_LUT_VCOM2, 42, 0x00, 0x60}, // the border, held like white
-  };
-  uint8_t lut[44];
+    uint8_t command;
+    const LiveLut *lut;
+  } tables[] = {{UC8151_LUT_WW, ww}, {UC8151_LUT_BW, bw}, {UC8151_LUT_WB, wb}, {UC8151_LUT_BB, bb},
+                {UC8151_LUT_VCOM2, border}};
+  uint8_t lut[44] = {0}; // VCOM stays at its DC level
+  bbep.writeCmd(UC8151_LUT_VCOM);
+  bbep.writeData(lut, 44);
   for (const auto &table : tables) {
     memset(lut, 0, sizeof(lut));
-    const uint8_t groups[12] = {table.changeLevels, drive, rest, drive, rest, 0x01,
-                                table.keepLevels,   keep,  keep, 0,     0,    0x01};
-    memcpy(lut, groups, sizeof(groups));
+    memcpy(lut, table.lut->groups, sizeof(table.lut->groups));
     bbep.writeCmd(table.command);
-    bbep.writeData(lut, table.length);
+    bbep.writeData(lut, 42);
   }
 }
 
@@ -489,7 +489,6 @@ static void send_live_partial_settings(void) {
   bbep.writeData((uint8_t *)cdi, sizeof(cdi));
   bbep.writeCmd(UC8151_TCON);
   bbep.writeData((uint8_t *)&tcon, 1);
-  send_balanced_partial_lut();
   bbep.writeCmd(0x82);
   bbep.writeData((uint8_t *)&vdcs, 1);
 }
@@ -499,32 +498,41 @@ bool display_live_supported(void) {
   return can_refresh_window();
 }
 
-bool display_live_begin(const uint8_t *on_screen) {
+bool display_live_begin(void) {
   if (!display_live_supported()) return false;
   const int x1 = bbep.width() - 1, y1 = bbep.height() - 1;
   const uint8_t ptl[9] = {0, 0, (uint8_t)(x1 >> 8), (uint8_t)(x1 | 7), 0, 0, (uint8_t)(y1 >> 8), (uint8_t)y1, 0x00};
   bbep.writeCmd(UC8151_PTIN);
   bbep.writeCmd(UC8151_PTL);
   bbep.writeData((uint8_t *)ptl, sizeof(ptl));
-  write_rows(UC8151_DTM1, on_screen);
   return true;
 }
 
-void display_live_cancel(void) { bbep.writeCmd(UC8151_PTOU); }
+void display_live_plane(int plane) { bbep.writeCmd(plane == 1 ? UC8151_DTM1 : UC8151_DTM2); }
 
-void display_live_finish(const uint8_t *frame) {
-  write_rows(UC8151_DTM2, frame);
-  send_live_partial_settings();
-  bbep.writeCmd(UC8151_PON);
-  bbep.wait();
+void display_live_row(const uint8_t *row) { bbep.writeData((uint8_t *)row, (bbep.width() + 7) / 8); }
+
+void display_live_refresh(int pass, bool gray) {
+  if (pass == 1) {
+    send_live_partial_settings();
+    send_live_luts(&HOLD_WHITE, &TO_WHITE, &TO_BLACK, gray ? &NOTHING : &HOLD_BLACK, &HOLD_WHITE);
+    bbep.writeCmd(UC8151_PON);
+    bbep.wait();
+  } else {
+    send_live_luts(&NOTHING, &BLACK_TO_DARK_GRAY, &WHITE_TO_LIGHT_GRAY, &HOLD_BLACK, &NOTHING);
+  }
   bbep.writeCmd(UC8151_DRF);
   bbep.wait();
+}
+
+void display_live_finish(bool drawn) {
   bbep.writeCmd(UC8151_PTOU);
   const uint8_t normalPll = 0x06, normalTcon = 0x22; // what full refreshes run at
   bbep.writeCmd(0x30);
   bbep.writeData((uint8_t *)&normalPll, 1);
   bbep.writeCmd(UC8151_TCON);
   bbep.writeData((uint8_t *)&normalTcon, 1);
+  if (!drawn) return;
   bCanDoPartial = true;
   iUpdateCount++;
   iPanelDraws++;

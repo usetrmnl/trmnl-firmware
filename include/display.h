@@ -95,13 +95,16 @@ uint32_t display_panel_draws(void);
 // Whether the next draw is due a full refresh, which clears ghosting
 bool display_full_refresh_due(void);
 
-// Redraws the TRMNL OG's panel from one 1-bit frame (1 = white, rows (width + 7) / 8 bytes) to the next with live
-// mode's fast balanced waveform, which moves only the pixels that change. begin sends the frame on screen (false on
-// other panels), so the caller can then reuse its buffer for the next frame and pass it to finish.
+// Redraws the TRMNL OG's panel with live mode's fast balanced waveform, which moves only the pixels that change.
+// begin opens the panel's window (false on other panels); each pass then takes the old (plane 1) and new (plane 2)
+// images row by row (1 = white, (width + 7) / 8 bytes) and a refresh. A gray frame takes two passes, black and white
+// one. finish closes the window, counting the draw when drawn.
 bool display_live_supported(void);
-bool display_live_begin(const uint8_t *on_screen);
-void display_live_finish(const uint8_t *frame);
-void display_live_cancel(void); // after begin, when there's no next frame to finish with
+bool display_live_begin(void);
+void display_live_plane(int plane);
+void display_live_row(const uint8_t *row);
+void display_live_refresh(int pass, bool gray);
+void display_live_finish(bool drawn);
 
 /**
  * @brief Function to got the display to the sleep

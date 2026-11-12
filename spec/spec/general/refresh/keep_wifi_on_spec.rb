@@ -71,6 +71,29 @@ General.describe "Keep Wi-Fi on", skip_if: :touchbar,
     end
   end
 
+  # Top half: gray bands that move every frame; bottom half: bands that stay, so unchanged grays keep their level.
+  def serve_gray_png(name, frame, number)
+    w, h = device.size
+    shift = ->(y) { y < h / 2 ? frame : 0 }
+    level = ->(x, y) { number.(x, y) ? 0 : ((x * 4 / w) + shift.(y)) % 4 }
+    dev.mock.images["#{name}.png"] = TrmnlSim::Images.png_image(level, w, h, bits: 2)
+    dev.mock.stamp(name)
+    TrmnlSim::Images.expected_gray(level, w, h, bits: 2)
+  end
+
+  it "draws gray live frames with the fast balanced waveform", only_on: "trmnl", why: "the OG's UC8179 draw" do
+    serve_gray_png("one", 0, device_number("1"))
+    serve_gray_png("two", 1, device_number("2"))
+    expected = serve_gray_png("three", 2, device_number("3"))
+    dev.mock.display_queue = %w[one two three].map { |name| { image: name, refresh_rate: 2, keep_wifi_on: true } }
+    dev.mock.display = { image: "three", refresh_rate: 600 }
+    dev.boot do |s|
+      s.wait_for_deep_sleep(timeout: 180)
+      expect([s.console(0).grep(/Live frame drawn in .* \(gray\)/).size, s])
+        .to match([2, show_image(expected, tolerance: 24, max_ratio: 0)])
+    end
+  end
+
   it "draws a live frame in full after an error screen covered the last one" do
     serve_png("one", device_number("1"))
     serve_png("two", device_number("2"))
