@@ -89,6 +89,20 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
  */
 void display_set_light_sleep(uint8_t enabled);
 
+// How many times the panel has been drawn since boot, whatever drew it
+uint32_t display_panel_draws(void);
+
+// Whether the next draw is due a full refresh, which clears ghosting
+bool display_full_refresh_due(void);
+
+// Redraws the TRMNL OG's panel from one 1-bit frame (1 = white, rows (width + 7) / 8 bytes) to the next with live
+// mode's fast balanced waveform, which moves only the pixels that change. begin sends the frame on screen (false on
+// other panels), so the caller can then reuse its buffer for the next frame and pass it to finish.
+bool display_live_supported(void);
+bool display_live_begin(const uint8_t *on_screen);
+void display_live_finish(const uint8_t *frame);
+void display_live_cancel(void); // after begin, when there's no next frame to finish with
+
 /**
  * @brief Function to got the display to the sleep
  * @param none
