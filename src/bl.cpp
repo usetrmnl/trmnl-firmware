@@ -81,7 +81,7 @@ void bl_init(void) {
 
   // OTA checking, image checking and drawing
   showScreen(wake.showErrorsNow);
-#ifndef BOARD_TRMNL_X // the X stays awake for short refreshes and taps in touchbar_stay_awake
+#ifndef BOARD_TRMNL_X // the X stays awake for short refreshes, taps and live mode in touchbar_stay_awake
   if (apiDisplayResult.response.keep_wifi_on) {
     attachInterrupt(digitalPinToInterrupt(pDevice->interrupt_pin), latch_button_press, FALLING);
   }
@@ -95,7 +95,11 @@ void bl_init(void) {
   detachInterrupt(digitalPinToInterrupt(pDevice->interrupt_pin));
 #endif
 #ifdef BOARD_TRMNL_X
-  touchbar_stay_awake([] { showScreen(true); });
+  touchbar_stay_awake([] {
+    OpenConnections::keep(apiDisplayResult.response.keep_wifi_on);
+    showScreen(true);
+  });
+  OpenConnections::keep(false);
 #endif
 
   // display go to sleep

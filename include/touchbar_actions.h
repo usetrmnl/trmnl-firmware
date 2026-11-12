@@ -23,7 +23,7 @@ void touchbar_start(esp_sleep_wakeup_cause_t wakeup_reason, bool gpio_wakeup);
 // locked the touch bar. While locked, returns only when a refresh is due.
 void process_iqs323_data(void);
 
-// After a touch, stays awake until 20 s pass without a touch
+// After a touch, or while answers carry keep_wifi_on, stays awake until 20 s pass without a touch
 void touchbar_stay_awake(void (*show_screen)(void));
 
 // Whether a touch's arrow indicator is waiting to redraw

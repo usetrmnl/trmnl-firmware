@@ -4,7 +4,7 @@
 # refresh_rate seconds after the answer arrived, instead of deep sleeping (src/bl.cpp, bl_init).
 
 General.describe "Keep Wi-Fi on", skip_if: :touchbar,
-                                  why: "the X stays awake for short refreshes in its touch bar loop" do
+                                  why: "the X runs live mode in its touch bar loop (core/trmnl_x/live_mode_spec.rb)" do
   fixture(:dev) { ProvisionedDevice.new(build) }
 
   before { dev.reset }

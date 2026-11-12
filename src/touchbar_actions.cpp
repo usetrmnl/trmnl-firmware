@@ -248,8 +248,11 @@ void process_iqs323_data(void) {
   }
 }
 
+// Live mode (keep_wifi_on) keeps the X awake without a touch; a session ending with none in it sleeps at once
+static bool should_stay_awake(void) { return stay_awake_for_touchbar || apiDisplayResult.response.keep_wifi_on; }
+
 void touchbar_stay_awake(void (*show_screen)(void)) {
-  if (!stay_awake_for_touchbar) return;
+  if (!should_stay_awake()) return;
   Log_info("Staying awake %d s for more touch bar taps", TOUCHBAR_STAY_AWAKE_MS / 1000);
   staying_awake = true;
   iqs323_task_set_streaming_mode(true);
@@ -270,7 +273,9 @@ void touchbar_stay_awake(void (*show_screen)(void)) {
       has_pending_indicator = false; // no known tap location, so skip the indicator arrow
     }
     show_screen();
-    screen_shown_ms = millis();
+    if (!should_stay_awake()) break;
+    // a live check-in is due refresh_rate seconds after the answer, not after the draw
+    screen_shown_ms = apiDisplayResult.response.keep_wifi_on ? apiDisplayResult.received_ms : millis();
     refresh_s = refreshInterval.seconds();
   }
   staying_awake = false;
