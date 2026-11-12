@@ -26,7 +26,8 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
         .reset_firmware = false,
         .special_function = SF_NONE,
         .action = "",
-        .verbose_logging = ""};
+        .verbose_logging = "",
+        .full_refresh_every = DEFAULT_FULL_REFRESH_EVERY};
   }
   String special_function_str = doc["special_function"];
   // Convert the temperature profile ("default", "a", "b", "c")
@@ -38,6 +39,8 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
   else if (tp == "b")
     u32TP = 2;
 //     else if (tp == "c") u32TP = 3;
+
+  int full_refresh_every = doc["full_refresh_every"] | DEFAULT_FULL_REFRESH_EVERY;
 
   return ApiDisplayResponse{
       .outcome = ApiDisplayOutcome::Ok,
@@ -55,5 +58,6 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
       .reset_firmware = doc["reset_firmware"],
       .special_function = parseSpecialFunction(special_function_str),
       .action = doc["action"] | "",
-      .verbose_logging = doc["verbose_logging"] | ""};
+      .verbose_logging = doc["verbose_logging"] | "",
+      .full_refresh_every = full_refresh_every >= 1 ? full_refresh_every : DEFAULT_FULL_REFRESH_EVERY};
 }

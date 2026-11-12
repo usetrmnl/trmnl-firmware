@@ -264,6 +264,23 @@ General.describe "Images" do
       end
     end
 
+    # bb_epaper logs "Forcing full refresh"; FastEPD logs a slow clear (mode 2).
+    def full_refreshes_over_three_draws(**fields)
+      show("first.png", png(digit(0, 1)), "image/png", **fields) do |s|
+        show_next(s, "second.png", png(digit(0, 1, "2")), **fields)
+        show_next(s, "third.png", png(digit(0, 1, "3")), **fields)
+        return s.console.grep(/Forcing full refresh|fullUpdate clear mode = 2/).size
+      end
+    end
+
+    it "fully refreshes as often as the server asks" do
+      expect(full_refreshes_over_three_draws(full_refresh_every: 1)).to be >= 3
+    end
+
+    it "fully refreshes less often by default" do
+      expect(full_refreshes_over_three_draws).to be < 3
+    end
+
     it "long refresh rates use fast instead of partial refreshes" do
       show("slow1.png", png(digit(0, 1)), "image/png", refresh_rate: 3600) do |s|
         eight = digit(0, 1, "8")
