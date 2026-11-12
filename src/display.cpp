@@ -445,11 +445,16 @@ static bool can_refresh_window(void) {
   return bbep.getChip() == BBEP_CHIP_UC81xx && (panel == EP75_800x480 || panel == EP75_800x480_GEN2);
 }
 
-static void write_rows(uint8_t command, const uint8_t *frame) {
-  const int pitch = (bbep.width() + 7) / 8;
+static void write_frame(uint8_t command, const uint8_t *frame) {
   bbep.writeCmd(command);
-  for (int row = 0; row < bbep.height(); row++)
-    bbep.writeData((uint8_t *)frame + row * pitch, pitch);
+  bbep.writeData((uint8_t *)frame, (bbep.width() + 7) / 8 * bbep.height());
+}
+
+// bb_epaper's wait sleeps 11 ms before it looks at BUSY and then checks only every 20 ms
+static void wait_until_idle(void) {
+  const uint32_t started = millis();
+  delayMicroseconds(100); // BUSY goes low a few microseconds after the command
+  while (digitalRead(bbep._bbep.iBUSYPin) == LOW && millis() - started < 5000) delay(1);
 }
 
 // Each table: level select (2 bits a phase: 00 GND, 01 VDH = black, 10 VDL = white), four phase lengths in frames and a
@@ -510,22 +515,22 @@ bool display_live_begin(const uint8_t *on_screen) {
   bbep.writeCmd(UC8151_PTIN);
   bbep.writeCmd(UC8151_PTL);
   bbep.writeData((uint8_t *)ptl, sizeof(ptl));
-  if (iPanelDraws != drawsAfterLiveFrame) write_rows(UC8151_DTM1, on_screen);
+  if (iPanelDraws != drawsAfterLiveFrame) write_frame(UC8151_DTM1, on_screen);
   return true;
 }
 
 void display_live_cancel(void) { bbep.writeCmd(UC8151_PTOU); }
 
 void display_live_finish(const uint8_t *frame) {
-  write_rows(UC8151_DTM2, frame);
+  write_frame(UC8151_DTM2, frame);
   send_live_partial_settings();
   bbep.writeCmd(UC8151_PON);
-  bbep.wait();
+  wait_until_idle();
   bbep.writeCmd(UC8151_DRF);
-  bbep.wait();
+  wait_until_idle();
   // unknown whether the UC8179 holds a DC level across the ink while powered and idle, so never leave it on
   bbep.writeCmd(UC8151_POFF);
-  bbep.wait();
+  wait_until_idle();
   bbep.writeCmd(UC8151_PTOU);
   const uint8_t normalPll = 0x06, normalTcon = 0x22; // what full refreshes run at
   bbep.writeCmd(0x30);
