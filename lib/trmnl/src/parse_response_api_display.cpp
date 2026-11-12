@@ -30,6 +30,7 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
         .keep_wifi_on = false,
         .full_refresh_every = DEFAULT_FULL_REFRESH_EVERY,
         .refresh_rate_ms = 0,
+        .live_stock = false,
         .image_data = ""};
   }
   String special_function_str = doc["special_function"];
@@ -65,5 +66,6 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
       .keep_wifi_on = doc["keep_wifi_on"] | false,
       .full_refresh_every = full_refresh_every >= 1 ? full_refresh_every : DEFAULT_FULL_REFRESH_EVERY,
       .refresh_rate_ms = doc["refresh_rate_ms"] | 0u,
+      .live_stock = doc["live_stock"] | false,
       .image_data = doc["image_data"] | ""};
 }

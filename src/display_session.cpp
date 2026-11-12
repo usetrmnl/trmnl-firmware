@@ -656,7 +656,8 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
     filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
     Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
     const unsigned long draw_started_ms = millis();
-    if (!(isPNG && apiDisplayResult.response.keep_wifi_on && live_frame_draw(buffer, content_size)))
+    if (!(isPNG && apiDisplayResult.response.keep_wifi_on && !apiDisplayResult.response.live_stock &&
+          live_frame_draw(buffer, content_size)))
       display_show_image(buffer, content_size, true); // PNG and JPEG decoders leave the buffer intact
     const unsigned long draw_ms = millis() - draw_started_ms;
     DisplayedImage::remember(szTemp); // current image becomes the previous image
