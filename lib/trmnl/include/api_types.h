@@ -23,6 +23,8 @@ enum class ApiDisplayOutcome {
   DeserializationError,
 };
 
+#define DEFAULT_FULL_REFRESH_EVERY 8
+
 struct ApiDisplayResponse {
   ApiDisplayOutcome outcome;
   String error_detail;
@@ -40,6 +42,7 @@ struct ApiDisplayResponse {
   String action;
   String verbose_logging;
   bool keep_wifi_on; // wait for the next check-in awake with Wi-Fi connected, not in deep sleep
+  int full_refresh_every; // partial draws between full refreshes, which clear ghosting
 };
 
 struct ApiDisplayInputs {

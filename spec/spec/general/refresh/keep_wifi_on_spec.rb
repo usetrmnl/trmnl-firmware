@@ -70,6 +70,16 @@ General.describe "Keep Wi-Fi on", skip_if: :touchbar,
     end
   end
 
+  it "fully refreshes as often as the server asks" do
+    frames = %w[1 2 3 4].map { |n| serve_png("frame#{n}", device_number(n)) && "frame#{n}" }
+    dev.mock.display_queue = frames.map { |f| { image: f, refresh_rate: 2, keep_wifi_on: true, full_refresh_every: 1 } }
+    dev.mock.display = { image: "frame4", refresh_rate: 600 }
+    dev.boot do |s|
+      s.wait_for_deep_sleep(timeout: 180)
+      expect(s.console(0).grep(/Forcing full refresh/).size).to be >= 4
+    end
+  end
+
   # HttpRetryRequest tries a failing check-in 5 times; the failed answer has no keep_wifi_on.
   it "deep sleeps when a check-in fails" do
     dev.mock.display = { image: "default", refresh_rate: 2, keep_wifi_on: true }
