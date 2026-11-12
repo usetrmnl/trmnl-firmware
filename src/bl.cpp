@@ -3248,8 +3248,8 @@ void goToSleep(void)
 #endif
 #ifdef BOARD_TRMNL_GEN2
 // Use the ULP of the ESP32-C5 to do interesting things on the ePaper while the main CPU is sleeping
-#endif // BOARD_TRMNL_GEN2
   start_ulp_program();
+#endif // BOARD_TRMNL_GEN2
   esp_deep_sleep_start();
 }
 
