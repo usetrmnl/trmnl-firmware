@@ -79,7 +79,19 @@ static uint32_t iPanelDraws = 0;
 static uint32_t drawsAfterLiveFrame = UINT32_MAX;
 uint32_t display_panel_draws(void) { return iPanelDraws; }
 
+// Live frames leave the 200 Hz frame rate and their gate timing set; every other draw runs at the panel's own
+static void leave_live_settings(void) {
+  if (iPanelDraws != drawsAfterLiveFrame) return;
+  const uint8_t normalPll = 0x06, normalTcon = 0x22;
+  bbep.writeCmd(0x30);
+  bbep.writeData((uint8_t *)&normalPll, 1);
+  bbep.writeCmd(UC8151_TCON);
+  bbep.writeData((uint8_t *)&normalTcon, 1);
+  drawsAfterLiveFrame = UINT32_MAX;
+}
+
 bool display_update_epaper(int refreshMode, bool wait, bool writePlane, uint8_t plane) {
+  leave_live_settings();
   // Light sleep with the WiFi radio running is unsupported: it hangs a Gen2 and fakes button presses on an OG
   display_apply_light_sleep(bLightSleepWanted && WiFi.getMode() == WIFI_MODE_NULL);
   if (writePlane) {
@@ -220,6 +232,7 @@ void display_wipe(void) {
   int refreshCount = 60;
 #endif
 
+  leave_live_settings();
   bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit);
   bbep.fillScreen(BBEP_WHITE);
   for (int i = 0; i < refreshCount; i++) {
@@ -445,11 +458,16 @@ static bool can_refresh_window(void) {
   return bbep.getChip() == BBEP_CHIP_UC81xx && (panel == EP75_800x480 || panel == EP75_800x480_GEN2);
 }
 
-static void write_rows(uint8_t command, const uint8_t *frame) {
-  const int pitch = (bbep.width() + 7) / 8;
+static void write_frame(uint8_t command, const uint8_t *frame) {
   bbep.writeCmd(command);
-  for (int row = 0; row < bbep.height(); row++)
-    bbep.writeData((uint8_t *)frame + row * pitch, pitch);
+  bbep.writeData((uint8_t *)frame, (bbep.width() + 7) / 8 * bbep.height());
+}
+
+// bb_epaper's wait sleeps 11 ms before it looks at BUSY and then checks only every 20 ms
+static void wait_until_idle(void) {
+  const uint32_t started = millis();
+  delayMicroseconds(100); // BUSY goes low a few microseconds after the command
+  while (digitalRead(bbep._bbep.iBUSYPin) == LOW && millis() - started < 5000) delay(1);
 }
 
 // Each table: level select (2 bits a phase: 00 GND, 01 VDH = black, 10 VDL = white), four phase lengths in frames and a
@@ -503,35 +521,41 @@ bool display_live_supported(void) {
   return can_refresh_window();
 }
 
+static void power_off(void) {
+  // unknown whether the UC8179 holds a DC level across the ink while powered and idle, so never leave it on
+  wait_until_idle();
+  bbep.writeCmd(UC8151_POFF);
+  wait_until_idle();
+}
+
+// Starts the panel's power-on, which takes 130 ms, so the frame can be decoded and sent meanwhile
 bool display_live_begin(const uint8_t *on_screen) {
   if (!display_live_supported()) return false;
+  const bool lastDrawWasLive = iPanelDraws == drawsAfterLiveFrame; // the controller still holds that frame and setup
   const int x1 = bbep.width() - 1, y1 = bbep.height() - 1;
   const uint8_t ptl[9] = {0, 0, (uint8_t)(x1 >> 8), (uint8_t)(x1 | 7), 0, 0, (uint8_t)(y1 >> 8), (uint8_t)y1, 0x00};
   bbep.writeCmd(UC8151_PTIN);
   bbep.writeCmd(UC8151_PTL);
   bbep.writeData((uint8_t *)ptl, sizeof(ptl));
-  if (iPanelDraws != drawsAfterLiveFrame) write_rows(UC8151_DTM1, on_screen);
+  if (!lastDrawWasLive) {
+    write_frame(UC8151_DTM1, on_screen);
+    send_live_partial_settings();
+  }
+  bbep.writeCmd(UC8151_PON);
   return true;
 }
 
-void display_live_cancel(void) { bbep.writeCmd(UC8151_PTOU); }
+void display_live_cancel(void) {
+  power_off();
+  bbep.writeCmd(UC8151_PTOU);
+}
 
 void display_live_finish(const uint8_t *frame) {
-  write_rows(UC8151_DTM2, frame);
-  send_live_partial_settings();
-  bbep.writeCmd(UC8151_PON);
-  bbep.wait();
+  write_frame(UC8151_DTM2, frame);
+  wait_until_idle(); // the power-on
   bbep.writeCmd(UC8151_DRF);
-  bbep.wait();
-  // unknown whether the UC8179 holds a DC level across the ink while powered and idle, so never leave it on
-  bbep.writeCmd(UC8151_POFF);
-  bbep.wait();
+  power_off();
   bbep.writeCmd(UC8151_PTOU);
-  const uint8_t normalPll = 0x06, normalTcon = 0x22; // what full refreshes run at
-  bbep.writeCmd(0x30);
-  bbep.writeData((uint8_t *)&normalPll, 1);
-  bbep.writeCmd(UC8151_TCON);
-  bbep.writeData((uint8_t *)&normalTcon, 1);
   bCanDoPartial = true;
   iUpdateCount++;
   iPanelDraws++;
@@ -600,6 +624,7 @@ void display_sleep(void) {
   Log_info("Goto Sleep...");
 #ifdef BB_EPAPER
   bbep.sleep(LIGHT_SLEEP);
+  drawsAfterLiveFrame = UINT32_MAX; // waking it resets the controller
 #else
   bbep.einkPower(0);
   bbep.deInit();
