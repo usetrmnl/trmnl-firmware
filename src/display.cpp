@@ -74,6 +74,9 @@ static void display_apply_light_sleep(uint8_t enabled) {
 }
 
 static uint32_t iPanelDraws = 0;
+// The panel's draw count right after a live frame. While it still matches, the controller's old-image memory already
+// holds the frame on screen, so the next live frame can skip sending it (55 ms of 48 KB on the desk OG).
+static uint32_t drawsAfterLiveFrame = UINT32_MAX;
 uint32_t display_panel_draws(void) { return iPanelDraws; }
 
 bool display_update_epaper(int refreshMode, bool wait, bool writePlane, uint8_t plane) {
@@ -101,6 +104,7 @@ static void display_select_one_bit_panel(bool only_if_changed = false) {
   if (only_if_changed && bbep.getPanelType() == one_bit) {
     return;
   }
+  drawsAfterLiveFrame = UINT32_MAX; // a fresh panel setup may not keep the controller's memory
   if (custom_pins) {
     bbep.setPanelType(one_bit);
     bbep.initIO(pDevice->epd_dc_pin, pDevice->epd_rst_pin, pDevice->epd_busy_pin, pDevice->epd_cs_pin,
@@ -506,7 +510,7 @@ bool display_live_begin(const uint8_t *on_screen) {
   bbep.writeCmd(UC8151_PTIN);
   bbep.writeCmd(UC8151_PTL);
   bbep.writeData((uint8_t *)ptl, sizeof(ptl));
-  write_rows(UC8151_DTM1, on_screen);
+  if (iPanelDraws != drawsAfterLiveFrame) write_rows(UC8151_DTM1, on_screen);
   return true;
 }
 
@@ -528,6 +532,7 @@ void display_live_finish(const uint8_t *frame) {
   bCanDoPartial = true;
   iUpdateCount++;
   iPanelDraws++;
+  drawsAfterLiveFrame = iPanelDraws;
 }
 #else
 // Pushes the drawn image to the panel with the right clearing passes
