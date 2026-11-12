@@ -44,6 +44,7 @@ struct ApiDisplayResponse {
   bool keep_wifi_on; // wait for the next check-in awake with Wi-Fi connected, not in deep sleep
   int full_refresh_every; // partial draws between full refreshes, which clear ghosting
   uint32_t refresh_rate_ms; // overrides refresh_rate when set, so a live session can check in under a second
+  String image_data; // the image as base64, sent inline in live mode; empty = download image_url
 };
 
 struct ApiDisplayInputs {
@@ -85,6 +86,7 @@ struct ApiDisplayInputs {
   bool imageCached;
   int prevWakeTime;
   String resetReason; // esp_reset_reason_t name of this boot, e.g. ESP_RST_PANIC
+  String updateTimings; // "api=..;download=..;draw=.." in ms for the last image; empty = none this boot
 };
 
 using ApiSetupInputs = ApiDisplayInputs;
