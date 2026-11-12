@@ -107,6 +107,38 @@ General.describe "Keep Wi-Fi on", skip_if: :touchbar,
     dev.boot do |s|
       s.wait_for_deep_sleep(timeout: 180)
       expect(s.console(0).grep(/Writing .* to SPIFFS/).size).to eq(0)
+
+  it "draws an image sent inside the answer without downloading it" do
+    path, expected = serve_png("one", device_number("1"))
+    image_data = [dev.mock.images["one.png"]].pack("m0")
+    dev.mock.display_queue = [{ image: "one", refresh_rate: 2, keep_wifi_on: true, image_data: }]
+    dev.mock.display = { image: "one", refresh_rate: 600 }
+    dev.boot do |s|
+      s.wait_for_deep_sleep(timeout: 180)
+      expect([dev.mock.paths.count(path), s]).to match([0, show_image(expected, tolerance: 64, max_ratio: 0)])
+    end
+  end
+
+  it "downloads the image when the inline copy is not valid base64" do
+    path, expected = serve_png("one", device_number("1"))
+    dev.mock.display_queue = [{ image: "one", refresh_rate: 2, keep_wifi_on: true, image_data: "@@@" }]
+    dev.mock.display = { image: "one", refresh_rate: 600 }
+    dev.boot do |s|
+      s.wait_for_deep_sleep(timeout: 180)
+      expect([dev.mock.paths.count(path), s]).to match([1, show_image(expected, tolerance: 64, max_ratio: 0)])
+    end
+  end
+
+  it "reports how long each step of the last image took" do
+    serve_png("one", device_number("1"))
+    dev.mock.display_queue = [{ image: "one", refresh_rate: 2, keep_wifi_on: true }]
+    dev.mock.display = { image: "one", refresh_rate: 600 }
+    dev.boot do |s|
+      s.wait_for_deep_sleep(timeout: 180)
+      first, second = dev.mock.requests.select { _1.path == "/api/display" }
+      expect([first.headers["Timing"], second]).to match(
+        [nil, have_header("Timing", /\Aapi=\d+;download=\d+;logs=\d+;draw=\d+;save=\d+\z/)]
+      )
     end
   end
 
