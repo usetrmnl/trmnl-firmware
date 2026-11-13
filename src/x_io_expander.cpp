@@ -1,6 +1,7 @@
 // TRMNL X hardware reached through the TCA9535 IO expander, which the panel driver (bbep) owns
 #include <display.h>
 #include <epd_driver.h>
+#include <globals.h>
 #include <trmnl_log.h>
 #include <x_hardware.h>
 
@@ -93,6 +94,67 @@ void display_set_orientation(uint8_t orientation) {
   }
   bbep.setRotation(angle);
 }
+
+void display_prepare_native_image() { bbep.setRotation(0); }
+
+// The physical orientation in which a native-layout image reads upright. Core turns a portrait
+// layout 90 degrees clockwise (its top on the panel's native right edge), while png_draw turns a
+// tall PNG the other way (its top on the native left edge).
+static uint8_t upright_orientation_for(bool tall_image) {
+  if (device_orientation == LANDSCAPE_LEFT || device_orientation == LANDSCAPE_RIGHT) return LANDSCAPE_RIGHT;
+  return tall_image ? PORTRAIT_UP_RIGHT : PORTRAIT_UP_DOWN;
+}
+
+static uint8_t reverse_bits(uint8_t b) {
+  b = (b >> 4) | (b << 4);
+  b = ((b & 0xcc) >> 2) | ((b & 0x33) << 2);
+  return ((b & 0xaa) >> 1) | ((b & 0x55) << 1);
+}
+
+static uint8_t reverse_bit_pairs(uint8_t b) {
+  b = (b >> 4) | (b << 4);
+  return ((b & 0xcc) >> 2) | ((b & 0x33) << 2);
+}
+
+static uint8_t reverse_pixels(uint8_t b, int mode) {
+  switch (mode) {
+  case BB_MODE_1BPP:
+    return reverse_bits(b);
+  case BB_MODE_2BPP:
+    return reverse_bit_pairs(b);
+  default:
+    return (b >> 4) | (b << 4);
+  }
+}
+
+// Turns the frame buffer 180 degrees in place. Assumes the native width fills whole bytes, as it
+// does on the TRMNL X (1872 pixels), so no row has padding bits to move.
+static void rotate_frame_buffer_180() {
+  const int mode = bbep.getMode();
+  const int pixels_per_byte = mode == BB_MODE_1BPP ? 8 : (mode == BB_MODE_2BPP ? 4 : 2);
+  const int pitch = bbep.width() / pixels_per_byte;
+  uint8_t *front = bbep.currentBuffer();
+  uint8_t *back = front + pitch * bbep.height() - 1;
+  while (front < back) {
+    const uint8_t first = *front;
+    *front++ = reverse_pixels(*back, mode);
+    *back-- = reverse_pixels(first, mode);
+  }
+  if (front == back) *front = reverse_pixels(*front, mode);
+}
+
+void display_finish_native_image(bool tall_image) {
+  const bool upside_down = device_orientation != upright_orientation_for(tall_image);
+  if (upside_down) {
+    Log_info("Turning the image 180 degrees for orientation %d", device_orientation);
+    rotate_frame_buffer_180();
+  }
+  bbep.setRotation(upside_down ? 180 : 0);
+}
+
+uint16_t display_native_width() { return bbep.getRotation() % 180 == 0 ? bbep.width() : bbep.height(); }
+
+uint16_t display_native_height() { return bbep.getRotation() % 180 == 0 ? bbep.height() : bbep.width(); }
 
 /**
  * Draw one frame of the "Changing device orientation..." confirmation screen.

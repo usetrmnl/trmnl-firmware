@@ -13,6 +13,8 @@
 #include "logging_parcers.h"
 
 #ifdef BOARD_TRMNL_X
+#include <x_hardware.h>
+
 #include "accelerometer.h"
 #endif
 
@@ -89,7 +91,11 @@ ApiDisplayInputs createApiHeaders() {
   inputs.chargingStatus = power().chargingStatus();
 
 #ifdef BOARD_TRMNL_X
-  inputs.orientation = bma530_orientation_to_string(device_orientation);
+  // The RTC default and a flat reading say nothing, so the server keeps the orientation it has
+  if (device_orientation_read) inputs.orientation = bma530_orientation_to_string(device_orientation);
+  // Rotation swaps bbep's width and height; the server wants the panel's own size
+  inputs.displayWidth = display_native_width();
+  inputs.displayHeight = display_native_height();
   // These getters already return -1 if the last gaugeInit() didn't produce a valid reading.
   inputs.batteryCount = battery_count;
   inputs.stateOfCharge = battery().readSoc();

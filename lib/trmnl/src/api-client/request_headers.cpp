@@ -24,7 +24,6 @@ HttpHeaderList buildDisplayHeaders(const ApiDisplayInputs &inputs) {
   headers.push_back({"Battery-Temp", String(inputs.batteryTemperature)});
   headers.push_back(
     {"Battery-Capacity", String(inputs.currentBatteryCapacity) + "/" + String(inputs.maxBatteryCapacity)});
-  headers.push_back({"Orientation", inputs.orientation});
   headers.push_back({"Gauge-SOC", String(inputs.gaugeSoc)});
   headers.push_back({"Gauge-Health", String(inputs.gaugeHealth)});
   headers.push_back({"Gauge-Capacity", String(inputs.gaugeCapacityRemain) + "/" + String(inputs.gaugeCapacityFull)});
@@ -34,6 +33,7 @@ HttpHeaderList buildDisplayHeaders(const ApiDisplayInputs &inputs) {
   headers.push_back({"Model", String(inputs.model)});
   if (inputs.panelId.length() > 0) headers.push_back({"Panel-Rev", inputs.panelId});
   if (inputs.panelVcom.length() > 0) headers.push_back({"Panel-Vcom", inputs.panelVcom});
+  if (inputs.orientation.length() > 0) headers.push_back({"Orientation", inputs.orientation});
   headers.push_back({"Image-Cached", inputs.imageCached ? "true" : "false"});
   headers.push_back({"Wake-Time", String(inputs.prevWakeTime)});
   headers.push_back({"Reset-Reason", inputs.resetReason});

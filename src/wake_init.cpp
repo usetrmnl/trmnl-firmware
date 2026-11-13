@@ -207,6 +207,7 @@ void startBoardHardware(const WakeContext &wake, uint32_t init_time) {
   {
     uint8_t computed_orientation;
     if (bma530_read_orientation(&bma530_dev, &computed_orientation) == BMA530_ORIENT_VALID) {
+      device_orientation_read = true;
       device_orientation = computed_orientation;
       display_set_orientation(device_orientation);
     }

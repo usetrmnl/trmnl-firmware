@@ -61,6 +61,9 @@ const uint8_t u8_graytable[] = {
 #include "Group5.h"
 #include "bmp.h"
 #include "png_flip.h"
+#ifdef BOARD_TRMNL_X
+#include <x_hardware.h>
+#endif
 
 #ifdef BB_EPAPER
 static uint8_t bLightSleepWanted = 0;
@@ -296,6 +299,15 @@ uint16_t display_width() { return bbep.width(); }
 // false when there was no memory to draw it
 static bool draw_image(uint8_t *image_buffer, int data_size, int *pRefreshMode, bool *pAlloc) {
   bool isPNG = data_size >= 4 && MOTOLONG(image_buffer) == (int32_t)0x89504e47;
+#ifdef BOARD_TRMNL_X
+  display_prepare_native_image();
+  // png_draw turns a PNG as wide as the panel is high to portrait; the IHDR width is big-endian at byte 16
+  const uint32_t png_width = isPNG && data_size >= 24 ? ((uint32_t)image_buffer[16] << 24) | (image_buffer[17] << 16) |
+                                                          (image_buffer[18] << 8) | image_buffer[19]
+                                                      : 0;
+  const bool tall_png = png_width == display_height() && display_height() != display_width();
+  const bool g5_image = !isPNG && *(uint16_t *)image_buffer == BB_BITMAP_MARKER;
+#endif
   auto width = display_width();
   auto height = display_height();
   bool bAlloc = false;
@@ -337,10 +349,6 @@ static bool draw_image(uint8_t *image_buffer, int data_size, int *pRefreshMode, 
         bbep.fillScreen(BBEP_WHITE);
       }
       bbep.loadG5Image(image_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
-#ifdef BOARD_TRMNL_X
-      display_draw_battery_icon(bbep.width() - DISPLAY_BATTERY_ICON_W - DISPLAY_BATTERY_ICON_MARGIN,
-                                DISPLAY_BATTERY_ICON_MARGIN);
-#endif // BOARD_TRMNL_X
     } else {
          // This work-around is due to a lack of RAM; the correct method would be to use loadBMP()
       const int iBmpWidth = image_buffer[18] | (image_buffer[19] << 8);
@@ -359,6 +367,14 @@ static bool draw_image(uint8_t *image_buffer, int data_size, int *pRefreshMode, 
 #endif // BB_EPAPER
     iUpdateCount = 1; // use partial update
   }
+#ifdef BOARD_TRMNL_X
+  display_finish_native_image(tall_png);
+  if (g5_image) { // drawn after the turn so it lands top right, the right way up
+    display_draw_battery_icon(bbep.width() - DISPLAY_BATTERY_ICON_W - DISPLAY_BATTERY_ICON_MARGIN,
+                              DISPLAY_BATTERY_ICON_MARGIN);
+  }
+  display_set_orientation(device_orientation); // firmware screens drawn after this follow the device
+#endif // BOARD_TRMNL_X
   *pRefreshMode = iRefreshMode;
   *pAlloc = bAlloc;
   return true;

@@ -14,6 +14,27 @@ void config_bma530_interrupt();
  * @return none
  */
 void display_set_orientation(uint8_t orientation);
+
+/**
+ * @brief Resets the rotation so a server image decodes in the panel's native layout
+ * @return none
+ */
+void display_prepare_native_image();
+
+/**
+ * @brief Turns a decoded native-layout image 180 degrees when the device is held upside down for it,
+ *        and leaves the rotation at 0 or 180 so overlays land upright on the image
+ * @param tall_image true for a PNG taller than wide, which png_draw turned to portrait
+ * @return none
+ */
+void display_finish_native_image(bool tall_image);
+
+/**
+ * @brief The panel's own size, whatever rotation drawing uses
+ * @return uint16_t - width or height in pixels
+ */
+uint16_t display_native_width();
+uint16_t display_native_height();
 void config_tca95535_pins_for_lp();
 void enter_shipment_sleep();
 void BQ27427_reset();
