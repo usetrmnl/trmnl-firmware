@@ -1,4 +1,5 @@
 #include <PNGdec.h>
+#include <new>
 #include <board_config.h>
 #include <color_reduce.h>
 #include <epd_driver.h>
@@ -541,14 +542,17 @@ int png_count_colors(PNG *png, const uint8_t *pData, int iDataSize) {
  */
 int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious) {
   int iPlane = PNG_1_BIT, rc = -1;
-  PNG *png = new PNG();
+  PNG *png = new (std::nothrow) PNG(); // plain new throws when the heap has no 49 KB block, and aborts
 
 #ifndef BB_EPAPER
   if (bPrevious && bbep.getPreviousMode() != BB_MODE_NONE)
     return 0; // no need to decode previous image, we drew a msg/glyph
 #endif
 
-  if (!png) return PNG_MEM_ERROR; // not enough memory for the decoder instance
+  if (!png) {
+    Log_error("No memory for the PNG decoder");
+    return -1;
+  }
   rc = png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
   png->close();
   if (rc == PNG_SUCCESS) {
