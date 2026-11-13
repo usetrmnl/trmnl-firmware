@@ -610,8 +610,8 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
 
   submitStoredLogs();
 
-  if (stay_awake_for_touchbar) {
-    Log.info("Received successfully; staying awake for touch bar taps");
+  if (stay_awake_for_touchbar || apiDisplayResult.response.keep_wifi_on) {
+    Log.info("Received successfully; keeping Wi-Fi on");
   } else {
     WiFi.disconnect(true); // no need for WiFi, save power starting here
     Log.info("%s [%d]: Received successfully; WiFi off.\r\n", __FILE__, __LINE__);

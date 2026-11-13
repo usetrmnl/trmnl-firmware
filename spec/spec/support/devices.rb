@@ -31,6 +31,8 @@ module Devices
       shipment: false,
       # Keeps its frame buffers in PSRAM (else it doesn't use PSRAM at all).
       psram_frame_buffers: false,
+      # Stays awake for taps and short refreshes in touchbar_stay_awake (touchbar_actions.cpp).
+      touchbar: false,
       app_slot: 0x10000,   # offset of the first app slot (the factory-flashed firmware)
       ota_slot: 0x1E0000,  # offset of the second app slot, which an OTA update installs into
       # Reads the panel revision (Panel-Rev header): the boards whose SPI pins the firmware knows
@@ -49,7 +51,7 @@ module Devices
       # A BOARD_HAS_PSRAM build: takes images up to 750000 bytes instead of 90000 (config.h).
       psram: true
     }.freeze
-    FEATURES = %i[button double_click soft_reset_press shipment psram_frame_buffers panel_rev sensors
+    FEATURES = %i[button double_click soft_reset_press shipment psram_frame_buffers touchbar panel_rev sensors
                   battery_tracks psram core].freeze
 
     attr_reader(*ATTRIBUTES.keys)
@@ -103,7 +105,7 @@ module Devices
     Device.new("TRMNL_X", "x", "TRMNL X",
                core: true, size: [1872, 1404], inks: "gray16", battery_v: nil, double_click: false,
                soft_reset_press: false, shipment: true, app_slot: 0x20000, ota_slot: 0x320000,
-               psram_frame_buffers: true),
+               psram_frame_buffers: true, touchbar: true),
     Device.new("seeed_reTerminal_E1002", "reterminal_e1002", "reTerminal E1002", inks: "spectra6"),
     # its boot button (GPIO 9) can't wake it from deep sleep (include/config.h PIN_INTERRUPT)
     Device.new("seeed_xiao_esp32c3", "seeed_esp32c3", "XIAO ESP32-C3 + 7.5\" panel",

@@ -131,6 +131,16 @@ static void enterSleep(bool keep_timer) {
 
 void goToSleep(void) { enterSleep(false); }
 
+esp_sleep_wakeup_cause_t button_wakeup_cause(void) {
+#if CONFIG_IDF_TARGET_ESP32
+  return ESP_SLEEP_WAKEUP_EXT1;
+#elif defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C5)
+  return ESP_SLEEP_WAKEUP_GPIO;
+#else
+  return ESP_SLEEP_WAKEUP_EXT0;
+#endif
+}
+
 #ifdef BOARD_TRMNL_X
 void goToSleepKeepingTimer(void) {
   if (next_timer_wake_rtc_us != 0 && esp_rtc_get_time_us() >= next_timer_wake_rtc_us) {
@@ -267,15 +277,22 @@ void wifiErrorDeepSleep(void) {
 // A panic reset, so the next boot can report it.
 static void awake_time_limit_reached(void *arg) { esp_system_abort("Awake time limit reached"); }
 
+static esp_timer_handle_t awake_limit_timer = nullptr;
+
 void awake_time_limit_start(void) {
-  esp_timer_handle_t timer;
   esp_timer_create_args_t timerArgs = {};
 
   timerArgs.callback = awake_time_limit_reached;
   timerArgs.name = "awake_limit";
-  if (esp_timer_create(&timerArgs, &timer) == ESP_OK) {
-    esp_timer_start_once(timer, (uint64_t)AWAKE_TIME_LIMIT_MS * 1000);
+  if (esp_timer_create(&timerArgs, &awake_limit_timer) == ESP_OK) {
+    esp_timer_start_once(awake_limit_timer, (uint64_t)AWAKE_TIME_LIMIT_MS * 1000);
   } else {
     Log_error("Awake time limit timer not created");
   }
+}
+
+void awake_time_limit_restart(void) {
+  if (!awake_limit_timer) return;
+  esp_timer_stop(awake_limit_timer);
+  esp_timer_start_once(awake_limit_timer, (uint64_t)AWAKE_TIME_LIMIT_MS * 1000);
 }
