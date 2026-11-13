@@ -60,5 +60,9 @@ ApiDisplayResult fetchApiDisplay(ApiDisplayInputs &apiDisplayInputs) {
         .received = false};
   }
   return ApiDisplayResult{
-      .error = https_request_err_e::HTTPS_NO_ERR, .response = apiResponse, .error_detail = "", .received = true};
+      .error = https_request_err_e::HTTPS_NO_ERR,
+      .response = apiResponse,
+      .error_detail = "",
+      .received = true,
+      .received_ms = millis()};
 }
