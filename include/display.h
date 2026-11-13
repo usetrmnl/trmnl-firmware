@@ -100,6 +100,8 @@ bool display_full_refresh_due(void);
 bool display_live_supported(void);
 bool display_live_begin(const uint8_t *on_screen);
 void display_live_finish(const uint8_t *frame);
+// Shows a 1-bit frame already in memory (1 = white) the way a 1-bit PNG is shown; false when the update failed
+bool display_show_frame(uint8_t *frame);
 void display_live_cancel(void); // after begin, when there's no next frame to finish with
 
 /**

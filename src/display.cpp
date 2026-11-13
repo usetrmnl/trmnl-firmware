@@ -546,6 +546,21 @@ bool display_live_begin(const uint8_t *on_screen) {
   return true;
 }
 
+bool display_show_frame(uint8_t *frame) {
+  display_select_one_bit_panel();
+  bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit);
+  bbep.setMemoryMode(BBEP_MODE_1BPP);
+  bbep.setBuffer(frame);
+  bbep.writePlane(bbep.getPanelType() == EP75_800x480 ? PLANE_0 : PLANE_FALSE_DIFF);
+  bbep.setBuffer(nullptr); // the frame belongs to the caller, which may free it
+  bool bWait = true;
+  const int iRefreshMode = choose_refresh_mode(REFRESH_PARTIAL, &bWait);
+  save_temp_profile_from_api();
+  if (!refresh_epaper(iRefreshMode, bWait, false)) return false;
+  iUpdateCount++;
+  return true;
+}
+
 void display_live_cancel(void) {
   power_off();
   bbep.writeCmd(UC8151_PTOU);

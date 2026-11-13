@@ -48,9 +48,13 @@ bool live_frame_draw(uint8_t *png, size_t size) {
   if (!onScreen) onScreen = (uint8_t *)malloc((size_t)((display_width() + 7) / 8) * display_height());
   if (!onScreen) return false;
   if (!onScreenKnown() || display_full_refresh_due() || !display_live_begin(onScreen)) {
-    // the usual draw that follows shows it; the next frame starts from this copy
-    drawsWhenOnScreen = decodeWithRoom(png, size) ? display_panel_draws() + 1 : UINT32_MAX;
-    return false;
+    // the usual way to draw it, from the copy, so the PNG isn't decoded a second time
+    if (!decodeWithRoom(png, size) || !display_show_frame(onScreen)) {
+      drawsWhenOnScreen = UINT32_MAX;
+      return false;
+    }
+    drawsWhenOnScreen = display_panel_draws();
+    return true;
   }
   const uint32_t started = millis();
   if (!decodeWithRoom(png, size)) {
