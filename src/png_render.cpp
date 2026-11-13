@@ -538,17 +538,17 @@ int png_count_colors(PNG *png, const uint8_t *pData, int iDataSize) {
  *        due to insufficient RAM to hold the fully decoded image
  * @param pointer to the buffer holding the PNG file
  * @param size of the PNG file
- * @return refresh mode based on image type and presence of old image
+ * @return refresh mode based on image type and presence of old image, or -1 when out of memory
  */
 int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious) {
   int iPlane = PNG_1_BIT, rc = -1;
-  PNG *png = new (std::nothrow) PNG(); // plain new throws when the heap has no 49 KB block, and aborts
 
 #ifndef BB_EPAPER
   if (bPrevious && bbep.getPreviousMode() != BB_MODE_NONE)
     return 0; // no need to decode previous image, we drew a msg/glyph
 #endif
 
+  PNG *png = new (std::nothrow) PNG(); // plain new throws when the heap has no 49 KB block, and aborts
   if (!png) {
     Log_error("No memory for the PNG decoder");
     return -1;
@@ -570,6 +570,7 @@ int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious) {
         CreateSpectra6Pal(); // create a fast color matching palette
         if (bbep.allocBuffer() != BBEP_SUCCESS) {
           Log_error("%s [%d]: bbep.AllocBuffer failed!\n\r", __FILE__, __LINE__);
+          delete png;
           return -1;
         }
         bbep.fillScreen(BBEP_WHITE); // in case the image is too small - undrawn areas will be white
