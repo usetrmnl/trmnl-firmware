@@ -5,6 +5,7 @@
 #include <display.h>
 #include <display_session.h>
 #include <globals.h>
+#include <http_result_handling.h>
 #include <keep_wifi_on.h>
 #include <request_handling.h>
 #include <setup_session.h>
@@ -18,8 +19,8 @@
 #include <touchbar_actions.h>
 #endif
 
-// Fetches the screen from /api/display, shows it (or the error), then handles what the response asks for
-static void showScreen(bool should_show_error_now) {
+// Fetches the screen from /api/display, shows it (or the error, when asked to), then handles what the answer asks for
+static https_request_err_e showScreen(bool should_show_error_now, bool draw_error_screen_on_failure = true) {
   https_request_err_e request_result = downloadAndShow(battery_voltage);
   Log.info("%s [%d]: request result - %s\r\n", __FILE__, __LINE__, https_request_err_str(request_result));
   showImageTooBigIfNeeded(request_result);
@@ -28,7 +29,8 @@ static void showScreen(bool should_show_error_now) {
   showFriendlyIdIfUnregistered(request_result);
   resetIfRequested(request_result);
   updateFirmwareIfDue();
-  showRequestResult(request_result);
+  if (draw_error_screen_on_failure || !requestIsFailure(request_result)) showRequestResult(request_result);
+  return request_result;
 }
 
 /**
@@ -57,7 +59,8 @@ void bl_init(void) {
 #ifdef BOARD_TRMNL_X
   touchbar_stay_awake([] { showScreen(true); });
 #else
-  stay_awake_while_server_asks([] { showScreen(true); });
+  stay_awake_while_server_asks(
+    [](bool draw_error_screen_on_failure) { return showScreen(true, draw_error_screen_on_failure); });
 #endif
 
   // display go to sleep
