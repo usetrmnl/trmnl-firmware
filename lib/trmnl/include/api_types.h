@@ -38,6 +38,7 @@ struct ApiDisplayResponse {
   bool reset_firmware;
   SPECIAL_FUNCTION special_function;
   String action;
+  String verbose_logging;
 };
 
 struct ApiDisplayInputs {
@@ -69,6 +70,7 @@ struct ApiDisplayInputs {
   String firmwareCommit;
   String model;
   String panelId; // EPD revision as hex; empty = unknown (header omitted)
+  String panelVcom; // VCOM_DC code from the panel's OTP, "-1" = none programmed; empty = not read (header omitted)
   int rssi;
   String wifiBand;
   int displayWidth;
@@ -78,6 +80,7 @@ struct ApiDisplayInputs {
   UsbStatus usbStatus;
   bool imageCached;
   int prevWakeTime;
+  String resetReason; // esp_reset_reason_t name of this boot, e.g. ESP_RST_PANIC
 };
 
 using ApiSetupInputs = ApiDisplayInputs;

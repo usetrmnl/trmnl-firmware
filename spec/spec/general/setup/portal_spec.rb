@@ -108,9 +108,9 @@ General.describe "Portal" do
   describe "JoinOptions" do
     # Join TRMNL-Sim through the portal with the setup page's extra `fields`, towards a mock
     # server; yields the simulator.
-    def join(**fields)
+    def join(networks: nil, **fields)
       device_mock do |mock|
-        fresh_device do |s|
+        fresh_device(**(networks ? { networks: } : {})) do |s|
           body = { ssid: "TRMNL-Sim", pswd: "password", server: mock.device_url, **fields }
           code, data = s.portal_request("/connect", body)
           expect(code).to eq(200), data
@@ -143,7 +143,8 @@ General.describe "Portal" do
     end
 
     it "wpa2 enterprise" do
-      join(isEnterprise: true, identity: "alice@example.com", username: "alice") do |s, mock|
+      networks = [{ ssid: "TRMNL-Sim", enterprise: { username: "alice", password: "password" } }]
+      join(networks:, isEnterprise: true, identity: "alice@example.com", username: "alice") do |s, mock|
         s.wait_for_console(/WPA2 Enterprise/, timeout: 90)
         mock.wait_for_request("/api/setup", timeout: 120)
         s.wait_for_deep_sleep(timeout: 180)
@@ -151,8 +152,10 @@ General.describe "Portal" do
     end
 
     it "wpa2 enterprise identity only" do
-      join(isEnterprise: true, identity: "alice@example.com", pswd: "") do |s|
+      networks = [{ ssid: "TRMNL-Sim", enterprise: { username: "alice@example.com", password: "" } }]
+      join(networks:, isEnterprise: true, identity: "alice@example.com", pswd: "") do |s, mock|
         s.wait_for_console(/WPA2 Enterprise/, timeout: 90)
+        mock.wait_for_request("/api/setup", timeout: 120)
         s.wait_for_deep_sleep(timeout: 300)
       end
     end

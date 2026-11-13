@@ -10,6 +10,7 @@
 #include <string.h>
 #include <trmnl_log.h>
 #include <utility>
+#include <wifi_network.h>
 
 #ifdef BOARD_TRMNL_X
 #include <WifiCaptive.h>
@@ -69,7 +70,7 @@ https_request_err_e HttpRetryRequest::execute() {
       return err; // success!
     }
 
-    if (!shouldFastRetryCode(_httpCode)) {
+    if (!shouldFastRetry(_httpCode, err)) {
       // Deterministic failure (e.g. 404): another identical request will not help.
       Log_error("HTTP GET failed (code %d, not retried): %s - %s, RSSI %" PRId32, _httpCode, https_request_err_str(err),
                 _errorDetail.c_str(), signalRssi());
@@ -181,6 +182,7 @@ void HttpRetryRequest::applyRequestSettings(HTTPClient &https, const String &hop
 }
 
 https_request_err_e HttpRetryRequest::attemptWiFi() {
+  ensureWifiConnected(); // a long panel refresh in light sleep can drop the connection
   return withHttp(
     _config.url,
     [this](HTTPClient *https, HttpError error) -> https_request_err_e {

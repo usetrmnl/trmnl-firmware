@@ -4,7 +4,7 @@
 
 #define FW_MAJOR_VERSION 1
 #define FW_MINOR_VERSION 8
-#define FW_PATCH_VERSION 16
+#define FW_PATCH_VERSION 20
 
 // Helper macros for stringification
 #define STRINGIFY(x)     #x
@@ -43,8 +43,12 @@
 #define PREFERENCES_LAST_SLEEP_TIME          "last_sleep"
 #define PREFERENCES_CONNECT_API_RETRY_COUNT  "retry_count"
 #define PREFERENCES_CONNECT_WIFI_RETRY_COUNT "wifi_retry"
+#define PREFERENCES_VERBOSE_LOG_KEY          "verbose_log"
 #define PREFERENCES_LAST_OTA                 "last_ota"
 #define PREFERENCES_TOUCHBAR_TUTORIAL_KEY    "touch_tutorial" // TRMNL X: the touch bar tutorial was finished
+#define PREFERENCES_TOUCHBAR_LOCKED_KEY      "touch_locked" // TRMNL X
+#define PREFERENCES_PANEL_VCOM               "panel_vcom" // VCOM_DC code read from the panel's OTP; -1 = none
+#define PREFERENCES_PANEL_VCOM_ID            "panel_vcom_id" // panel ID that VCOM was read from
 
 #define WIFI_CONNECTION_RSSI                 (-100)
 
@@ -132,7 +136,7 @@
 #define API_BASE_URL                       "https://trmnl.app"
 
 // Abort an image download when the stream goes this long with no data.
-#define IMAGE_STREAM_INACTIVITY_TIMEOUT_MS 15000
+#define IMAGE_STREAM_INACTIVITY_TIMEOUT_MS 30000
 
 // Battery measurement types
 // BATT_NONE = use fake voltage
@@ -178,6 +182,7 @@ typedef struct tag_trmnl_device {
 enum {
   EPD_75 = 0,
   EPD_426,
+  EPD_426B,
   EPD_397,
   EPD_75_3CLR,
   EPD_75_4CLR,

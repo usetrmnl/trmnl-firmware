@@ -2,7 +2,7 @@
 
 // The TRMNL X is the only board with a control scheme for the menu so far. Another board needs one
 // (menu_controls_t), and a look at the X-only parts here: the drawing (FastEPD, sized for the X's
-// panel), Shut Down (shipment mode) and the fuel gauge in Diagnostics.
+// panel), Shut Down (shipment mode), the fuel gauge in Diagnostics and the touchbar lock.
 #ifdef BOARD_TRMNL_X
 
 #include <Preferences.h>
@@ -154,9 +154,9 @@ enum menu_hint_style_t {
 };
 
 // One of the control scheme's hints along the bottom edge: an up/down triangle, if any, then the
-// label, drawn in `style`
-static void menu_draw_hint(const menu_hint_t &hint, int slot, menu_hint_style_t style = MENU_HINT_OUTLINED) {
-  if (!hint.label) return;
+// label, drawn in `style`. Returns its pill's rectangle.
+static BB_RECT menu_draw_hint(const menu_hint_t &hint, int slot, menu_hint_style_t style = MENU_HINT_OUTLINED) {
+  if (!hint.label) return BB_RECT{};
   const int y = bbep.height() - MENU_HINT_MARGIN;
   BB_RECT rect, line;
   bbep.setFont(Inter_18);
@@ -181,6 +181,12 @@ static void menu_draw_hint(const menu_hint_t &hint, int slot, menu_hint_style_t 
   bbep.setTextColor(fg, bg);
   bbep.drawString(hint.label, left + content_w - rect.w, y);
   bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
+  BB_RECT pill = {};
+  pill.x = px;
+  pill.y = py;
+  pill.w = pw;
+  pill.h = ph;
+  return pill;
 }
 
 static void menu_draw_hints(const menu_hint_t *hints) {
@@ -210,9 +216,9 @@ static void menu_show_screen(const menu_view_t &view, bool replace) {
     display_draw_battery_icon(bbep.width() - DISPLAY_BATTERY_ICON_W - DISPLAY_BATTERY_ICON_MARGIN,
                               DISPLAY_BATTERY_ICON_MARGIN);
   }
-    // Over the image: like the loading screen, no clearing passes, straight over the old content.
-    // Over another menu: clear it, since a partial update leaves its text ghosting through.
-    // Either way the current image becomes the previous one, for the arrow's partial updates.
+  // Over the image: like the loading screen, no clearing passes, straight over the old content.
+  // Over another menu: clear it, since a partial update leaves its text ghosting through.
+  // Either way the current image becomes the previous one, for the arrow's partial updates.
   bbep.fullUpdate(replace ? CLEAR_FAST : CLEAR_NONE, false);
   Log_info("menu_show_screen end");
 }
@@ -235,6 +241,9 @@ static int run_menu_screen(const char *const *labels, int count, bool replace, c
                            bool battery = false) {
   menu_view_t view = {labels, count, selected, body, body_count, menu_controls->hints, battery};
   menu_show_screen(view, replace);
+  // Drop taps made before the screen was up, such as the second tap of a double tap
+  while (menu_controls->read() != menu_input_t::NONE) {
+  }
 
   int chosen = -1;
   unsigned long last_input = millis();
@@ -283,11 +292,8 @@ struct special_menu_item_t {
 };
 
 static const special_menu_item_t special_menu_items[] = {
-    {"Identify", SF_IDENTIFY},
-    {"Restart Playlist", SF_RESTART_PLAYLIST},
-    {"Send to Me", SF_SEND_TO_ME},
-    {"Guest Mode", SF_GUEST_MODE},
-    {"Back", SF_NONE},
+    {"Identify", SF_IDENTIFY},     {"Restart Playlist", SF_RESTART_PLAYLIST}, {"Send to Me", SF_SEND_TO_ME},
+    {"Guest Mode", SF_GUEST_MODE}, {"Toggle Hold Screen", SF_TOGGLE_HOLD},    {"Back", SF_NONE},
 };
 #define SPECIAL_MENU_COUNT ((int)(sizeof(special_menu_items) / sizeof(special_menu_items[0])))
 
@@ -296,15 +302,13 @@ enum settings_menu_item_t {
   SETTINGS_MENU_DIAGNOSTICS,
   SETTINGS_MENU_RESET_WIFI,
   SETTINGS_MENU_SHUT_DOWN,
+  SETTINGS_MENU_LOCK,
   SETTINGS_MENU_BACK,
   SETTINGS_MENU_COUNT,
 };
 
 static const char *const settings_menu_labels[SETTINGS_MENU_COUNT] = {
-    "Diagnostics...",
-    "Reset Wi-Fi...",
-    "Shut Down...",
-    "Back",
+    "Diagnostics...", "Reset Wi-Fi...", "Shut Down...", "Lock Touchbar...", "Back",
 };
 
 // The confirmations of Reset Wi-Fi and Shut Down; Back goes to Settings
@@ -512,6 +516,161 @@ static bool run_tutorial(bool replace) {
   return true;
 }
 
+// Hold prompt layout
+#define HOLD_PROMPT_LINES_Y   TUTORIAL_CONTROLS_Y
+#define HOLD_PROMPT_CANCEL_Y  TUTORIAL_FINISH_Y
+#define HOLD_PROMPT_DONE_Y    1200
+#define HOLD_PROMPT_HINT_SLOT 1 // SELECT's
+#define HOLD_PROMPT_FRAME_MS  150 // min between progress bar updates
+#define HOLD_PROMPT_LET_GO_MS 100 // up this long ends a hold: panel updates can upset readings
+
+#define HOLD_PROMPT_LINES     2
+
+// A screen that confirms by holding SELECT, its pill filling as a progress bar. An input already down
+// when it shows must end first.
+typedef struct {
+  const char *title;
+  const char *lines[HOLD_PROMPT_LINES]; // nullptr skips
+  const char *prompt;
+  const char *cancel;
+  const char *done; // shown once held
+  const char *pill; // in SELECT's hint slot
+  uint32_t hold_ms;
+} menu_hold_prompt_t;
+
+// The text describes MENU_UNLOCK_HOLD_MS
+static const menu_hold_prompt_t lock_prompt = {
+    "Lock Touchbar?",
+    {
+        "All taps will be ignored.",
+        "To unlock, hold the center for 5 seconds.",
+    },
+    "Hold the center to lock.",
+    "Tap anywhere to cancel.",
+    "Touchbar locked.",
+    "Hold to lock",
+    3000,
+};
+
+static const menu_hold_prompt_t unlock_prompt = {
+    "Unlock Touchbar?",
+    {nullptr, nullptr},
+    "Hold the center to unlock.",
+    "Tap anywhere to cancel.",
+    "Touchbar unlocked.",
+    "Hold to unlock",
+    3000,
+};
+
+enum hold_prompt_result_t {
+  HOLD_PROMPT_HELD,
+  HOLD_PROMPT_CANCELLED,
+  HOLD_PROMPT_TIMEOUT,
+};
+
+// Inverts the inside of `pill` between two columns: white turns black, the label it passes white
+static void hold_prompt_advance_bar(const BB_RECT &pill, int from, int to) {
+  const int x = pill.x + MENU_HINT_BORDER, y = pill.y + MENU_HINT_BORDER;
+  const int w = pill.w - 2 * MENU_HINT_BORDER, h = pill.h - 2 * MENU_HINT_BORDER;
+  for (int row = 0; row < h; row++) {
+    const int inset = display_pill_inset(h, row);
+    const int left = max(from, x + inset), right = min(to, x + w - inset);
+    if (right > left) bbep.invertRect(left, y + row, right - left, 1);
+  }
+}
+
+// Returns the pill's rectangle
+static BB_RECT hold_prompt_show_screen(const menu_hold_prompt_t &prompt, bool replace) {
+  Log_info("hold_prompt_show_screen start");
+  bbep.setMode(BB_MODE_1BPP);
+  bbep.fillScreen(BBEP_WHITE);
+  bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
+  bbep.setFont(Roboto_Black_24);
+  menu_draw_centered(prompt.title, bbep.width() / 2, TUTORIAL_TITLE_Y);
+  bbep.setFont(Inter_18);
+  for (int i = 0; i < HOLD_PROMPT_LINES; i++) {
+    if (prompt.lines[i]) {
+      menu_draw_centered(prompt.lines[i], bbep.width() / 2, HOLD_PROMPT_LINES_Y + i * TUTORIAL_LINE_SPACING);
+    }
+  }
+  menu_draw_centered(prompt.cancel, bbep.width() / 2, HOLD_PROMPT_CANCEL_Y);
+  bbep.setFont(Roboto_Black_24);
+  menu_draw_centered(prompt.prompt, bbep.width() / 2, TUTORIAL_PRACTICE_Y);
+  const menu_hint_t hint = {prompt.pill, MENU_HINT_ICON_NONE};
+  const BB_RECT pill = menu_draw_hint(hint, HOLD_PROMPT_HINT_SLOT);
+  bbep.fullUpdate(replace ? CLEAR_FAST : CLEAR_NONE, false);
+  Log_info("hold_prompt_show_screen end");
+  return pill;
+}
+
+// Runs `prompt` until it is held and released, anything else, or MENU_TIMEOUT_MS. `replace`: replace a
+// menu on the screen instead of the image.
+static hold_prompt_result_t run_hold_prompt(const menu_hold_prompt_t &prompt, bool replace) {
+  const BB_RECT pill = hold_prompt_show_screen(prompt, replace);
+
+  const unsigned long shown = millis();
+  // An earlier touch neither counts nor cancels: it may be the opening finger, or panel noise
+  while (menu_controls->select_down()) {
+    if (millis() - shown >= MENU_TIMEOUT_MS) {
+      Log_info("Hold prompt: timeout - still held from before");
+      return HOLD_PROMPT_TIMEOUT;
+    }
+    delay(MENU_POLL_INTERVAL_MS);
+  }
+  while (menu_controls->read() != menu_input_t::NONE) {
+  }
+
+  while (millis() - shown < MENU_TIMEOUT_MS) {
+    delay(MENU_POLL_INTERVAL_MS);
+    menu_input_t input = menu_controls->read();
+    if (input == menu_input_t::NONE) continue;
+    if (input != menu_input_t::SELECT) {
+      Log_info("Hold prompt: another input - cancelled");
+      return HOLD_PROMPT_CANCELLED;
+    }
+
+    const unsigned long hold_start = millis();
+    Log_info("Hold prompt: hold started");
+    const int bar_start = pill.x + MENU_HINT_BORDER, bar_w = pill.w - 2 * MENU_HINT_BORDER;
+    int bar_x = bar_start;
+    unsigned long last_frame = hold_start, let_go_at = 0;
+    bool down = true;
+    while (true) {
+      const unsigned long now = millis();
+      const bool down_now = menu_controls->select_down();
+      if (down && !down_now) let_go_at = now;
+      down = down_now;
+      if (!down && now - let_go_at >= HOLD_PROMPT_LET_GO_MS) {
+        Log_info("Hold prompt: let go early - cancelled");
+        return HOLD_PROMPT_CANCELLED;
+      }
+      if (down && now - hold_start >= prompt.hold_ms) break;
+      if (down && now - last_frame >= HOLD_PROMPT_FRAME_MS) {
+        const int x = bar_start + (uint64_t)bar_w * (now - hold_start) / prompt.hold_ms;
+        hold_prompt_advance_bar(pill, bar_x, x);
+        bar_x = x;
+        bbep.partialUpdate(true); // panel stays on for the next frame
+        last_frame = millis();
+      }
+      delay(MENU_POLL_INTERVAL_MS);
+    }
+
+    Log_info("Hold prompt: held");
+    hold_prompt_advance_bar(pill, bar_x, bar_start + bar_w);
+    bbep.setFont(Roboto_Black_24);
+    menu_draw_centered(prompt.done, bbep.width() / 2, HOLD_PROMPT_DONE_Y);
+    bbep.partialUpdate(false);
+    // A release after sleep would wake the device
+    const unsigned long held = millis();
+    while (menu_controls->select_down() && millis() - held < MENU_TIMEOUT_MS) {
+      delay(MENU_POLL_INTERVAL_MS);
+    }
+    return HOLD_PROMPT_HELD;
+  }
+  Log_info("Hold prompt: timeout");
+  return HOLD_PROMPT_TIMEOUT;
+}
+
 // With the shipment status cleared, the restart goes back to shipment mode: off until USB-C power.
 // Does not return.
 static void menu_shut_down(void) {
@@ -526,6 +685,7 @@ enum menu_screen_t {
   MENU_SCREEN_DIAGNOSTICS,
   MENU_SCREEN_RESET_WIFI,
   MENU_SCREEN_SHUT_DOWN,
+  MENU_SCREEN_LOCK,
 };
 
 enum menu_outcome_t {
@@ -602,6 +762,9 @@ static menu_outcome_t run_menu_screens(SPECIAL_FUNCTION *function) {
       case SETTINGS_MENU_SHUT_DOWN:
         screen = MENU_SCREEN_SHUT_DOWN;
         break;
+      case SETTINGS_MENU_LOCK:
+        screen = MENU_SCREEN_LOCK;
+        break;
       case SETTINGS_MENU_BACK:
         screen = MENU_SCREEN_MAIN;
         break;
@@ -642,11 +805,25 @@ static menu_outcome_t run_menu_screens(SPECIAL_FUNCTION *function) {
       screen = MENU_SCREEN_SETTINGS;
       break;
     }
+    case MENU_SCREEN_LOCK: {
+      switch (run_hold_prompt(lock_prompt, true)) {
+      case HOLD_PROMPT_HELD:
+        Log_info("Menu: locked the touchbar");
+        preferences.putBool(PREFERENCES_TOUCHBAR_LOCKED_KEY, true);
+        return MENU_OUTCOME_CLOSE;
+      case HOLD_PROMPT_CANCELLED:
+        screen = MENU_SCREEN_SETTINGS;
+        break;
+      case HOLD_PROMPT_TIMEOUT:
+        return MENU_OUTCOME_CLOSE;
+      }
+      break;
+    }
     }
   }
 }
 
-void menu_open(const menu_controls_t &controls) {
+bool menu_open(const menu_controls_t &controls) {
   Log_info("Opening menu");
   SPECIAL_FUNCTION function = SF_NONE;
   menu_controls = &controls;
@@ -664,7 +841,9 @@ void menu_open(const menu_controls_t &controls) {
     // The rest of the wake fetches the next screen
     break;
   case MENU_OUTCOME_PREVIOUS_SCREEN:
-    show_cached_image_by_offset(-1);
+    // The rest of the wake asks the server for the previous screen
+    special_function = SF_REWIND;
+    special_function_chosen = true;
     break;
   case MENU_OUTCOME_SPECIAL_FUNCTION:
     // The API request names this function, so the server runs it rather than the saved one
@@ -680,10 +859,10 @@ void menu_open(const menu_controls_t &controls) {
     menu_shut_down();
     break;
   case MENU_OUTCOME_CLOSE:
-    // Re-show the current image and go back to sleep
-    show_last_image_and_sleep();
-    break;
+    show_last_image();
+    return false;
   }
+  return true;
 }
 
 bool menu_tutorial_done(const menu_controls_t &controls) {
@@ -698,6 +877,16 @@ void menu_open_tutorial(const menu_controls_t &controls) {
   if (controls.end) controls.end();
   menu_controls = nullptr;
   show_last_image_and_sleep();
+}
+
+bool menu_run_unlock_prompt(const menu_controls_t &controls) {
+  menu_controls = &controls;
+  if (controls.begin) controls.begin();
+  bool held = run_hold_prompt(unlock_prompt, false) == HOLD_PROMPT_HELD;
+  if (controls.end) controls.end();
+  menu_controls = nullptr;
+  if (held) preferences.remove(PREFERENCES_TOUCHBAR_LOCKED_KEY);
+  return held;
 }
 
 void menu_run_ship_check(const menu_controls_t &controls, const menu_tutorial_t &check) {

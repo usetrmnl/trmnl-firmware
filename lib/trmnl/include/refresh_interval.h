@@ -6,6 +6,7 @@
 #define MAX_QUIET_SLOW_RETRIES         12  // 12 tries * 5 minutes = 1 hour
 #define SHORT_TERM_SLOW_RETRY_INTERVAL 300 // 5 minutes
 #define LONG_TERM_SLOW_RETRY_INTERVAL  900 // 15 minutes
+#define FAILED_UPDATE_RETRY_INTERVAL   30  // seconds the update failure message stays up
 
 // Single owner of the device's stored refresh interval ("refresh_rate" in NVS):
 // the number of seconds goToSleep() arms the deep-sleep timer with. Covers the
@@ -36,6 +37,7 @@ public:
   uint32_t applyApiRetry(uint8_t attempt);  // 15 / 30 / 60, then SHORT_TERM_SLOW_RETRY_INTERVAL
   uint32_t applyWifiRetry(uint8_t attempt); // 60 / 180, then 300
   uint32_t applyDefault();                  // fixed fallback, e.g. /api/setup 404
+  uint32_t applyFailedUpdate();             // FAILED_UPDATE_RETRY_INTERVAL
 
 private:
   static uint32_t fastPollSeconds(uint32_t streak);

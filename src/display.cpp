@@ -74,7 +74,7 @@ static void display_apply_light_sleep(uint8_t enabled) {
 }
 
 bool display_update_epaper(int refreshMode, bool wait, bool writePlane, uint8_t plane) {
-#if defined(BOARD_SEEED_RETERMINAL_E1002) || defined(BOARD_SEEED_RETERMINAL_E1004)
+#if defined(BOARD_SEEED_RETERMINAL_E1002) || defined(BOARD_SEEED_RETERMINAL_E1004) || defined(BOARD_TRMNL_GEN2)
     // Light sleep with the WiFi radio running is unsupported
   if (bLightSleepWanted && WiFi.getMode() != WIFI_MODE_NULL) {
     display_apply_light_sleep(false);
@@ -88,7 +88,7 @@ bool display_update_epaper(int refreshMode, bool wait, bool writePlane, uint8_t 
   if (refreshMode == REFRESH_PARTIAL && !bCanDoPartial) {
     refreshMode = REFRESH_FAST;
     Log_info("Can't do partial refresh, no previous image");
-  } else {
+  } else if (refreshMode == REFRESH_PARTIAL) {
     Log_info("Have valid previous image in EPD memory, doing partial refresh");
   }
   bbep.refresh(refreshMode, wait);
@@ -115,7 +115,7 @@ static void display_select_one_bit_panel(bool only_if_changed = false) {
 // Message screens are 1-bit
 void display_prepare_message(void) {
   display_select_one_bit_panel(true);
-  bbep.setMemoryMode(BB_MODE_1BPP); // use 1-bit mode to save memory
+  bbep.setMemoryMode(BBEP_MODE_1BPP); // use 1-bit mode to save memory
   bbep.allocBuffer(false);
 }
 
@@ -128,7 +128,7 @@ void display_prepare_message(void) {
  */
 void display_init(void) {
   if (pDevice == NULL) {
-    hw_config_init();
+    hw_config_init(DEVICE_MODEL);
   }
   Log_info("dev module start");
   iTempProfile = preferences.getUInt(PREFERENCES_TEMP_PROFILE, TEMP_PROFILE_DEFAULT);
@@ -153,6 +153,12 @@ void display_init(void) {
     panel_rev = get_panel_rev();
     panel_rev_read = true;
     Log_info("Panel ID = 0x%08x\n", panel_rev);
+    read_panel_vcom(panel_rev);
+  }
+  if (strcmp(DEVICE_MODEL, "xiao_epaper_mini") == 0 && panel_rev == 0x40000000) {
+    // New 4.26" panel needs a different ePaper configuration
+    Log_info("Detected newer 4.26 inch panel type; switching profiles...");
+    hw_config_init("xiao_epaper_mini_b");
   }
   if (pDevice->epd_mosi_pin != 0 || pDevice->epd_sck_pin != 0) {
     bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit); // must be set BEFORE calling initio
@@ -239,7 +245,13 @@ void display_sleep(uint32_t u32Millis) {
 #else
     // Runtime control for light sleep (true = enabled, false = disabled)
   static bool light_sleep_enabled = true;
-  if (!light_sleep_enabled) {
+#ifdef BOARD_TRMNL_GEN2
+  // Light sleep with the WiFi radio running hangs the ESP32-C5
+  bool wifi_on = WiFi.getMode() != WIFI_MODE_NULL;
+#else
+  bool wifi_on = false;
+#endif
+  if (!light_sleep_enabled || wifi_on) {
     delay(u32Millis);
   } else {
     esp_sleep_enable_timer_wakeup(u32Millis * 1000L);
@@ -308,7 +320,7 @@ static bool draw_image(uint8_t *image_buffer, int data_size, int *pRefreshMode, 
             // G5 compressed image
       BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
 #ifdef BB_EPAPER
-      bbep.setMemoryMode(BB_MODE_1BPP); // use 1-bit mode to save memory
+      bbep.setMemoryMode(BBEP_MODE_1BPP); // use 1-bit mode to save memory
       if (bbep.allocBuffer(false) != BBEP_SUCCESS) {
         Log_info("Error allocating bb_epaper frame buffer");
         return false;
@@ -337,7 +349,7 @@ static bool draw_image(uint8_t *image_buffer, int data_size, int *pRefreshMode, 
                            (iBmpWidth / 8) * iBmpHeight); // palette may be [white, black]
       flip_image(image_buffer + 62, iBmpWidth, iBmpHeight, false); // fix bottom-up bitmap images
 #ifdef BB_EPAPER
-      bbep.setMemoryMode(BB_MODE_1BPP);
+      bbep.setMemoryMode(BBEP_MODE_1BPP);
       bbep.setBuffer(image_buffer + 62); // uncompressed 1-bpp bitmap
 #endif // BB_EPAPER
     }
@@ -354,6 +366,8 @@ static bool draw_image(uint8_t *image_buffer, int data_size, int *pRefreshMode, 
 
 // Saves the temperature profile the server asked for, when it changed
 static void save_temp_profile_from_api(void) {
+  // Cached/menu redraws can happen before this wake has fetched a display response.
+  if (!apiDisplayResult.received) return;
   if (iTempProfile != apiDisplayResult.response.temp_profile) {
     iTempProfile = apiDisplayResult.response.temp_profile;
     Log_info("Saving new temperature profile (%" PRIu32 ") to FLASH", iTempProfile);

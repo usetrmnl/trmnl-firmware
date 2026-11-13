@@ -45,6 +45,7 @@ extern float battery_voltage; // read at wake, before the display and WiFi draw 
 extern esp_sleep_wakeup_cause_t wakeup_reason;
 extern SPECIAL_FUNCTION special_function;
 extern bool special_function_chosen; // picked on the device (TRMNL X touch menu), not the saved one
+extern bool stay_awake_for_touchbar; // TRMNL X: stay awake and online after the screen for more touch bar taps
 extern int last_wifi_rssi;              // RTC: signal strength (dBm) at the last connection, 0 if unknown
 extern int iPrevWakeTime;               // RTC: total wake time of the last cycle (for statistics collection)
 extern bool bUsedCachedImage;           // RTC: last image displayed was read from cache (for statistics collection)

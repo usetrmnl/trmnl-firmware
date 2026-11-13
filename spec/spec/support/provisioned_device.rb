@@ -86,6 +86,7 @@ class ProvisionedDevice
     Sims.start(build, flash: File.join(dir, "flash.bin"), erase: true, extra_args: sim_args,
                       name: "#{cache_name}-setup") do |s|
       s.wait(portal: true, timeout: 90)
+      s.portal_enable_verbose_logging
       s.portal_connect("TRMNL-Sim", "password", server: m.device_url)
       m.wait_for_request("/api/display", timeout: 120)
       # a slow panel (Spectra 6) can still be refreshing when the chip sleeps
