@@ -4,7 +4,7 @@
 
 #define FW_MAJOR_VERSION 1
 #define FW_MINOR_VERSION 8
-#define FW_PATCH_VERSION 19
+#define FW_PATCH_VERSION 20
 
 // Helper macros for stringification
 #define STRINGIFY(x)     #x
