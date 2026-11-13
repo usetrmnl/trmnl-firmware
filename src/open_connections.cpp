@@ -25,8 +25,7 @@ namespace {
 
   WiFiClient *newClient(const String &origin) {
     if (!origin.startsWith("https://")) return new WiFiClient();
-    WiFiClientSecure *client =
-      origin == "https://trmnl.app" ? new ResumableWiFiClientSecure() : new WiFiClientSecure();
+    WiFiClientSecure *client = origin == "https://trmnl.app" ? new ResumableWiFiClientSecure() : new WiFiClientSecure();
     client->setInsecure();
     return client;
   }
@@ -50,7 +49,8 @@ void OpenConnections::keep(bool on) {
 }
 
 void OpenConnections::closeAll() {
-  for (Connection &connection : connections) close(connection);
+  for (Connection &connection : connections)
+    close(connection);
 }
 
 HTTPClient *OpenConnections::begin(const String &url) {

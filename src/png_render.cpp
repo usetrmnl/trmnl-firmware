@@ -1,9 +1,9 @@
 #include <PNGdec.h>
-#include <new>
 #include <board_config.h>
 #include <color_reduce.h>
 #include <epd_driver.h>
 #include <globals.h>
+#include <new>
 #include <png_render.h>
 #include <trmnl_log.h>
 

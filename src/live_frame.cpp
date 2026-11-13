@@ -4,9 +4,9 @@
 #ifdef BB_EPAPER
 #include <Arduino.h>
 #include <PNGdec.h>
-#include <new>
 #include <display.h>
 #include <live_frame_png.h>
+#include <new>
 #include <open_connections.h>
 #include <trmnl_log.h>
 
@@ -24,8 +24,8 @@ namespace {
 
   bool decodeIntoOnScreenFrame(uint8_t *png, size_t size) {
     PNG *decoder = new (std::nothrow) PNG();
-    const bool decoded = decoder && decoder->openRAM(png, size, decodeRow) == PNG_SUCCESS &&
-                         decoder->decode(nullptr, 0) == PNG_SUCCESS;
+    const bool decoded =
+      decoder && decoder->openRAM(png, size, decodeRow) == PNG_SUCCESS && decoder->decode(nullptr, 0) == PNG_SUCCESS;
     if (decoder) decoder->close();
     delete decoder;
     return decoded;

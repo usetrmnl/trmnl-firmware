@@ -14,8 +14,8 @@
 #include <filesystem.h>
 #include <globals.h>
 #include <live_frame.h>
-#include <open_connections.h>
 #include <logging_parcers.h>
+#include <open_connections.h>
 #include <png.h>
 #include <power.h>
 #include <refresh_interval.h>

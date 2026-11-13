@@ -469,7 +469,8 @@ static void write_frame(uint8_t command, const uint8_t *frame) {
 static void wait_until_idle(void) {
   const uint32_t started = millis();
   delayMicroseconds(100); // BUSY goes low a few microseconds after the command
-  while (digitalRead(bbep._bbep.iBUSYPin) == LOW && millis() - started < 5000) delay(1);
+  while (digitalRead(bbep._bbep.iBUSYPin) == LOW && millis() - started < 5000)
+    delay(1);
 }
 
 // Each table: level select (2 bits a phase: 00 GND, 01 VDH = black, 10 VDL = white), four phase lengths in frames and a
@@ -479,18 +480,17 @@ static void send_balanced_partial_lut(void) {
   const struct {
     uint8_t command, length, changeLevels, keepLevels;
   } tables[] = {
-    {UC8151_LUT_VCOM, 44, 0x00, 0x00},  // VCOM stays at its DC level
-    {UC8151_LUT_WW, 42, 0x00, 0x60},    // unchanged white
-    {UC8151_LUT_BW, 42, 0x48, 0x00},    // black to white
-    {UC8151_LUT_WB, 42, 0x84, 0x00},    // white to black
-    {UC8151_LUT_BB, 42, 0x00, 0x90},    // unchanged black
-    {UC8151_LUT_VCOM2, 42, 0x00, 0x60}, // the border, held like white
+      {UC8151_LUT_VCOM, 44, 0x00, 0x00}, // VCOM stays at its DC level
+      {UC8151_LUT_WW, 42, 0x00, 0x60}, // unchanged white
+      {UC8151_LUT_BW, 42, 0x48, 0x00}, // black to white
+      {UC8151_LUT_WB, 42, 0x84, 0x00}, // white to black
+      {UC8151_LUT_BB, 42, 0x00, 0x90}, // unchanged black
+      {UC8151_LUT_VCOM2, 42, 0x00, 0x60}, // the border, held like white
   };
   uint8_t lut[44];
   for (const auto &table : tables) {
     memset(lut, 0, sizeof(lut));
-    const uint8_t groups[12] = {table.changeLevels, 0, 0, drive, rest, 0x01,
-                                table.keepLevels,   keep,  keep, 0,     0,    0x01};
+    const uint8_t groups[12] = {table.changeLevels, 0, 0, drive, rest, 0x01, table.keepLevels, keep, keep, 0, 0, 0x01};
     memcpy(lut, groups, sizeof(groups));
     bbep.writeCmd(table.command);
     bbep.writeData(lut, table.length);
@@ -498,7 +498,7 @@ static void send_balanced_partial_lut(void) {
 }
 
 static void send_live_partial_settings(void) {
-  const uint8_t pll = 0x0F;  // about 200 Hz (0x06 = 50 Hz, the panel's default)
+  const uint8_t pll = 0x0F; // about 200 Hz (0x06 = 50 Hz, the panel's default)
   const uint8_t tcon = 0x00; // no gate/source non-overlap: rows are only about 10 us at 200 Hz
   const uint8_t vdcs = 0x1E; // VCOM -1.6 V, the OG panel's factory value; the -0.1 V default fades black
   const uint8_t pwr[5] = {0x07, 0x07, 0x3f, 0x3f, 0x03}, psr = 0x3f, cdi[2] = {0x39, 0x07};
@@ -593,9 +593,9 @@ static void refresh_fastepd(bool bSkipClear) {
     // bWait=false means loading screen: skip clearing passes so it appears
     // faster. Ghosting from the previous image is acceptable since the
     // real content refresh (bWait=true) immediately follows.
-    int iClearMode = bSkipClear                                  ? CLEAR_NONE
+    int iClearMode = bSkipClear                                           ? CLEAR_NONE
                      : (display_full_refresh_due() || (iTempProfile > 0)) ? CLEAR_SLOW
-                                                                  : CLEAR_FAST;
+                                                                          : CLEAR_FAST;
     Log_info("fullUpdate clear mode = %d\n", iClearMode);
     bbep.fullUpdate(iClearMode, false);
     //   }
