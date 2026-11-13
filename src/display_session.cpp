@@ -14,6 +14,7 @@
 #include <filesystem.h>
 #include <globals.h>
 #include <live_frame.h>
+#include <open_connections.h>
 #include <logging_parcers.h>
 #include <png.h>
 #include <power.h>
@@ -630,8 +631,12 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
     char szTemp[36];
     filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
     Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
-    if (!(isPNG && apiDisplayResult.response.keep_wifi_on && live_frame_draw(buffer, content_size)))
+    const bool live = apiDisplayResult.response.keep_wifi_on;
+    if (!(isPNG && live && live_frame_draw(buffer, content_size)) && !display_show_image(buffer, content_size, true) && live) {
+      OpenConnections::keep(false); // their TLS buffers can leave no block big enough for the PNG decoder
+      OpenConnections::keep(true);
       display_show_image(buffer, content_size, true); // PNG and JPEG decoders leave the buffer intact
+    }
     DisplayedImage::remember(szTemp); // current image becomes the previous image
     if (!apiDisplayResult.response.keep_wifi_on) { // live frames change too often to be worth saving
       Log.info("%s [%d]: Writing %s to SPIFFS\r\n", __FILE__, __LINE__, szTemp);
