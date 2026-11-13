@@ -7,6 +7,7 @@
 #include <new>
 #include <display.h>
 #include <live_frame_png.h>
+#include <open_connections.h>
 #include <trmnl_log.h>
 
 namespace {
@@ -29,6 +30,12 @@ namespace {
     delete decoder;
     return decoded;
   }
+
+  bool decodeWithRoom(uint8_t *png, size_t size) {
+    if (decodeInto(png, size)) return true;
+    OpenConnections::closeAll(); // their TLS buffers can leave no block big enough for the PNG decoder
+    return decodeInto(png, size);
+  }
 } // namespace
 
 bool live_frame_draw(uint8_t *png, size_t size) {
@@ -42,11 +49,11 @@ bool live_frame_draw(uint8_t *png, size_t size) {
   if (!onScreen) return false;
   if (!onScreenKnown() || display_full_refresh_due() || !display_live_begin(onScreen)) {
     // the usual draw that follows shows it; the next frame starts from this copy
-    drawsWhenOnScreen = decodeInto(png, size) ? display_panel_draws() + 1 : UINT32_MAX;
+    drawsWhenOnScreen = decodeWithRoom(png, size) ? display_panel_draws() + 1 : UINT32_MAX;
     return false;
   }
   const uint32_t started = millis();
-  if (!decodeInto(png, size)) {
+  if (!decodeWithRoom(png, size)) {
     display_live_cancel();
     drawsWhenOnScreen = UINT32_MAX;
     return false;

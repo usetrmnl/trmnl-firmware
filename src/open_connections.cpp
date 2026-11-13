@@ -46,7 +46,10 @@ namespace {
 
 void OpenConnections::keep(bool on) {
   kept = on;
-  if (on) return;
+  if (!on) closeAll();
+}
+
+void OpenConnections::closeAll() {
   for (Connection &connection : connections) close(connection);
 }
 

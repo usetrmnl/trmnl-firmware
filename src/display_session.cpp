@@ -633,8 +633,7 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
     Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
     const bool live = apiDisplayResult.response.keep_wifi_on;
     if (!(isPNG && live && live_frame_draw(buffer, content_size)) && !display_show_image(buffer, content_size, true) && live) {
-      OpenConnections::keep(false); // their TLS buffers can leave no block big enough for the PNG decoder
-      OpenConnections::keep(true);
+      OpenConnections::closeAll(); // their TLS buffers can leave no block big enough for the PNG decoder
       display_show_image(buffer, content_size, true); // PNG and JPEG decoders leave the buffer intact
     }
     DisplayedImage::remember(szTemp); // current image becomes the previous image
