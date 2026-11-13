@@ -22,7 +22,7 @@
 #endif
 
 // Fetches the screen from /api/display, shows it (or the error), then handles what the response asks for
-static https_request_err_e showScreen(bool should_show_error_now) {
+static https_request_err_e showScreen(bool should_show_error_now, bool show_error_screen = true) {
   https_request_err_e request_result = downloadAndShow(battery_voltage);
   Log.info("%s [%d]: request result - %s\r\n", __FILE__, __LINE__, https_request_err_str(request_result));
   showImageTooBigIfNeeded(request_result);
@@ -31,7 +31,7 @@ static https_request_err_e showScreen(bool should_show_error_now) {
   showFriendlyIdIfUnregistered(request_result);
   resetIfRequested(request_result);
   updateFirmwareIfDue();
-  showRequestResult(request_result);
+  if (show_error_screen || !requestIsFailure(request_result)) showRequestResult(request_result);
   return request_result;
 }
 
@@ -91,11 +91,11 @@ void bl_init(void) {
   while (apiDisplayResult.response.keep_wifi_on) { // a check-in that keeps failing clears it, so errors sleep as usual
     awake_time_limit_restart(); // the limit catches a device stuck awake, not one the server keeps checking in
     waitAwakeForNextCheckIn();
-    https_request_err_e result = showScreen(true);
-    // one bad check-in would otherwise end the session until the device's next scheduled wake
-    for (int retry = 0; requestIsFailure(result) && retry < 3; retry++) {
+    https_request_err_e result = showScreen(true, false);
+    // one bad check-in would otherwise end the session until the next scheduled wake; only the last try shows its error
+    for (int retry = 1; requestIsFailure(result) && retry <= 3; retry++) {
       delay(2000);
-      result = showScreen(true);
+      result = showScreen(true, retry == 3);
     }
   }
   OpenConnections::keep(false);

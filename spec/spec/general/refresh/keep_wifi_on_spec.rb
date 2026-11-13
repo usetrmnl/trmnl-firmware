@@ -120,6 +120,19 @@ General.describe "Keep Wi-Fi on", skip_if: :touchbar,
     end
   end
 
+  it "draws no error screen for a check-in that fails once" do
+    serve_png("one", device_number("1"))
+    dev.mock.display = { image: "one", refresh_rate: 1, keep_wifi_on: true }
+    dev.boot do |s|
+      dev.mock.wait_for_request("/images/one.png", timeout: 90)
+      s.wait(display_idle: true, settle_ms: 3000, timeout: 60)
+      messages_before = s.console(0).count { _1.include?("display_show_msg start") }
+      dev.mock.set_fault("/api/display", status: 500, times: 5)
+      s.wait(settle_ms: 20_000, timeout: 120)
+      expect(s.console(0).count { _1.include?("display_show_msg start") }).to eq(messages_before)
+    end
+  end
+
   it "stays in the session through a check-in that fails" do
     dev.mock.display = { image: "default", refresh_rate: 1, keep_wifi_on: true }
     dev.boot do |s|
