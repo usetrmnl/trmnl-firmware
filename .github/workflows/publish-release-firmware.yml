@@ -17,10 +17,6 @@ on:
         description: "Release tag to publish (e.g. v1.8.15)"
         required: true
         type: string
-      force:
-        description: "Bypass prepare_release.sh's HEAD commit message check"
-        type: boolean
-        default: false
       overwrite:
         description: "Re-upload files that already exist in S3"
         type: boolean
@@ -42,51 +38,51 @@ on:
       build_TRMNL_7inch5_OG_DIY_Kit:
         description: "Build TRMNL_7inch5_OG_DIY_Kit (BYOD)"
         type: boolean
-        default: false
+        default: true
       build_seeed_xiao_esp32c3:
         description: "Build seeed_xiao_esp32c3 (BYOD)"
         type: boolean
-        default: false
+        default: true
       build_seeed_reTerminal_E1001:
         description: "Build seeed_reTerminal_E1001 (BYOD)"
         type: boolean
-        default: false
+        default: true
       build_seeed_reTerminal_E1002:
         description: "Build seeed_reTerminal_E1002 (BYOD)"
         type: boolean
-        default: false
+        default: true
       build_TRMNL_X_E1003:
         description: "Build TRMNL_X_E1003 (BYOD)"
         type: boolean
-        default: false
+        default: true
       build_xteink_x4:
         description: "Build xteink_x4 (BYOD)"
         type: boolean
-        default: false
+        default: true
       build_xteink_x4_pwr_btn:
         description: "Build xteink_x4_pwr_btn (BYOD, push-to-refresh)"
         type: boolean
-        default: false
+        default: true
       build_xteink_x3:
         description: "Build xteink_x3 (BYOD)"
         type: boolean
-        default: false
+        default: true
       build_seeed_sticky:
         description: "Build seeed_sticky (BYOD)"
         type: boolean
-        default: false
+        default: true
       build_seeed_reTerminal_E1004:
         description: "Build seeed_reTerminal_E1004 (BYOD)"
         type: boolean
-        default: false
+        default: true
       build_TRMNL_X_PAPERS3:
         description: "Build TRMNL_X_PAPERS3 (BYOD)"
         type: boolean
-        default: false
+        default: true
       build_TRMNL_X_LILYGO_T5PRO:
         description: "Build TRMNL_X_LILYGO_T5PRO (BYOD)"
         type: boolean
-        default: false
+        default: true
 
 concurrency:
   group: publish-release-firmware
@@ -170,7 +166,7 @@ jobs:
           INCLUDE_GIT_HASH_IN_VERSION_NUMBER: "false"
           # Separate PlatformIO core dir per platform (see prepare_release.sh)
           PIO_CORE_ROOT: ${{ runner.temp }}/pio-cores
-        run: ./scripts/prepare_release.sh ${{ inputs.force && '--force' || '' }} ${ENVS}
+        run: ./scripts/prepare_release.sh ${ENVS}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
