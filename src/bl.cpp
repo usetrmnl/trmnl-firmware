@@ -7,6 +7,7 @@
 #include <display.h>
 #include <display_session.h>
 #include <globals.h>
+#include <http_result_handling.h>
 #include <open_connections.h>
 #include <request_handling.h>
 #include <setup_session.h>
@@ -21,7 +22,7 @@
 #endif
 
 // Fetches the screen from /api/display, shows it (or the error), then handles what the response asks for
-static void showScreen(bool should_show_error_now) {
+static https_request_err_e showScreen(bool should_show_error_now) {
   https_request_err_e request_result = downloadAndShow(battery_voltage);
   Log.info("%s [%d]: request result - %s\r\n", __FILE__, __LINE__, https_request_err_str(request_result));
   showImageTooBigIfNeeded(request_result);
@@ -31,6 +32,7 @@ static void showScreen(bool should_show_error_now) {
   resetIfRequested(request_result);
   updateFirmwareIfDue();
   showRequestResult(request_result);
+  return request_result;
 }
 
 #ifndef BOARD_TRMNL_X
@@ -86,10 +88,15 @@ void bl_init(void) {
     attachInterrupt(digitalPinToInterrupt(pDevice->interrupt_pin), latch_button_press, FALLING);
   }
   OpenConnections::keep(apiDisplayResult.response.keep_wifi_on);
-  while (apiDisplayResult.response.keep_wifi_on) { // a failed check-in clears it, so errors sleep as usual
+  while (apiDisplayResult.response.keep_wifi_on) { // a check-in that keeps failing clears it, so errors sleep as usual
     awake_time_limit_restart(); // the limit catches a device stuck awake, not one the server keeps checking in
     waitAwakeForNextCheckIn();
-    showScreen(true);
+    https_request_err_e result = showScreen(true);
+    // one bad check-in would otherwise end the session until the device's next scheduled wake
+    for (int retry = 0; requestIsFailure(result) && retry < 3; retry++) {
+      delay(2000);
+      result = showScreen(true);
+    }
   }
   OpenConnections::keep(false);
   detachInterrupt(digitalPinToInterrupt(pDevice->interrupt_pin));

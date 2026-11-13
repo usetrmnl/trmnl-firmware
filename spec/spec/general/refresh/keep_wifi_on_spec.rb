@@ -120,14 +120,25 @@ General.describe "Keep Wi-Fi on", skip_if: :touchbar,
     end
   end
 
-  # HttpRetryRequest tries a failing check-in 5 times; the failed answer has no keep_wifi_on.
+  it "stays in the session through a check-in that fails" do
+    dev.mock.display = { image: "default", refresh_rate: 1, keep_wifi_on: true }
+    dev.boot do |s|
+      dev.mock.wait_for_request("/api/display", timeout: 90)
+      dev.mock.set_fault("/api/display", status: 500, times: 5)
+      s.wait(settle_ms: 20_000, timeout: 120)
+      latest = dev.mock.requests.select { _1.path == "/api/display" }.last(3)
+      expect([s.status["state"], latest]).to match(["running", all(have_header("Reset-Reason", "ESP_RST_POWERON"))])
+    end
+  end
+
+  # HttpRetryRequest tries a failing check-in 5 times, and a session tries 3 more check-ins before it sleeps.
   it "deep sleeps when a check-in fails" do
     dev.mock.display = { image: "default", refresh_rate: 2, keep_wifi_on: true }
     dev.boot do |s|
       dev.mock.wait_for_request("/api/display", timeout: 90)
       dev.mock.set_fault("/api/display", status: 500)
-      s.wait_for_deep_sleep(timeout: 180)
-      expect(dev.mock.count("/api/display")).to be <= 1 + 5 + 1
+      s.wait_for_deep_sleep(timeout: 300)
+      expect(dev.mock.count("/api/display")).to be <= 1 + (4 * 5) + 1
     end
   end
 
