@@ -311,6 +311,7 @@ static bool draw_image(uint8_t *image_buffer, int data_size, int *pRefreshMode, 
   if (isPNG == true && data_size < MAX_IMAGE_SIZE) {
     Log_info("Drawing PNG");
     iRefreshMode = png_to_epd(image_buffer, data_size, false);
+    if (iRefreshMode < 0) return false; // no decoder memory, or no frame buffer
   } else if (MOTOSHORT(image_buffer) == 0xffd8) {
     Log_info("Drawing JPEG");
     iRefreshMode = jpeg_to_epd(image_buffer, data_size);
