@@ -21,7 +21,7 @@
 #include <touchbar_actions.h>
 #endif
 
-// Fetches the screen from /api/display, shows it (or the error), then handles what the response asks for
+// Fetches the screen from /api/display, shows it (or the error, when asked to), then handles what the answer asks for
 static https_request_err_e showScreen(bool should_show_error_now, bool show_error_screen = true) {
   https_request_err_e request_result = downloadAndShow(battery_voltage);
   Log.info("%s [%d]: request result - %s\r\n", __FILE__, __LINE__, https_request_err_str(request_result));
@@ -39,12 +39,13 @@ static https_request_err_e showScreen(bool should_show_error_now, bool show_erro
 static volatile bool button_pressed_while_awake = false;
 static void IRAM_ATTR latch_button_press(void) { button_pressed_while_awake = true; }
 
-// Waits refresh_rate_ms, or else refresh_rate seconds, from the last answer. The check-in after it reads as a timer wake, or as a
+// Waits refresh_rate_ms (or refresh_rate seconds) from the last answer. The next check-in reads as a timer wake, or a
 // button wake after a press, even one made during a check-in, which is handled as on a button wake.
 static void waitAwakeForNextCheckIn(void) {
   const ApiDisplayResponse &answer = apiDisplayResult.response;
   // the floors stop a 0 from hammering the API
-  const uint32_t wait_ms = answer.refresh_rate_ms ? max<uint32_t>(answer.refresh_rate_ms, 250) : max<uint32_t>(answer.refresh_rate, 1) * 1000;
+  const uint32_t wait_ms =
+    answer.refresh_rate_ms ? max<uint32_t>(answer.refresh_rate_ms, 250) : max<uint32_t>(answer.refresh_rate, 1) * 1000;
   wakeup_reason = ESP_SLEEP_WAKEUP_TIMER;
   while (millis() - apiDisplayResult.received_ms < wait_ms) {
     if (button_pressed_while_awake) {

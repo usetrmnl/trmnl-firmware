@@ -80,7 +80,7 @@ static uint32_t drawsAfterLiveFrame = UINT32_MAX;
 uint32_t display_panel_draws(void) { return iPanelDraws; }
 
 // Live frames leave the 200 Hz frame rate and their gate timing set; every other draw runs at the panel's own
-static void leave_live_settings(void) {
+static void restore_normal_refresh_settings(void) {
   if (iPanelDraws != drawsAfterLiveFrame) return;
   const uint8_t normalPll = 0x06, normalTcon = 0x22;
   bbep.writeCmd(0x30);
@@ -91,7 +91,7 @@ static void leave_live_settings(void) {
 }
 
 bool display_update_epaper(int refreshMode, bool wait, bool writePlane, uint8_t plane) {
-  leave_live_settings();
+  restore_normal_refresh_settings();
   // Light sleep with the WiFi radio running is unsupported: it hangs a Gen2 and fakes button presses on an OG
   display_apply_light_sleep(bLightSleepWanted && WiFi.getMode() == WIFI_MODE_NULL);
   if (writePlane) {
@@ -232,7 +232,7 @@ void display_wipe(void) {
   int refreshCount = 60;
 #endif
 
-  leave_live_settings();
+  restore_normal_refresh_settings();
   bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit);
   bbep.fillScreen(BBEP_WHITE);
   for (int i = 0; i < refreshCount; i++) {
@@ -393,7 +393,8 @@ static void save_temp_profile_from_api(void) {
 
 // Before a check-in answers, the server's interval is unknown and the default applies
 bool display_full_refresh_due(void) {
-  const int every = apiDisplayResult.received ? apiDisplayResult.response.full_refresh_every : DEFAULT_FULL_REFRESH_EVERY;
+  const int every =
+    apiDisplayResult.received ? apiDisplayResult.response.full_refresh_every : DEFAULT_FULL_REFRESH_EVERY;
   return iUpdateCount % every == 0;
 }
 
@@ -472,8 +473,7 @@ static void wait_until_idle(void) {
 }
 
 // Each table: level select (2 bits a phase: 00 GND, 01 VDH = black, 10 VDL = white), four phase lengths in frames and a
-// repeat count. Changing pixels go straight to the target: a 1-bit pixel's changes alternate, so its DC stays within one
-// drive; unchanged ones get a balanced 1-frame pair that keeps them from darkening.
+// repeat count; changing pixels go straight to the target, unchanged ones get a balanced 1+1 hold.
 static void send_balanced_partial_lut(void) {
   const uint8_t drive = 60, rest = 5, keep = 1; // at 200 Hz: 0.3 s, then the shortest hold
   const struct {
@@ -530,7 +530,7 @@ static void power_off(void) {
 }
 
 // Starts the panel's power-on, which takes 130 ms, so the frame can be decoded and sent meanwhile
-bool display_live_begin(const uint8_t *on_screen) {
+bool display_live_begin(const uint8_t *on_screen_frame) {
   if (!display_live_supported()) return false;
   const bool lastDrawWasLive = iPanelDraws == drawsAfterLiveFrame; // the controller still holds that frame and setup
   const int x1 = bbep.width() - 1, y1 = bbep.height() - 1;
@@ -539,7 +539,7 @@ bool display_live_begin(const uint8_t *on_screen) {
   bbep.writeCmd(UC8151_PTL);
   bbep.writeData((uint8_t *)ptl, sizeof(ptl));
   if (!lastDrawWasLive) {
-    write_frame(UC8151_DTM1, on_screen);
+    write_frame(UC8151_DTM1, on_screen_frame);
     send_live_partial_settings();
   }
   bbep.writeCmd(UC8151_PON);

@@ -38,4 +38,4 @@ void wifiErrorDeepSleep(void);
 
 /** Restart the device if this wake has not reached deep sleep within 20 minutes. Not used on the X. */
 void awake_time_limit_start(void);
-void awake_time_limit_restart(void); // counts the limit again from now
+void awake_time_limit_restart(void);

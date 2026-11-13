@@ -20,7 +20,7 @@ bool liveFramePngDrawable(const uint8_t *png, size_t size, uint32_t screenWidth,
          (colorType == 0 || colorType == 3) && interlace == 0;
 }
 
-void liveFrameRow(const uint8_t *pixels, uint32_t width, const uint8_t *palette, uint8_t *out) {
+void copyPngRowToPanelRow(const uint8_t *pixels, uint32_t width, const uint8_t *palette, uint8_t *out) {
   const bool flip = palette && brightness(&palette[0]) > brightness(&palette[3]);
   for (uint32_t i = 0; i < (width + 7) / 8; i++)
     out[i] = flip ? ~pixels[i] : pixels[i];

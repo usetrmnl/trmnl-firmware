@@ -64,5 +64,6 @@ HTTPClient *OpenConnections::begin(const String &url) {
 void OpenConnections::end(HTTPClient *http) {
   http->end(); // keeps the connection open when the server allows it
   for (Connection &connection : connections)
-    if (connection.http == http && !connection.client->connected()) connection.client->stop(); // end() leaves a closed one
+    // end() leaves a connection the server closed
+    if (connection.http == http && !connection.client->connected()) connection.client->stop();
 }

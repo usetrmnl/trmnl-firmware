@@ -55,9 +55,9 @@ void test_rows_keep_their_pixels_when_black_comes_first(void) {
   const uint8_t pixels[2] = {0xF0, 0x0F};
   const uint8_t blackFirst[6] = {0, 0, 0, 255, 255, 255};
   uint8_t out[2];
-  liveFrameRow(pixels, 16, nullptr, out);
+  copyPngRowToPanelRow(pixels, 16, nullptr, out);
   TEST_ASSERT_EQUAL_HEX8_ARRAY(pixels, out, 2);
-  liveFrameRow(pixels, 16, blackFirst, out);
+  copyPngRowToPanelRow(pixels, 16, blackFirst, out);
   TEST_ASSERT_EQUAL_HEX8_ARRAY(pixels, out, 2);
 }
 
@@ -65,7 +65,7 @@ void test_rows_flip_when_white_comes_first_in_the_palette(void) {
   const uint8_t pixels[1] = {0xF0};
   const uint8_t whiteFirst[6] = {255, 255, 255, 0, 0, 0};
   uint8_t out[1];
-  liveFrameRow(pixels, 8, whiteFirst, out);
+  copyPngRowToPanelRow(pixels, 8, whiteFirst, out);
   TEST_ASSERT_EQUAL_HEX8(0x0F, out[0]);
 }
 

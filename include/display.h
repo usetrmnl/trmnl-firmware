@@ -94,11 +94,10 @@ uint32_t display_panel_draws(void);
 // Whether the next draw is due a full refresh, which clears ghosting
 bool display_full_refresh_due(void);
 
-// Redraws the TRMNL OG's panel from one 1-bit frame (1 = white, rows (width + 7) / 8 bytes) to the next with live
-// mode's fast balanced waveform, which moves only the pixels that change. begin sends the frame on screen (false on
-// other panels), so the caller can then reuse its buffer for the next frame and pass it to finish.
+// Live mode's fast redraw of the OG from one 1-bit frame (1 = white) to the next; begin sends the frame on screen
+// (false on other panels), so its buffer can then be reused for the frame passed to finish.
 bool display_live_supported(void);
-bool display_live_begin(const uint8_t *on_screen);
+bool display_live_begin(const uint8_t *on_screen_frame);
 void display_live_finish(const uint8_t *frame);
 // Shows a 1-bit frame already in memory (1 = white) the way a 1-bit PNG is shown; false when the update failed
 bool display_show_frame(uint8_t *frame);

@@ -632,7 +632,8 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
     filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
     Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
     const bool live = apiDisplayResult.response.keep_wifi_on;
-    if (!(isPNG && live && live_frame_draw(buffer, content_size)) && !display_show_image(buffer, content_size, true) && live) {
+    if (!(isPNG && live && live_frame_draw(buffer, content_size)) && !display_show_image(buffer, content_size, true) &&
+        live) {
       OpenConnections::closeAll(); // their TLS buffers can leave no block big enough for the PNG decoder
       display_show_image(buffer, content_size, true); // PNG and JPEG decoders leave the buffer intact
     }
