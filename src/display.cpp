@@ -472,10 +472,10 @@ static void wait_until_idle(void) {
 }
 
 // Each table: level select (2 bits a phase: 00 GND, 01 VDH = black, 10 VDL = white), four phase lengths in frames and a
-// repeat count. Changing pixels get the opposite color first, then the target, so each change nets zero DC; unchanged
-// ones get a balanced 1-frame pair that keeps them from darkening.
+// repeat count. Changing pixels go straight to the target: a 1-bit pixel's changes alternate, so its DC stays within one
+// drive; unchanged ones get a balanced 1-frame pair that keeps them from darkening.
 static void send_balanced_partial_lut(void) {
-  const uint8_t drive = 60, rest = 5, keep = 1; // at 200 Hz: 0.3 s twice, then the shortest hold
+  const uint8_t drive = 60, rest = 5, keep = 1; // at 200 Hz: 0.3 s, then the shortest hold
   const struct {
     uint8_t command, length, changeLevels, keepLevels;
   } tables[] = {
@@ -489,7 +489,7 @@ static void send_balanced_partial_lut(void) {
   uint8_t lut[44];
   for (const auto &table : tables) {
     memset(lut, 0, sizeof(lut));
-    const uint8_t groups[12] = {table.changeLevels, drive, rest, drive, rest, 0x01,
+    const uint8_t groups[12] = {table.changeLevels, 0, 0, drive, rest, 0x01,
                                 table.keepLevels,   keep,  keep, 0,     0,    0x01};
     memcpy(lut, groups, sizeof(groups));
     bbep.writeCmd(table.command);
