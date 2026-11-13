@@ -27,7 +27,8 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
         .special_function = SF_NONE,
         .action = "",
         .verbose_logging = "",
-        .keep_wifi_on = false};
+        .keep_wifi_on = false,
+        .refresh_rate_ms = 0};
   }
   String special_function_str = doc["special_function"];
   // Convert the temperature profile ("default", "a", "b", "c")
@@ -57,5 +58,6 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
       .special_function = parseSpecialFunction(special_function_str),
       .action = doc["action"] | "",
       .verbose_logging = doc["verbose_logging"] | "",
-      .keep_wifi_on = doc["keep_wifi_on"] | false};
+      .keep_wifi_on = doc["keep_wifi_on"] | false,
+      .refresh_rate_ms = doc["refresh_rate_ms"] | 0u};
 }
