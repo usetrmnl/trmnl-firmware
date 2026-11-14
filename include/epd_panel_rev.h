@@ -12,6 +12,9 @@ void read_panel_vcom(uint32_t panel_id);
 // The Panel-Vcom request header: the VCOM_DC code, "-1" when the OTP holds none, empty when not read
 String display_panel_vcom_string(void);
 
+// The Panel-Otp request header: panelOtpSummaryFromOtp() as hex, empty when not read or unprogrammed
+String display_panel_otp_string(void);
+
 /**
  * @brief Panel ID (EPD revision) as 8 hex digits for the Panel-Rev request header
  * @return hex string, or empty if the ID is unknown/not read
