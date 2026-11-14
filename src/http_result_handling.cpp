@@ -14,6 +14,10 @@ bool requestIsFailure(https_request_err_e result) {
   }
 }
 
+bool requestOrImageFailed(https_request_err_e result) {
+  return requestIsFailure(result) || result == HTTPS_IMAGE_DOWNLOAD_FAILED;
+}
+
 RequestFailureAction requestFailureAction(https_request_err_e result, bool showErrorNow, uint8_t failedWakes) {
   if (!requestIsFailure(result)) return RequestFailureAction::ResetCount;
   if (showErrorNow) return RequestFailureAction::ShowNow;

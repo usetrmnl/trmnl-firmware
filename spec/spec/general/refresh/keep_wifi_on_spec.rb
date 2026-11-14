@@ -70,14 +70,68 @@ General.describe "Keep Wi-Fi on", skip_if: :touchbar,
     end
   end
 
-  # HttpRetryRequest tries a failing check-in 5 times; the failed answer has no keep_wifi_on.
+  it "draws no error screen for a check-in that fails once" do
+    serve_png("one", device_number("1"))
+    dev.mock.display = { image: "one", refresh_rate: 1, keep_wifi_on: true }
+    dev.boot do |s|
+      dev.mock.wait_for_request("/images/one.png", timeout: 90)
+      s.wait(display_idle: true, settle_ms: 3000, timeout: 60)
+      messages_before = s.console(0).count { _1.include?("display_show_msg start") }
+      dev.mock.set_fault("/api/display", status: 500, times: 5)
+      s.wait(settle_ms: 20_000, timeout: 120)
+      expect(s.console(0).count { _1.include?("display_show_msg start") }).to eq(messages_before)
+    end
+  end
+
+  # A 404 from the image host is not tried again within the download, so one failing check-in fails it.
+  it "draws no error screen for an image download that fails once" do
+    serve_png("one", device_number("1"))
+    serve_png("unreachable", device_number("2"))
+    dev.mock.display = { image: "one", refresh_rate: 1, keep_wifi_on: true }
+    dev.boot do |s|
+      dev.mock.wait_for_request("/images/one.png", timeout: 90)
+      s.wait(display_idle: true, settle_ms: 3000, timeout: 60)
+      dev.mock.set_fault("/images/unreachable.png", status: 404, times: 1)
+      dev.mock.display = { image: "unreachable", refresh_rate: 1, keep_wifi_on: true }
+      dev.mock.wait_for_request("/images/unreachable.png", timeout: 30)
+      s.wait(settle_ms: 8000, timeout: 60)
+      lines = s.console(0)
+      expect(lines.drop(lines.index { _1.include?("unreachable.png") }).grep(/display_show_msg start/)).to be_empty
+    end
+  end
+
+  it "draws the image too big screen once for a check-in and its quiet tries" do
+    serve_png("one", device_number("1"))
+    serve_png("too_big", device_number("2"))
+    dev.mock.set_fault("/images/too_big.png", body: "x" * 1_000_000)
+    dev.mock.display_queue = [{ image: "one", refresh_rate: 1, keep_wifi_on: true }] +
+                             Array.new(4) { { image: "too_big", refresh_rate: 1, keep_wifi_on: true } }
+    dev.mock.display = { image: "one", refresh_rate: 600 }
+    dev.boot do |s|
+      s.wait_for_deep_sleep(timeout: 180)
+      expect(s.console(0).count { _1.include?("display_show_msg start") }).to eq(1)
+    end
+  end
+
+  it "stays in the session through a check-in that fails" do
+    dev.mock.display = { image: "default", refresh_rate: 1, keep_wifi_on: true }
+    dev.boot do |s|
+      dev.mock.wait_for_request("/api/display", timeout: 90)
+      dev.mock.set_fault("/api/display", status: 500, times: 5)
+      s.wait(settle_ms: 20_000, timeout: 120)
+      latest = dev.mock.requests.select { _1.path == "/api/display" }.last(3)
+      expect([s.status["state"], latest]).to match(["running", all(have_header("Reset-Reason", "ESP_RST_POWERON"))])
+    end
+  end
+
+  # HttpRetryRequest tries a failing check-in 5 times, and a session tries 3 more check-ins before it sleeps.
   it "deep sleeps when a check-in fails" do
     dev.mock.display = { image: "default", refresh_rate: 2, keep_wifi_on: true }
     dev.boot do |s|
       dev.mock.wait_for_request("/api/display", timeout: 90)
       dev.mock.set_fault("/api/display", status: 500)
-      s.wait_for_deep_sleep(timeout: 180)
-      expect(dev.mock.count("/api/display")).to be <= 1 + 5 + 1
+      s.wait_for_deep_sleep(timeout: 300)
+      expect(dev.mock.count("/api/display")).to be <= 1 + (4 * 5) + 1
     end
   end
 
