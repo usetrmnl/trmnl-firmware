@@ -4,6 +4,7 @@
 #include <globals.h>
 #include <http_result_handling.h>
 #include <keep_wifi_on.h>
+#include <open_connections.h>
 #include <sleep_session.h>
 
 static volatile bool button_pressed_while_awake = false;
@@ -34,6 +35,7 @@ static constexpr int CHECK_IN_TRIES_AFTER_A_FAILURE = 3; // 2 s apart; only the 
 void stay_awake_while_server_asks(https_request_err_e (*show_screen)(bool draw_error_screen_on_failure)) {
   if (!apiDisplayResult.response.keep_wifi_on) return;
   attachInterrupt(digitalPinToInterrupt(pDevice->interrupt_pin), latch_button_press, FALLING);
+  OpenConnections::keep(true);
   while (apiDisplayResult.response.keep_wifi_on) { // a check-in that keeps failing clears it, so errors sleep as usual
     awake_time_limit_restart(); // the limit catches a device stuck awake, not one the server keeps checking in
     wait_awake_for_next_check_in();
@@ -43,5 +45,6 @@ void stay_awake_while_server_asks(https_request_err_e (*show_screen)(bool draw_e
       result = show_screen(attempt == CHECK_IN_TRIES_AFTER_A_FAILURE);
     }
   }
+  OpenConnections::keep(false);
   detachInterrupt(digitalPinToInterrupt(pDevice->interrupt_pin));
 }

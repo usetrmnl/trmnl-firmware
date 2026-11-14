@@ -18,6 +18,15 @@ enum HttpError {
 
 uint32_t downloadStream(WiFiClient *stream, int content_size, uint8_t *buffer);
 
+// A plain or TLS client for url's scheme; resumable resumes the trmnl.app TLS session across deep sleep
+inline WiFiClient *newWiFiClientFor(const String &url, bool resumable) {
+  if (url.indexOf("https://") == -1) return new WiFiClient();
+  WiFiClientSecure *secureClient =
+    resumable && url.indexOf("https://trmnl.app") != -1 ? new ResumableWiFiClientSecure() : new WiFiClientSecure();
+  secureClient->setInsecure();
+  return secureClient;
+}
+
 /**
  * @brief Higher-order function that sets up WiFiClient and HTTPClient, then runs a callback
  * @param url The initial URL to connect to
@@ -28,24 +37,7 @@ template <typename Callback, typename ReturnType = decltype(std::declval<Callbac
 ReturnType withHttp(const String &url, Callback callback, bool resumable = false) {
   Log_info("==== withHttp() %s", url.c_str());
 
-  bool isHttps = (url.indexOf("https://") != -1);
-  bool isTrmnlApi = (url.indexOf("https://trmnl.app") != -1);
-
-  // Conditionally allocate only the client we need
-  WiFiClient *client = nullptr;
-
-  if (isHttps) {
-    WiFiClientSecure *secureClient;
-    if (resumable && isTrmnlApi) {
-      secureClient = new ResumableWiFiClientSecure(); // trmnl.app only: resume the TLS session across deep sleep
-    } else {
-      secureClient = new WiFiClientSecure();
-    }
-    secureClient->setInsecure();
-    client = secureClient;
-  } else {
-    client = new WiFiClient();
-  }
+  WiFiClient *client = newWiFiClientFor(url, resumable);
 
   // Check if client creation succeeded
   if (!client) {

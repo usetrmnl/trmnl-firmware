@@ -5,6 +5,7 @@
 #include <http_client.h>
 #include <http_utils.h>
 #include <inttypes.h>
+#include <open_connections.h>
 #include <services/http_retry_request.h>
 #include <stdlib.h>
 #include <string.h>
@@ -183,49 +184,54 @@ void HttpRetryRequest::applyRequestSettings(HTTPClient &https, const String &hop
 
 https_request_err_e HttpRetryRequest::attemptWiFi() {
   ensureWifiConnected(); // a long panel refresh in light sleep can drop the connection
-  return withHttp(
-    _config.url,
-    [this](HTTPClient *https, HttpError error) -> https_request_err_e {
-      if (error == HttpError::HTTPCLIENT_WIFICLIENT_ERROR || !https) {
-        _errorDetail = "Unable to create WiFiClient";
-        Log_error_serial("%s", _errorDetail.c_str());
-        return HTTPS_UNABLE_TO_CONNECT;
-      }
-      if (error != HttpError::HTTPCLIENT_SUCCESS) {
-        _errorDetail = "Unable to create HTTPClient";
-        Log_error_serial("%s", _errorDetail.c_str());
-        return HTTPS_UNABLE_TO_CONNECT;
-      }
+  auto request = [this](HTTPClient *https, HttpError error) -> https_request_err_e {
+    if (error == HttpError::HTTPCLIENT_WIFICLIENT_ERROR || !https) {
+      _errorDetail = "Unable to create WiFiClient";
+      Log_error_serial("%s", _errorDetail.c_str());
+      return HTTPS_UNABLE_TO_CONNECT;
+    }
+    if (error != HttpError::HTTPCLIENT_SUCCESS) {
+      _errorDetail = "Unable to create HTTPClient";
+      Log_error_serial("%s", _errorDetail.c_str());
+      return HTTPS_UNABLE_TO_CONNECT;
+    }
 
-      applyRequestSettings(*https, _config.url);
-      Log_info("GET %s", _config.url.c_str());
-      int code = https->GET();
+    applyRequestSettings(*https, _config.url);
+    Log_info("GET %s", _config.url.c_str());
+    int code = https->GET();
 
-      // follow one redirect
-      if (code == HTTP_CODE_PERMANENT_REDIRECT || code == HTTP_CODE_TEMPORARY_REDIRECT) {
-        String location = https->getLocation();
-        https->end();
-        String redirectUrl = resolveRedirectLocation(location, httpOriginOf(_config.url));
-        Log_info("Redirected to: %s", redirectUrl.c_str());
-        https->begin(redirectUrl);
-        https->setReuse(false);
-        applyRequestSettings(*https, redirectUrl);
-        code = https->GET();
-      }
+    // follow one redirect
+    if (code == HTTP_CODE_PERMANENT_REDIRECT || code == HTTP_CODE_TEMPORARY_REDIRECT) {
+      String location = https->getLocation();
+      https->end();
+      String redirectUrl = resolveRedirectLocation(location, httpOriginOf(_config.url));
+      Log_info("Redirected to: %s", redirectUrl.c_str());
+      https->begin(redirectUrl);
+      https->setReuse(false);
+      applyRequestSettings(*https, redirectUrl);
+      code = https->GET();
+    }
 
-      _httpCode = code;
-      if (code < 0 ||
-          !(code == HTTP_CODE_OK || code == HTTP_CODE_MOVED_PERMANENTLY || code == HTTP_CODE_TOO_MANY_REQUESTS)) {
-        _errorDetail = "HTTP Client failed with error: " + https->errorToString(code) + "(" + String(code) + ")";
-        Log_error_serial("[HTTPS] GET... failed, error: %s", _errorDetail.c_str());
-        return HTTPS_RESPONSE_CODE_INVALID;
-      }
-      Log_info("GET... code: %d, RSSI: %d", code, WiFi.RSSI());
+    _httpCode = code;
+    if (code < 0 ||
+        !(code == HTTP_CODE_OK || code == HTTP_CODE_MOVED_PERMANENTLY || code == HTTP_CODE_TOO_MANY_REQUESTS)) {
+      _errorDetail = "HTTP Client failed with error: " + https->errorToString(code) + "(" + String(code) + ")";
+      Log_error_serial("[HTTPS] GET... failed, error: %s", _errorDetail.c_str());
+      return HTTPS_RESPONSE_CODE_INVALID;
+    }
+    Log_info("GET... code: %d, RSSI: %d", code, WiFi.RSSI());
 
-      _contentType = https->header("Content-Type");
-      return readWiFiBody(*https, https->getSize());
-    },
-    /*resumable=*/true);
+    _contentType = https->header("Content-Type");
+    return readWiFiBody(*https, https->getSize());
+  };
+  if (HTTPClient *keptHttp = OpenConnections::begin(_config.url)) {
+    _connectionKept = true;
+    https_request_err_e result = request(keptHttp, HTTPCLIENT_SUCCESS);
+    _connectionKept = false;
+    OpenConnections::end(keptHttp, result == HTTPS_NO_ERR);
+    return result;
+  }
+  return withHttp(_config.url, request, /*resumable=*/true);
 }
 
 https_request_err_e HttpRetryRequest::readWiFiBody(HTTPClient &https, int contentLength) {
@@ -270,7 +276,7 @@ https_request_err_e HttpRetryRequest::readWiFiBody(HTTPClient &https, int conten
       vTaskDelay(1); // yield to allow time for the data to arrive
     }
   }
-  stream->stop(); // Important! If you don't do this, WiFi will have a memory exception later
+  if (!_connectionKept) stream->stop(); // a kept one stays open; any other unstopped crashes WiFi later
 
   if (received < expected) {
     _errorDetail = String("incomplete download (") + (closedEarly ? "connection closed early" : "timed out") +

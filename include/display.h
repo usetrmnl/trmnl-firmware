@@ -77,10 +77,9 @@ uint16_t display_width();
  * @brief Function to show the image on the display
  * @param image_buffer pointer to the uint8_t image buffer
  * @param reverse shows if the color scheme is reverse
- * @return none
+ * @return false when it could not draw
  */
-
-void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool bSkipClear = false);
+bool display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool bSkipClear = false);
 
 /**
  * @brief Enable or disable light sleep at runtime
