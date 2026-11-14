@@ -1,12 +1,16 @@
 // TRMNL X hardware reached through the TCA9535 IO expander, which the panel driver (bbep) owns
 #include <display.h>
 #include <epd_driver.h>
+#include <globals.h>
 #include <trmnl_log.h>
 #include <x_hardware.h>
 
 #ifdef BOARD_TRMNL_X
+#include "Group5.h"
+#include "accelerometer.h"
 #include "driver/gpio.h"
 #include "esp_sleep.h"
+#include "fonts.h"
 
 #define TCA9535_INT 38
 
@@ -58,6 +62,148 @@ void config_tca95535_pins_for_lp() {
   bbep.ioPinMode(14, INPUT);
 
   bbep.ioPinMode(15, INPUT);
+}
+
+void config_bma530_interrupt() {
+  bbep.ioPinMode(3, INPUT);
+  bbep.ioRead(10);
+}
+
+/**
+ * Maps a BMA530-computed device orientation to the bb_ep rotation angle that
+ * keeps drawn content upright, per the TRMNL X mounting confirmed empirically
+ * with display_test_orientation_rotations(): 0=LANDSCAPE_RIGHT,
+ * 90=PORTRAIT_UP_RIGHT, 180=LANDSCAPE_LEFT, 270=PORTRAIT_UP_DOWN.
+ */
+void display_set_orientation(uint8_t orientation) {
+  int angle;
+  switch (orientation) {
+  case PORTRAIT_UP_RIGHT:
+    angle = 90;
+    break;
+  case LANDSCAPE_LEFT:
+    angle = 180;
+    break;
+  case PORTRAIT_UP_DOWN:
+    angle = 270;
+    break;
+  case LANDSCAPE_RIGHT:
+  default:
+    angle = 0;
+    break;
+  }
+  bbep.setRotation(angle);
+}
+
+void display_prepare_native_image() { bbep.setRotation(0); }
+
+// The physical orientation in which a native-layout image reads upright. Core turns a portrait
+// layout 90 degrees clockwise (its top on the panel's native right edge), while png_draw turns a
+// tall PNG the other way (its top on the native left edge).
+static uint8_t upright_orientation_for(bool tall_image) {
+  if (device_orientation == LANDSCAPE_LEFT || device_orientation == LANDSCAPE_RIGHT) return LANDSCAPE_RIGHT;
+  return tall_image ? PORTRAIT_UP_RIGHT : PORTRAIT_UP_DOWN;
+}
+
+static uint8_t reverse_bits(uint8_t b) {
+  b = (b >> 4) | (b << 4);
+  b = ((b & 0xcc) >> 2) | ((b & 0x33) << 2);
+  return ((b & 0xaa) >> 1) | ((b & 0x55) << 1);
+}
+
+static uint8_t reverse_bit_pairs(uint8_t b) {
+  b = (b >> 4) | (b << 4);
+  return ((b & 0xcc) >> 2) | ((b & 0x33) << 2);
+}
+
+static uint8_t reverse_pixels(uint8_t b, int mode) {
+  switch (mode) {
+  case BB_MODE_1BPP:
+    return reverse_bits(b);
+  case BB_MODE_2BPP:
+    return reverse_bit_pairs(b);
+  default:
+    return (b >> 4) | (b << 4);
+  }
+}
+
+// Turns the frame buffer 180 degrees in place. Assumes the native width fills whole bytes, as it
+// does on the TRMNL X (1872 pixels), so no row has padding bits to move.
+static void rotate_frame_buffer_180() {
+  const int mode = bbep.getMode();
+  const int pixels_per_byte = mode == BB_MODE_1BPP ? 8 : (mode == BB_MODE_2BPP ? 4 : 2);
+  const int pitch = bbep.width() / pixels_per_byte;
+  uint8_t *front = bbep.currentBuffer();
+  uint8_t *back = front + pitch * bbep.height() - 1;
+  while (front < back) {
+    const uint8_t first = *front;
+    *front++ = reverse_pixels(*back, mode);
+    *back-- = reverse_pixels(first, mode);
+  }
+  if (front == back) *front = reverse_pixels(*front, mode);
+}
+
+void display_finish_native_image(bool tall_image) {
+  const bool upside_down = device_orientation != upright_orientation_for(tall_image);
+  if (upside_down) {
+    Log_info("Turning the image 180 degrees for orientation %d", device_orientation);
+    rotate_frame_buffer_180();
+  }
+  bbep.setRotation(upside_down ? 180 : 0);
+}
+
+uint16_t display_native_width() { return bbep.getRotation() % 180 == 0 ? bbep.width() : bbep.height(); }
+
+uint16_t display_native_height() { return bbep.getRotation() % 180 == 0 ? bbep.height() : bbep.width(); }
+
+/**
+ * Draw one frame of the "Changing device orientation..." confirmation screen.
+ */
+void display_show_orientation_confirm(uint8_t *logo_buffer, int dots_filled) {
+  bbep.setMode(BB_MODE_1BPP);
+  bbep.fillScreen(BBEP_WHITE);
+
+  int logo_bottom = bbep.height() / 2 - 40;
+  if (logo_buffer && *(uint16_t *)logo_buffer == BB_BITMAP_MARKER) {
+    BB_BITMAP *pBBB = (BB_BITMAP *)logo_buffer;
+    int x = (bbep.width() - pBBB->width) / 2;
+    int y = (bbep.height() - pBBB->height) / 2 - 40;
+    logo_bottom = y + pBBB->height;
+    bbep.loadG5Image(logo_buffer, x, y, BBEP_WHITE, BBEP_BLACK);
+  }
+
+  const char msg[] = "Changing device orientation...";
+  BB_RECT rect;
+  bbep.setFont(Inter_18);
+  bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
+  bbep.getStringBox(msg, &rect);
+  int text_y = logo_bottom + 40;
+  bbep.setCursor((bbep.width() - rect.w) / 2, text_y);
+  bbep.println(msg);
+
+  if (dots_filled < 0) dots_filled = 0;
+  if (dots_filled > ORIENTATION_CONFIRM_DOT_COUNT) dots_filled = ORIENTATION_CONFIRM_DOT_COUNT;
+
+  const int DOT_RADIUS = 6;
+  const int DOT_SPACING = 24;
+  int dots_y = text_y + rect.h + 30;
+  int dots_total_width = (ORIENTATION_CONFIRM_DOT_COUNT - 1) * DOT_SPACING;
+  int dots_start_x = bbep.width() / 2 - dots_total_width / 2;
+
+  for (int i = 0; i < ORIENTATION_CONFIRM_DOT_COUNT; i++) {
+    int cx = dots_start_x + i * DOT_SPACING;
+    if (i < dots_filled) {
+      bbep.fillCircle(cx, dots_y, DOT_RADIUS, BBEP_BLACK);
+    } else {
+      bbep.drawCircle(cx, dots_y, DOT_RADIUS, BBEP_BLACK);
+    }
+  }
+
+  if (dots_filled == 0) {
+    bbep.fullUpdate();
+  } else {
+    bbep.partialUpdate(false);
+  }
 }
 
 void otg_turn_on() {
