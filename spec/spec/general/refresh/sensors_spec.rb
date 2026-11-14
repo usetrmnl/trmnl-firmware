@@ -73,7 +73,7 @@ General.describe "Sensors" do
         s.wait_for_deep_sleep(timeout: 30)
         dev.mock.display = { image: "default", action: "sleep", refresh_rate: 1800 }
         req = dev.mock.next_request("/api/display", timeout: 30) { s.double_click(ms: 80, gap_ms: 150) }
-        expect(req).to have_header("special_function", "true")
+        expect(req).to have_header("special_function", "sleep")
         s.wait_for_deep_sleep(timeout: 30)
       end
     end
