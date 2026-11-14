@@ -67,4 +67,5 @@ private:
   String _payload;             // owns the body on the Wi-Fi no-Content-Length path
   uint8_t *_bodyBuffer = nullptr; // owns the body on the Wi-Fi sized path and the modem path
   uint32_t _bodySize = 0;
+  bool _connectionKept = false; // an open connection the next request reuses
 };

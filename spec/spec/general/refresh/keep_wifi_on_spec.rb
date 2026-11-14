@@ -70,6 +70,32 @@ General.describe "Keep Wi-Fi on", skip_if: :touchbar,
     end
   end
 
+  it "makes the check-ins of a session over one connection" do
+    dev.mock.keep_alive = true
+    dev.mock.display_queue = Array.new(3) { { image: "default", refresh_rate: 1, keep_wifi_on: true } }
+    dev.mock.display = { image: "default", refresh_rate: 600 }
+    dev.boot do |s|
+      s.wait_for_deep_sleep(timeout: 180)
+      check_ins = dev.mock.requests.select { _1.path == "/api/display" }
+      expect(check_ins.drop(1).map(&:connection_number).uniq.size).to eq(1)
+    end
+  end
+
+  it "draws the frames after an image that redirects" do
+    serve_png("moved", device_number("1"))
+    path, expected = serve_png("after_move", device_number("2"))
+    dev.mock.keep_alive = true
+    dev.mock.set_fault("/images/moved.png", redirect: "#{dev.mock.device_url}/images/moved.png?v=2", times: 1)
+    dev.mock.display_queue = [{ image: "moved", refresh_rate: 1, keep_wifi_on: true },
+                              { image: "after_move", refresh_rate: 1, keep_wifi_on: true }]
+    dev.mock.display = { image: "after_move", refresh_rate: 600 }
+    dev.boot do |s|
+      s.wait_for_deep_sleep(timeout: 180)
+      expect([dev.mock.paths.count("/images/moved.png"), dev.mock.paths.count(path)]).to eq([2, 2])
+      expect(s).to show_image(expected, tolerance: 64, max_ratio: 0)
+    end
+  end
+
   it "draws no error screen for a check-in that fails once" do
     serve_png("one", device_number("1"))
     dev.mock.display = { image: "one", refresh_rate: 1, keep_wifi_on: true }

@@ -453,29 +453,30 @@ static void refresh_fastepd(bool bSkipClear) {
  * @brief Function to show the image on the display
  * @param image_buffer pointer to the uint8_t image buffer
  * @param reverse shows if the color scheme is reverse
- * @return none
+ * @return false when it could not draw
  */
-void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool bSkipClear) {
+bool display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool bSkipClear) {
   int iRefreshMode;
   bool bAlloc;
 
   Log_info("display_show_image start");
   Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
   if (!draw_image(image_buffer, data_size, &iRefreshMode, &bAlloc)) {
-    return;
+    return false;
   }
   Log_info("Display refresh start");
   save_temp_profile_from_api();
 #ifdef BB_EPAPER
   iRefreshMode = choose_refresh_mode(iRefreshMode, &bWait);
   if (!refresh_epaper(iRefreshMode, bWait, bAlloc)) {
-    return;
+    return false;
   }
 #else
   refresh_fastepd(bSkipClear);
 #endif
   iUpdateCount++;
   Log_info("display_show_image end");
+  return true;
 }
 /**
  * @brief Function to got the display to the sleep

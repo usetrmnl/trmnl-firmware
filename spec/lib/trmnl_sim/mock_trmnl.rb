@@ -12,7 +12,8 @@ require_relative "images"
 module TrmnlSim
   # A request the mock server received.
   # rubocop:disable Lint/StructNewOverride -- `method` is the HTTP method
-  RecordedRequest = Struct.new(:method, :path, :headers, :body, :at, :tls_resumed, keyword_init: true) do
+  RecordedRequest = Struct.new(:method, :path, :headers, :body, :at, :tls_resumed, :connection_number,
+                               keyword_init: true) do
     def json = JSON.parse(body.to_s.empty? ? "null" : body)
   end
   # rubocop:enable Lint/StructNewOverride
@@ -44,13 +45,14 @@ module TrmnlSim
   #   display:       the next /api/display answer: image (name), refresh_rate, plus any raw
   #                  fields (update_firmware, firmware_url, special_function, ...)
   #   display_queue: such hashes consumed first, one per request
+  #   keep_alive:    answer more than one request per connection (off: "Connection: close")
   class MockTrmnl
     FAULT_KEYS = %i[status body content_type delay hang truncate rate close redirect chunked times].freeze
     REASONS = { 200 => "OK", 301 => "Moved Permanently", 302 => "Found", 307 => "Temporary Redirect",
                 308 => "Permanent Redirect", 404 => "Not Found", 500 => "Internal Server Error" }.freeze
 
     attr_reader :requests, :images, :filenames, :files, :faults, :port, :tls
-    attr_accessor :api_key, :friendly_id, :setup, :display, :display_queue, :device_host
+    attr_accessor :api_key, :friendly_id, :setup, :display, :display_queue, :device_host, :keep_alive
 
     # A mock for the duration of the block.
     def self.open(**)
@@ -89,6 +91,7 @@ module TrmnlSim
       @port = @server.addr[1]
       @ssl_context = tls_context(@device_host) if tls
       @connections = []
+      @connection_count = 0
       @acceptor = Thread.new { accept_loop }
     end
 
@@ -118,6 +121,7 @@ module TrmnlSim
         @display_queue.clear
         @faults.clear
         @display = display
+        @keep_alive = false
       end
       self
     end
@@ -289,6 +293,7 @@ module TrmnlSim
 
     def serve_connection(sock)
       io = sock
+      connection_number = @lock.synchronize { @connection_count += 1 }
       tls_resumed = nil
       if @ssl_context
         # Handshake here, in the connection's thread, not in the accept loop.
@@ -297,7 +302,7 @@ module TrmnlSim
         io.accept
         tls_resumed = io.session_reused?
       end
-      serve(io, tls_resumed)
+      nil while serve(io, tls_resumed, connection_number)
     rescue IOError, SystemCallError, OpenSSL::SSL::SSLError # EOFError is an IOError
       nil # the device went away (e.g. a power-loss fault mid-download)
     ensure
@@ -308,8 +313,9 @@ module TrmnlSim
       end
     end
 
-    def serve(io, tls_resumed)
-      request_line = io.gets("\r\n") or return
+    # True when the connection stays open for another request.
+    def serve(io, tls_resumed, connection_number)
+      request_line = io.gets("\r\n") or return false
       method, target = request_line.split
       headers = Headers.new
       while (line = io.gets("\r\n")) && line != "\r\n"
@@ -318,12 +324,15 @@ module TrmnlSim
       end
       length = headers["Content-Length"].to_i
       body = length.positive? ? io.read(length) : "".b
-      rec = RecordedRequest.new(method:, path: target.split("?").first, headers:, body:, at: Time.now, tls_resumed:)
+      rec = RecordedRequest.new(method:, path: target.split("?").first, headers:, body:, at: Time.now, tls_resumed:,
+                                connection_number:)
       @lock.synchronize do
         @requests << rec
         @changed.broadcast
       end
-      respond(io, rec, take_fault(rec.path) || {})
+      fault = take_fault(rec.path)
+      respond(io, rec, fault || {})
+      keep_alive && !fault && !headers["Connection"].to_s.casecmp?("close")
     end
 
     def respond(io, rec, fault)
@@ -381,7 +390,8 @@ module TrmnlSim
 
     def write_head(io, code, headers)
       head = "HTTP/1.1 #{code} #{REASONS.fetch(code, 'Status')}\r\n"
-      headers.merge("Connection" => "close").each { |k, v| head << "#{k}: #{v}\r\n" }
+      headers = headers.merge("Connection" => "close") unless keep_alive
+      headers.each { |k, v| head << "#{k}: #{v}\r\n" }
       io.write("#{head}\r\n")
     end
 
