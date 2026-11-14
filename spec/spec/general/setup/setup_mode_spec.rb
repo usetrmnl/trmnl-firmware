@@ -5,13 +5,13 @@
 General.describe "Setup mode" do
   # Where the screens' texts are (display_show_msg in the firmware's display.cpp): the version
   # line at (40, 48) left of the top-right QR code, the portal's texts at fixed heights; centred.
-  # On the OG's 800x480 panel: body [0, 56, 800, 424], top_right [320, 0, 480, 56], ssid_line
+  # On the OG's 800x480 panel: body [0, 56, 800, 424], top_right [480, 0, 320, 56], ssid_line
   # [140, 368, 520, 44], timed_out [260, 320, 280, 48]. Other panels compare with their own
   # goldens (golden/<env>/, see Golden.for_device).
   def region(name)
     w, h = device.size
     { body: [0, 56, w, h - 56],
-      top_right: [320, 0, w - 320, 56],
+      top_right: [480, 0, w - 480, 56],
       ssid_line: [(w - 520) / 2, 368, 520, 44],
       timed_out: [(w - 280) / 2, 320, 280, 48] }.fetch(name)
   end
