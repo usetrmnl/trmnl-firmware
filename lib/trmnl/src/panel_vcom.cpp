@@ -9,8 +9,11 @@ namespace {
   const size_t RANGE_SIZE = 0xF7;
   const size_t VERSIONS_OFFSET = 0xBDD; // production version[23:0], then LUT version[23:0]
   const size_t VERSION_SIZE = 6;
+  const size_t COMMAND_DEFAULTS_OFFSET = 0x0C; // enable key 0xA5, then the power-on values of PSR, BTST, CDI and others
+  const size_t COMMAND_DEFAULTS_SIZE = 19;
   const size_t FIRST_VCOM_INDEX = 1 + BOUNDARY_COUNT;
   const size_t FIRST_VERSION_INDEX = FIRST_VCOM_INDEX + RANGE_COUNT;
+  const size_t FIRST_COMMAND_DEFAULT_INDEX = FIRST_VERSION_INDEX + VERSION_SIZE;
 
   // Where a byte at this bank offset goes in the summary; -1 when the summary leaves it out
   int summaryIndex(size_t offset) {
@@ -18,6 +21,8 @@ namespace {
     if (offset >= FIRST_RANGE_VCOM_OFFSET && offset < FIRST_RANGE_VCOM_OFFSET + RANGE_COUNT * RANGE_SIZE &&
         (offset - FIRST_RANGE_VCOM_OFFSET) % RANGE_SIZE == 0)
       return FIRST_VCOM_INDEX + (offset - FIRST_RANGE_VCOM_OFFSET) / RANGE_SIZE;
+    if (offset >= COMMAND_DEFAULTS_OFFSET && offset < COMMAND_DEFAULTS_OFFSET + COMMAND_DEFAULTS_SIZE)
+      return FIRST_COMMAND_DEFAULT_INDEX + offset - COMMAND_DEFAULTS_OFFSET;
     if (offset >= VERSIONS_OFFSET && offset < VERSIONS_OFFSET + VERSION_SIZE)
       return FIRST_VERSION_INDEX + offset - VERSIONS_OFFSET;
     return -1;

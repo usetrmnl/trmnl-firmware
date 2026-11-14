@@ -16,6 +16,9 @@ static void program_desk_og_bank(size_t bank) {
   for (size_t range = 0; range < 7; range++)
     otp[bank + 0x49 + range * 0xF7 + 5] = 0x1E;
   otp[bank + 0xBE0] = 0xFE; // LUT version
+  const uint8_t command_defaults[19] = {0xA5, 0x17, 0x17, 0x17, 0x3D, 0x3C, 0x00, 0x33, 0x07, 0x22,
+                                        0x64, 0x01, 0xE0, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00};
+  memcpy(otp + bank + 0x0C, command_defaults, sizeof(command_defaults));
 }
 
 void setUp(void) {
@@ -34,9 +37,12 @@ void test_summary_lists_bank_boundaries_vcoms_and_versions(void) {
     otp[0xC00 + 0x49 + range * 0xF7 + 5] = 0x20 + range;
   for (size_t i = 0; i < 6; i++)
     otp[0xC00 + 0xBDD + i] = 0x30 + i;
-  const uint8_t expected[PANEL_OTP_SUMMARY_SIZE] = {1,    0,    1,    2,    3,    4,    5,    6,    7,    8,
-                                                    9,    10,   0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27,
-                                                    0x28, 0x29, 0x2A, 0x2B, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35};
+  for (size_t i = 0; i < 19; i++)
+    otp[0xC00 + 0x0C + i] = 0x40 + i;
+  const uint8_t expected[PANEL_OTP_SUMMARY_SIZE] = {
+      1,    0,    1,    2,    3,    4,    5,    6,    7,    8,    9,    10,   0x20, 0x21, 0x22, 0x23, 0x24,
+      0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x40, 0x41, 0x42, 0x43,
+      0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x4F, 0x50, 0x51, 0x52};
   TEST_ASSERT_TRUE(panelOtpSummaryFromOtp(read_otp_byte, summary));
   TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, summary, PANEL_OTP_SUMMARY_SIZE);
 }
@@ -52,6 +58,7 @@ void test_ignores_data_in_an_unchecked_first_bank(void) {
   TEST_ASSERT_EQUAL_UINT8(1, summary[0]);
   TEST_ASSERT_EQUAL_UINT8(0x05, summary[2]);
   TEST_ASSERT_EQUAL_UINT8(0xFF, summary[19]);
+  TEST_ASSERT_EQUAL_UINT8(0x3D, summary[34]); // booster phase C1
   TEST_ASSERT_EQUAL_INT(0x1E, panelVcomFromOtpSummary(summary));
 }
 
