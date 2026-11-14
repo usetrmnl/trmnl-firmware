@@ -100,6 +100,19 @@ General.describe "Keep Wi-Fi on", skip_if: :touchbar,
     end
   end
 
+  it "draws the image too big screen once for a check-in and its quiet tries" do
+    serve_png("one", device_number("1"))
+    serve_png("too_big", device_number("2"))
+    dev.mock.set_fault("/images/too_big.png", body: "x" * 1_000_000)
+    dev.mock.display_queue = [{ image: "one", refresh_rate: 1, keep_wifi_on: true }] +
+                             Array.new(4) { { image: "too_big", refresh_rate: 1, keep_wifi_on: true } }
+    dev.mock.display = { image: "one", refresh_rate: 600 }
+    dev.boot do |s|
+      s.wait_for_deep_sleep(timeout: 180)
+      expect(s.console(0).count { _1.include?("display_show_msg start") }).to eq(1)
+    end
+  end
+
   it "stays in the session through a check-in that fails" do
     dev.mock.display = { image: "default", refresh_rate: 1, keep_wifi_on: true }
     dev.boot do |s|

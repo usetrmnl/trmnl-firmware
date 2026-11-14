@@ -23,7 +23,7 @@
 static https_request_err_e showScreen(bool should_show_error_now, bool draw_error_screen_on_failure = true) {
   https_request_err_e request_result = downloadAndShow(battery_voltage);
   Log.info("%s [%d]: request result - %s\r\n", __FILE__, __LINE__, https_request_err_str(request_result));
-  showImageTooBigIfNeeded(request_result);
+  if (draw_error_screen_on_failure) showImageTooBigIfNeeded(request_result);
   applyRetryPolicy(request_result, should_show_error_now); // may sleep
   submitStoredLogs();
   showFriendlyIdIfUnregistered(request_result);
