@@ -136,8 +136,8 @@ module TrmnlX
   # - a short press (up to 1 s, which wakes the OG and refreshes) is a tap in the middle, which
   #   wakes the X (Update-Source: EXT0) into the touch menu, then a second one choosing Next
   #   Screen, which refreshes (TrmnlX.next_screen);
-  # - a long press (5-15 s: forget WiFi, open the setup portal) is the X's WiFi reset: Settings,
-  #   Reset Wi-Fi... and its confirmation in the touch menu (TrmnlX.ask_to_reset_wifi);
+  # - a long press (5-15 s: open the settings portal, saved networks kept) is the X's WiFi reset:
+  #   Settings, Reset Wi-Fi... and its confirmation in the touch menu (TrmnlX.ask_to_reset_wifi);
   # - the OG's double click or 1-5 s press (run the special function) and 15 s press (soft reset:
   #   forget the device too) aren't mapped: the X runs the saved special function from its touch
   #   menu, but nothing drives that here yet, and it has no soft reset. An example using them is
@@ -169,7 +169,7 @@ module TrmnlX
       down ? touch_down("center") : touch_up("center")
     end
 
-    # Forget WiFi and open the setup portal from the touch menu. The X reads the touch bar when
+    # Open the settings portal (saved networks kept) from the touch menu. The X reads the touch bar when
     # it wakes, so it waits for the device to be asleep first.
     def reset_wifi_gesture
       wait(state: "deep_sleep", timeout: 120, settle_ms: 200) unless status["state"] == "deep_sleep"

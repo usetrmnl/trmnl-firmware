@@ -318,7 +318,8 @@ static const char *const settings_menu_labels[SETTINGS_MENU_COUNT] = {
 
 static const char *const reset_wifi_menu_labels[CONFIRM_MENU_COUNT] = {"Confirm Reset Wi-Fi", "Back"};
 static const char *const reset_wifi_menu_body[] = {
-    "Forget the saved Wi-Fi network and open the setup portal?",
+    "Open the setup portal to manage Wi-Fi and settings?",
+    "Saved networks are kept.",
 };
 
 static const char *const shut_down_menu_labels[CONFIRM_MENU_COUNT] = {"Confirm Shut Down", "Back"};
@@ -851,8 +852,9 @@ bool menu_open(const menu_controls_t &controls) {
     special_function_chosen = true;
     break;
   case MENU_OUTCOME_RESET_WIFI:
-    Log_info("Resetting WiFi from the menu");
-    resetDeviceCredentials();
+    // The rest of the wake opens the portal; the saved networks and the pairing are kept
+    Log_info("Opening the settings portal from the menu");
+    WifiCaptivePortal.requestPortal();
     break;
   case MENU_OUTCOME_SHUT_DOWN:
     Log_info("Shutting down from the menu");
