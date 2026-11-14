@@ -35,9 +35,7 @@ static uint8_t ReadSPIByte(void) {
 static uint8_t ReadSPIByteWhileClockHigh(void) {
   uint8_t u8 = 0;
   for (int i = 0; i < 8; i++) {
-    delayMicroseconds(2);
     digitalWrite(pDevice->epd_sck_pin, 1);
-    delayMicroseconds(2);
     u8 = (u8 << 1) | digitalRead(pDevice->epd_mosi_pin);
     digitalWrite(pDevice->epd_sck_pin, 0);
   }
