@@ -48,12 +48,13 @@
 #define PREFERENCES_TOUCHBAR_TUTORIAL_KEY    "touch_tutorial" // TRMNL X: the touch bar tutorial was finished
 #define PREFERENCES_TOUCHBAR_LOCKED_KEY      "touch_locked" // TRMNL X
 #define PREFERENCES_PANEL_VCOM               "panel_vcom" // VCOM_DC code read from the panel's OTP; -1 = none
-#define PREFERENCES_PANEL_VCOM_ID            "panel_vcom_id" // panel ID that VCOM was read from
+#define PREFERENCES_PANEL_OTP     "panel_otp" // hex summary of the panel's OTP bank; see panelOtpSummaryFromOtp()
+#define PREFERENCES_PANEL_VCOM_ID "panel_vcom_id" // panel ID that VCOM was read from
 
-#define WIFI_CONNECTION_RSSI                 (-100)
+#define WIFI_CONNECTION_RSSI      (-100)
 
-#define DISPLAY_BMP_IMAGE_SIZE 48062 // in bytes - 62 bytes - header; 48000 bytes - bitmap (480*800 1bpp) / 8
-#define DEFAULT_IMAGE_SIZE     48000
+#define DISPLAY_BMP_IMAGE_SIZE    48062 // in bytes - 62 bytes - header; 48000 bytes - bitmap (480*800 1bpp) / 8
+#define DEFAULT_IMAGE_SIZE        48000
 #if defined(BOARD_HAS_PSRAM)
 #define MAX_IMAGE_SIZE 750000 // Use PSRAM on the ESP32-S3/C5 (all X-class boards have PSRAM)
 #else
