@@ -75,6 +75,18 @@ General.describe "Refresh cycle" do
       end
     end
 
+    # showWakeLogo (status_screens.cpp) draws the loading screen before the new one, except on
+    # color panels, where each refresh takes 15 s or more.
+    it "draws the loading screen first on a button wake, except on color panels", :smoke,
+       needs: :button, skip_if: :shipment, why: "the X wakes by touch bar, with its own loading screen" do
+      draws = %w[bwr bwry spectra6].include?(device.inks) ? 1 : 2
+      dev.boot_asleep do |s|
+        refreshes = s.wait_for_deep_sleep["display_refreshes"]
+        dev.mock.next_request("/api/display", timeout: 90) { s.press(150) }
+        expect(s.wait_for_deep_sleep(timeout: 120)["display_refreshes"] - refreshes).to eq(draws)
+      end
+    end
+
     it "reports the battery voltage", :smoke do
       dev.boot_asleep do |s|
         s.set_battery(3700)
