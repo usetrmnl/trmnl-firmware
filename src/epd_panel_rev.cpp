@@ -111,8 +111,11 @@ void read_panel_vcom(uint32_t panel_id) {
   // ROTP 0xA2 is a UC8179 command; sending it to another controller is a risk the header is not worth
   if (strcmp(DEVICE_MODEL, "og") != 0 || !panel_is_ultrachip || panel_id == 0) return;
   int vcom;
+  // A summary cached by an older, shorter layout is read again
+  const size_t cached_otp_length = preferences.getString(PREFERENCES_PANEL_OTP, "").length();
   if (preferences.getUInt(PREFERENCES_PANEL_VCOM_ID, 0) == panel_id && preferences.isKey(PREFERENCES_PANEL_VCOM) &&
-      preferences.isKey(PREFERENCES_PANEL_OTP)) {
+      preferences.isKey(PREFERENCES_PANEL_OTP) &&
+      (cached_otp_length == 0 || cached_otp_length == 2 * PANEL_OTP_SUMMARY_SIZE)) {
     vcom = preferences.getInt(PREFERENCES_PANEL_VCOM, -1);
     panel_otp_string = preferences.getString(PREFERENCES_PANEL_OTP, "");
   } else {
