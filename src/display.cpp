@@ -73,7 +73,25 @@ static void display_apply_light_sleep(uint8_t enabled) {
 #endif
 }
 
+static uint32_t iPanelDraws = 0;
+// The panel's draw count right after a live frame. While it still matches, the controller still holds that frame in
+// its old-image memory and the live setup in its registers, so the next live frame sends neither again.
+static uint32_t drawsAfterLiveFrame = UINT32_MAX;
+uint32_t display_panel_draws(void) { return iPanelDraws; }
+
+// Live frames leave the 200 Hz frame rate and their gate timing set; every other draw runs at the panel's own
+static void restore_normal_refresh_settings(void) {
+  if (iPanelDraws != drawsAfterLiveFrame) return;
+  const uint8_t normalPll = 0x06, normalTcon = 0x22;
+  bbep.writeCmd(0x30);
+  bbep.writeData((uint8_t *)&normalPll, 1);
+  bbep.writeCmd(UC8151_TCON);
+  bbep.writeData((uint8_t *)&normalTcon, 1);
+  drawsAfterLiveFrame = UINT32_MAX;
+}
+
 bool display_update_epaper(int refreshMode, bool wait, bool writePlane, uint8_t plane) {
+  restore_normal_refresh_settings();
   // Light sleep with the WiFi radio running is unsupported: it hangs a Gen2 and fakes button presses on an OG
   display_apply_light_sleep(bLightSleepWanted && WiFi.getMode() == WIFI_MODE_NULL);
   if (writePlane) {
@@ -86,6 +104,7 @@ bool display_update_epaper(int refreshMode, bool wait, bool writePlane, uint8_t 
     Log_info("Have valid previous image in EPD memory, doing partial refresh");
   }
   bbep.refresh(refreshMode, wait);
+  iPanelDraws++;
     // The next update can be a partial update because the current is 1-bpp and stays in the EPD RAM
   bCanDoPartial = (bbep.getPanelType() == dpList[pDevice->panel_set][iTempProfile].OneBit);
   return true;
@@ -97,6 +116,7 @@ static void display_select_one_bit_panel(bool only_if_changed = false) {
   if (only_if_changed && bbep.getPanelType() == one_bit) {
     return;
   }
+  drawsAfterLiveFrame = UINT32_MAX; // a fresh panel setup may not keep the controller's memory
   if (custom_pins) {
     bbep.setPanelType(one_bit);
     bbep.initIO(pDevice->epd_dc_pin, pDevice->epd_rst_pin, pDevice->epd_busy_pin, pDevice->epd_cs_pin,
@@ -212,6 +232,7 @@ void display_wipe(void) {
   int refreshCount = 60;
 #endif
 
+  restore_normal_refresh_settings();
   bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit);
   bbep.fillScreen(BBEP_WHITE);
   for (int i = 0; i < refreshCount; i++) {
@@ -369,13 +390,15 @@ static void save_temp_profile_from_api(void) {
   }
 }
 
+bool display_full_refresh_due(void) { return (iUpdateCount & 7) == 0; }
+
 #ifdef BB_EPAPER
 // Adjusts the image's refresh mode for the refresh count, the server's settings and the panel
 static int choose_refresh_mode(int iRefreshMode, bool *pWait) {
   bool bWait = *pWait;
-  if ((iUpdateCount & 7) == 0 || apiDisplayResult.response.maximum_compatibility == true) {
+  if (display_full_refresh_due() || apiDisplayResult.response.maximum_compatibility == true) {
     Log_info("%s [%d]: Forcing full refresh; desired refresh mode was: %d\r\n", __FILE__, __LINE__, iRefreshMode);
-    iRefreshMode = REFRESH_FULL; // force full refresh every 8 partials
+    iRefreshMode = REFRESH_FULL;
   }
   int refresh_seconds = refreshInterval.seconds();
   if (refresh_seconds >= 30 * 60 && iRefreshMode == REFRESH_PARTIAL) {
@@ -423,6 +446,125 @@ static bool refresh_epaper(int iRefreshMode, bool bWait, bool bAlloc) {
   }
   return true;
 }
+
+static void write_frame(uint8_t command, const uint8_t *frame) {
+  bbep.writeCmd(command);
+  bbep.writeData((uint8_t *)frame, (bbep.width() + 7) / 8 * bbep.height());
+}
+
+// bb_epaper's wait sleeps 11 ms before it looks at BUSY and then checks only every 20 ms
+static void wait_until_idle(void) {
+  const uint32_t started = millis();
+  delayMicroseconds(100); // BUSY goes low a few microseconds after the command
+  while (digitalRead(bbep._bbep.iBUSYPin) == LOW && millis() - started < 5000)
+    delay(1);
+}
+
+// Each table: level select (2 bits a phase: 00 GND, 01 VDH = black, 10 VDL = white), four phase lengths in frames and a
+// repeat count; changing pixels go straight to the target, unchanged ones get a balanced 1+1 hold.
+static void send_balanced_partial_lut(void) {
+  const uint8_t drive = 60, rest = 5, keep = 1; // at 200 Hz: 0.3 s, then the shortest hold
+  const struct {
+    uint8_t command, length, changeLevels, keepLevels;
+  } tables[] = {
+      {UC8151_LUT_VCOM, 44, 0x00, 0x00}, // VCOM stays at its DC level
+      {UC8151_LUT_WW, 42, 0x00, 0x60}, // unchanged white
+      {UC8151_LUT_BW, 42, 0x48, 0x00}, // black to white
+      {UC8151_LUT_WB, 42, 0x84, 0x00}, // white to black
+      {UC8151_LUT_BB, 42, 0x00, 0x90}, // unchanged black
+      {UC8151_LUT_VCOM2, 42, 0x00, 0x60}, // the border, held like white
+  };
+  uint8_t lut[44];
+  for (const auto &table : tables) {
+    memset(lut, 0, sizeof(lut));
+    const uint8_t groups[12] = {table.changeLevels, 0, 0, drive, rest, 0x01, table.keepLevels, keep, keep, 0, 0, 0x01};
+    memcpy(lut, groups, sizeof(groups));
+    bbep.writeCmd(table.command);
+    bbep.writeData(lut, table.length);
+  }
+}
+
+static void send_live_partial_settings(void) {
+  const uint8_t pll = 0x0F; // about 200 Hz (0x06 = 50 Hz, the panel's default)
+  const uint8_t tcon = 0x00; // no gate/source non-overlap: rows are only about 10 us at 200 Hz
+  const uint8_t vdcs = 0x1E; // VCOM -1.6 V, the OG panel's factory value; the -0.1 V default fades black
+  const uint8_t pwr[5] = {0x07, 0x07, 0x3f, 0x3f, 0x03}, psr = 0x3f, cdi[2] = {0x39, 0x07};
+  bbep.writeCmd(0x30);
+  bbep.writeData((uint8_t *)&pll, 1);
+  bbep.writeCmd(UC8151_PWR);
+  bbep.writeData((uint8_t *)pwr, sizeof(pwr));
+  bbep.writeCmd(UC8151_PSR); // waveform from the registers, not the panel's OTP
+  bbep.writeData((uint8_t *)&psr, 1);
+  bbep.writeCmd(UC8151_CDI); // the border from its own table
+  bbep.writeData((uint8_t *)cdi, sizeof(cdi));
+  bbep.writeCmd(UC8151_TCON);
+  bbep.writeData((uint8_t *)&tcon, 1);
+  send_balanced_partial_lut();
+  bbep.writeCmd(0x82);
+  bbep.writeData((uint8_t *)&vdcs, 1);
+}
+
+bool display_live_supported(void) {
+  display_select_one_bit_panel(true); // after a gray image the panel is set up for 2 bits
+  const int panel = bbep.getPanelType();
+  return bbep.getChip() == BBEP_CHIP_UC81xx && (panel == EP75_800x480 || panel == EP75_800x480_GEN2);
+}
+
+static void power_off(void) {
+  // unknown whether the UC8179 holds a DC level across the ink while powered and idle, so never leave it on
+  wait_until_idle();
+  bbep.writeCmd(UC8151_POFF);
+  wait_until_idle();
+}
+
+// Starts the panel's power-on, which takes 130 ms, so the frame can be decoded and sent meanwhile
+bool display_live_begin(const uint8_t *on_screen_frame) {
+  if (!display_live_supported()) return false;
+  const bool lastDrawWasLive = iPanelDraws == drawsAfterLiveFrame;
+  const int x1 = bbep.width() - 1, y1 = bbep.height() - 1;
+  const uint8_t ptl[9] = {0, 0, (uint8_t)(x1 >> 8), (uint8_t)(x1 | 7), 0, 0, (uint8_t)(y1 >> 8), (uint8_t)y1, 0x00};
+  bbep.writeCmd(UC8151_PTIN);
+  bbep.writeCmd(UC8151_PTL);
+  bbep.writeData((uint8_t *)ptl, sizeof(ptl));
+  if (!lastDrawWasLive) {
+    write_frame(UC8151_DTM1, on_screen_frame);
+    send_live_partial_settings();
+  }
+  bbep.writeCmd(UC8151_PON);
+  return true;
+}
+
+bool display_show_frame(uint8_t *frame) {
+  display_select_one_bit_panel();
+  bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit);
+  bbep.setMemoryMode(BBEP_MODE_1BPP);
+  bbep.setBuffer(frame);
+  bbep.writePlane(bbep.getPanelType() == EP75_800x480 ? PLANE_0 : PLANE_FALSE_DIFF);
+  bbep.setBuffer(nullptr); // the frame belongs to the caller, which may free it
+  bool bWait = true;
+  const int iRefreshMode = choose_refresh_mode(REFRESH_PARTIAL, &bWait);
+  save_temp_profile_from_api();
+  if (!refresh_epaper(iRefreshMode, bWait, false)) return false;
+  iUpdateCount++;
+  return true;
+}
+
+void display_live_cancel(void) {
+  power_off();
+  bbep.writeCmd(UC8151_PTOU);
+}
+
+void display_live_finish(const uint8_t *frame) {
+  write_frame(UC8151_DTM2, frame);
+  wait_until_idle(); // the power-on
+  bbep.writeCmd(UC8151_DRF);
+  power_off();
+  bbep.writeCmd(UC8151_PTOU);
+  bCanDoPartial = true;
+  iUpdateCount++;
+  iPanelDraws++;
+  drawsAfterLiveFrame = iPanelDraws;
+}
 #else
 // Pushes the drawn image to the panel with the right clearing passes
 static void refresh_fastepd(bool bSkipClear) {
@@ -439,9 +581,9 @@ static void refresh_fastepd(bool bSkipClear) {
     // bWait=false means loading screen: skip clearing passes so it appears
     // faster. Ghosting from the previous image is acceptable since the
     // real content refresh (bWait=true) immediately follows.
-    int iClearMode = bSkipClear                                        ? CLEAR_NONE
-                     : ((iUpdateCount & 7) == 0 || (iTempProfile > 0)) ? CLEAR_SLOW
-                                                                       : CLEAR_FAST;
+    int iClearMode = bSkipClear                                           ? CLEAR_NONE
+                     : (display_full_refresh_due() || (iTempProfile > 0)) ? CLEAR_SLOW
+                                                                          : CLEAR_FAST;
     Log_info("fullUpdate clear mode = %d\n", iClearMode);
     bbep.fullUpdate(iClearMode, false);
     //   }
@@ -487,6 +629,7 @@ void display_sleep(void) {
   Log_info("Goto Sleep...");
 #ifdef BB_EPAPER
   bbep.sleep(LIGHT_SLEEP);
+  drawsAfterLiveFrame = UINT32_MAX; // waking it resets the controller
 #else
   bbep.einkPower(0);
   bbep.deInit();
