@@ -20,6 +20,14 @@ void test_api_errors_are_failures(void) {
   TEST_ASSERT_TRUE(requestIsFailure(HTTPS_IMAGE_FILE_TOO_BIG));
 }
 
+void test_live_quiet_tries_cover_failures_and_image_host_failures(void) {
+  TEST_ASSERT_TRUE(requestOrImageFailed(HTTPS_UNABLE_TO_CONNECT));
+  TEST_ASSERT_TRUE(requestOrImageFailed(HTTPS_IMAGE_FILE_TOO_BIG));
+  TEST_ASSERT_TRUE(requestOrImageFailed(HTTPS_IMAGE_DOWNLOAD_FAILED));
+  TEST_ASSERT_FALSE(requestOrImageFailed(HTTPS_NO_ERR));
+  TEST_ASSERT_FALSE(requestOrImageFailed(HTTPS_PLUGIN_NOT_ATTACHED));
+}
+
 void test_success_resets_the_count(void) {
   TEST_ASSERT_TRUE(requestFailureAction(HTTPS_SUCCESS, false, 3) == RequestFailureAction::ResetCount);
   TEST_ASSERT_TRUE(requestFailureAction(HTTPS_IMAGE_DOWNLOAD_FAILED, false, 2) == RequestFailureAction::ResetCount);
@@ -61,6 +69,7 @@ void process() {
   RUN_TEST(test_success_and_non_errors_are_not_failures);
   RUN_TEST(test_image_host_failure_is_not_a_failure);
   RUN_TEST(test_api_errors_are_failures);
+  RUN_TEST(test_live_quiet_tries_cover_failures_and_image_host_failures);
   RUN_TEST(test_success_resets_the_count);
   RUN_TEST(test_manual_wake_failure_shows_now);
   RUN_TEST(test_timer_wake_failure_stays_quiet_up_to_the_limit);

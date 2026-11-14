@@ -18,6 +18,9 @@ enum class RequestFailureAction {
 // Whether the result counts as a failed request. An image host failure doesn't: the API answered.
 bool requestIsFailure(https_request_err_e result);
 
+// A failed request, or an image host that failed after the API answered.
+bool requestOrImageFailed(https_request_err_e result);
+
 // failedWakes is the stored 1-based count before this wake's attempt.
 RequestFailureAction requestFailureAction(https_request_err_e result, bool showErrorNow, uint8_t failedWakes);
 

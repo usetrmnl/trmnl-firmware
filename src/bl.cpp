@@ -29,7 +29,7 @@ static https_request_err_e showScreen(bool should_show_error_now, bool draw_erro
   showFriendlyIdIfUnregistered(request_result);
   resetIfRequested(request_result);
   updateFirmwareIfDue();
-  if (draw_error_screen_on_failure || !requestIsFailure(request_result)) showRequestResult(request_result);
+  if (draw_error_screen_on_failure || !requestOrImageFailed(request_result)) showRequestResult(request_result);
   return request_result;
 }
 

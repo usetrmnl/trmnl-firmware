@@ -38,7 +38,7 @@ void stay_awake_while_server_asks(https_request_err_e (*show_screen)(bool draw_e
     awake_time_limit_restart(); // the limit catches a device stuck awake, not one the server keeps checking in
     wait_awake_for_next_check_in();
     https_request_err_e result = show_screen(false);
-    for (int attempt = 1; requestIsFailure(result) && attempt <= CHECK_IN_TRIES_AFTER_A_FAILURE; attempt++) {
+    for (int attempt = 1; requestOrImageFailed(result) && attempt <= CHECK_IN_TRIES_AFTER_A_FAILURE; attempt++) {
       delay(2000);
       result = show_screen(attempt == CHECK_IN_TRIES_AFTER_A_FAILURE);
     }

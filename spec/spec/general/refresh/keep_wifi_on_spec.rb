@@ -83,6 +83,23 @@ General.describe "Keep Wi-Fi on", skip_if: :touchbar,
     end
   end
 
+  # A 404 from the image host is not tried again within the download, so one failing check-in fails it.
+  it "draws no error screen for an image download that fails once" do
+    serve_png("one", device_number("1"))
+    serve_png("unreachable", device_number("2"))
+    dev.mock.display = { image: "one", refresh_rate: 1, keep_wifi_on: true }
+    dev.boot do |s|
+      dev.mock.wait_for_request("/images/one.png", timeout: 90)
+      s.wait(display_idle: true, settle_ms: 3000, timeout: 60)
+      dev.mock.set_fault("/images/unreachable.png", status: 404, times: 1)
+      dev.mock.display = { image: "unreachable", refresh_rate: 1, keep_wifi_on: true }
+      dev.mock.wait_for_request("/images/unreachable.png", timeout: 30)
+      s.wait(settle_ms: 8000, timeout: 60)
+      lines = s.console(0)
+      expect(lines.drop(lines.index { _1.include?("unreachable.png") }).grep(/display_show_msg start/)).to be_empty
+    end
+  end
+
   it "stays in the session through a check-in that fails" do
     dev.mock.display = { image: "default", refresh_rate: 1, keep_wifi_on: true }
     dev.boot do |s|
