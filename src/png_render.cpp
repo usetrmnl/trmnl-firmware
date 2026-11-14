@@ -3,6 +3,7 @@
 #include <color_reduce.h>
 #include <epd_driver.h>
 #include <globals.h>
+#include <new>
 #include <png_render.h>
 #include <trmnl_log.h>
 
@@ -537,18 +538,21 @@ int png_count_colors(PNG *png, const uint8_t *pData, int iDataSize) {
  *        due to insufficient RAM to hold the fully decoded image
  * @param pointer to the buffer holding the PNG file
  * @param size of the PNG file
- * @return refresh mode based on image type and presence of old image
+ * @return refresh mode based on image type and presence of old image, or -1 when nothing was drawn
  */
 int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious) {
   int iPlane = PNG_1_BIT, rc = -1;
-  PNG *png = new PNG();
 
 #ifndef BB_EPAPER
   if (bPrevious && bbep.getPreviousMode() != BB_MODE_NONE)
     return 0; // no need to decode previous image, we drew a msg/glyph
 #endif
 
-  if (!png) return PNG_MEM_ERROR; // not enough memory for the decoder instance
+  PNG *png = new (std::nothrow) PNG(); // plain new throws instead of returning NULL
+  if (!png) {
+    Log_error("%s [%d]: Not enough memory for the PNG decoder instance", __FILE__, __LINE__);
+    return -1;
+  }
   rc = png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
   png->close();
   if (rc == PNG_SUCCESS) {
@@ -566,6 +570,7 @@ int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious) {
         CreateSpectra6Pal(); // create a fast color matching palette
         if (bbep.allocBuffer() != BBEP_SUCCESS) {
           Log_error("%s [%d]: bbep.AllocBuffer failed!\n\r", __FILE__, __LINE__);
+          delete (png);
           return -1;
         }
         bbep.fillScreen(BBEP_WHITE); // in case the image is too small - undrawn areas will be white
@@ -575,6 +580,7 @@ int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious) {
         png->close();
         delete (png); // free the decoder instance
         bbep.writePlane(); // send the pixels to the display panel
+        bbep.freeBuffer(); // the panel has the pixels now and the refresh does not read the framebuffer
         return REFRESH_FAST;
       }
 #ifdef BOARD_TRMNL_4CLR
@@ -671,6 +677,7 @@ int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious) {
     }
   } else {
     Log_error("%s [%d]: png->openRAM() returned %d", __FILE__, __LINE__, rc);
+    rc = -1; // a PNGdec error code is not a refresh mode
   }
   delete (png); // free the decoder instance
   return rc;
