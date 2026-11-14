@@ -131,7 +131,11 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse) {
 
           // Print the extracted string
           Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
-          if (!filesystem_fixed_file_exists(new_filename)) {
+          char fixed_filename[36];
+          filesystem_fix_filename(new_filename.c_str(), fixed_filename);
+          // a live frame is not saved, so the screen is its cache; outside live mode a BMP's filename may be reused
+          bool live_frame_on_screen = apiResponse.keep_wifi_on && DisplayedImage::matches(fixed_filename);
+          if (!filesystem_fixed_file_exists(new_filename) && !live_frame_on_screen) {
             Log.info("%s [%d]: New image. Download and show it.\r\n", __FILE__, __LINE__);
             status = true;
             bUsedCachedImage = false;
@@ -510,7 +514,7 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
     return downloadAndShow(batteryVoltage);
   }
 
-  if (!status && result == HTTPS_SUCCESS) { // this means we already have this image stored in SPIFFS
+  if (!status && result == HTTPS_SUCCESS) { // already stored in SPIFFS, or a live frame still on screen
     char szTemp[36];
     filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
     if (DisplayedImage::matches(szTemp)) {
@@ -553,7 +557,7 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
     free(buffer);
     buffer = nullptr;
     DisplayedImage::remember(szTemp); // current image becomes the previous image
-      // Rotate NVS path keys: last ← current ← szTemp
+    // Rotate NVS path keys: last ← current ← szTemp
     String _curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
     String _lastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
     if (!_curPath.isEmpty() && (_curPath != String(szTemp) || _lastPath.isEmpty()))
@@ -627,19 +631,21 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
     filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
     Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
     display_show_image(buffer, content_size, true); // PNG and JPEG decoders leave the buffer intact
-    Log.info("%s [%d]: Writing %s to SPIFFS\r\n", __FILE__, __LINE__, szTemp);
-    filesystem_purge_old_file(szTemp); // try to delete the old version or older than 24h
-    writeImageToFile(szTemp, buffer, content_size);
     DisplayedImage::remember(szTemp); // current image becomes the previous image
-    String _curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
-    String _lastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
-    if (!_curPath.isEmpty() && (_curPath != String(szTemp) || _lastPath.isEmpty()))
-      preferences.putString(PREFERENCES_LAST_PATH_KEY, _curPath);
-    preferences.putString(PREFERENCES_CURRENT_PATH_KEY, String(szTemp));
+    if (!apiDisplayResult.response.keep_wifi_on) { // live frames change too often to be worth saving
+      Log.info("%s [%d]: Writing %s to SPIFFS\r\n", __FILE__, __LINE__, szTemp);
+      filesystem_purge_old_file(szTemp); // try to delete the old version or older than 24h
+      writeImageToFile(szTemp, buffer, content_size);
+      String _curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
+      String _lastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
+      if (!_curPath.isEmpty() && (_curPath != String(szTemp) || _lastPath.isEmpty()))
+        preferences.putString(PREFERENCES_LAST_PATH_KEY, _curPath);
+      preferences.putString(PREFERENCES_CURRENT_PATH_KEY, String(szTemp));
 #ifdef BOARD_TRMNL_X
-    update_playlist_order(preferences, szTemp, _curPath.c_str());
+      update_playlist_order(preferences, szTemp, _curPath.c_str());
 #endif
-    preferences.putString(PREFERENCES_BROWSE_PATH_KEY, String(szTemp));
+      preferences.putString(PREFERENCES_BROWSE_PATH_KEY, String(szTemp));
+    }
   } else if (!isPNG && !isJPEG) {
     bmp_res = parseBMPHeader(buffer, image_reverse);
     Log.info("%s [%d]: BMP Parsing result: %d\r\n", __FILE__, __LINE__, bmp_res);
