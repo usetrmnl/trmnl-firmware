@@ -17,6 +17,7 @@ enum {
   PNG_2_BIT_INVERTED,
 };
 #ifdef BB_EPAPER
+static uint8_t *pOneBitFrame = nullptr; // when set, png_draw() keeps the 1-bit rows here instead of sending them
 
 /**
  * @brief Callback function for each line of PNG decoded
@@ -350,7 +351,11 @@ int png_draw(PNGDRAW *pDraw) {
       } // for x
     }
   }
-  bbep.writeData(pTemp, (iWidth + 7) / 8);
+  if (pOneBitFrame) {
+    memcpy(&pOneBitFrame[pDraw->y * ((bbep.width() + 7) / 8)], pTemp, (iWidth + 7) / 8);
+  } else {
+    bbep.writeData(pTemp, (iWidth + 7) / 8);
+  }
   return 1;
 } /* png_draw() */
 #else // TRMNL_X version
@@ -610,7 +615,15 @@ int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious) {
         png->close(); // use a different PNGDraw callback for color matching
         bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit);
         rc = REFRESH_PARTIAL; // the new image is 1bpp - try a partial update
-        bbep.startWrite(PLANE_0); // start writing image data to plane 0
+        const bool bBothPlanes = bbep.getPanelType() != EP75_800x480; // PLANE_FALSE_DIFF
+        // decode once into memory and write both planes from it, instead of decoding a second time for plane 1
+        if (bBothPlanes && !(bbep.capabilities() & BBEP_3COLOR) && png->getWidth() == bbep.width() &&
+            png->getHeight() == bbep.height()) {
+          pOneBitFrame = (uint8_t *)malloc(((bbep.width() + 7) / 8) * bbep.height());
+          Log_info("SPIKE frame malloc %s, heap free %u largest %u", pOneBitFrame ? "ok" : "FAILED",
+                   heap_caps_get_free_size(MALLOC_CAP_8BIT), heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+        }
+        if (!pOneBitFrame) bbep.startWrite(PLANE_0); // start writing image data to plane 0
         png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
         if (png->getBpp() == 1 || png->getBpp() > 2) {
           iPlane = PNG_1_BIT;
@@ -623,7 +636,23 @@ int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious) {
           }
         }
         png->close();
-        if (bbep.getPanelType() != EP75_800x480) { // need to write the inverted plane to do PLANE_FALSE_DIFF
+        if (pOneBitFrame) { // the same writes as decoding twice; writePlane() would re-send EP426's full init
+          const int iPitch = (bbep.width() + 7) / 8;
+          uint8_t *pRow = bbep.getCache();
+          bbep.startWrite(PLANE_0);
+          for (int y = 0; y < bbep.height(); y++) {
+            bbep.writeData(&pOneBitFrame[y * iPitch], iPitch);
+          }
+          bbep.startWrite(PLANE_1);
+          for (int y = 0; y < bbep.height(); y++) {
+            for (int i = 0; i < iPitch; i++) {
+              pRow[i] = ~pOneBitFrame[y * iPitch + i];
+            }
+            bbep.writeData(pRow, iPitch);
+          }
+          free(pOneBitFrame);
+          pOneBitFrame = nullptr;
+        } else if (bBothPlanes) { // need to write the inverted plane to do PLANE_FALSE_DIFF
           bbep.startWrite(PLANE_1); // start writing image data to plane 1
           png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
           if (iPlane == PNG_1_BIT) {
