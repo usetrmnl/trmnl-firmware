@@ -85,7 +85,10 @@ bool display_update_epaper(int refreshMode, bool wait, bool writePlane, uint8_t 
   if (writePlane) {
     bbep.writePlane(plane);
   }
-  if (refreshMode == REFRESH_PARTIAL && !bCanDoPartial) {
+  if (bbep.capabilities() & (BBEP_3COLOR | BBEP_4COLOR | BBEP_7COLOR)) {
+    Log_info("Color EPD, must use full refresh mode");
+    refreshMode = REFRESH_FULL;
+  } else if (refreshMode == REFRESH_PARTIAL && !bCanDoPartial) {
     refreshMode = REFRESH_FAST;
     Log_info("Can't do partial refresh, no previous image");
   } else if (refreshMode == REFRESH_PARTIAL) {
@@ -145,6 +148,14 @@ void display_init(void) {
   pinMode(10, OUTPUT); // SD card enable (if it's powered down, the SPI bus may be blocked)
   digitalWrite(10, 1);
 #endif // BOARD_SEEED_STICKY
+
+#ifdef BOARD_ZECTRIX_NOTE4
+  pinMode(6, OUTPUT); // EPD power enable
+  pinMode(17, OUTPUT); // Battery LDO enable
+  digitalWrite(6, HIGH);
+  digitalWrite(17, HIGH);
+#endif // BOARD_ZECTRIX_NOTE4
+
     // Read the panel ID after any board-specific power/CS setup, but before bb_epaper takes over the SPI pins.
     // Only on the first call: the bit-banged read detaches SCK/MOSI from the SPI peripheral, and
     // SPI.begin() is a no-op once the bus is running, so a second read would leave the panel unreachable.

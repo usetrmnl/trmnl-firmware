@@ -140,6 +140,54 @@ int png_draw_6clr(PNGDRAW *pDraw) {
   return 1; // continue decoding
 } /* png_draw_6clr() */
 
+//
+// Write 1-bit image data as packed 2-bits per pixel
+// for the SSD26xx EPD controller
+// (Zectrix Note 4 & newer Seeed Sticky so far)
+//
+int png_draw_2bit_bw(PNGDRAW *pDraw)
+{
+    int x;
+    uint8_t ucBppChanged = 0, ucInvert = 0;
+    uint8_t uc, ucMask, src, *s, *d, *pTemp = bbep.getCache(); // get some scratch memory (not from the stack)
+    int iWidth;
+
+    iWidth = pDraw->iWidth;
+    if (pDraw->y >= bbep.height()) return 0; // stop decoding if we'll go past the bottom
+    if (iWidth > bbep.width()) iWidth = bbep.width(); // crop image width to display size if it's larger
+
+    if (pDraw->iPixelType == PNG_PIXEL_INDEXED || pDraw->iBpp > 2) {
+        if (pDraw->iBpp == 1) { // 1-bit output, just see which color is brighter
+            uint32_t u32Gray0, u32Gray1;
+            u32Gray0 = pDraw->pPalette[0] + (pDraw->pPalette[1]<<2) + pDraw->pPalette[2];
+            u32Gray1 = pDraw->pPalette[3] + (pDraw->pPalette[4]<<2) + pDraw->pPalette[5];
+          if (u32Gray0 < u32Gray1) {
+            ucInvert = 0xff;
+          }
+        } else {
+            // Reduce the source image to 1-bpp or 2-bpp
+            ReduceBpp((pDraw->pUser) ? 2:1, pDraw->iPixelType, pDraw->pPalette, pDraw->pPixels, pTemp, iWidth, pDraw->iBpp);
+            ucBppChanged = 1;
+        }
+    } else if (pDraw->iBpp == 2) {
+        ucInvert = 0xff; // 2-bit non-palette images need to be inverted colors for 4-gray mode
+    }
+    s = (ucBppChanged) ? pTemp : (uint8_t *)pDraw->pPixels;
+    d = pTemp;
+    for (x=0; x<iWidth; x+= 8) {
+        uint8_t uc1=0, uc2=0;
+        for (int bit=0; bit<4; bit++) {
+            uc1 <<= 2; uc2 <<= 2;
+            if (s[0] & (0x80 >> bit)) uc1 |= 1;
+            if (s[0] & (0x08 >> bit)) uc2 |= 1;
+        }
+        s++;
+        *d++ = uc1; *d++ = uc2;
+    }
+    bbep.writeData(pTemp, (iWidth+3)/4);
+    return 1;
+} /* png_draw_2bit_bw() */
+
 #ifdef BOARD_TRMNL_4CLR
 //
 // Draw the PNG image into the local framebuffer memory using the drawPixel() method
@@ -576,6 +624,18 @@ int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious) {
         delete (png); // free the decoder instance
         bbep.writePlane(); // send the pixels to the display panel
         return REFRESH_FAST;
+      }
+      if (bbep.capabilities() & BBEP_2BIT_BW) {
+        // new SSD26xx controller forces 2-bits per pixel for 1-bit content
+        Log_info("%s [%d]: decoding for SSD26xx special case 2/1-bit\r\n", __FILE__, __LINE__);
+        png->openRAM((uint8_t *)pPNG, iDataSize, png_draw_2bit_bw);
+        bbep.startWrite(PLANE_1); // start writing image data (0x10 cmd instead of 0x13)
+        png->decode(NULL, 0);
+        png->close();
+        delete(png); // free the decoder instance
+        bbep.writeCmd(UC8151_PON); // turn the power on AFTER writing the data
+        bbep.wait();
+        return REFRESH_PARTIAL;
       }
 #ifdef BOARD_TRMNL_4CLR
       Log_info("%s [%d]: decoding for 4-color EPD\r\n", __FILE__, __LINE__);
