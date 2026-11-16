@@ -36,6 +36,16 @@ jobs:
       - name: Install PlatformIO Core
         run: pip install --upgrade platformio==6.1.19 esptool
 
+      # A dev build with a released version number looks up to date to core, so a device leaving
+      # the development channel would keep it instead of taking the release.
+      - name: Refuse a version that is already released
+        run: |
+          VERSION=$(awk '/^#define FW_(MAJOR|MINOR|PATCH)_VERSION/ {print $3}' include/config.h | paste -sd. -)
+          if git ls-remote --exit-code --tags origin "refs/tags/v${VERSION}" >/dev/null; then
+            echo "::error::v${VERSION} is released. Bump FW_PATCH_VERSION in include/config.h before the next dev build."
+            exit 1
+          fi
+
       - name: Build dev firmware (${{ matrix.env }})
         env:
           INCLUDE_GIT_HASH_IN_VERSION_NUMBER: "true"
