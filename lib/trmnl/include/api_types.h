@@ -69,8 +69,6 @@ struct ApiDisplayInputs {
   String firmwareCommit;
   String model;
   String panelId; // EPD revision as hex; empty = unknown (header omitted)
-  String panelVcom; // VCOM_DC code from the panel's OTP, "-1" = none programmed; empty = not read (header omitted)
-  String panelOtp;  // hex summary of the panel's OTP bank; empty = not read (header omitted)
   int rssi;
   String wifiBand;
   int displayWidth;
