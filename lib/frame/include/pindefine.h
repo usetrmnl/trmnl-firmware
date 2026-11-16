@@ -20,7 +20,6 @@
 #define SPI_Data2	7   // Reserved for QSPI
 #define SPI_Data3	6   // Reserved for QSPI
 
-#define SPI_1DSX	23   // Reserved for 1DSX
 #define EXP_EN	    24 // VIN exp 3.3V black brd(fix) (OLD SPI_2DSX)
 // Legacy CS pin definitions (not used - CS is via TCA9555 expanders)
 #define SPI_CS0		1

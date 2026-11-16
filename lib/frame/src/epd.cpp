@@ -312,19 +312,25 @@ void frameInit(void)
       }
     }
   }
-
+  
   pinMode(EXP_EN, OUTPUT);
   delay(10);
   digitalWrite(EXP_EN, HIGH);
   delay(100);
+
+  // Initialize the RGB LED
+  Log_info("Turning on blue LED");
+  FrameLEDInit(); // Needs the I2C & expander power working
+  FrameLEDSet(LED_BLUE, 128); // Blue to indicate the device woke up and is initializing
+
   expander2.write1(12, LOW);      // test
   expander2.pinMode1(12, OUTPUT); // test
   pinMode(PMIC_PG, INPUT);        // PG io 26
   delay(50);
   pinMode(EPD_BUSY, INPUT); // busy io 27
   delay(50);
-  pinMode(SPI_1DSX, INPUT); // 1DSX io 23
-  delay(50);
+  //pinMode(SPI_1DSX, INPUT); // 1DSX io 23
+  //delay(50);
   // pinMode(SPI_2DSX, INPUT); // 2DSX io 24
   // delay(50);
   pinMode(6, INPUT);
@@ -337,6 +343,7 @@ void frameInit(void)
   delay(50);
   pinMode(10, INPUT);
   delay(50);
+
   expander2.pinMode1(EXP2_EPD_RST, INPUT);
   expander1.pinMode1(EXP1_EN_V5A, INPUT);
   expander2.pinMode1(EXP2_EN_V5D, INPUT);
@@ -367,7 +374,6 @@ void frameInit(void)
   expander1.pinMode1(EXP1_PMIC_PS, OUTPUT);
   // pinMode(TOOGLE_SEL1, OUTPUT); // not used
   // pinMode(TOOGLE_SEL2, OUTPUT); // not used
-
   // digitalWrite(TOOGLE_SEL1, LOW);// not used
   // digitalWrite(TOOGLE_SEL2, LOW);// not used
   pinMode(PMIC_EN, OUTPUT); // PS expander1 p15
@@ -444,8 +450,7 @@ void frameInit(void)
   BatteryStatus bat = batteryRead();
   batteryLog(bat);
 
-  // Initialize the RGB LED
-  FrameLEDInit();
+  FrameLEDSet(LED_GREEN, 128); // green to indicate the initialization is done and it's communicating
 
   // Initialize SD card
   //FrameSDInit();
@@ -739,6 +744,7 @@ void epdDisplay(void)
     //   expander2.write1(12, HIGH);// for debug only
     //   expander2.pinMode1(12, OUTPUT);// for debug only
     Log_info("Turn on PMIC.\n");
+    FrameLEDSet(LED_RED, 128); // Red to indicate the EPD is active
     if (enablePmic() == DONE)
     {
         pgWasGood = 1; // reset before tracking PMIC_PG across the busy-wait loops below
@@ -774,6 +780,7 @@ void epdDisplay(void)
     disablePmic();
 
     Log_info("Display Done!!\n");
+    FrameLEDSet(LED_BLACK, 0); // Black to indicate the display update finished
 }
 
 void epdDisplayColor(unsigned char colorSelect)
