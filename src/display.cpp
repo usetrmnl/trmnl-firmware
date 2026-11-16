@@ -28,6 +28,8 @@ BBEPAPER bbep;
 #include "driver/gpio.h"
 #include "driver/rtc_io.h"
 #include "esp_sleep.h"
+#include "esp_heap_caps.h"
+#include "esp_timer.h"
 
 // clang-format off
 const uint8_t u8_graytable[] = {
@@ -325,7 +327,13 @@ static bool draw_image(uint8_t *image_buffer, int data_size, int *pRefreshMode, 
 #endif // BB_EPAPER
   if (isPNG == true && data_size < MAX_IMAGE_SIZE) {
     Log_info("Drawing PNG");
+    const int64_t spikeStart = esp_timer_get_time();
+    Log_info("SPIKE heap before png_to_epd free %u largest %u", heap_caps_get_free_size(MALLOC_CAP_8BIT),
+             heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
     iRefreshMode = png_to_epd(image_buffer, data_size, false);
+    Log_info("SPIKE png_to_epd %lld us, heap after free %u largest %u min ever %u", esp_timer_get_time() - spikeStart,
+             heap_caps_get_free_size(MALLOC_CAP_8BIT), heap_caps_get_largest_free_block(MALLOC_CAP_8BIT),
+             heap_caps_get_minimum_free_size(MALLOC_CAP_8BIT));
     if (iRefreshMode < 0) return false; // no decoder memory, or no frame buffer
   } else if (MOTOSHORT(image_buffer) == 0xffd8) {
     Log_info("Drawing JPEG");

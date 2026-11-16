@@ -4,6 +4,7 @@
 #include <epd_driver.h>
 #include <globals.h>
 #include <new>
+#include <esp_heap_caps.h>
 #include <png_render.h>
 #include <trmnl_log.h>
 
@@ -266,6 +267,7 @@ int png_draw_4clr(PNGDRAW *pDraw) {
 #endif // BOARD_TRMNL_4CLR (4 color only)
 
 int png_draw(PNGDRAW *pDraw) {
+  if (pDraw->y == 0) Log_info("SPIKE decode pass, plane mode %d", *(int *)pDraw->pUser);
   int x;
   uint8_t ucBppChanged = 0, ucInvert = 0;
   uint8_t uc, ucMask, src, *s, *d, *pTemp = bbep.getCache(); // get some scratch memory (not from the stack)
@@ -495,6 +497,7 @@ const uint8_t ucTwoBitFlags[256] = {
 // clang-format on
 
 int png_draw_count(PNGDRAW *pDraw) {
+  if (pDraw->y == 0) Log_info("SPIKE decode pass, count colors");
   int x, *pFlags = (int *)pDraw->pUser;
   uint8_t *s, set_bits;
 
@@ -553,6 +556,8 @@ int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious) {
     Log_error("No memory for the PNG decoder");
     return -1;
   }
+  Log_info("SPIKE heap with decoder free %u largest %u", heap_caps_get_free_size(MALLOC_CAP_8BIT),
+           heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
   rc = png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
   png->close();
   if (rc == PNG_SUCCESS) {
