@@ -37,7 +37,8 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
     u32TP = 1;
   else if (tp == "b")
     u32TP = 2;
-//     else if (tp == "c") u32TP = 3;
+  else if (tp == "c")
+    u32TP = 3;
 
   return ApiDisplayResponse{
       .outcome = ApiDisplayOutcome::Ok,
