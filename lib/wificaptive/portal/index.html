@@ -19,6 +19,7 @@
       --warn-bg: #FBF0DC;
       --warn-ink: #6B4E12;
       --spark-fg: #FFF;
+      --btn-radius: 8px;
       --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
       --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     }
@@ -95,7 +96,7 @@
       color: var(--ink);
       background: transparent;
       border: 1px solid var(--rule);
-      border-radius: 2px;
+      border-radius: var(--btn-radius);
       cursor: pointer;
       padding: 7px 9px;
       margin: -4px 0;
@@ -523,7 +524,7 @@
       letter-spacing: .1em;
       text-transform: uppercase;
       padding: 15px 18px;
-      border-radius: 2px;
+      border-radius: var(--btn-radius);
       border: 1px solid transparent;
       cursor: pointer;
       width: 100%;
@@ -803,19 +804,33 @@
     }
 
     .net-act {
+      position: relative;
       font-family: var(--mono);
       font-size: 10.5px;
       letter-spacing: .14em;
       text-transform: uppercase;
-      color: var(--spark);
-      background: none;
-      border: 0;
+      color: var(--spark-fg);
+      background: var(--spark);
+      border: 1px solid var(--spark);
+      border-radius: var(--btn-radius);
       cursor: pointer;
-      min-height: 48px;
-      padding: 0 0 0 8px;
-      text-decoration: underline;
-      text-underline-offset: 3px;
+      padding: 8px 10px;
+      margin-left: 4px;
       flex: 0 0 auto;
+      transition: background-color .12s steps(3), color .12s steps(3), border-color .12s steps(3);
+    }
+
+    /* the visible button is small; this stretches its touch target to 48px */
+    .net-act::before {
+      content: "";
+      position: absolute;
+      inset: -9px -6px;
+    }
+
+    .net-act:hover {
+      background: var(--ink);
+      border-color: var(--ink);
+      color: var(--invert-fg);
     }
   </style>
   <script>
@@ -1687,7 +1702,7 @@
       <div class="msg page-msg" role="status" hidden></div>
 
       <div class="actions" id="add-actions">
-        <button id="btnAdd" class="btn btn-quiet" type="button" onclick="location.hash = '#add-network'">Add a
+        <button id="btnAdd" class="btn btn-primary" type="button" onclick="location.hash = '#add-network'">Add a
           network</button>
       </div>
     </div>
