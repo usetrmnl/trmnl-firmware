@@ -280,7 +280,7 @@ General.describe "Special functions" do
     end
 
     # the OG reads a press in the double-click window after the waking tap
-    it "tap then long press resets wifi", needs: :double_click do
+    it "tap then long press opens the settings portal", needs: :double_click do
       dev.boot_asleep do |s|
         s.wait_for_deep_sleep
         s.press(20)

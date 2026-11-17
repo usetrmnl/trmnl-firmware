@@ -300,7 +300,7 @@ static const special_menu_item_t special_menu_items[] = {
 // The Settings submenu; Back goes to the main menu
 enum settings_menu_item_t {
   SETTINGS_MENU_DIAGNOSTICS,
-  SETTINGS_MENU_RESET_WIFI,
+  SETTINGS_MENU_PORTAL,
   SETTINGS_MENU_SHUT_DOWN,
   SETTINGS_MENU_LOCK,
   SETTINGS_MENU_BACK,
@@ -308,17 +308,18 @@ enum settings_menu_item_t {
 };
 
 static const char *const settings_menu_labels[SETTINGS_MENU_COUNT] = {
-    "Diagnostics...", "Reset Wi-Fi...", "Shut Down...", "Lock Touchbar...", "Back",
+    "Diagnostics...", "Wi-Fi & Settings...", "Shut Down...", "Lock Touchbar...", "Back",
 };
 
-// The confirmations of Reset Wi-Fi and Shut Down; Back goes to Settings
+// The confirmations of Wi-Fi & Settings and Shut Down; Back goes to Settings
 #define CONFIRM_MENU_CONFIRM 0
 #define CONFIRM_MENU_BACK    1 // where the arrow starts, so a stray input doesn't confirm
 #define CONFIRM_MENU_COUNT   2
 
-static const char *const reset_wifi_menu_labels[CONFIRM_MENU_COUNT] = {"Confirm Reset Wi-Fi", "Back"};
-static const char *const reset_wifi_menu_body[] = {
-    "Forget the saved Wi-Fi network and open the setup portal?",
+static const char *const portal_menu_labels[CONFIRM_MENU_COUNT] = {"Open Wi-Fi & Settings", "Back"};
+static const char *const portal_menu_body[] = {
+    "Open the setup portal to manage Wi-Fi and settings?",
+    "Saved networks are kept.",
 };
 
 static const char *const shut_down_menu_labels[CONFIRM_MENU_COUNT] = {"Confirm Shut Down", "Back"};
@@ -683,7 +684,7 @@ enum menu_screen_t {
   MENU_SCREEN_SPECIAL,
   MENU_SCREEN_SETTINGS,
   MENU_SCREEN_DIAGNOSTICS,
-  MENU_SCREEN_RESET_WIFI,
+  MENU_SCREEN_PORTAL,
   MENU_SCREEN_SHUT_DOWN,
   MENU_SCREEN_LOCK,
 };
@@ -692,7 +693,7 @@ enum menu_outcome_t {
   MENU_OUTCOME_NEXT_SCREEN,
   MENU_OUTCOME_PREVIOUS_SCREEN,
   MENU_OUTCOME_SPECIAL_FUNCTION,
-  MENU_OUTCOME_RESET_WIFI,
+  MENU_OUTCOME_PORTAL,
   MENU_OUTCOME_SHUT_DOWN,
   MENU_OUTCOME_CLOSE, // Close on the main menu, or a timeout on any screen
 };
@@ -756,8 +757,8 @@ static menu_outcome_t run_menu_screens(SPECIAL_FUNCTION *function) {
       case SETTINGS_MENU_DIAGNOSTICS:
         screen = MENU_SCREEN_DIAGNOSTICS;
         break;
-      case SETTINGS_MENU_RESET_WIFI:
-        screen = MENU_SCREEN_RESET_WIFI;
+      case SETTINGS_MENU_PORTAL:
+        screen = MENU_SCREEN_PORTAL;
         break;
       case SETTINGS_MENU_SHUT_DOWN:
         screen = MENU_SCREEN_SHUT_DOWN;
@@ -787,12 +788,12 @@ static menu_outcome_t run_menu_screens(SPECIAL_FUNCTION *function) {
       screen = MENU_SCREEN_SETTINGS;
       break;
     }
-    case MENU_SCREEN_RESET_WIFI: {
-      int choice = run_menu_screen(reset_wifi_menu_labels, CONFIRM_MENU_COUNT, true, reset_wifi_menu_body,
-                                   sizeof(reset_wifi_menu_body) / sizeof(reset_wifi_menu_body[0]), MENU_TIMEOUT_MS,
-                                   CONFIRM_MENU_BACK);
+    case MENU_SCREEN_PORTAL: {
+      int choice =
+        run_menu_screen(portal_menu_labels, CONFIRM_MENU_COUNT, true, portal_menu_body,
+                        sizeof(portal_menu_body) / sizeof(portal_menu_body[0]), MENU_TIMEOUT_MS, CONFIRM_MENU_BACK);
       if (choice < 0) return MENU_OUTCOME_CLOSE;
-      if (choice == CONFIRM_MENU_CONFIRM) return MENU_OUTCOME_RESET_WIFI;
+      if (choice == CONFIRM_MENU_CONFIRM) return MENU_OUTCOME_PORTAL;
       screen = MENU_SCREEN_SETTINGS;
       break;
     }
@@ -850,9 +851,10 @@ bool menu_open(const menu_controls_t &controls) {
     special_function = function;
     special_function_chosen = true;
     break;
-  case MENU_OUTCOME_RESET_WIFI:
-    Log_info("Resetting WiFi from the menu");
-    resetDeviceCredentials();
+  case MENU_OUTCOME_PORTAL:
+    // The rest of the wake opens the portal; the saved networks and the pairing are kept
+    Log_info("Opening the settings portal from the menu");
+    WifiCaptivePortal.requestPortal();
     break;
   case MENU_OUTCOME_SHUT_DOWN:
     Log_info("Shutting down from the menu");

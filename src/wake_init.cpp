@@ -79,9 +79,8 @@ void initPeripherals(void) {
   delay(2000);
 
   if (digitalRead(PIN_INTERRUPT) == LOW) {
-    Log_info("Boot button pressed during startup, resetting WiFi credentials...");
-    WifiCaptivePortal.resetSettings();
-    Log_info("WiFi credentials reset completed");
+    Log_info("Boot button pressed during startup, opening the settings portal...");
+    WifiCaptivePortal.requestPortal();
   }
 #endif
 }

@@ -17,7 +17,7 @@ General.describe "OTA updates" do
       update_from("/missing.bin")
       dev.boot do |s|
         expect_to_keep_running_the_old_firmware(s, "/missing.bin")
-        # the update error and how to reset Wi-Fi (only the X has a golden of it)
+        # the update error and where Wi-Fi & Settings is (only the X has a golden of it)
         expect(s).to match_golden("firmware_update_error.png") if Golden.own_region("firmware_update_error.png", device)
       end
     end

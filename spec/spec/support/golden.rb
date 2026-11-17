@@ -19,14 +19,14 @@ module Golden
       # 'Connect your phone or computer to "TRMNL-000001" Wi-Fi'
       "setup_ssid_line.png" => [400, 1236, 1072, 48],
       # "Can't connect to Wi-Fi. Will keep trying." (the X's font has the apostrophe) and how to
-      # reset Wi-Fi from the menu
-      "wifi_failed_message.png" => [176, 1160, 1520, 96],
+      # open Wi-Fi & Settings from the menu
+      "wifi_failed_message.png" => [96, 1160, 1680, 96],
       # "Wi-Fi connected, but can't reach the API." and how to retry (Next Screen in the menu)
       "api_unable_to_connect.png" => [528, 304, 816, 136],
       # "API responded, but the image download failed." and how to advance (Next Screen in the menu)
       "image_download_failed.png" => [528, 304, 816, 136],
-      # "Wi-Fi connected, but the firmware update download failed." and how to reset Wi-Fi
-      "firmware_update_error.png" => [368, 360, 1136, 104],
+      # "Wi-Fi connected, but the firmware update download failed." and where Wi-Fi & Settings is
+      "firmware_update_error.png" => [256, 360, 1360, 104],
       # "The image format is not supported."
       "format_error.png" => [624, 1184, 624, 64],
       # "Please visit trmnl.com/start" / "with Friendly ID SIMTST to finish setup"
