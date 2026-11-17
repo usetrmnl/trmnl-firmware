@@ -392,21 +392,6 @@
       background-position: 0 0, 2px 2px;
     }
 
-    .skel {
-      margin: 0 -20px;
-      padding: 0 20px;
-      height: 48px;
-      border-bottom: 1px solid var(--rule-soft);
-      display: flex;
-      align-items: center;
-    }
-
-    .skel span {
-      height: 9px;
-      border-radius: 1px;
-      opacity: .6;
-    }
-
     .scanning {
       display: flex;
       flex-direction: column;
@@ -1210,10 +1195,9 @@
       btn.textContent = scanning ? 'Scanning…' : 'Scan again';
     }
 
-    // The spinner and the placeholder rows of a scan that is running
+    // The spinner of a scan that is running
     function setScanning(scanning) {
       show('scanning-info', scanning);
-      show('scanning-loader', scanning);
     }
 
     function refresh() {
@@ -1729,11 +1713,6 @@
             </svg>
           </span>
           <p>Scanning for networks</p>
-        </div>
-        <div id="scanning-loader">
-          <div class="skel"><span class="dither" style="width:58%"></span></div>
-          <div class="skel"><span class="dither" style="width:41%"></span></div>
-          <div class="skel"><span class="dither" style="width:66%"></span></div>
         </div>
         <div class="netlist" id="table-others" role="radiogroup" aria-label="Networks in range"></div>
         <div id="no-networks" class="msg" hidden>
