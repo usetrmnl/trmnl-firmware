@@ -231,23 +231,9 @@
       border-bottom: 1px solid var(--rule);
     }
 
-    .grp-label button {
-      font: inherit;
-      background: none;
-      border: 0;
-      cursor: pointer;
-      color: var(--spark);
-      padding: 15px 0;
-      margin: -15px 0;
-      min-height: 48px;
-      border-bottom: 0;
-      text-decoration: underline;
-      text-underline-offset: 3px;
-    }
-
-    .grp-label button:disabled {
-      color: var(--ink-3);
-      cursor: default;
+    /* a small button in a section label keeps the label row at its usual height */
+    .grp-label .btn-sm {
+      margin: -10px 0 -4px;
     }
 
     /* Lists run the full page width: they cancel .p-body's 20px gutter and
@@ -803,34 +789,41 @@
       gap: 6px;
     }
 
-    .net-act {
+    /* A small regular button, inside a row or a label (Forget, Scan again) */
+    .btn-sm {
       position: relative;
       font-family: var(--mono);
       font-size: 10.5px;
       letter-spacing: .14em;
       text-transform: uppercase;
-      color: var(--spark-fg);
-      background: var(--spark);
-      border: 1px solid var(--spark);
+      color: var(--ink);
+      background: transparent;
+      border: 1px solid var(--rule);
       border-radius: var(--btn-radius);
       cursor: pointer;
       padding: 8px 10px;
-      margin-left: 4px;
       flex: 0 0 auto;
-      transition: background-color .12s steps(3), color .12s steps(3), border-color .12s steps(3);
+      transition: border-color .12s steps(3);
     }
 
     /* the visible button is small; this stretches its touch target to 48px */
-    .net-act::before {
+    .btn-sm::before {
       content: "";
       position: absolute;
       inset: -9px -6px;
     }
 
-    .net-act:hover {
-      background: var(--ink);
+    .btn-sm:hover:not(:disabled) {
       border-color: var(--ink);
-      color: var(--invert-fg);
+    }
+
+    .btn-sm:disabled {
+      opacity: .55;
+      cursor: default;
+    }
+
+    .net-act {
+      margin-left: 4px;
     }
   </style>
   <script>
@@ -1183,7 +1176,7 @@
           (tags ? '<span class="net-tags">' + tags + '</span>' : '') + '</span>' +
           '<span class="badge">' + (n.band === '5GHz' ? '5G' : '2.4G') + '</span>' +
           (inRange ? barsHTML(inRange.rssi) : '') +
-          '<button class="net-act" type="button">Forget</button>';
+          '<button class="btn-sm net-act" type="button">Forget</button>';
         row.querySelector('.ssid').textContent = n.ssid;
         var btn = row.querySelector('.net-act');
         btn.setAttribute('aria-label', 'Forget ' + n.ssid);
@@ -1711,7 +1704,7 @@
       <div>
         <div class="grp-label">
           <span>In range</span>
-          <button id="btnRefresh" type="button" onclick="refresh()">Refresh</button>
+          <button id="btnRefresh" class="btn-sm" type="button" onclick="refresh()">Refresh</button>
         </div>
         <div id="scan-error" class="msg msg-warn" role="alert" hidden>
           <strong>Couldn't scan for networks</strong>
