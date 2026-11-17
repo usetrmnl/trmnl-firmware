@@ -78,10 +78,21 @@
       justify-content: space-between;
     }
 
+    /* The logo sits in the centre column, Back (when shown) in the left one */
     .p-head-lead {
-      display: flex;
+      flex: 1 1 auto;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
       align-items: center;
-      gap: 12px;
+    }
+
+    .p-head-lead .head-back {
+      grid-column: 1;
+      justify-self: start;
+    }
+
+    .p-head-lead .logo {
+      grid-column: 2;
     }
 
     /* The visible box is small; ::before stretches the touch target to 44px.
