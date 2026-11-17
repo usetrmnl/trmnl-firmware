@@ -85,12 +85,12 @@ module TrmnlX
     menu_tap(s, "center", /chose Settings/, screen: true)
   end
 
-  # Open Settings..., then Reset Wi-Fi..., leaving its confirmation (Confirm Reset Wi-Fi, Back)
+  # Open Settings..., then Wi-Fi & Settings..., leaving its confirmation (Open Wi-Fi & Settings, Back)
   # on the screen with the arrow on Back.
-  def ask_to_reset_wifi(s)
+  def ask_to_open_portal(s)
     open_settings_menu(s)
-    menu_tap(s, "right", /Diagnostics\.\.\. -> Reset Wi-Fi/)
-    menu_tap(s, "center", /chose Reset Wi-Fi/, screen: true)
+    menu_tap(s, "right", /Diagnostics\.\.\. -> Wi-Fi & Settings/)
+    menu_tap(s, "center", /chose Wi-Fi & Settings/, screen: true)
   end
 
   # The flash of an X a customer just unboxed: a shipped X (see ShippedX) taken out of shipment
@@ -136,8 +136,8 @@ module TrmnlX
   # - a short press (up to 1 s, which wakes the OG and refreshes) is a tap in the middle, which
   #   wakes the X (Update-Source: EXT0) into the touch menu, then a second one choosing Next
   #   Screen, which refreshes (TrmnlX.next_screen);
-  # - a long press (5-15 s: open the settings portal, saved networks kept) is the X's WiFi reset:
-  #   Settings, Reset Wi-Fi... and its confirmation in the touch menu (TrmnlX.ask_to_reset_wifi);
+  # - a long press (5-15 s: open the settings portal, saved networks kept) is the X's Settings,
+  #   Wi-Fi & Settings... and its confirmation in the touch menu (TrmnlX.ask_to_open_portal);
   # - the OG's double click or 1-5 s press (run the special function) and 15 s press (soft reset:
   #   forget the device too) aren't mapped: the X runs the saved special function from its touch
   #   menu, but nothing drives that here yet, and it has no soft reset. An example using them is
@@ -153,7 +153,7 @@ module TrmnlX
       if ms >= 15_000
         skip!("the TRMNL X has no soft-reset gesture (the OG's 15 s press)")
       elsif ms > 5000
-        reset_wifi_gesture
+        settings_portal_gesture
       elsif ms > 1000
         skip!("the TRMNL X has no gesture that runs the special function (the OG's 1-5 s press)")
       else
@@ -171,11 +171,11 @@ module TrmnlX
 
     # Open the settings portal (saved networks kept) from the touch menu. The X reads the touch bar when
     # it wakes, so it waits for the device to be asleep first.
-    def reset_wifi_gesture
+    def settings_portal_gesture
       wait(state: "deep_sleep", timeout: 120, settle_ms: 200) unless status["state"] == "deep_sleep"
       skip_tutorial
-      TrmnlX.ask_to_reset_wifi(self)
-      TrmnlX.menu_tap(self, "left", /Back -> Confirm Reset Wi-Fi/)
+      TrmnlX.ask_to_open_portal(self)
+      TrmnlX.menu_tap(self, "left", /Back -> Open Wi-Fi & Settings/)
       touch("center", ms: 150)
     end
 

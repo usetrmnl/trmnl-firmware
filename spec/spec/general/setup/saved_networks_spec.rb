@@ -69,7 +69,7 @@ General.describe "Portal" do
     end
 
     # A long press opens the settings portal and keeps the saved networks (button_wake_act,
-    # src/button.cpp; on the X, Settings > Reset Wi-Fi in the touch menu).
+    # src/button.cpp; on the X, Settings > Wi-Fi & Settings in the touch menu).
     def open_settings(s)
       s.press(6000)
       s.wait(portal: true, timeout: 120)
