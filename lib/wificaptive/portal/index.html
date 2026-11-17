@@ -535,20 +535,13 @@
       cursor: default;
     }
 
-    .btn-quiet,
-    .btn-danger {
+    .btn-quiet {
       background: transparent;
       color: var(--ink);
       border-color: var(--rule);
     }
 
     .btn-quiet:hover {
-      border-color: var(--ink);
-    }
-
-    .btn-danger:hover {
-      background: var(--ink);
-      color: var(--invert-fg);
       border-color: var(--ink);
     }
 
@@ -1815,7 +1808,7 @@
       <div class="adv-sec">
         <h3>Sensor test</h3>
         <p class="hint">Runs the panel through a refresh cycle and reports the temperature before and after.</p>
-        <button id="btnTest" class="btn btn-quiet" type="button" onclick="runTest()">Run sensor test</button>
+        <button id="btnTest" class="btn btn-primary" type="button" onclick="runTest()">Run sensor test</button>
       </div>
       <div class="adv-sec">
         <h3>Serial logs</h3>
@@ -1835,7 +1828,7 @@
         from scratch.
       </div>
       <div class="actions">
-        <button id="btnReset" class="btn btn-danger" type="button" onclick="confirmSoftReset()">Soft reset this
+        <button id="btnReset" class="btn btn-primary" type="button" onclick="confirmSoftReset()">Soft reset this
           TRMNL</button>
         <div class="msg page-msg" role="alert" hidden></div>
       </div>
@@ -1848,7 +1841,7 @@
       <p><strong id="confirmTitle"></strong></p>
       <p id="confirmText"></p>
       <div class="row2">
-        <button id="confirmYes" class="btn btn-danger" type="button" onclick="confirmYes()"></button>
+        <button id="confirmYes" class="btn btn-primary" type="button" onclick="confirmYes()"></button>
         <button id="confirmNo" class="btn btn-quiet" type="button" onclick="closeModal()">Cancel</button>
       </div>
     </div>
