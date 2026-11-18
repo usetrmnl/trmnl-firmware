@@ -9,6 +9,12 @@ CONFIG_AUTOSTART_ARDUINO=y
 CONFIG_FREERTOS_HZ=1000
 
 #
+# Compiler
+#
+# -Os, for smaller firmware. Without it, ESP-IDF's default is -Og (debug).
+CONFIG_COMPILER_OPTIMIZATION_SIZE=y
+
+#
 # Board
 #
 CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
