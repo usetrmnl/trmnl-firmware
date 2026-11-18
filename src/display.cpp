@@ -178,6 +178,13 @@ void display_init(void) {
   } else { // it's a pre-defined PCB+display in bb_epaper
     bbep.begin(dpList[pDevice->panel_set][0].OneBit);
   }
+  if (strcmp(DEVICE_MODEL, "seeed_sticky_b") == 0 && bbep.testPanelType() == BBEP_CHIP_SSD16xx) {
+    // New 3.97" panel needs a different ePaper configuration
+    Log_info("Detected SSD1677 (old) Sticky panel type; switching profiles...");
+    hw_config_init("seeed_sticky");
+  } else {
+    Log_info("Detected SSD2677 (new) Sticky panel type");
+  }
 #else // Parallel eink devices
 #if defined(BOARD_SEEED_RETERMINAL_E1003)
   bbep.initIT8951(EPD_MOSI_PIN, EPD_MISO_PIN, EPD_SCK_PIN, EPD_CS_PIN, EPD_BUSY_PIN, EPD_RST_PIN, EPD_EN_PIN,

@@ -165,25 +165,28 @@ int png_draw_2bit_bw(PNGDRAW *pDraw)
             ucInvert = 0xff;
           }
         } else {
-            // Reduce the source image to 1-bpp or 2-bpp
-            ReduceBpp((pDraw->pUser) ? 2:1, pDraw->iPixelType, pDraw->pPalette, pDraw->pPixels, pTemp, iWidth, pDraw->iBpp);
+            // Reduce the source image to 2-bpp
+            ReduceBpp(2, pDraw->iPixelType, pDraw->pPalette, pDraw->pPixels, pTemp, iWidth, pDraw->iBpp);
             ucBppChanged = 1;
         }
-    } else if (pDraw->iBpp == 2) {
-        ucInvert = 0xff; // 2-bit non-palette images need to be inverted colors for 4-gray mode
     }
-    s = (ucBppChanged) ? pTemp : (uint8_t *)pDraw->pPixels;
-    d = pTemp;
-    for (x=0; x<iWidth; x+= 8) {
-        uint8_t uc1=0, uc2=0;
-        for (int bit=0; bit<4; bit++) {
-            uc1 <<= 2; uc2 <<= 2;
-            if (s[0] & (0x80 >> bit)) uc1 |= 1;
-            if (s[0] & (0x08 >> bit)) uc2 |= 1;
+    if (pDraw->iBpp == 1) {
+        s = (ucBppChanged) ? pTemp : (uint8_t *)pDraw->pPixels;
+        d = pTemp;
+        for (x=0; x<iWidth; x+= 8) {
+            uint8_t uc1=0, uc2=0;
+            for (int bit=0; bit<4; bit++) {
+                uc1 <<= 2; uc2 <<= 2;
+                if (s[0] & (0x80 >> bit)) uc1 |= 1;
+                if (s[0] & (0x08 >> bit)) uc2 |= 1;
+            }
+            s++;
+            *d++ = uc1; *d++ = uc2;
         }
-        s++;
-        *d++ = uc1; *d++ = uc2;
+    } else if (pDraw->iBpp == 2 && !ucBppChanged) {
+        memcpy(pTemp, pDraw->pPixels, (iWidth+3)/4); // Use the unmodified PNG pixels for 2-bpp
     }
+    // For 2-bit gray, the output of ReduceBpp is already in the right form
     bbep.writeData(pTemp, (iWidth+3)/4);
     return 1;
 } /* png_draw_2bit_bw() */
@@ -629,6 +632,11 @@ int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious) {
         // new SSD26xx controller forces 2-bits per pixel for 1-bit content
         Log_info("%s [%d]: decoding for SSD26xx special case 2/1-bit\r\n", __FILE__, __LINE__);
         png->openRAM((uint8_t *)pPNG, iDataSize, png_draw_2bit_bw);
+        if (png->getBpp() >= 2) { // Draw as 2-bit grayscale image
+            Log_info("Using 2-bit grayscale panel setup for this image");
+            bbep.setPanelType(dpList[pDevice->panel_set][0].TwoBit);
+            bbep.sendInit();
+        }
         bbep.startWrite(PLANE_1); // start writing image data (0x10 cmd instead of 0x13)
         png->decode(NULL, 0);
         png->close();

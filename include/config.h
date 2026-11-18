@@ -195,7 +195,8 @@ enum {
   EPD_133_COLOR,
   EPD_368,
   EPD_42C,
-  EPD_42_4CLR
+  EPD_42_4CLR,
+  EPD_397C,
 };
 
 /**

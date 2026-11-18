@@ -40,6 +40,7 @@ const TRMNL_DEVICE device_list[] =
   "waveshare",     13,   14,    15,  26,   27,  25,   0xff, 0xff, 33,    0xff, 0xff,    0xff,   BATT_ADC,  EPD_75,
   "waveshare_397", 11,   12,    10,  46,   9,   3,    41,   42,   0,     0xff, 0xff,    0xff,   BATT_AXP2101,  EPD_397,
   "seeed_sticky",  13,   14,    15,  17,   16,  18,   1,    0,    4,     0xff, 0xff,    0xff,   BATT_BQ27220,  EPD_397,  
+  "seeed_sticky_b", 13,  14,    15,  17,   16,  18,   1,    0,    4,     0xff, 0xff,    0xff,   BATT_BQ27220,  EPD_397C,  
   "seeed_esp32c3", 8,    10,    3,   2,    5,   4,    0xff, 0xff, 9,     0xff, 0xff,    0xff,   BATT_ADC,  EPD_75,
   "seeed_esp32s3", 7,    9,     2,   1,    4,   3,    0xff, 0xff, 0,     0xff, 0xff,    0xff,   BATT_ADC,  EPD_75,
   "xiao_epaper_mini", 7, 9,     44,  38,   10,  4,    0xff, 0xff, 2,     1,    6,       0xff,   BATT_ADC,  EPD_426,
@@ -63,7 +64,7 @@ const TRMNL_DEVICE device_list[] =
 // TRMNL SPI ePaper panel types list. The list order is fixed and based on enumerated values
 // N.B. ALWAYS ADD NEW PANELS TO THE END OF THE LIST
 // clang-format off
-const DISPLAY_PROFILE dpList[15][3] = { // 1-bit and 2-bit display types for each profile
+const DISPLAY_PROFILE dpList[16][3] = { // 1-bit and 2-bit display types for each profile
     {{EP75_800x480, EP75_800x480_4GRAY}, {EP75_800x480_GEN2, EP75_800x480_4GRAY_GEN2}, {EP75_800x480, EP75_800x480_4GRAY_V2}},
     {{EP426_800x480, EP426_800x480_4GRAY}, {EP426_800x480, EP426_800x480_4GRAY}, {EP426_800x480, EP426_800x480_4GRAY}},
     {{EP426B_800x480, EP426B_800x480_4GRAY}, {EP426B_800x480, EP426B_800x480_4GRAY}, {EP426B_800x480, EP426B_800x480_4GRAY}},
@@ -79,6 +80,7 @@ const DISPLAY_PROFILE dpList[15][3] = { // 1-bit and 2-bit display types for eac
     {{EP368_792x528, EP368_792x528_4GRAY}, {EP368_792x528, EP368_792x528_4GRAY}, {EP368_792x528, EP368_792x528_4GRAY}},
     {{EP42C_400x300, EP42C_400x300},{EP42C_400x300, EP42C_400x300},{EP42C_400x300, EP42C_400x300}},
     {{EP42YR_400x300, EP42YR_400x300}, {EP42YR_400x300, EP42YR_400x300}, {EP42YR_400x300, EP42YR_400x300}},
+    {{EP397C_800x480, EP397C_800x480_4GRAY}, {EP397C_800x480, EP397C_800x480_4GRAY}, {EP397C_800x480, EP397C_800x480_4GRAY}},
 };
 // clang-format on
 #endif // !PARALLEL_EPD
