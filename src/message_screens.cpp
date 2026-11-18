@@ -738,3 +738,33 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
   Log_info("Start drawing...");
   present_setup_message();
 }
+
+// The screen shown while the button is held past BUTTON_HOLD_TIME (OG): two lines of text in the
+// middle of a white screen, with a blank line between them
+void display_show_button_hold_dialog(void) {
+#if defined(BB_EPAPER) && defined(BOARD_TRMNL)
+  const char line1[] = "Release button to open settings.";
+  const char line2[] = "Keep holding to soft reset.";
+
+  display_init();
+  display_prepare_message();
+  bbep.fillScreen(BBEP_WHITE);
+  use_message_font();
+
+  // getStringBox() measures from the cursor (the baseline): rect.y - cursor y is the top's offset
+  BB_RECT r1, r2;
+  bbep.setCursor(0, 0);
+  bbep.getStringBox(line1, &r1);
+  bbep.getStringBox(line2, &r2);
+  const int line_h = max(r1.h, r2.h);
+  const int ascent = -min(r1.y, r2.y);
+  const int top = (bbep.height() - 3 * line_h) / 2;
+  bbep.drawString(line1, (bbep.width() - r1.w) / 2, top + ascent);
+  bbep.drawString(line2, (bbep.width() - r2.w) / 2, top + 2 * line_h + ascent);
+
+  if (!display_update_epaper(REFRESH_FAST, true, true, PLANE_0)) {
+    Log_error("Button hold screen: e-paper update failed");
+  }
+  bbep.freeBuffer();
+#endif
+}
