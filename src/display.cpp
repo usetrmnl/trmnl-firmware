@@ -10,6 +10,7 @@
 #include <display_widgets.h>
 #include <epd_panel_rev.h>
 #include <jpeg_render.h>
+#include <panel_power.h>
 #include <png_render.h>
 #include <power.h>
 #include <preferences_persistence.h>
@@ -180,6 +181,7 @@ void display_init(void) {
 #ifdef BOARD_TRMNL_X
 //    bbep.initPanel(BB_PANEL_TRMNL_X);
   bbep.setPasses(3, 3); // The 10.3" panel needs fewer pushes
+  panel_power_limit_wait();
 #endif
 // #elif defined( BOARD_TRMNL_X_SENSORIAS3 )
 //     bbep.initPanel(BB_PANEL_V7_RAW);
