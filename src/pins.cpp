@@ -1,7 +1,8 @@
 #include <Arduino.h>
 #include <board_config.h>
 #include <config.h>
-#ifndef BOARD_TRMNL_X
+#if defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002)
+#include "driver/rtc_io.h"
 #endif
 
 void pins_init(void) {
@@ -10,6 +11,11 @@ void pins_init(void) {
   io_conf.mode = GPIO_MODE_INPUT;
 #ifdef BOARD_TRMNL_X
   io_conf.pin_bit_mask = (1ULL << PIN_INTERRUPT);
+#elif defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002)
+  rtc_gpio_deinit(GPIO_NUM_3);
+  rtc_gpio_deinit(GPIO_NUM_4);
+  rtc_gpio_deinit(GPIO_NUM_5);
+  io_conf.pin_bit_mask = (1ULL << 3) | (1ULL << 4) | (1ULL << 5);
 #else
   io_conf.pin_bit_mask = (1ULL << pDevice->interrupt_pin);
 #endif

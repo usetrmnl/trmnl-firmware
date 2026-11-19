@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <Wire.h>
 #include <config.h>
 #include <esp_sleep.h>
 #include <misc/sensor.h>
@@ -11,11 +12,70 @@ static const char *szDevices[] = {"None",    "AHT20",  "BMP180",  "BME280", "BMP
 static const char *szMakers[] = {"None", "ASAIR",   "Bosch",     "Bosch", "Bosch",     "Sensirion",
                                  "TI",   "STMicro", "MicroChip", "Bosch", "Sensirion", "Sensirion"};
 
+#define SENSOR_TYPE_SHT40 11
+
+// Native Sensirion SHT40 CRC-8 verification (polynomial 0x31, init 0xFF)
+static uint8_t sht40_crc8(const uint8_t *data, int len) {
+  uint8_t crc = 0xFF;
+  for (int i = 0; i < len; i++) {
+    crc ^= data[i];
+    for (int b = 0; b < 8; b++) {
+      if (crc & 0x80) {
+        crc = (crc << 1) ^ 0x31;
+      } else {
+        crc = (crc << 1);
+      }
+    }
+  }
+  return crc;
+}
+
+// Probes and reads a native Sensirion SHT40 sensor (I2C address 0x44)
+static bool readSHT40(int sda, int scl, int *outTemp10x, int *outHum) {
+  Wire.begin(sda, scl);
+  Wire.beginTransmission(0x44);
+  Wire.write(0xFD); // high-repeatability measurement command
+  if (Wire.endTransmission() != 0) {
+    return false;
+  }
+  delay(10); // max conversion time is 8.3ms
+  if (Wire.requestFrom((uint8_t)0x44, (uint8_t)6) != 6) {
+    return false;
+  }
+  uint8_t buf[6];
+  for (int i = 0; i < 6; i++) {
+    buf[i] = Wire.read();
+  }
+  if (sht40_crc8(&buf[0], 2) != buf[2] || sht40_crc8(&buf[3], 2) != buf[5]) {
+    return false;
+  }
+  uint16_t rawT = ((uint16_t)buf[0] << 8) | buf[1];
+  uint16_t rawH = ((uint16_t)buf[3] << 8) | buf[4];
+  float tC = -45.0f + 175.0f * ((float)rawT / 65535.0f);
+  float hRel = -6.0f + 125.0f * ((float)rawH / 65535.0f);
+  if (hRel < 0.0f) hRel = 0.0f;
+  if (hRel > 100.0f) hRel = 100.0f;
+  *outTemp10x = (int)roundf(tC * 10.0f);
+  *outHum = (int)roundf(hRel);
+  return true;
+}
+
 void EnvironmentSensor::init(TRMNL_DEVICE *pDevice) {
   bool co2Found = false;
   int sensorType = -1;
 
   if (pDevice->sensor_sda == 0xff) return; // no I2C bus defined for this device
+
+  // Check for native Sensirion SHT40 first (address 0x44) to prevent legacy SHT3X probing conflicts
+  int sht40Temp = 0, sht40Hum = 0;
+  if (readSHT40(pDevice->sensor_sda, pDevice->sensor_scl, &sht40Temp, &sht40Hum)) {
+    _readings.sampledAt = (int)time(nullptr);
+    _readings.temperature = sht40Temp;
+    _readings.humidity = sht40Hum;
+    _readings.sensorType = SENSOR_TYPE_SHT40;
+    Log_info("Sensirion SHT40 found! Temp = %d.%dC, Hum = %d%%", _readings.temperature / 10, _readings.temperature % 10, _readings.humidity);
+    return;
+  }
 
   // check if there is a SCD41 or supported temperature sensor attached
   if (_scd41.init(pDevice->sensor_sda, pDevice->sensor_scl) == SCD41_SUCCESS) {
@@ -109,7 +169,7 @@ bool EnvironmentSensor::buildSensorsHeader(char **szTemp) {
               szMakers[_readings.sensorType], szDevices[_readings.sensorType], _readings.humidity, _readings.sampledAt);
       strcat(*szTemp, szPart);
     }
-    if (_readings.pressure > 0) {
+    if (_readings.pressure > 0) { // add pressure
       sprintf(szPart, ",make=%s;model=%s;kind=pressure;value=%d;unit=hectopascal;created_at=%d",
               szMakers[_readings.sensorType], szDevices[_readings.sensorType], _readings.pressure, _readings.sampledAt);
       strcat(*szTemp, szPart);

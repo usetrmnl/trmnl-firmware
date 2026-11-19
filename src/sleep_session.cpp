@@ -56,6 +56,22 @@ static uint64_t timerSleepUs([[maybe_unused]] bool keep_timer) {
  * @param keep_timer sleep until the last sleep's timer, not for the refresh interval
  * @return none
  */
+#if defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002)
+#include "driver/rtc_io.h"
+
+static void setupE1001ButtonWake(void) {
+  esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
+  const gpio_num_t pins[] = {GPIO_NUM_3, GPIO_NUM_4, GPIO_NUM_5};
+  for (int i = 0; i < 3; i++) {
+    rtc_gpio_init(pins[i]);
+    rtc_gpio_set_direction(pins[i], RTC_GPIO_MODE_INPUT_ONLY);
+    rtc_gpio_pullup_en(pins[i]);
+    rtc_gpio_pulldown_dis(pins[i]);
+  }
+  esp_sleep_enable_ext1_wakeup((1ULL << 3) | (1ULL << 4) | (1ULL << 5), ESP_EXT1_WAKEUP_ANY_LOW);
+}
+#endif
+
 static void enterSleep(bool keep_timer) {
   Log.info("%s [%d]: go to sleep\r\n", __FILE__, __LINE__);
   submitStoredLogs();
@@ -107,6 +123,8 @@ static void enterSleep(bool keep_timer) {
 #elif defined(CONFIG_IDF_TARGET_ESP32S3)
 #ifdef BOARD_TRMNL_X
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
+#elif defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002)
+  setupE1001ButtonWake();
 #else
   esp_sleep_enable_ext0_wakeup((gpio_num_t)pDevice->interrupt_pin, 0);
 #endif
@@ -169,6 +187,8 @@ void goToSleepButtonOnly(void) {
 #elif CONFIG_IDF_TARGET_ESP32S3
 #ifdef BOARD_TRMNL_X
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
+#elif defined(BOARD_SEEED_RETERMINAL_E1001) || defined(BOARD_SEEED_RETERMINAL_E1002)
+  setupE1001ButtonWake();
 #else
   esp_sleep_enable_ext0_wakeup((gpio_num_t)pDevice->interrupt_pin, 0);
 #endif
