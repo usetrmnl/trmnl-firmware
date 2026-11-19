@@ -1,0 +1,115 @@
+name: publish-spike-firmware
+
+# Sends builds of a branch to TRMNL, only when a spike channel there follows the branch.
+# Without a channel the first job ends in seconds and nothing is built.
+on:
+  push:
+    branches-ignore: ["main"]
+  delete:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-spike-firmware-${{ github.event_name }}-${{ github.event.ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  channel:
+    if: github.event_name != 'delete'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      models: ${{ steps.ask.outputs.models }}
+
+    steps:
+      - name: Ask TRMNL which models a channel wants for this branch
+        id: ask
+        env:
+          TRMNL_ADMIN_API_TOKEN: ${{ secrets.TRMNL_ADMIN_API_TOKEN }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          STATUS=$(curl -sS -o channel.json -w '%{http_code}' --get \
+            -H "Access-Token: ${TRMNL_ADMIN_API_TOKEN}" \
+            --data-urlencode "branch=${BRANCH}" \
+            https://trmnl.com/admin_api/spike_channels || true)
+          if [ "$STATUS" != "200" ]; then
+            echo "No spike channel follows ${BRANCH} (HTTP ${STATUS}). Nothing to build."
+            echo 'models=[]' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "models=$(jq -c '.data.models' channel.json)" >> "$GITHUB_OUTPUT"
+
+  publish:
+    needs: channel
+    if: needs.channel.outputs.models != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        model: ${{ fromJSON(needs.channel.outputs.models) }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio/.cache
+          key: ${{ runner.os }}-pio
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Install PlatformIO Core
+        run: pip install --upgrade platformio==6.1.19 esptool
+
+      - name: Build spike firmware (${{ matrix.model }})
+        env:
+          INCLUDE_GIT_HASH_IN_VERSION_NUMBER: "true"
+          MODEL: ${{ matrix.model }}
+        run: |
+          case "$MODEL" in
+            trmnl) PIO_ENV=trmnl ;;
+            trmnl_x) PIO_ENV=TRMNL_X ;;
+            trmnl_4clr) PIO_ENV=trmnl_4clr ;;
+            *) echo "No PlatformIO environment for model ${MODEL}"; exit 1 ;;
+          esac
+          pio run -e "$PIO_ENV"
+          echo "PIO_ENV=${PIO_ENV}" >> "$GITHUB_ENV"
+
+      # The token is given to this step only, after the build, so branch code never sees it.
+      - name: Send the build to the spike channel
+        env:
+          TRMNL_ADMIN_API_TOKEN: ${{ secrets.TRMNL_ADMIN_API_TOKEN }}
+          BRANCH: ${{ github.ref_name }}
+          MODEL: ${{ matrix.model }}
+        run: |
+          curl --fail-with-body -sS -X POST \
+            -H "Access-Token: ${TRMNL_ADMIN_API_TOKEN}" \
+            --form-string "branch=${BRANCH}" \
+            --form-string "model=${MODEL}" \
+            --form-string "commit=$(git rev-parse --short HEAD)" \
+            -F "file=@.pio/build/${PIO_ENV}/firmware.bin;type=application/octet-stream" \
+            https://trmnl.com/admin_api/spike_channels/builds
+
+  branch-deleted:
+    if: github.event_name == 'delete' && github.event.ref_type == 'branch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Tell TRMNL the branch is gone
+        env:
+          TRMNL_ADMIN_API_TOKEN: ${{ secrets.TRMNL_ADMIN_API_TOKEN }}
+          BRANCH: ${{ github.event.ref }}
+        run: |
+          STATUS=$(curl -sS -o /dev/null -w '%{http_code}' -X POST \
+            -H "Access-Token: ${TRMNL_ADMIN_API_TOKEN}" \
+            --data-urlencode "branch=${BRANCH}" \
+            https://trmnl.com/admin_api/spike_channels/branch_deleted || true)
+          echo "TRMNL answered HTTP ${STATUS} for ${BRANCH} (404 means no channel followed it)."
