@@ -28,11 +28,16 @@ RSpec.describe "Faults on the TRMNL X", env: "TRMNL_X" do
     end
 
     # Without its touch bar, not boot-looping: restarting never reaches the server and drains
-    # the battery.
+    # the battery. The absent controller holds its ready line low, which as a wake source
+    # would end every sleep at once.
     it "keeps running with the touch controller absent" do
       dev.boot(faults: { i2c_absent: [touch_bar] }) do |s|
         dev.mock.wait_for_request("/api/display", timeout: 15)
-        expect(s.wait(state: "deep_sleep", timeout: 60)["status"]["boot_count"]).to be < 3
+        status = s.wait(state: "deep_sleep", timeout: 60, settle_ms: 300)["status"]
+        expect(status["boot_count"]).to eq(1)
+        expect(status["wake_at_s"] - status["sim_time_s"]).to be_within(15).of(300)
+        dev.mock.next_request("/api/display", timeout: 60) { s.wake }
+        expect(s.wait(state: "deep_sleep", timeout: 60, settle_ms: 300)["status"]["boot_count"]).to eq(2)
       end
     end
 
