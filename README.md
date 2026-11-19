@@ -7,100 +7,64 @@ created for the [TRMNL](https://trmnl.com) e-ink display.
 >
 > to access production-ready firmware, check out the [tagged releases](https://github.com/usetrmnl/trmnl-firmware/releases/)
  or use the [Flash Assistant](https://trmnl.com/flash).
-## **Algorithm block scheme**
+## **Wake cycle**
+
+Each wake the device connects to Wi-Fi, fetches its screen from `/api/display`, draws it, checks for a reset or firmware update and goes back to deep sleep.
+
+<details>
+<summary>Show the full flowchart</summary>
 
 ```mermaid
-graph TB
+flowchart TD
+    Wake(["Wake: power-on, button or timer"]) --> Init("Init board, pins, preferences")
+    Init --> IsButton{"Woken by<br/>the button?"}
 
-    Start(["Start"])
-    Init("Init peripherals")
-    Start --> Init
+    %% Button wake (the TRMNL X reads its touch bar instead)
+    IsButton -->|"Yes"| Press{"How was it<br/>pressed?"}
+    Press -->|"Hold ≥ 15 s"| Wipe1(["Wipe credentials, reboot"])
+    Press -->|"Hold 5–15 s"| ForgetWifi("Forget Wi-Fi")
+    Press -->|"Double-click"| SpecialFn("Run special function")
+    Press -->|"Short press"| Hardware
+    ForgetWifi --> Hardware
+    SpecialFn --> Hardware
+    IsButton -->|"No"| Hardware("Read battery, init display<br/>and filesystem<br/>(wake logo unless timer wake)")
 
-    IsLongRst{"Reset button
-      pressed > 5000 ms?"}
-    Init --> IsLongRst
-
-    ClearWifi("Wi-Fi credentials clear")
-    IsLongRst -->|"Yes"| ClearWifi
-    DisplayInit("Display init")
-    IsLongRst -->|"No"| DisplayInit
-    ClearWifi --> DisplayInit
-    WakeReason{"Wake by
-      user or timer?"}
-    DisplayInit --> WakeReason
-
-    ClearDisplay("Display clear")
-    WakeReason -->|"User"| ClearDisplay
-    IsWiFiSetup{"Wi-Fi saved?"}
-    WakeReason -->|"Timer"| IsWiFiSetup
-    ClearDisplay --> IsWiFiSetup
-    NeedConfig("Show set-up message")
-    IsWiFiSetup -->|"No"| NeedConfig
-
-    %% Config Wifi
-    RunSetup("Start config portal")
-    NeedConfig --> RunSetup
-    IsReset1{"Device
-      reset?"}
-    RunSetup -->|"Yes"| IsReset1
-    WipeConfig1("API key, friendly ID and WiFi clear")
-    IsReset1 -->|"Yes"| WipeConfig1
-    Reboot1(["Reboot"])
-    WipeConfig1 --> Reboot1
-    IsWifiConnect{"WiFi
-      connected?"}
-    IsReset1 -->|"No"| IsWifiConnect
-
-    %% Main Body
-    TryConnect{"WiFi connected
-      (5tries)?"}
-    IsWiFiSetup -->|"Yes"| TryConnect
-
-    ConnectError("Show connection error")
-    IsWifiConnect -->|"No"| ConnectError
-    TryConnect -->|"No"| ConnectError
-    Sleep1(["Sleep"])
-    ConnectError --> Sleep1
-    ClockSync("Check synchronization")
-    IsWifiConnect -->|"Yes"| ClockSync
-    TryConnect -->|"Yes"| ClockSync
-    IsApiSetup{"API key and
-      friendly ID exist?"}
-    ClockSync --> IsApiSetup
+    %% Wi-Fi
+    Hardware --> IsWifiSaved{"Wi-Fi<br/>saved?"}
+    IsWifiSaved -->|"No"| Portal{"Captive portal"}
+    Portal -->|"Reset device"| Wipe2(["Wipe credentials, reboot"])
+    Portal -->|"Timed out"| WifiError(["Show Wi-Fi error, sleep"])
+    Portal -->|"Connected"| Clock
+    IsWifiSaved -->|"Yes"| Connect{"Connected?<br/>(3 attempts)"}
+    Connect -->|"No"| WifiRetry(["Sleep with backoff<br/>(error shown on button wake<br/>or 12th failed wake)"])
+    Connect -->|"Yes"| Clock("Sync clock (NTP)")
 
     %% Setup
-    CallSetup("Ping /api/setup")
-    IsApiSetup -->|"No"| CallSetup
-    IsSetupSuccess{"Setup
-      success?"}
-    CallSetup --> IsSetupSuccess
-    SetupError("Show setup error")
-    IsSetupSuccess --> SetupError
-    Sleep2(["Sleep"])
-    SetupError --> Sleep2
+    Clock --> HasKeys{"API key and<br/>friendly ID saved?"}
+    HasKeys -->|"No"| Setup{"GET /api/setup"}
+    Setup -->|"404 MAC unknown"| NotRegistered(["Show not-registered<br/>screen, sleep"])
+    Setup -->|"200"| SetupOk("Save credentials, show<br/>friendly ID screen")
+    Setup -->|"Other error"| SetupError("Show setup error")
+    SetupOk --> Fetch
+    SetupError --> Fetch
+    HasKeys -->|"Yes"| Fetch
 
-    %% Check update
-    PingServer{"Ping server,
-      success?"}
-    IsApiSetup -->|"Yes"| PingServer
-    IsSetupSuccess -->|"Yes"| PingServer
-    PingError("Show server error")
-    PingServer -->|"No"| PingError
-    Sleep3(["Sleep"])
-    PingError --> Sleep3
-
-    %% Act on update
-    IsNeedReset{"Need to reset
-     the device?"}
-    PingServer -->|"Yes"| IsNeedReset
-    IsNeedReset -->|"Yes"| WipeConfig1
-    IsNeedUpdate{"Need to update?"}
-    IsNeedReset -->|"No"| IsNeedUpdate
-    IsNeedUpdate -->|"No"| Sleep3
-    Update("Download and update")
-    IsNeedUpdate -->|"Yes"| Update
-    Update --> Sleep3
+    %% Display
+    Fetch("Send stored logs, GET /api/display,<br/>download and draw the image") --> StayQuiet{"Failed on a timer<br/>wake, < 12 tries?"}
+    StayQuiet -->|"Yes"| QuietSleep(["Sleep with backoff"])
+    StayQuiet -->|"No"| ResetAsked{"Server asked<br/>for a reset?"}
+    ResetAsked -->|"Yes"| Wipe3(["Wipe credentials, reboot"])
+    ResetAsked -->|"No"| UpdateDue{"Firmware<br/>update due?"}
+    UpdateDue -->|"Yes"| Update{"Download and<br/>flash, success?"}
+    Update -->|"Yes"| Reboot(["Reboot"])
+    Update -->|"No"| ShowResult
+    UpdateDue -->|"No"| ShowResult("Show error screen, if any")
+    ShowResult --> MoreTaps{"TRMNL X:<br/>touch bar tapped?"}
+    MoreTaps -->|"Yes"| Fetch
+    MoreTaps -->|"No"| Sleep(["Sleep until the refresh<br/>interval or a button press"])
 ```
+
+</details>
 
 ## **Web Server Endpoints**
 

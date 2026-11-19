@@ -8,11 +8,15 @@
 #include "battery_hollow.h"
 #include "battery_small.h"
 
-void display_fill_pill(int x, int y, int w, int h, uint8_t color) {
+int display_pill_inset(int h, int row) {
   float r = h / 2.0f;
+  float dy = row + 0.5f - r;
+  return (int)lroundf(r - sqrtf(r * r - dy * dy));
+}
+
+void display_fill_pill(int x, int y, int w, int h, uint8_t color) {
   for (int row = 0; row < h; row++) {
-    float dy = row + 0.5f - r;
-    int inset = (int)lroundf(r - sqrtf(r * r - dy * dy));
+    int inset = display_pill_inset(h, row);
     if (w - 2 * inset > 0) {
       bbep.fillRect(x + inset, y + row, w - 2 * inset, 1, color);
     }

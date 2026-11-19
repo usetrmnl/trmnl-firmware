@@ -11,6 +11,7 @@ enum SPECIAL_FUNCTION {
   SF_REWIND,
   SF_SEND_TO_ME,
   SF_GUEST_MODE,
+  SF_TOGGLE_HOLD,
 };
 
 SPECIAL_FUNCTION parseSpecialFunction(String &special_function_str);

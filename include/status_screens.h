@@ -22,3 +22,8 @@ void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiResponse);
 
 // Shows the loading logo on a wake the user caused, and makes the next screen redraw.
 void showWakeLogo(void);
+
+#ifdef BOARD_TRMNL_X
+// Shows the loading logo, with the touch bar indicator over it, while a touch's screen downloads.
+void showTouchbarLoading(void);
+#endif

@@ -140,6 +140,58 @@ int png_draw_6clr(PNGDRAW *pDraw) {
   return 1; // continue decoding
 } /* png_draw_6clr() */
 
+//
+// Write 1-bit image data as packed 2-bits per pixel
+// for the SSD26xx EPD controller
+// (Zectrix Note 4 & newer Seeed Sticky so far)
+//
+int png_draw_2bit_bw(PNGDRAW *pDraw) {
+  int x;
+  uint8_t ucBppChanged = 0, ucInvert = 0;
+  uint8_t uc, ucMask, src, *s, *d, *pTemp = bbep.getCache(); // get some scratch memory (not from the stack)
+  int iWidth;
+
+  iWidth = pDraw->iWidth;
+  if (pDraw->y >= bbep.height()) return 0; // stop decoding if we'll go past the bottom
+  if (iWidth > bbep.width()) iWidth = bbep.width(); // crop image width to display size if it's larger
+
+  if (pDraw->iPixelType == PNG_PIXEL_INDEXED || pDraw->iBpp > 2) {
+    if (pDraw->iBpp == 1) { // 1-bit output, just see which color is brighter
+      uint32_t u32Gray0, u32Gray1;
+      u32Gray0 = pDraw->pPalette[0] + (pDraw->pPalette[1] << 2) + pDraw->pPalette[2];
+      u32Gray1 = pDraw->pPalette[3] + (pDraw->pPalette[4] << 2) + pDraw->pPalette[5];
+      if (u32Gray0 < u32Gray1) {
+        ucInvert = 0xff;
+      }
+    } else {
+            // Reduce the source image to 2-bpp
+      ReduceBpp(2, pDraw->iPixelType, pDraw->pPalette, pDraw->pPixels, pTemp, iWidth, pDraw->iBpp);
+      ucBppChanged = 1;
+    }
+  }
+  if (pDraw->iBpp == 1) {
+    s = (ucBppChanged) ? pTemp : (uint8_t *)pDraw->pPixels;
+    d = pTemp;
+    for (x = 0; x < iWidth; x += 8) {
+      uint8_t uc1 = 0, uc2 = 0;
+      for (int bit = 0; bit < 4; bit++) {
+        uc1 <<= 2;
+        uc2 <<= 2;
+        if (s[0] & (0x80 >> bit)) uc1 |= 1;
+        if (s[0] & (0x08 >> bit)) uc2 |= 1;
+      }
+      s++;
+      *d++ = uc1;
+      *d++ = uc2;
+    }
+  } else if (pDraw->iBpp == 2 && !ucBppChanged) {
+    memcpy(pTemp, pDraw->pPixels, (iWidth + 3) / 4); // Use the unmodified PNG pixels for 2-bpp
+  }
+    // For 2-bit gray, the output of ReduceBpp is already in the right form
+  bbep.writeData(pTemp, (iWidth + 3) / 4);
+  return 1;
+} /* png_draw_2bit_bw() */
+
 #ifdef BOARD_TRMNL_4CLR
 //
 // Draw the PNG image into the local framebuffer memory using the drawPixel() method
@@ -377,15 +429,18 @@ int png_draw(PNGDRAW *pDraw) {
   uint8_t uc = 0;
   uint8_t ucMask, ucPixel, src, *s, *d;
   int iPitch, iBpp;
+  int iWidth = pDraw->iWidth;
+  // A portrait image (as wide as the panel is high) is drawn turned; any other is cropped to the panel
+  const bool rotated = iWidth == bbep.height() && iWidth != bbep.width();
 
-  if (y >= bbep.height() && pDraw->iWidth != bbep.height())
-    return 0; // image is larger than the display (and not rotated), stop decoding it
+  if (!rotated && iWidth > bbep.width()) iWidth = bbep.width();
+  if (y >= (rotated ? bbep.width() : bbep.height())) return 0; // past the end of the panel, stop decoding it
   if (pDraw->iPixelType == PNG_PIXEL_INDEXED ||
       pDraw->iBpp > 4) { // need to convert through the palette and/or reduce the bpp
     s = bbep.tempBuffer(); // temp space we can use
     iBpp = (pDraw->iBpp > 4) ? 4 : pDraw->iBpp;
     if (iBpp == 2) iBpp = 4; // 2-bit indexed images -> 4bpp for calibrated gray refresh
-    ReduceBpp(iBpp, pDraw->iPixelType, pDraw->pPalette, pDraw->pPixels, s, pDraw->iWidth, pDraw->iBpp);
+    ReduceBpp(iBpp, pDraw->iPixelType, pDraw->pPalette, pDraw->pPixels, s, iWidth, pDraw->iBpp);
   } else { // for grayscale images of 1/2/4-bpp we can directly use the pixels as-is
     iBpp = pDraw->iBpp;
     s = (uint8_t *)pDraw->pPixels;
@@ -405,16 +460,17 @@ int png_draw(PNGDRAW *pDraw) {
   }
   iPitch = bbep.width() / 2;
   if (iBpp == 1) {
-    if (bbep.width() >= pDraw->iWidth) { // normal orientation
-      iPitch = (bbep.width() + 7) / 8;
+    iPitch = (bbep.width() + 7) / 8; // 1-bit lines, turned or not
+    if (!rotated) { // normal orientation
       d += y * iPitch; // point to the correct line
-      memcpy(d, s, (pDraw->iWidth + 7) / 8);
+      memcpy(d, s, (iWidth + 7) / 8);
+      if (iWidth & 7) d[iWidth / 8] |= 0xff >> (iWidth & 7); // pad bits past the image are white
     } else { // rotated
       uint8_t ucPixel, ucMask, j;
       d += (bbep.height() - 1) * iPitch;
       d += (y / 8);
       ucMask = 0x80 >> (y & 7); // destination mask
-      for (x = 0; x < pDraw->iWidth; x++) {
+      for (x = 0; x < iWidth; x++) {
         if ((x & 7) == 0) uc = *s++;
         ucPixel = d[0] & ~ucMask; // unset old pixel
         if (uc & 0x80) ucPixel |= ucMask;
@@ -425,19 +481,20 @@ int png_draw(PNGDRAW *pDraw) {
     }
   } else {
     if (iBpp == 2) { // expand 2-bit grayscale to 4-bit for calibrated refresh
-      Expand2bppLineTo4bpp(s, bbep.tempBuffer(), pDraw->iWidth);
+      Expand2bppLineTo4bpp(s, bbep.tempBuffer(), iWidth);
       s = bbep.tempBuffer();
       iBpp = 4;
     }
         // 4-bit native format (includes expanded 2-bit)
-    if (bbep.width() == pDraw->iWidth) { // normal orientation
+    if (!rotated) { // normal orientation
       d += y * iPitch; // point to the correct line
-      memcpy(d, s, (pDraw->iWidth + 1) / 2);
+      memcpy(d, s, (iWidth + 1) / 2);
+      if (iWidth & 1) d[iWidth / 2] |= 0x0f; // pad pixel past the image is white
     } else { // rotated
       d += (bbep.height() - 1) * iPitch;
       d += (y / 2);
       if (y & 1) { // odd line (column)
-        for (x = 0; x < pDraw->iWidth; x += 2) {
+        for (x = 0; x < iWidth; x += 2) {
           uc = (d[0] & 0xf0) | (s[0] >> 4);
           *d = uc;
           d -= iPitch;
@@ -447,7 +504,7 @@ int png_draw(PNGDRAW *pDraw) {
           s++;
         } // for x
       } else {
-        for (x = 0; x < pDraw->iWidth; x += 2) {
+        for (x = 0; x < iWidth; x += 2) {
           uc = (d[0] & 0xf) | (s[0] & 0xf0);
           *d = uc;
           d -= iPitch;
@@ -572,6 +629,23 @@ int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious) {
         bbep.writePlane(); // send the pixels to the display panel
         return REFRESH_FAST;
       }
+      if (bbep.capabilities() & BBEP_2BIT_BW) {
+        // new SSD26xx controller forces 2-bits per pixel for 1-bit content
+        Log_info("%s [%d]: decoding for SSD26xx special case 2/1-bit\r\n", __FILE__, __LINE__);
+        png->openRAM((uint8_t *)pPNG, iDataSize, png_draw_2bit_bw);
+        if (png->getBpp() >= 2) { // Draw as 2-bit grayscale image
+          Log_info("Using 2-bit grayscale panel setup for this image");
+          bbep.setPanelType(dpList[pDevice->panel_set][0].TwoBit);
+          bbep.sendInit();
+        }
+        bbep.startWrite(PLANE_1); // start writing image data (0x10 cmd instead of 0x13)
+        png->decode(NULL, 0);
+        png->close();
+        delete (png); // free the decoder instance
+        bbep.writeCmd(UC8151_PON); // turn the power on AFTER writing the data
+        bbep.wait();
+        return REFRESH_PARTIAL;
+      }
 #ifdef BOARD_TRMNL_4CLR
       Log_info("%s [%d]: decoding for 4-color EPD\r\n", __FILE__, __LINE__);
       png->openRAM((uint8_t *)pPNG, iDataSize, png_draw_4clr);
@@ -655,6 +729,11 @@ int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious) {
         break;
       }
       Log_info("%s [%d]: FastEPD graphics mode set to: %d\n", __FILE__, __LINE__, bbep.getMode());
+      { // an image smaller than the panel leaves the rest white (0xff at 1 and 4 bpp)
+        uint8_t *pBuffer = (bPrevious) ? bbep.previousBuffer() : bbep.currentBuffer();
+        int iPitch = (png->getBpp() == 1) ? (bbep.width() + 7) / 8 : bbep.width() / 2;
+        memset(pBuffer, 0xff, iPitch * bbep.height());
+      }
       png->decode((void *)bPrevious, 0);
       png->close();
 #endif

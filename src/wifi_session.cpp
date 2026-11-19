@@ -25,7 +25,7 @@ void wifiSessionInit(void) { WifiCaptivePortal.setHostname(getWifiClientHostname
 
 #ifdef BOARD_TRMNL_X
 static bool wifiSessionModemNeeded(void) {
-  if (WifiCaptivePortal.isSaved()) {
+  if (!WifiCaptivePortal.isPortalNeeded()) {
     WifiCredentials lastCreds = WifiCaptivePortal.getLastCredentials();
     return lastCreds.is5GHz;
   }
@@ -50,13 +50,13 @@ static void wifiSessionPrepareModem(void) {
     g_modem = nullptr;
   }
 
-  // Only scan when no credentials are saved (i.e. captive portal will be shown).
-  if (g_modem && !WifiCaptivePortal.isSaved()) {
+  // Only scan when the captive portal will be shown (nothing saved, or the user asked for it).
+  if (g_modem && WifiCaptivePortal.isPortalNeeded()) {
     // The modem is a separate radio and can see the device's own captive-portal
     // SoftAP over the air; exclude it so it never shows up as a connectable network.
     String ownApSsid = WifiCaptivePortal.getAPSSID();
 
-    Log_info("No saved credentials — scanning networks via modem...");
+    Log_info("Portal needed — scanning networks via modem...");
     auto modemNets = g_modem->scanNetworks();
     Log_info("Modem found %d network(s)", modemNets.size());
     std::vector<ExternalNetwork> nets;
@@ -108,7 +108,7 @@ void wifiSessionConnect(bool should_show_error_now) {
 // goToSleep();
 #else
 
-  if (WifiCaptivePortal.isSaved()) {
+  if (!WifiCaptivePortal.isPortalNeeded()) {
     // WiFi saved, connection
     Log.info("%s [%d]: WiFi saved\r\n", __FILE__, __LINE__);
     int connection_res = connectWithSavedCredentials() ? 1 : 0;
@@ -134,8 +134,8 @@ void wifiSessionConnect(bool should_show_error_now) {
       wifiErrorDeepSleep();
     }
   } else {
-    // WiFi credentials are not saved - start captive portal
-    Log.info("%s [%d]: WiFi NOT saved\r\n", __FILE__, __LINE__);
+    // WiFi credentials are not saved, or the user asked for the settings - start captive portal
+    Log.info("%s [%d]: WiFi NOT saved or portal requested\r\n", __FILE__, __LINE__);
 
 #ifdef BOARD_TRMNL_X
     if (preferences.getBool("eth_enabled", false)) {

@@ -80,7 +80,10 @@ void updateFirmwareIfDue(void) {
       showMessageWithLogo(FW_UPDATE_SUCCESS);
       ESP.restart();
     }
-    if (firmwareUpdateResult.failureMessage != NONE) showMessageWithLogo(firmwareUpdateResult.failureMessage);
+    if (firmwareUpdateResult.failureMessage != NONE) {
+      showMessageWithLogo(firmwareUpdateResult.failureMessage);
+      refreshInterval.applyFailedUpdate();
+    }
   }
 }
 

@@ -24,6 +24,17 @@ static uint8_t ReadSPIByte(void) {
   }
   return u8;
 }
+
+// The UC8179 drives each bit while SCK is high; ReadSPIByte() samples after the fall and shifts every byte left by one
+static uint8_t ReadSPIByteWhileClockHigh(void) {
+  uint8_t u8 = 0;
+  for (int i = 0; i < 8; i++) {
+    digitalWrite(pDevice->epd_sck_pin, 1);
+    u8 = (u8 << 1) | digitalRead(pDevice->epd_mosi_pin);
+    digitalWrite(pDevice->epd_sck_pin, 0);
+  }
+  return u8;
+}
 /**
  * @brief Function to read the EPD revision to know what temperature profile to use
  * @param none
@@ -32,14 +43,11 @@ static uint8_t ReadSPIByte(void) {
 uint32_t get_panel_rev(void) {
   uint32_t u32 = 0;
   uint8_t u8;
+  bool bSolomon = false; // assume the panel has an UltraChip controller
 
   if (pDevice->epd_mosi_pin == 0 && pDevice->epd_sck_pin == 0) { // pre-defined PCB+display in bb_epaper; pins unknown
     return 0;
   }
-  if (pDevice->panel_set != EPD_75) { // REV (0x70) is only known to be a harmless read on the 7.5" B/W UC8179
-    return 0;
-  }
-
     // Initialize the SPI bus in 'bit-bang' mode before running the normal init sequence
     // This will allow us to use MOSI as a bidirectional line for reading data from the panel
   pinMode(pDevice->epd_sck_pin, OUTPUT);
@@ -54,18 +62,22 @@ uint32_t get_panel_rev(void) {
   delay(20);
   digitalWrite(pDevice->epd_rst_pin, 1);
   delay(20);
-  if (digitalRead(pDevice->epd_busy_pin) ==
-      0) { // it's a SSD16xx; not useful at the moment because our 7.5" B/W is a UC81xx type panel
-    return 0;
+  if (digitalRead(pDevice->epd_busy_pin) == 0) { // it's a SSD16xx; different command and output
+    bSolomon = true;
   }
   digitalWrite(pDevice->epd_dc_pin, 0); // command mode
   digitalWrite(pDevice->epd_cs_pin, 0);
   pinMode(pDevice->epd_mosi_pin, OUTPUT);
-  WriteSPIByte(0x70); // Revision (REV) command
+  if (bSolomon) {
+    WriteSPIByte(0x2e); // Read the "Display Option"
+  } else {
+    WriteSPIByte(0x70); // Revision (REV) command
+  }
   digitalWrite(pDevice->epd_dc_pin, 1); // data mode
   pinMode(pDevice->epd_mosi_pin, INPUT);
   for (int i = 0; i < 7; i++) {
-    u8 = ReadSPIByte();
+    // SSD16xx panels keep the old timing: the 4.26" panel check in display_init() matches a value read with it
+    u8 = bSolomon ? ReadSPIByte() : ReadSPIByteWhileClockHigh();
     if (i >= 3) { // first 3 bytes are 0xff
       u32 <<= 8;
       u32 |= u8;

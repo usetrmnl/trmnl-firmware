@@ -9,6 +9,7 @@ struct ApiDisplayResult {
   https_request_err_e error;
   ApiDisplayResponse response;
   String error_detail;
+  bool received; // false before a request, or when transport/JSON parsing failed
 };
 
 // Display headers plus the optional SENSORS header.
