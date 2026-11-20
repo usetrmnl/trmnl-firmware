@@ -25,3 +25,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
                       String message);
 
 void display_show_msg_qa(const float *voltage, const float *temperature, bool qa_result);
+
+// Shows "Release button to open settings. / Keep holding to soft reset." on a white screen (TRMNL OG
+// only; a no-op elsewhere)
+void display_show_button_hold_dialog(void);

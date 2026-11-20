@@ -7,13 +7,19 @@
 #include <board_config.h>
 #include <config.h>
 #include <globals.h>
+#include <message_screens.h>
 #include <misc/buzzer.h>
 
 #include "trmnl_log.h"
 
-static unsigned long wait_for_button_release(unsigned long start_time) {
+// hold_dialog: once the press passes BUTTON_HOLD_TIME, show what releasing or holding on will do
+static unsigned long wait_for_button_release(unsigned long start_time, bool hold_dialog) {
   pinMode(pDevice->interrupt_pin, INPUT);
   while (digitalRead(pDevice->interrupt_pin) == LOW && millis() - start_time < BUTTON_SOFT_RESET_TIME) {
+    if (hold_dialog && millis() - start_time > BUTTON_HOLD_TIME) {
+      hold_dialog = false;
+      display_show_button_hold_dialog(); // blocks for the refresh; the button is read again after it
+    }
     delay(10);
   }
   if (millis() - start_time >= BUTTON_SOFT_RESET_TIME) {
@@ -36,13 +42,13 @@ static ButtonPressResult classify_press_duration(unsigned long duration) {
   return NoAction;
 }
 
-static ButtonPressResult wait_for_second_press(unsigned long start_time) {
+static ButtonPressResult wait_for_second_press(unsigned long start_time, bool hold_dialog) {
   auto release_time = millis();
 
   while (millis() - release_time < BUTTON_DOUBLE_CLICK_WINDOW) {
     if (digitalRead(pDevice->interrupt_pin) == LOW) {
       auto second_press_start = millis();
-      auto second_duration = wait_for_button_release(second_press_start);
+      auto second_duration = wait_for_button_release(second_press_start, hold_dialog);
 
       ButtonPressResult long_press_result = classify_press_duration(second_duration);
       if (long_press_result != NoAction) {
@@ -58,14 +64,14 @@ static ButtonPressResult wait_for_second_press(unsigned long start_time) {
   return ShortPress;
 }
 
-static ButtonPressResult classify_button_presses() {
+static ButtonPressResult classify_button_presses(bool hold_dialog) {
   auto time_start = millis();
   Log_info("Button time=%lu: start", time_start);
   pinMode(pDevice->interrupt_pin, INPUT);
   if (digitalRead(pDevice->interrupt_pin) == HIGH) {
     if (time_start < 2000) {
       Log_info("Button: already released at start (GPIO wakeup), waiting for second press");
-      return wait_for_second_press(time_start);
+      return wait_for_second_press(time_start, hold_dialog);
     } else {
       Log_info("Button: waiting for button press");
       while (digitalRead(pDevice->interrupt_pin) == HIGH) {
@@ -75,7 +81,7 @@ static ButtonPressResult classify_button_presses() {
     }
   }
 
-  auto press_duration = wait_for_button_release(time_start);
+  auto press_duration = wait_for_button_release(time_start, hold_dialog);
 
   ButtonPressResult long_press_result = classify_press_duration(press_duration);
   if (long_press_result != NoAction) {
@@ -84,14 +90,14 @@ static ButtonPressResult classify_button_presses() {
 
   if (press_duration > 50) {
     Log_info("Button: first press detected, waiting for second press");
-    return wait_for_second_press(time_start);
+    return wait_for_second_press(time_start, hold_dialog);
   }
 
   return NoAction;
 }
 
-ButtonPressResult read_button_presses() {
-  auto result = classify_button_presses();
+ButtonPressResult read_button_presses(bool hold_dialog) {
+  auto result = classify_button_presses(hold_dialog);
   if (result == ShortPress || result == DoubleClick) {
     buzzer().beep(100);
   }
