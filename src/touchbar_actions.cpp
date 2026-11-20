@@ -313,6 +313,10 @@ void touchbar_log_wake_stub_status(void) {
            wakeup_stub_iqs_status.ch2_cnts[1], wakeup_stub_iqs_status.ch2_cnts[2], wakeup_stub_iqs_status.ch2_cnts[3]);
 }
 
+static bool started;
+
+bool touchbar_started(void) { return started; }
+
 void touchbar_start(esp_sleep_wakeup_cause_t wakeup_reason, bool gpio_wakeup) {
   // Only sleep wakes and deliberate restarts (e.g. OTA) keep the lock: better unlocked than locked out
   const esp_reset_reason_t reset_reason = esp_reset_reason();
@@ -337,10 +341,9 @@ void touchbar_start(esp_sleep_wakeup_cause_t wakeup_reason, bool gpio_wakeup) {
   }
 
   // Wait for IQS323 initialization to complete
-  if (!iqs323_task_wait_ready(5000)) {
-    Log_error("IQS323 Task: Initialization timeout - rebooting");
-    delay(1000);
-    ESP.restart();
+  started = iqs323_task_wait_ready(5000);
+  if (!started) {
+    Log_error("IQS323 Task: Initialization failed - continuing without the touch bar");
   }
 
   if (gpio_wakeup) {
