@@ -16,8 +16,8 @@ module Golden
       # all but the "TRMNL firmware <version> (<git hash>)" line
       "setup_screen_body.png" => [0, 64, 1872, 1340],
       "setup_screen_top_right.png" => [640, 0, 1232, 64],
-      # 'Connect your phone or computer to "TRMNL-000001" Wi-Fi'
-      "setup_ssid_line.png" => [400, 1236, 1072, 48],
+      # 'Connect your phone or computer to:' / '"TRMNL-000001" Wi-Fi'
+      "setup_ssid_line.png" => [400, 1236, 1072, 88],
       # "Can't connect to Wi-Fi. Will keep trying." (the X's font has the apostrophe) and how to
       # reset Wi-Fi from the menu
       "wifi_failed_message.png" => [176, 1160, 1520, 96],
