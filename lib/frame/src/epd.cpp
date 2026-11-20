@@ -319,9 +319,9 @@ void frameInit(void)
   delay(100);
 
   // Initialize the RGB LED
-  Log_info("Turning on blue LED");
+  Log_info("Turning on green LED");
   FrameLEDInit(); // Needs the I2C & expander power working
-  FrameLEDSet(LED_BLUE, 128); // Blue to indicate the device woke up and is initializing
+  FrameLEDSet(LED_GREEN, 128); // Green to indicate the device is powered up
 
   expander2.write1(12, LOW);      // test
   expander2.pinMode1(12, OUTPUT); // test
@@ -450,7 +450,7 @@ void frameInit(void)
   BatteryStatus bat = batteryRead();
   batteryLog(bat);
 
-  FrameLEDSet(LED_GREEN, 128); // green to indicate the initialization is done and it's communicating
+  FrameLEDSet(LED_BLUE, 128); // Blue to indicate the initialization is done and it's communicating
 
   // Initialize SD card
   //FrameSDInit();
@@ -744,7 +744,7 @@ void epdDisplay(void)
     //   expander2.write1(12, HIGH);// for debug only
     //   expander2.pinMode1(12, OUTPUT);// for debug only
     Log_info("Turn on PMIC.\n");
-    FrameLEDSet(LED_RED, 128); // Red to indicate the EPD is active
+    FrameLEDSet(LED_WHITE, 128); // White to indicate the EPD is active
     if (enablePmic() == DONE)
     {
         pgWasGood = 1; // reset before tracking PMIC_PG across the busy-wait loops below

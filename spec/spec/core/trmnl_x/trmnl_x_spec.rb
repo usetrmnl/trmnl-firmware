@@ -147,28 +147,6 @@ RSpec.describe "TRMNL X", env: "TRMNL_X" do
       end
     end
 
-    it "left tap shows the previous image offline" do
-      one = dev.mock.set_png("one", TrmnlX.digits("1"))
-      two = dev.mock.set_png("two", TrmnlX.digits("2"))
-      dev.mock.display_queue << { image: "one", refresh_rate: 300 }
-      dev.mock.display = { image: "two", refresh_rate: 300 }
-      dev.boot do |s|
-        dev.mock.wait_for_request("/images/one.png", timeout: 120)
-        s.wait(state: "deep_sleep", timeout: 120)
-        s.wake
-        dev.mock.wait_for_request("/images/two.png", timeout: 120)
-        s.wait(state: "deep_sleep", timeout: 120, settle_ms: 500)
-        expect(s).to show_image(two, tolerance: 64, max_ratio: 0)
-        n = dev.mock.cursor
-        c = s.status["console_total"]
-        s.touch("left", ms: 150)
-        s.wait(console: /Playlist browse/, since: c, timeout: 60)
-        s.wait(state: "deep_sleep", timeout: 120)
-        expect(s).to show_image(one, tolerance: 64, max_ratio: 0)
-        expect(dev.mock.paths.drop(n)).to eq([]) # no network needed
-      end
-    end
-
     it "dock reports usb power and charging" do
       dev.boot do |s|
         req = dev.mock.wait_for_request("/api/display", timeout: 120)

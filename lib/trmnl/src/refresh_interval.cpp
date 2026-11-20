@@ -44,6 +44,11 @@ uint32_t RefreshInterval::applyDefault() {
   return SHORT_TERM_SLOW_RETRY_INTERVAL;
 }
 
+uint32_t RefreshInterval::applyFailedUpdate() {
+  writeIfChanged(FAILED_UPDATE_RETRY_INTERVAL);
+  return FAILED_UPDATE_RETRY_INTERVAL;
+}
+
 uint32_t RefreshInterval::fastPollSeconds(uint32_t streak) {
   if (streak <= 50) return 5;   // 5 sec
   if (streak <= 60) return 60;  // 1 min

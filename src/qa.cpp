@@ -1,7 +1,9 @@
 #include <Arduino.h>
 #include <ArduinoLog.h>
 #include <Preferences.h>
+#include <board_config.h>
 #include <display.h>
+#include <message_screens.h>
 #include <power.h>
 
 #include "WifiCaptive.h"
@@ -10,8 +12,6 @@
 #include "logo_medium.h"
 #include "logo_small.h"
 #include "pins.h"
-extern TRMNL_DEVICE *pDevice;
-void hw_config_init(void);
 
 extern "C" {
 #include "esp_timer.h"   // esp_timer_get_time()
@@ -288,7 +288,7 @@ bool startQA() {
 
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
   // QA runs before bl_init(), which is where pDevice is normally set up.
-  if (pDevice == NULL) hw_config_init();
+  if (pDevice == NULL) hw_config_init(DEVICE_MODEL);
   pins_init();
   Log.info("QA Test started\n");
   attachInterrupt(digitalPinToInterrupt(pDevice->interrupt_pin), onBtnPress, FALLING);

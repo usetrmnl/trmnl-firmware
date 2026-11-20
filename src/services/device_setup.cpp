@@ -200,8 +200,7 @@ void DeviceSetup::downloadSetupImage() {
       _result.friendlyId = _persistence.readString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
       _result.showSetupScreen = true;
       _result.outcome = DeviceSetupOutcome::Success;
-    } else if (counter == (uint32_t)contentSize && counter >= 4 && imageBuffer[0] == 0x89 && imageBuffer[1] == 'P' &&
-               imageBuffer[2] == 'N' && imageBuffer[3] == 'G') {
+    } else if (counter == (uint32_t)contentSize && counter >= 4 && isPng(imageBuffer)) {
       Log.info("%s [%d]: Received PNG setup logo (%d bytes)\r\n", __FILE__, __LINE__, counter);
       writeImageToFile("/logo.png", imageBuffer, counter);
       _result.imagePath = "/logo.png";

@@ -59,12 +59,27 @@ RSpec.describe "TRMNL X", env: "TRMNL_X" do
   end
 
   describe "Onboarding" do
+    # DeviceSetupX::downloadSetupImage, src/services/device_setup_x.cpp: the server sends the X a PNG logo
+    it "keeps the server's PNG setup logo when onboarding on 5 GHz" do
+      TrmnlSim::MockTrmnl.open do |mock|
+        mock.set_png("setup_logo", ->(x, y) { ((x / 64) + (y / 64)).even? ? 0 : 1 })
+        mock.setup = { image_url: "#{mock.device_url}/images/setup_logo.png" }
+        shipped.boot do |s|
+          TrmnlX.onboard(s, mock, TrmnlX::SSID_5)
+          log = s.console(0).join("\n")
+          expect(log).to include("Received PNG setup logo")
+          expect(log).not_to include("Modem logo download failed")
+        end
+      end
+    end
+
     it "portal rescans both radios and joins the chosen band" do
       TrmnlSim::MockTrmnl.open do |mock|
         shipped.boot do |s|
           s.wait_for_console(/Entering shipment mode light sleep loop/, timeout: 30)
           s.dock(true)
           s.wait(portal: true, timeout: 90)
+          s.portal_enable_verbose_logging
           s.dock(false)
           c = s.status["console_total"]
           s.portal_request("/scan?force=1")
@@ -147,6 +162,7 @@ RSpec.describe "TRMNL X", env: "TRMNL_X" do
       s.wait_for_console(/Entering shipment mode light sleep loop/, timeout: 180)
       s.dock(true)
       s.wait(portal: true, timeout: 180)
+      s.portal_enable_verbose_logging
       s.dock(false)
       s.set_networks([{ ssid: TrmnlX::SSID_24, password: "password", rssi: -54, channel: 6 },
                       { ssid: TrmnlX::SSID_5, password: "password", rssi: -48, channel: 36 }])

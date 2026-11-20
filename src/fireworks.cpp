@@ -4,10 +4,7 @@
 #ifdef BOARD_TRMNL_X
 
 #include <Arduino.h>
-
-#include "FastEPD.h"
-
-extern FASTEPD bbep; // display.cpp
+#include <epd_driver.h>
 
 // Fireworks, white on black: the screen is wiped to black, then three rockets arc up from the
 // bottom, one after another, and each bursts into a ring of arcs. Each frame is a partial update that

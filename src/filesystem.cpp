@@ -380,3 +380,42 @@ bool filesystem_fixed_file_exists(String &newName) {
     szTemp); // shorten the name (if needed) to fit the SPIFFS file length limit of 31 chars + 0 terminator
   return filesystem_file_exists(szTemp);
 } /* filesystem_fixed_file_exists() */
+
+/**
+ * @brief Function to read an image from the file system
+ * @param filename
+ * @param pointer to file size returned
+ * @return pointer to allocated buffer
+ */
+uint8_t *display_read_file(const char *filename, int *file_size) {
+  File f = FS.open(filename, "r");
+  uint8_t *buffer;
+
+  if (!f) {
+    Serial.println("Failed to open file!");
+    *file_size = 0;
+    return nullptr;
+  }
+  *file_size = f.size();
+  if (*file_size == 0) {
+    Serial.println("File is empty!");
+    f.close();
+    return nullptr;
+  }
+  Serial.printf("File size to allocate: %d bytes\n", *file_size);
+#ifdef CONFIG_SPIRAM
+  Serial.println("Allocating file buffer in PSRAM");
+  buffer = (uint8_t *)ps_malloc(*file_size);
+#else
+  Serial.println("Allocating file buffer in regular RAM");
+  buffer = (uint8_t *)malloc(*file_size);
+#endif
+  if (!buffer) {
+    Serial.println("Memory allocation failed!");
+    *file_size = 0;
+    return nullptr;
+  }
+  f.read(buffer, *file_size);
+  f.close();
+  return buffer;
+} /* display_read_file() */

@@ -1,12 +1,10 @@
 #include "button.h"
 
-#include "config.h"
-extern TRMNL_DEVICE *pDevice;
-
 #include <Arduino.h>
 #include <ArduinoLog.h>
 #include <WifiCaptive.h>
 #include <bl.h>
+#include <board_config.h>
 #include <config.h>
 #include <globals.h>
 #include <misc/buzzer.h>
@@ -100,15 +98,16 @@ ButtonPressResult read_button_presses() {
   return result;
 }
 
-// Acts on the press read after a button wake: a long press forgets WiFi, a soft-reset press forgets the
-// device (does not return). Returns true for a double click, which runs the special function.
+// Acts on the press read after a button wake: a long press opens the settings portal (the saved WiFi
+// networks are kept), a soft-reset press forgets the device (does not return). Returns true for a double click, which
+// runs the special function.
 bool button_wake_act(ButtonPressResult button) {
   bool double_click = false;
   Log_info("GPIO wakeup (%d) -> button was read (%s)", wakeup_reason, ButtonPressResultNames[button]);
   switch (button) {
   case LongPress:
-    Log_info("WiFi reset");
-    WifiCaptivePortal.resetSettings();
+    Log_info("Settings portal requested");
+    WifiCaptivePortal.requestPortal();
     break;
   case DoubleClick:
     double_click = true;

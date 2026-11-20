@@ -3,10 +3,8 @@
 #include <Arduino.h>
 #include <trmnl_log.h>
 
-// display.h lives in the project's include/ dir, not reachable from lib/* normally.
-#define _NO_DEV_CONFIG_
-#define UWORD uint16_t
-#include "../../../include/display.h"
+// touchbar_indicator.h lives in the project's include/ dir, not reachable from lib/* normally.
+#include "../../../include/touchbar_indicator.h"
 
 extern unsigned long startup_time; // set in bl_init()
 

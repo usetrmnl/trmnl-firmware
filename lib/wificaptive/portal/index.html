@@ -19,6 +19,7 @@
       --warn-bg: #FBF0DC;
       --warn-ink: #6B4E12;
       --spark-fg: #FFF;
+      --btn-radius: 8px;
       --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
       --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     }
@@ -77,10 +78,21 @@
       justify-content: space-between;
     }
 
+    /* The logo sits in the centre column, Back (when shown) in the left one */
     .p-head-lead {
-      display: flex;
+      flex: 1 1 auto;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
       align-items: center;
-      gap: 12px;
+    }
+
+    .p-head-lead .head-back {
+      grid-column: 1;
+      justify-self: start;
+    }
+
+    .p-head-lead .logo {
+      grid-column: 2;
     }
 
     /* The visible box is small; ::before stretches the touch target to 44px.
@@ -95,7 +107,7 @@
       color: var(--ink);
       background: transparent;
       border: 1px solid var(--rule);
-      border-radius: 2px;
+      border-radius: var(--btn-radius);
       cursor: pointer;
       padding: 7px 9px;
       margin: -4px 0;
@@ -150,38 +162,11 @@
       }
     }
 
-    .mode {
-      font-family: var(--mono);
-      font-size: 10px;
-      letter-spacing: .12em;
-      text-transform: uppercase;
-      color: var(--ink-2);
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .mode .dot {
-      width: 6px;
-      height: 6px;
-      background: var(--spark);
-      border-radius: 50%;
-      animation: pulse 2s steps(2, end) infinite;
-    }
-
-    @keyframes pulse {
-      50% {
-        opacity: .25;
-      }
-    }
-
     .p-body {
       padding: 22px 20px 32px;
       display: flex;
       flex-direction: column;
       gap: 26px;
-      max-width: 480px;
-      margin: 0 auto;
     }
 
     .p-title {
@@ -201,8 +186,6 @@
       display: flex;
       flex-direction: column;
       gap: 6px;
-      padding-top: 14px;
-      border-top: 1px solid var(--rule);
     }
 
     .mac-line {
@@ -254,42 +237,32 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding-bottom: 8px;
+      margin: 0 -20px;
+      padding: 0 20px 8px;
       border-bottom: 1px solid var(--rule);
     }
 
-    .grp-label button {
-      font: inherit;
-      background: none;
-      border: 0;
-      cursor: pointer;
-      color: var(--spark);
-      padding: 15px 0;
-      margin: -15px 0;
-      min-height: 48px;
-      border-bottom: 0;
-      text-decoration: underline;
-      text-underline-offset: 3px;
+    /* a small button in a section label keeps the label row at its usual height */
+    .grp-label .btn-sm {
+      margin: -10px 0 -4px;
     }
 
-    .grp-label button:disabled {
-      color: var(--ink-3);
-      cursor: default;
-    }
-
+    /* Lists run the full page width: they cancel .p-body's 20px gutter and
+       their rows carry it as their only padding. */
     .netlist {
       display: flex;
       flex-direction: column;
+      margin: 0 -20px;
     }
 
     .net {
       display: flex;
       align-items: center;
       gap: 10px;
+      position: relative;
       min-height: 48px;
-      padding: 0 10px;
-      margin: 0 -10px;
-      width: calc(100% + 20px);
+      padding: 0 20px;
+      width: 100%;
       border: 0;
       border-bottom: 1px solid var(--rule-soft);
       background: transparent;
@@ -356,7 +329,9 @@
       font-family: var(--mono);
       font-size: 12px;
       opacity: 0;
-      flex: 0 0 8px;
+      /* in the gutter, so network names line up with the rest of the page */
+      position: absolute;
+      left: 7px;
     }
 
     .badge {
@@ -415,19 +390,6 @@
         linear-gradient(45deg, var(--rule) 25%, transparent 25%, transparent 75%, var(--rule) 75%);
       background-size: 4px 4px;
       background-position: 0 0, 2px 2px;
-    }
-
-    .skel {
-      height: 48px;
-      border-bottom: 1px solid var(--rule-soft);
-      display: flex;
-      align-items: center;
-    }
-
-    .skel span {
-      height: 9px;
-      border-radius: 1px;
-      opacity: .6;
     }
 
     .scanning {
@@ -544,7 +506,7 @@
       letter-spacing: .1em;
       text-transform: uppercase;
       padding: 15px 18px;
-      border-radius: 2px;
+      border-radius: var(--btn-radius);
       border: 1px solid transparent;
       cursor: pointer;
       width: 100%;
@@ -569,20 +531,13 @@
       cursor: default;
     }
 
-    .btn-quiet,
-    .btn-danger {
+    .btn-quiet {
       background: transparent;
       color: var(--ink);
       border-color: var(--rule);
     }
 
     .btn-quiet:hover {
-      border-color: var(--ink);
-    }
-
-    .btn-danger:hover {
-      background: var(--ink);
-      color: var(--invert-fg);
       border-color: var(--ink);
     }
 
@@ -682,8 +637,8 @@
       letter-spacing: .14em;
       text-transform: uppercase;
       color: var(--ink-3);
-      margin: 0;
-      padding-bottom: 8px;
+      margin: 0 -20px;
+      padding: 0 20px 8px;
       border-bottom: 1px solid var(--rule);
     }
 
@@ -700,20 +655,6 @@
       height: 18px;
       accent-color: var(--spark);
       flex: 0 0 auto;
-    }
-
-    .danger-zone {
-      border: 1px solid var(--rule);
-      border-radius: 2px;
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .danger-zone p {
-      margin: 0;
-      color: var(--ink-2);
     }
 
     .modal {
@@ -746,255 +687,561 @@
     .modal-content p {
       margin: 0;
     }
+
+    /* The landing menu: one row per settings page (see PAGES in the script). */
+    .menu {
+      display: flex;
+      flex-direction: column;
+      border-top: 1px solid var(--rule);
+      margin: 0 -20px;
+    }
+
+    /* The landing menu sits flush under the header, whose bottom rule is its top line */
+    .menu-flush {
+      border-top: 0;
+      margin-top: -22px;
+    }
+
+    .menu-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 68px;
+      padding: 12px 20px;
+      width: 100%;
+      border: 0;
+      border-bottom: 1px solid var(--rule);
+      background: transparent;
+      color: var(--ink);
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+      transition: background-color .12s steps(3);
+    }
+
+    .menu-item:hover {
+      background: var(--rule-soft);
+    }
+
+    .menu-item:focus-visible {
+      outline-offset: -2px;
+    }
+
+    .menu-text {
+      flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .menu-title {
+      font-family: var(--mono);
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .menu-desc {
+      color: var(--ink-2);
+      font-size: 12.5px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .menu-tag {
+      border-color: var(--spark);
+      color: var(--spark);
+      text-transform: uppercase;
+    }
+
+    .chev {
+      color: var(--ink-3);
+      font-family: var(--mono);
+      font-size: 11px;
+      flex: 0 0 auto;
+    }
+
+    /* A saved network: its name with its labels on a line below */
+    .net-main {
+      flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      padding: 10px 0;
+    }
+
+    .net-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    /* A small regular button, inside a row or a label (Forget, Scan again) */
+    .btn-sm {
+      position: relative;
+      font-family: var(--mono);
+      font-size: 10.5px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--ink);
+      background: transparent;
+      border: 1px solid var(--rule);
+      border-radius: var(--btn-radius);
+      cursor: pointer;
+      padding: 8px 10px;
+      flex: 0 0 auto;
+      transition: border-color .12s steps(3);
+    }
+
+    /* the visible button is small; this stretches its touch target to 48px */
+    .btn-sm::before {
+      content: "";
+      position: absolute;
+      inset: -9px -6px;
+    }
+
+    .btn-sm:hover:not(:disabled) {
+      border-color: var(--ink);
+    }
+
+    .btn-sm:disabled {
+      opacity: .55;
+      cursor: default;
+    }
+
+    .net-act {
+      margin-left: 4px;
+    }
   </style>
   <script>
+    // ---- Pages ---------------------------------------------------------------
+    // Every screen but the landing menu is a page, listed here. Its `title` is
+    // the heading (with `sub` as an optional line under it). A page without
+    // `parent` gets a row in the landing menu; one with `parent` gets a row in
+    // that page's menu (<nav class="menu" data-parent="PARENT"> in the parent's
+    // view) and its Back button goes there. `desc` (the line under the title in
+    // the menu) and `tag` (a small highlighted label, or '') may be strings or
+    // functions; functions are evaluated again whenever the device state
+    // changes (renderMenus).
+    //
+    // To add a page, either:
+    // - give it a `setting`, for a page that is one text field saved through
+    //   POST /settings (the view is generated, see buildSettingPages), or
+    // - put a <div class="view" id="view-NAME" hidden> in the body, with a
+    //   <div class="msg page-msg" hidden> where its messages should appear.
+    var SERVER_ERROR = 'Please enter a valid URL for your custom server';
+
+    var PAGES = [
+      {
+        id: 'wifi',
+        title: 'Wi-Fi',
+        desc: function () {
+          if (!savedLoaded) return 'Networks your TRMNL can join';
+          if (!saved.length) return 'Not connected yet';
+          return saved.length === 1 ? saved[0].ssid : saved.length + ' saved networks';
+        },
+        tag: function () { return wifiEmpty() ? 'Start here' : ''; }
+      },
+      {
+        id: 'add-network',
+        parent: 'wifi',
+        title: 'Select a Network'
+      },
+      {
+        id: 'advanced',
+        title: 'Advanced Settings',
+        sub: 'Most people never need anything here.',
+        desc: 'Server, hostname, time, diagnostics, reset'
+      },
+      {
+        id: 'server',
+        parent: 'advanced',
+        title: 'Server',
+        // `key` is the field in GET /device-settings, `param` the one POST /settings
+        // takes; `fallback` is what the menu shows while the value is empty. `clean`
+        // tidies the trimmed value and `error` returns what is wrong with it, or ''.
+        setting: {
+          key: 'api_url',
+          param: 'server',
+          label: 'API server',
+          type: 'url',
+          placeholder: 'https://trmnl.app',
+          hint: 'Point your TRMNL at your own server (BYOS). Changing it pairs the device again.',
+          fallback: 'trmnl.app',
+          clean: function (value) { return value.replace(/\/+$/, ''); },
+          error: function (value) {
+            try { new URL(value); } catch (_) { return SERVER_ERROR; }
+            return /^https?:\/\//.test(value) ? '' : SERVER_ERROR;
+          }
+        }
+      },
+      {
+        id: 'hostname',
+        parent: 'advanced',
+        title: 'Hostname',
+        setting: {
+          key: 'hostname',
+          param: 'hostname',
+          label: 'Name on your network',
+          placeholder: 'trmnl-living-room',
+          hint: 'Letters, numbers and hyphens. Leave empty for the default (trmnl-xxxx).',
+          fallback: 'Default',
+          error: function (value) {
+            return /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/.test(value) ? ''
+              : 'Hostname can use letters, numbers and hyphens only, and cannot start or end with a hyphen.';
+          }
+        }
+      },
+      {
+        id: 'time',
+        parent: 'advanced',
+        title: 'Time Source',
+        setting: {
+          key: 'ntp_server',
+          param: 'ntpServer1',
+          label: 'NTP server',
+          placeholder: 'time.nist.gov',
+          hint: 'Leave empty to use time.google.com.',
+          fallback: 'time.google.com'
+        }
+      },
+      {
+        id: 'diagnostics',
+        parent: 'advanced',
+        title: 'Diagnostics',
+        desc: 'Sensor test, serial logs'
+      },
+      {
+        id: 'reset',
+        parent: 'advanced',
+        title: 'Reset',
+        desc: 'Erase Wi-Fi, device ID and API key'
+      }
+    ];
+
+    // Device state shared by the pages
+    var saved = [], savedLoaded = false, maxSaved = 5; // GET /saved-networks
+    var scanned = [];                                   // GET /scan
+    var deviceSettings = {};                            // GET /device-settings
+
+    // ---- Helpers -------------------------------------------------------------
+    function $(id) {
+      return document.getElementById(id);
+    }
+
+    function show(id, visible) {
+      $(id).hidden = !visible;
+    }
+
+    function each(list, fn) {
+      Array.prototype.forEach.call(list, fn);
+    }
+
+    var OFFLINE = 'Could not reach your TRMNL. Check that you are still on its Wi-Fi network, then try again.';
+
+    // A request to the device: a POST of JSON when `body` is given, else a GET.
+    // Resolves with the JSON it answers (null when it answers without any, like
+    // /scan's 202 while a scan runs) and rejects with an Error whose message can
+    // be shown as it is.
+    function api(path, body) {
+      var options = body === undefined ? {} : {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      };
+      return fetch(path, options).then(function (response) {
+        if (!response.ok) throw new Error(OFFLINE);
+        if (response.status !== 200) return null;
+        return response.json().catch(function () { return null; });
+      }, function () {
+        throw new Error(OFFLINE);
+      });
+    }
+
+    // ---- Navigation ----------------------------------------------------------
+    function currentPage() {
+      var id = location.hash.replace('#', '');
+      for (var i = 0; i < PAGES.length; i++) if (PAGES[i].id === id) return PAGES[i];
+      return null; // anything else is the landing menu
+    }
+
+    function evaluate(value) {
+      return (typeof value === 'function' ? value() : value) || '';
+    }
+
+    // Fills every menu on the page: the landing menu (data-parent="") and each
+    // parent page's menu, with a row per page whose parent it is.
+    function renderMenus() {
+      each(document.querySelectorAll('nav.menu'), function (menu) {
+        var parent = menu.dataset.parent || '';
+        menu.innerHTML = '';
+        PAGES.forEach(function (page) {
+          if ((page.parent || '') !== parent) return;
+          var item = document.createElement('button');
+          item.type = 'button';
+          item.className = 'menu-item';
+          item.onclick = function () { location.hash = '#' + page.id; };
+          item.innerHTML =
+            '<span class="menu-text"><span class="menu-title"></span><span class="menu-desc"></span></span>' +
+            '<span class="badge menu-tag" hidden></span>' +
+            '<span class="chev" aria-hidden="true">&#9654;</span>';
+          item.querySelector('.menu-title').textContent = page.title;
+          // a setting's row shows its value
+          item.querySelector('.menu-desc').textContent = page.setting
+            ? deviceSettings[page.setting.key] || page.setting.fallback
+            : evaluate(page.desc);
+          var tag = evaluate(page.tag);
+          var tagEl = item.querySelector('.menu-tag');
+          tagEl.textContent = tag;
+          tagEl.hidden = !tag;
+          menu.appendChild(item);
+        });
+      });
+
+      // Done needs a saved network to go back to
+      show('home-actions', saved.length > 0);
+    }
+
+    // Back goes up one level: to the parent page, or the landing menu
+    function goBack() {
+      var page = currentPage();
+      var target = (page && page.parent) || 'home';
+      // an empty Wi-Fi page sends you on to Add a Network, so Back skips over it
+      if (target === 'wifi' && wifiEmpty()) target = 'home';
+      location.hash = '#' + target;
+    }
+
+    function wifiEmpty() {
+      return savedLoaded && !saved.length;
+    }
+
+    // The Wi-Fi page has nothing to show without a saved network: go on to adding one.
+    // Replaces the history entry, so the browser's own Back doesn't land here again.
+    function skipEmptyWifi() {
+      var page = currentPage();
+      if (page && page.id === 'wifi' && wifiEmpty()) {
+        location.replace('#add-network');
+        return true;
+      }
+      return false;
+    }
+
+    function showView() {
+      closeModal();
+      if (skipEmptyWifi()) return; // comes back here for Add a Network
+      var page = currentPage();
+      var active = 'view-' + (page ? page.id : 'home');
+      each(document.querySelectorAll('.view'), function (view) {
+        view.hidden = view.id !== active;
+      });
+      show('headBack', page);
+      show('pageHead', page);
+      $('pageTitle').textContent = page ? page.title : '';
+      $('pageSub').textContent = page ? page.sub || '' : '';
+      show('pageSub', page && page.sub);
+      window.scrollTo(0, 0);
+      if (page) $('pageTitle').focus();
+    }
+
+    // ---- Messages ------------------------------------------------------------
+    // Each view has one message box (its .page-msg); a view without one shows nothing.
+    function msgBox() {
+      var page = currentPage();
+      return document.querySelector('#view-' + (page ? page.id : 'home') + ' .page-msg');
+    }
+
+    // Shows `text` on the page being shown, under a bold `title` if given. `box`
+    // is for an answer that may arrive after the user has moved to another page.
+    function pageMsg(text, warn, title, box) {
+      box = box || msgBox();
+      if (!box) return;
+      box.classList.toggle('msg-warn', !!warn);
+      box.textContent = '';
+      if (title) box.appendChild(document.createElement('strong')).textContent = title;
+      box.appendChild(document.createTextNode(text));
+      box.hidden = false;
+    }
+
+    function hideMsgs() {
+      each(document.querySelectorAll('.page-msg'), function (box) { box.hidden = true; });
+    }
+
+    // ---- Confirmation dialog -------------------------------------------------
+    var confirmAction = null;
+
+    function askConfirm(title, text, actionLabel, action) {
+      $('confirmTitle').textContent = title;
+      $('confirmText').textContent = text;
+      $('confirmYes').textContent = actionLabel;
+      confirmAction = action;
+      $('confirmationModal').setAttribute('open', '');
+      $('confirmNo').focus();
+    }
+
+    function confirmYes() {
+      var action = confirmAction;
+      closeModal();
+      if (action) action();
+    }
+
+    function closeModal() {
+      confirmAction = null;
+      $('confirmationModal').removeAttribute('open');
+    }
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && $('confirmationModal').hasAttribute('open')) closeModal();
+    });
+
+    // ---- Landing page --------------------------------------------------------
+    // Done: the device closes the portal and restarts onto a saved network.
+    function finish() {
+      var btn = $('btnDone');
+      btn.disabled = true;
+      api('/exit', {}).then(function () {
+        btn.textContent = 'Restarting…';
+        pageMsg('Your TRMNL is restarting and will reconnect to Wi-Fi. You can close this page.');
+      }, function (e) {
+        btn.disabled = false;
+        pageMsg(e.message, true);
+      });
+    }
+
+    function displayInfo(mac, mac5) {
+      if (mac) {
+        $('mac24').textContent = mac.toUpperCase();
+        show('mac24-row', true);
+      }
+      if (mac5) {
+        $('mac5').textContent = mac5.toUpperCase();
+        show('mac5-row', true);
+        // Only dual-band boards report a second MAC; single-band ones keep the plain label.
+        $('mac24-label').textContent = '2.4 GHz MAC';
+      }
+      if (mac || mac5) show('info-message', true);
+    }
+
+    // ---- Wi-Fi: saved networks -----------------------------------------------
+    function loadSaved() {
+      return api('/saved-networks').then(function (json) {
+        saved = json.networks || [];
+        maxSaved = json.max || maxSaved;
+        // First-time setup: a portal that opens with nothing saved goes straight to
+        // adding a network. Only on launch and only from the bare URL, so Back still
+        // reaches Wi-Fi and the menu.
+        if (!savedLoaded && !saved.length && !location.hash) location.hash = '#add-network';
+        savedLoaded = true;
+      }, function () { }).then(function () {
+        renderSaved();
+        renderMenus();
+        skipEmptyWifi(); // the last network was forgotten, or the list loaded after the page opened
+      });
+    }
+
+    function isSavedNetwork(ssid, band) {
+      return saved.some(function (n) { return n.ssid === ssid && (!band || n.band === band); });
+    }
+
+    function renderSaved() {
+      show('saved-networks', saved.length > 0);
+      show('saved-hint', saved.length > 1);
+      // a full list has no room for another network
+      show('full-note', saved.length >= maxSaved);
+      show('add-actions', saved.length < maxSaved);
+
+      var table = $('table-saved');
+      table.innerHTML = '';
+      saved.forEach(function (n) {
+        var inRange = scanned.filter(function (s) { return s.name === n.ssid && s.band === n.band; })[0];
+        var tags =
+          (n.enterprise ? '<span class="badge">ENT</span>' : '') +
+          (n.static_ip ? '<span class="badge">STATIC IP</span>' : '');
+        var row = document.createElement('div');
+        row.className = 'net';
+        row.innerHTML =
+          '<span class="net-main"><span class="ssid"></span>' +
+          (tags ? '<span class="net-tags">' + tags + '</span>' : '') + '</span>' +
+          '<span class="badge">' + (n.band === '5GHz' ? '5G' : '2.4G') + '</span>' +
+          (inRange ? barsHTML(inRange.rssi) : '') +
+          '<button class="btn-sm net-act" type="button">Forget</button>';
+        row.querySelector('.ssid').textContent = n.ssid;
+        var btn = row.querySelector('.net-act');
+        btn.setAttribute('aria-label', 'Forget ' + n.ssid);
+        btn.onclick = function () { forgetNetwork(n); };
+        table.appendChild(row);
+      });
+    }
+
+    function forgetNetwork(n) {
+      var text = saved.length === 1
+        ? 'This is the only saved network. Your TRMNL stays in setup mode until you add another.'
+        : 'Your TRMNL will no longer join this network.';
+      askConfirm('Forget ' + n.ssid + '?', text, 'Forget', function () {
+        hideMsgs();
+        api('/forget-network', { index: n.index, ssid: n.ssid })
+          .catch(function () { pageMsg('Could not forget ' + n.ssid + '. Please try again.', true); })
+          .then(loadSaved)
+          .then(renderScanned);
+      });
+    }
+
+    // ---- Wi-Fi: networks in range --------------------------------------------
     function setRefreshButtonState(scanning) {
-      var btn = document.getElementById('btnRefresh');
+      var btn = $('btnRefresh');
       if (scanning && document.activeElement === btn) btn.blur();
       btn.disabled = scanning;
-      btn.textContent = scanning ? 'Scanning\u2026' : 'Scan again';
+      btn.textContent = scanning ? 'Scanning…' : 'Scan again';
     }
 
-    async function refresh() {
+    // The spinner of a scan that is running
+    function setScanning(scanning) {
+      show('scanning-info', scanning);
+    }
+
+    function refresh() {
+      $('table-others').innerHTML = '';
+      setScanning(true);
+      getInfo(true);
+    }
+
+    function getInfo(force) {
       setRefreshButtonState(true);
-
-      document.getElementById('table-saved').innerHTML = '';
-      document.getElementById('table-others').innerHTML = '';
-      document.getElementById('saved-networks').hidden = true;
-
-      document.getElementById('scanning-info').hidden = false;
-      document.getElementById('scanning-loader').hidden = false;
-
-      await getInfo(true);
-    }
-
-    function toggleEnterpriseFields(isEnterprise) {
-      document.getElementById('isEnterpriseHidden').value = isEnterprise ? 'true' : 'false';
-      document.getElementById('enterprise_fields').hidden = !isEnterprise;
-      document.getElementById('enterprise_username_group').hidden = !isEnterprise;
-      document.getElementById('enterprise_indicator').hidden = !isEnterprise;
-    }
-
-    function connect() {
-      hideAlert();
-      var ssid = document.getElementById('ssid').value;
-      var pswd = document.getElementById('password').value;
-      var server = document.getElementById('server').value;
-      var band = document.getElementById('band').value;
-      var isEnterprise = document.getElementById('isEnterpriseHidden').value === 'true';
-
-      if (!ssid) {
-        displayAlert('Please enter your Wi-Fi name');
-        return;
-      }
-
-      if (isEnterprise) {
-        var identity = document.getElementById('identity').value;
-        if (!identity) {
-          displayAlert('Please enter your identity for WPA2 Enterprise');
+      show('scan-error', false);
+      show('no-networks', false);
+      api('/scan' + (force ? '?force=1' : '')).then(function (json) {
+        if (!json) {
+          // still scanning: ask again, without force, which would restart the scan
+          setTimeout(function () { getInfo(false); }, 2000);
           return;
         }
-      }
-
-      // if the server field carries a value, validate the url
-      if (server) {
-        try {
-          new URL(server);
-
-          if (!server.startsWith('http://') && !server.startsWith('https://')) {
-            throw new Error();
-          }
-        } catch (_) {
-          location.hash = '#advanced';
-          displayAdvancedAlert('Please enter a valid URL for your custom server');
-          return;
-        }
-      }
-
-      server = server.trim();
-      server = server.replace(/\/+$/, '');
-
-      var body = {
-        ssid: ssid,
-        pswd: pswd,
-        server: server,
-        band: band,
-        isEnterprise: isEnterprise
-      };
-
-      if (isEnterprise) {
-        body.identity = document.getElementById('identity').value;
-        body.username = document.getElementById('username').value;
-      }
-
-      var useStaticIP = document.getElementById('useStaticIP').checked;
-      if (useStaticIP) {
-        var staticIP = document.getElementById('staticIP').value.trim();
-        var ipPattern = /^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.){3}(25[0-5]|(2[0-4]|1\d|[1-9]|)\d)$/;
-        if (!staticIP || !ipPattern.test(staticIP)) {
-          location.hash = '#advanced';
-          displayAdvancedAlert('Enter a valid static IP address, like 192.168.1.100');
-          return;
-        }
-        body.useStaticIP = true;
-        body.staticIP = staticIP;
-        body.gateway = document.getElementById('gateway').value.trim();
-        body.subnet = document.getElementById('subnet').value.trim();
-        body.dns1 = document.getElementById('dns1').value.trim();
-      }
-
-      var hostname = document.getElementById('customHostname').value.trim();
-      if (hostname) {
-        if (!/^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/.test(hostname)) {
-          location.hash = '#advanced';
-          displayAdvancedAlert('Hostname can use letters, numbers and hyphens only, and cannot start or end with a hyphen.');
-          return;
-        }
-        body.hostname = hostname;
-      }
-
-      var ntp = document.getElementById('ntpServer1').value.trim();
-      if (ntp) body.ntpServer1 = ntp;
-
-      var btn = document.getElementById("btnConnect");
-      btn.disabled = true;
-      btn.textContent = "Connecting\u2026";
-      document.getElementById('connect-status').hidden = false;
-
-      fetch('/connect', {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(body)
-      })
-        .then(response => response.json())
-        .then(response => {
-          displayWifiInfo(response);
-          pollConnectionStatus(isEnterprise);
-        })
-        .catch(_ => {
-          document.getElementById('connect-status').hidden = true;
-          resetConnectButton();
-          displayAlert('Could not reach your TRMNL. Check that you are still on its Wi-Fi network, then try again.');
-        });
-    }
-
-    function pollConnectionStatus(isEnterprise) {
-      fetch('/connection-status')
-        .then(response => response.json())
-        .then(response => {
-          if (response.status === 'connecting' || response.status === 'idle') {
-            setTimeout(() => pollConnectionStatus(isEnterprise), 500);
-            return;
-          }
-
-          displayConnectionResult(response.status, isEnterprise);
-        })
-        .catch(_ => {
-          setTimeout(() => pollConnectionStatus(isEnterprise), 500);
-        });
-    }
-
-    // Shared by the live poll above and restoreConnectionStatus() below, which
-    // recovers the same result after a page reload (the STA radio changing
-    // channel on connect can briefly drop captive-portal clients, reloading
-    // the page and losing pollConnectionStatus's in-memory poll loop).
-    function displayConnectionResult(status, isEnterprise) {
-      document.getElementById('connect-status').hidden = true;
-
-      if (status === 'connected') {
-        displayAlert('Wi-Fi connected.');
-        return;
-      }
-
-      resetConnectButton();
-      if (status === 'authentication_failed') {
-        var message = isEnterprise
-          ? 'Wi-Fi authentication failed. Check your credentials and try again.'
-          : 'Incorrect Wi-Fi password. Please try again.';
-        displayAlert(message);
-        document.getElementById('password').focus();
-      } else if (status === 'network_not_found') {
-        displayAlert('Wi-Fi network not found. Check the network name and try again.');
-      } else {
-        displayAlert('Unable to connect to Wi-Fi. Please try again.');
-      }
-    }
-
-    function restoreConnectionStatus() {
-      fetch('/connection-status')
-        .then(response => response.json())
-        .then(response => {
-          if (response.status !== 'idle' && response.status !== 'connecting') {
-            var isEnterprise = document.getElementById('isEnterpriseHidden').value === 'true';
-            displayConnectionResult(response.status, isEnterprise);
-          }
-        })
-        .catch(_ => {});
-    }
-
-    function resetConnectButton() {
-      var btn = document.getElementById('btnConnect');
-      btn.disabled = false;
-      btn.textContent = 'Connect';
-    }
-
-    function togglePassword() {
-      var btn = document.getElementById("toggler");
-      var input = document.getElementById("password");
-      var showing = input.type === "text";
-      input.type = showing ? "password" : "text";
-      btn.textContent = showing ? "Show" : "Hide";
-    }
-
-    function showScanError() {
-      document.getElementById('scanning-loader').hidden = true;
-      document.getElementById('scanning-info').hidden = true;
-      document.getElementById('scan-error').hidden = false;
-      setRefreshButtonState(false);
-    }
-
-    async function getInfo(force) {
-      setRefreshButtonState(true);
-      document.getElementById('scan-error').hidden = true;
-      document.getElementById('no-networks').hidden = true;
-      let scanningInfoBox = document.getElementById('scanning-info');
-      let scanningLoader = document.getElementById('scanning-loader');
-      let response = await fetch('/scan' + (force ? '?force=1' : ''), {
-        method: 'GET',
-      })
-        .catch(_ => null);
-
-      if (!response) {
-        showScanError(); // network-level failure
-        return;
-      }
-
-      if (response.status == 200) {
-        var json = await response.json();
-        scanningInfoBox.hidden = true;
-        scanningLoader.hidden = true;
+        setScanning(false);
         setRefreshButtonState(false);
-
         displayInfo(json.mac, json.mac_5ghz);
-        var knownNetworks = json.networks.filter((item) => item.saved);
-        var otherNetworks = json.networks.filter((item) => !item.saved);
-        document.getElementById('saved-networks').hidden = knownNetworks.length === 0;
-        knownNetworks.forEach((item, row) => {
-          appendWifiToTable("table-saved", item.name, item.open, item.rssi, item.enterprise, false, item.band);
-        });
-        otherNetworks.forEach((item, row) => {
-          appendWifiToTable("table-others", item.name, item.open, item.rssi, item.enterprise, true, item.band);
-        });
-        var noneFound = otherNetworks.length === 0;
-        document.getElementById('no-networks').hidden = !noneFound;
-      } else if (response.status == 202) {
-        setTimeout(() => getInfo(false), 2000); // poll only - force would restart the scan
-      } else {
-        showScanError(); // any HTTP error status
-      }
+        // The device also lists its saved networks that are out of range (rssi -200):
+        // those are shown under Saved, from /saved-networks.
+        scanned = json.networks.filter(function (item) { return Number(item.rssi) > -150; });
+        renderScanned();
+        renderSaved();
+      }, function () {
+        setScanning(false);
+        show('scan-error', true);
+        setRefreshButtonState(false);
+      });
+    }
+
+    function renderScanned() {
+      var selected = $('ssid').value;
+      var band = $('band').value;
+      $('table-others').innerHTML = '';
+      scanned.forEach(function (item) {
+        // a saved network (same name and band) is listed under Saved Networks only
+        if (isSavedNetwork(item.name, item.band)) return;
+        var row = appendWifiToTable(item);
+        if (item.name === selected && (item.band || '') === band) row.setAttribute('aria-checked', 'true');
+      });
+      show('no-networks', scanned.length === 0);
     }
 
     var LOCK_SVG = '<svg class="lock" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2m3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2M5 8h6a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1"/></svg>';
@@ -1006,161 +1253,294 @@
       return s + '</span>';
     }
 
-    function appendWifiToTable(table, name, open, rssi, enterprise, onClick, band) {
-      var row = document.createElement(onClick ? 'button' : 'div');
+    function appendWifiToTable(item) {
+      var row = document.createElement('button');
       row.className = 'net';
-      if (onClick) {
-        row.type = 'button';
-        row.setAttribute('role', 'radio');
-        row.setAttribute('aria-checked', 'false');
-        row.onclick = function () { selectNetwork(this); };
-      }
-      row.dataset.ssid = name;
-      row.dataset.band = band || '';
-      row.dataset.ent = enterprise ? '1' : '';
+      row.type = 'button';
+      row.setAttribute('role', 'radio');
+      row.setAttribute('aria-checked', 'false');
+      row.onclick = function () { selectNetwork(this); };
+      row.dataset.ssid = item.name;
+      row.dataset.band = item.band || '';
+      row.dataset.ent = item.enterprise ? '1' : '';
 
-      var label = band === '5GHz' ? '5G' : (band ? '2.4G' : '');
+      var label = item.band === '5GHz' ? '5G' : (item.band ? '2.4G' : '');
       row.innerHTML =
         '<span class="caret" aria-hidden="true">&#9654;</span>' +
         '<span class="ssid"></span>' +
         (label ? '<span class="badge">' + label + '</span>' : '') +
-        (enterprise ? '<span class="badge">ENT</span>' : '') +
-        (open ? '' : LOCK_SVG) +
-        barsHTML(rssi);
-      row.querySelector('.ssid').textContent = name;
+        (item.enterprise ? '<span class="badge">ENT</span>' : '') +
+        (item.open ? '' : LOCK_SVG) +
+        barsHTML(item.rssi);
+      row.querySelector('.ssid').textContent = item.name;
 
-      document.getElementById(table).appendChild(row);
+      $('table-others').appendChild(row);
+      return row;
     }
 
     function selectNetwork(el) {
-      var group = document.getElementById('table-others');
-      Array.prototype.forEach.call(group.children, function (row) {
+      each($('table-others').children, function (row) {
         row.setAttribute('aria-checked', String(row === el));
       });
 
-      document.getElementById('ssid').value = el.dataset.ssid;
-      document.getElementById('band').value = el.dataset.band || '';
+      $('ssid').value = el.dataset.ssid;
+      $('band').value = el.dataset.band || '';
 
       var isEnterprise = el.dataset.ent === '1';
-      var pw = document.getElementById('password');
-      pw.value = '';
+      $('password').value = '';
       toggleEnterpriseFields(isEnterprise);
-      focusField(isEnterprise ? document.getElementById('identity') : pw);
+      focusField($(isEnterprise ? 'identity' : 'password'));
     }
 
-    function displayWifiInfo(response) {
-      if (response.ssid && response.ssid.length > 0) {
-        document.getElementById('connect-status-title').textContent = 'Connecting to ' + response.ssid;
-      }
-      displayInfo(response.mac, response.mac_5ghz);
+    // ---- Wi-Fi: adding a network ---------------------------------------------
+    function isEnterpriseForm() {
+      return $('isEnterpriseHidden').value === 'true';
     }
 
-    function displayInfo(mac, mac5) {
-      if (mac) {
-        document.getElementById('mac24').textContent = mac.toUpperCase();
-        document.getElementById('mac24-row').hidden = false;
-      }
-      if (mac5) {
-        document.getElementById('mac5').textContent = mac5.toUpperCase();
-        document.getElementById('mac5-row').hidden = false;
-        // Only dual-band boards report a second MAC; single-band ones keep the plain label.
-        document.getElementById('mac24-label').textContent = '2.4 GHz MAC';
-      }
-      if (mac || mac5) document.getElementById('info-message').hidden = false;
-    }
-
-    function displayAlert(message) {
-      var box = document.getElementById('message');
-      box.textContent = message;
-      box.hidden = false;
-    }
-
-    function hideAlert() {
-      document.getElementById('message').hidden = true;
-      document.getElementById('adv-message').hidden = true;
-    }
-
-    // Advanced-field validation errors surface here rather than in #message:
-    // #message lives inside #view-setup, which is hidden the moment connect()
-    // switches the route to #advanced to show the offending field.
-    function displayAdvancedAlert(message) {
-      var box = document.getElementById('adv-message');
-      box.textContent = message;
-      box.hidden = false;
-    }
-
-    async function loadServerFromDevice() {
-      try {
-        const response = await fetch('/device-settings');
-        const server = (await response.json()).api_url;
-        if (server) document.getElementById('server').value = server;
-      } catch (_) { }
+    function toggleEnterpriseFields(isEnterprise) {
+      $('isEnterpriseHidden').value = isEnterprise ? 'true' : 'false';
+      show('enterprise_fields', isEnterprise);
+      show('enterprise_username_group', isEnterprise);
+      show('enterprise_indicator', isEnterprise);
     }
 
     function toggleStaticIP() {
-      document.getElementById('static_ip_fields').hidden = !document.getElementById('useStaticIP').checked;
+      show('static_ip_fields', $('useStaticIP').checked);
+    }
+
+    function togglePassword() {
+      var input = $('password');
+      var showing = input.type === 'text';
+      input.type = showing ? 'password' : 'text';
+      $('toggler').textContent = showing ? 'Show' : 'Hide';
+    }
+
+    // The network the form describes, or null (with the problem shown) when it is incomplete.
+    function networkFromForm() {
+      hideMsgs();
+      var problem = function (text) {
+        pageMsg(text, true);
+        return null;
+      };
+      var ssid = $('ssid').value;
+      var isEnterprise = isEnterpriseForm();
+
+      if (!ssid) return problem('Please enter your Wi-Fi name');
+
+      if (saved.length >= maxSaved && !isSavedNetwork(ssid)) {
+        return problem('All ' + maxSaved + ' network slots are in use. Forget a saved network first.');
+      }
+
+      var body = {
+        ssid: ssid,
+        pswd: $('password').value,
+        band: $('band').value,
+        isEnterprise: isEnterprise
+      };
+
+      if (isEnterprise) {
+        body.identity = $('identity').value;
+        body.username = $('username').value;
+        if (!body.identity) return problem('Please enter your identity for WPA2 Enterprise');
+      }
+
+      if ($('useStaticIP').checked) {
+        var staticIP = $('staticIP').value.trim();
+        var ipPattern = /^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.){3}(25[0-5]|(2[0-4]|1\d|[1-9]|)\d)$/;
+        if (!ipPattern.test(staticIP)) return problem('Enter a valid static IP address, like 192.168.1.100');
+        body.useStaticIP = true;
+        body.staticIP = staticIP;
+        body.gateway = $('gateway').value.trim();
+        body.subnet = $('subnet').value.trim();
+        body.dns1 = $('dns1').value.trim();
+      }
+
+      return body;
+    }
+
+    function connect() {
+      var body = networkFromForm();
+      if (!body) return;
+
+      var btn = $('btnConnect');
+      btn.disabled = true;
+      btn.textContent = 'Connecting…';
+      show('connect-status', true);
+
+      api('/connect', body).then(function (response) {
+        if (response.ssid) $('connect-status-title').textContent = 'Connecting to ' + response.ssid;
+        displayInfo(response.mac, response.mac_5ghz);
+        pollConnectionStatus(body.isEnterprise);
+      }, function (e) {
+        show('connect-status', false);
+        resetConnectButton();
+        pageMsg(e.message, true);
+      });
+    }
+
+    // Asks how the join went until it is over, then shows the outcome. With `once`
+    // it asks a single time: on page load, to recover the outcome of a join the
+    // page lost track of (the STA radio changing channel on connect can briefly
+    // drop captive-portal clients, which reloads the page).
+    function pollConnectionStatus(isEnterprise, once) {
+      var again = function () {
+        if (!once) setTimeout(function () { pollConnectionStatus(isEnterprise); }, 500);
+      };
+      api('/connection-status').then(function (response) {
+        if (response.status === 'connecting' || response.status === 'idle') return again();
+        displayConnectionResult(response.status, isEnterprise);
+      }, again);
+    }
+
+    function displayConnectionResult(status, isEnterprise) {
+      show('connect-status', false);
+      // the result may come back after a reload, on another page
+      if ((currentPage() || {}).id !== 'add-network') location.hash = '#add-network';
+
+      if (status === 'connected') {
+        pageMsg('Wi-Fi connected.');
+        return;
+      }
+
+      resetConnectButton();
+      if (status === 'authentication_failed') {
+        pageMsg(isEnterprise
+          ? 'Wi-Fi authentication failed. Check your credentials and try again.'
+          : 'Incorrect Wi-Fi password. Please try again.', true);
+        $('password').focus();
+      } else if (status === 'network_not_found') {
+        pageMsg('Wi-Fi network not found. Check the network name and try again.', true);
+      } else {
+        pageMsg('Unable to connect to Wi-Fi. Please try again.', true);
+      }
+    }
+
+    function resetConnectButton() {
+      var btn = $('btnConnect');
+      btn.disabled = false;
+      btn.textContent = 'Save and Connect';
+    }
+
+    // ---- Advanced settings ---------------------------------------------------
+    function settingInput(page) {
+      return $('set-' + page.id);
+    }
+
+    // The view of every page with a `setting`: its field, a hint and Save.
+    function buildSettingPages() {
+      PAGES.forEach(function (page) {
+        var setting = page.setting;
+        if (!setting) return;
+        var view = document.createElement('div');
+        view.className = 'view';
+        view.id = 'view-' + page.id;
+        view.hidden = true;
+        view.innerHTML =
+          '<div class="field"><label></label><input class="inp"><p class="hint"></p></div>' +
+          '<div class="actions"><button class="btn btn-primary" type="button">Save</button>' +
+          '<div class="msg page-msg" role="alert" hidden></div></div>';
+        var input = view.querySelector('input');
+        input.id = 'set-' + page.id;
+        input.type = setting.type || 'text';
+        input.placeholder = setting.placeholder;
+        var label = view.querySelector('label');
+        label.htmlFor = input.id;
+        label.textContent = setting.label;
+        view.querySelector('.hint').textContent = setting.hint;
+        view.querySelector('button').onclick = function () { saveSetting(page, this); };
+        $('views').appendChild(view);
+      });
+    }
+
+    function loadSettings() {
+      return api('/device-settings').then(function (settings) {
+        deviceSettings = settings || {};
+        PAGES.forEach(function (page) {
+          if (page.setting) settingInput(page).value = deviceSettings[page.setting.key] || '';
+        });
+        $('verboseLogging').checked = !!deviceSettings.verbose_logging;
+      }, function () { }).then(renderMenus);
+    }
+
+    // Saves a setting page's field, then goes back to the menu, which shows the new value.
+    function saveSetting(page, btn) {
+      hideMsgs();
+      var setting = page.setting;
+      var value = settingInput(page).value.trim();
+      if (setting.clean) value = setting.clean(value);
+      var error = value && setting.error ? setting.error(value) : '';
+      if (error) {
+        pageMsg(error, true);
+        return;
+      }
+      // Unchanged: nothing to send (the device pairs again whenever it is sent a server)
+      if (value === (deviceSettings[setting.key] || '')) {
+        goBack();
+        return;
+      }
+
+      var body = {};
+      body[setting.param] = value;
+      btn.disabled = true;
+      api('/settings', body).then(function () {
+        deviceSettings[setting.key] = value;
+        renderMenus();
+        goBack();
+      }, function (e) {
+        pageMsg(e.message, true);
+      }).then(function () { btn.disabled = false; });
+    }
+
+    // Saved right away, without a Save button
+    function saveVerboseLogging() {
+      var box = $('verboseLogging');
+      var enabled = box.checked;
+      api('/verbose-logging', { enabled: enabled }).then(function () {
+        pageMsg(enabled ? 'Verbose logging enabled.' : 'Verbose logging disabled.');
+      }, function () {
+        box.checked = !enabled;
+        pageMsg('Could not save verbose logging setting. Please try again.', true);
+      });
     }
 
     function confirmSoftReset() {
-      document.getElementById('confirmationModal').setAttribute('open', '');
-      document.querySelector('#confirmationModal .btn-quiet').focus();
+      askConfirm('Soft reset this TRMNL?',
+        'This erases saved Wi-Fi networks, the device ID and the API key. It can’t be undone.',
+        'Soft reset', softReset);
     }
-    function closeModal() { document.getElementById('confirmationModal').removeAttribute('open'); }
-
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && document.getElementById('confirmationModal').hasAttribute('open')) {
-        closeModal();
-      }
-    });
 
     function softReset() {
-      closeModal();
-      var btn = document.getElementById('btnReset');
+      var btn = $('btnReset');
       btn.disabled = true;
-      btn.textContent = 'Resetting\u2026';
-      fetch('/soft-reset', { method: 'GET' })
-        .then(_ => displayAdvancedAlert('Soft reset complete. Your TRMNL is back to its default settings.'))
-        .catch(_ => displayAdvancedAlert('The reset did not complete. Try again, or contact support if it keeps failing.'))
-        .finally(() => { btn.disabled = false; btn.textContent = 'Soft reset this TRMNL'; });
+      btn.textContent = 'Resetting…';
+      api('/soft-reset').then(function () {
+        pageMsg('Soft reset complete. Your TRMNL is back to its default settings.', true);
+      }, function () {
+        pageMsg('The reset did not complete. Try again, or contact support if it keeps failing.', true);
+      }).then(function () {
+        btn.disabled = false;
+        btn.textContent = 'Soft reset this TRMNL';
+      });
     }
 
     function runTest() {
-      var btn = document.getElementById('btnTest');
-      var out = document.getElementById('test-output');
+      var btn = $('btnTest');
+      var box = msgBox(); // the test takes a while: its result belongs on this page
       btn.disabled = true;
-      btn.textContent = 'Running\u2026';
-      fetch('/run-test')
-        .then(res => res.json())
-        .then(data => {
-          out.classList.toggle('msg-warn', !data.testPassed || data.Threshold);
-          if (data.Threshold) {
-            out.innerHTML = '<strong>Test skipped</strong>The panel is above 55 \u00b0C. Let it cool, then run the test again.';
-          } else {
-            out.innerHTML = '<strong>' + (data.testPassed ? 'Test passed' : 'Test failed') + '</strong>' +
-              'Initial ' + data.initialTemp + ' \u00b0C \u00b7 Final ' + data.finalTemp + ' \u00b0C';
-          }
-          out.hidden = false;
-        })
-        .catch(_ => {
-          out.classList.add('msg-warn');
-          out.innerHTML = '<strong>Test did not run</strong>Check that you are still on your TRMNL\'s Wi-Fi network.';
-          out.hidden = false;
-        })
-        .finally(() => { btn.disabled = false; btn.textContent = 'Run sensor test'; });
-    }
-
-    function showView() {
-      closeModal();
-      var advanced = location.hash === '#advanced';
-      document.getElementById('view-setup').hidden = advanced;
-      document.getElementById('view-advanced').hidden = !advanced;
-      document.getElementById('modeText').textContent = advanced ? 'Advanced' : 'Setup mode';
-      document.getElementById('modeDot').hidden = advanced;
-      document.getElementById('headBack').hidden = !advanced;
-      window.scrollTo(0, 0);
-      var title = (advanced ? document.getElementById('view-advanced') : document.getElementById('view-setup'))
-        .querySelector('.p-title');
-      if (title) title.focus();
+      btn.textContent = 'Running…';
+      api('/run-test').then(function (data) {
+        if (data.Threshold) {
+          pageMsg('The panel is above 55 °C. Let it cool, then run the test again.', true, 'Test skipped', box);
+        } else {
+          pageMsg('Initial ' + data.initialTemp + ' °C · Final ' + data.finalTemp + ' °C',
+            !data.testPassed, data.testPassed ? 'Test passed' : 'Test failed', box);
+        }
+      }, function (e) {
+        pageMsg(e.message, true, 'Test did not run', box);
+      }).then(function () {
+        btn.disabled = false;
+        btn.textContent = 'Run sensor test';
+      });
     }
 
     // The iOS captive-portal sheet focuses the page's first text field (Network
@@ -1214,16 +1594,19 @@
     });
 
     window.addEventListener('hashchange', showView);
-    // This script runs in <head>, before <body> exists, so the initial call
-    // has to wait for the DOM rather than run inline like the listener
-    // registration above - otherwise #view-setup/#view-advanced are still
-    // null and a direct load of /#advanced throws instead of opening it.
-    document.addEventListener('DOMContentLoaded', showView);
-
-    setTimeout(getInfo, 500);
-    setTimeout(loadServerFromDevice, 100);
-    setTimeout(restoreConnectionStatus, 100);
-    setTimeout(restoreConnectionStatus, 100);
+    // This script runs in <head>, before <body> exists, so everything that
+    // touches the page waits for the DOM rather than running inline like the
+    // listener registration above - otherwise the views are still null and a
+    // direct load of /#advanced throws instead of opening it.
+    document.addEventListener('DOMContentLoaded', function () {
+      buildSettingPages();
+      renderMenus();
+      showView();
+      loadSaved();
+      loadSettings();
+      pollConnectionStatus(isEnterpriseForm(), true);
+      setTimeout(getInfo, 500);
+    });
   </script>
 </head>
 
@@ -1231,7 +1614,7 @@
   <header class="p-head">
     <div class="p-head-row">
       <div class="p-head-lead">
-        <button class="head-back" id="headBack" type="button" onclick="location.hash = '#setup'" hidden>&larr;
+        <button class="head-back" id="headBack" type="button" onclick="goBack()" hidden>&larr;
           Back</button>
         <svg class="logo" viewBox="0 0 216 45" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="TRMNL">
           <g fill-rule="evenodd" clip-rule="evenodd">
@@ -1255,27 +1638,65 @@
           </g>
         </svg>
       </div>
-      <span class="mode"><i class="dot" id="modeDot"></i> <span id="modeText">Setup mode</span></span>
     </div>
   </header>
-  <div class="p-body">
-    <div class="view" id="view-setup">
-      <div>
-        <h1 class="p-title" tabindex="-1">Connect your TRMNL</h1>
-      </div>
-      <div id="saved-networks" hidden>
-        <div class="grp-label"><span>Saved</span></div>
-        <div class="netlist" id="table-saved"></div>
+  <div class="p-body" id="views">
+    <div id="pageHead" hidden>
+      <h1 class="p-title" id="pageTitle" tabindex="-1"></h1>
+      <p class="p-sub" id="pageSub" hidden></p>
+    </div>
+
+    <div class="view" id="view-home">
+      <nav class="menu menu-flush" id="menu" data-parent="" aria-label="Settings"></nav>
+
+      <div class="msg page-msg" role="status" hidden></div>
+
+      <div class="actions" id="home-actions" hidden>
+        <button id="btnDone" class="btn btn-primary" type="button" onclick="finish()">Save and Connect</button>
       </div>
 
+      <footer class="mac-footer" id="info-message" hidden>
+        <div class="mac-line" id="mac24-row" hidden>
+          <span class="mac-label" id="mac24-label">MAC address</span>
+          <span class="mac-alt" id="mac24"></span>
+        </div>
+        <div class="mac-line" id="mac5-row" hidden>
+          <span class="mac-label">5 GHz MAC</span>
+          <span class="mac-alt" id="mac5"></span>
+        </div>
+      </footer>
+    </div>
+
+    <div class="view" id="view-wifi" hidden>
+      <div id="saved-networks" hidden>
+        <div class="grp-label"><span>Saved Networks</span></div>
+        <div class="netlist" id="table-saved"></div>
+        <p class="hint" id="saved-hint" style="margin-top:10px" hidden>The strongest network will automatically be
+          used.</p>
+      </div>
+
+      <div id="full-note" class="msg" hidden>
+        <strong>All network slots are in use</strong>
+        Forget a saved network to add a new one.
+      </div>
+
+      <div class="msg page-msg" role="status" hidden></div>
+
+      <div class="actions" id="add-actions">
+        <button id="btnAdd" class="btn btn-primary" type="button" onclick="location.hash = '#add-network'">Add a
+          network</button>
+      </div>
+    </div>
+
+    <div class="view" id="view-add-network" hidden>
       <div>
         <div class="grp-label">
           <span>In range</span>
-          <button id="btnRefresh" type="button" onclick="refresh()">Scan again</button>
+          <button id="btnRefresh" class="btn-sm" type="button" onclick="refresh()">Refresh</button>
         </div>
         <div id="scan-error" class="msg msg-warn" role="alert" hidden>
           <strong>Couldn't scan for networks</strong>
-          Type your network name below, or tap Scan again.
+          Type your network name below, or Refresh.
         </div>
         <div id="scanning-info" class="scanning">
           <span class="spinner" aria-hidden="true">
@@ -1292,11 +1713,6 @@
             </svg>
           </span>
           <p>Scanning for networks</p>
-        </div>
-        <div id="scanning-loader">
-          <div class="skel"><span class="dither" style="width:58%"></span></div>
-          <div class="skel"><span class="dither" style="width:41%"></span></div>
-          <div class="skel"><span class="dither" style="width:66%"></span></div>
         </div>
         <div class="netlist" id="table-others" role="radiogroup" aria-label="Networks in range"></div>
         <div id="no-networks" class="msg" hidden>
@@ -1336,45 +1752,9 @@
           </div>
         </div>
 
-        <div class="msg msg-warn" id="message" role="alert" hidden></div>
-
-        <div class="msg msg-live" id="connect-status" role="status" hidden>
-          <strong id="connect-status-title">Connecting</strong>
-          <span>Keep this page open. Your TRMNL restarts when it's connected.</span>
-          <div class="progress"><i class="dither"></i></div>
-        </div>
-      </div>
-
-      <div class="actions">
-        <button id="btnConnect" class="btn btn-primary" type="button" onclick="connect()">Connect</button>
-        <button id="btnAdvanced" class="btn btn-quiet" type="button" onclick="location.hash = '#advanced'">Advanced
-          settings</button>
-      </div>
-    </div>
-
-    <div class="view" id="view-advanced" hidden>
-
-      <div>
-        <h1 class="p-title" tabindex="-1">Advanced settings</h1>
-        <p class="p-sub">Most people never need anything here. Values apply when you tap Connect.</p>
-      </div>
-
-      <div class="msg msg-warn" id="adv-message" role="alert" hidden></div>
-
-      <div class="adv-sec">
-        <h3>Server</h3>
-        <div class="field">
-          <label for="server">API server</label>
-          <input class="inp" type="url" id="server" name="server" placeholder="https://trmnl.app">
-          <p class="hint">Point your TRMNL at your own server (BYOS).</p>
-        </div>
-      </div>
-
-      <div class="adv-sec">
-        <h3>Network address</h3>
         <label class="switch">
           <input type="checkbox" id="useStaticIP" onchange="toggleStaticIP()">
-          Assign a static IP instead of using DHCP
+          Use a static IP on this network
         </label>
         <div id="static_ip_fields" class="fields" hidden>
           <div class="field">
@@ -1394,68 +1774,65 @@
             <input class="inp" type="text" id="dns1" placeholder="Default: 8.8.8.8">
           </div>
         </div>
-      </div>
 
-      <div class="adv-sec">
-        <h3>Name on your network</h3>
-        <div class="field">
-          <label for="customHostname">Hostname</label>
-          <input class="inp" type="text" id="customHostname" placeholder="trmnl-living-room">
-          <p class="hint">Letters, numbers and hyphens. Leave empty for the default (trmnl-xxxx).</p>
-        </div>
-      </div>
+        <div class="msg page-msg" role="alert" hidden></div>
 
-      <div class="adv-sec">
-        <h3>Time source</h3>
-        <div class="field">
-          <label for="ntpServer1">NTP server</label>
-          <input class="inp" type="text" id="ntpServer1" placeholder="time.nist.gov">
-          <p class="hint">Leave empty to use time.google.com.</p>
-        </div>
-      </div>
-
-      <div class="adv-sec">
-        <h3>Diagnostics</h3>
-        <p class="hint">Runs the panel through a refresh cycle and reports the temperature before and after.</p>
-        <button id="btnTest" class="btn btn-quiet" type="button" onclick="runTest()">Run sensor test</button>
-        <div class="msg" id="test-output" role="status" hidden></div>
-      </div>
-
-      <div class="adv-sec">
-        <h3>Reset</h3>
-        <div class="danger-zone">
-          <p>A soft reset erases saved Wi-Fi networks, the device ID and the API key. You'll set the device up again
-            from scratch.</p>
-          <button id="btnReset" class="btn btn-danger" type="button" onclick="confirmSoftReset()">Soft reset this
-            TRMNL</button>
+        <div class="msg msg-live" id="connect-status" role="status" hidden>
+          <strong id="connect-status-title">Connecting</strong>
+          <span>Keep this page open. Your TRMNL restarts when it's connected.</span>
+          <div class="progress"><i class="dither"></i></div>
         </div>
       </div>
 
       <div class="actions">
-        <button class="btn btn-quiet" type="button" onclick="location.hash = '#setup'">&larr; Back to Wi-Fi</button>
+        <button id="btnConnect" class="btn btn-primary" type="button" onclick="connect()">Save and
+          Connect</button>
       </div>
-
     </div>
 
-    <footer class="mac-footer" id="info-message" hidden>
-      <div class="mac-line" id="mac24-row" hidden>
-        <span class="mac-label" id="mac24-label">MAC address</span>
-        <span class="mac-alt" id="mac24"></span>
+    <div class="view" id="view-advanced" hidden>
+      <nav class="menu" data-parent="advanced" aria-label="Advanced settings"></nav>
+    </div>
+
+    <div class="view" id="view-diagnostics" hidden>
+      <div class="adv-sec">
+        <h3>Sensor test</h3>
+        <p class="hint">Runs the panel through a refresh cycle and reports the temperature before and after.</p>
+        <button id="btnTest" class="btn btn-primary" type="button" onclick="runTest()">Run sensor test</button>
       </div>
-      <div class="mac-line" id="mac5-row" hidden>
-        <span class="mac-label">5 GHz MAC</span>
-        <span class="mac-alt" id="mac5"></span>
+      <div class="adv-sec">
+        <h3>Serial logs</h3>
+        <label class="switch">
+          <input type="checkbox" id="verboseLogging" onchange="saveVerboseLogging()">
+          Send logs to serial
+        </label>
+        <p class="hint">Saved right away. Detailed logs over USB, for troubleshooting.</p>
       </div>
-    </footer>
+      <div class="msg page-msg" role="status" hidden></div>
+    </div>
+
+    <div class="view" id="view-reset" hidden>
+      <div class="msg msg-warn">
+        <strong>This can't be undone</strong>
+        A soft reset erases saved Wi-Fi networks, the device ID and the API key. You'll set the device up again
+        from scratch.
+      </div>
+      <div class="actions">
+        <button id="btnReset" class="btn btn-primary" type="button" onclick="confirmSoftReset()">Soft reset this
+          TRMNL</button>
+        <div class="msg page-msg" role="alert" hidden></div>
+      </div>
+    </div>
+
   </div>
 
   <div id="confirmationModal" class="modal">
-    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="resetTitle">
-      <p id="resetTitle"><strong>Soft reset this TRMNL?</strong></p>
-      <p>This erases saved Wi-Fi networks, the device ID and the API key. It can't be undone.</p>
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+      <p><strong id="confirmTitle"></strong></p>
+      <p id="confirmText"></p>
       <div class="row2">
-        <button class="btn btn-danger" type="button" onclick="softReset()">Soft reset</button>
-        <button class="btn btn-quiet" type="button" onclick="closeModal()">Cancel</button>
+        <button id="confirmYes" class="btn btn-primary" type="button" onclick="confirmYes()"></button>
+        <button id="confirmNo" class="btn btn-quiet" type="button" onclick="closeModal()">Cancel</button>
       </div>
     </div>
   </div>

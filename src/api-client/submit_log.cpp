@@ -12,6 +12,10 @@
 
 bool submitLogToApi(LogApiInput &input, const char *api_url) {
   String payload = serializeApiLogRequest(input.log_buffer);
+  if (!payload) { // out of memory leaves it without a buffer, and logging a null string crashes
+    Log_error("No memory for the log payload");
+    return false;
+  }
   Log_info("[HTTPS] begin /api/log ...");
 
   char new_url[200];

@@ -20,11 +20,13 @@ bool reset_firmware = false; // need to reset credentials
 bool log_retry = false;      // need to log connection retry
 
 // --- Wake / sleep state ---
+unsigned long startup_time = 0;
 uint32_t time_since_sleep;
 float battery_voltage;
 esp_sleep_wakeup_cause_t wakeup_reason = ESP_SLEEP_WAKEUP_UNDEFINED;
 SPECIAL_FUNCTION special_function = SF_NONE;
 bool special_function_chosen = false;
+bool stay_awake_for_touchbar = false;
 RTC_DATA_ATTR int iPrevWakeTime = 0;
 RTC_DATA_ATTR int last_wifi_rssi = 0;
 RTC_DATA_ATTR bool bUsedCachedImage = false;

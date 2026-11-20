@@ -88,4 +88,29 @@ General.describe "Memcheck" do
       end
     end
   end
+
+  describe "MemcheckPortal" do
+    # Memcheck reports bad accesses, not leaks: a missing free() only shows as live heap that
+    # keeps growing. Live bytes start over at every boot, so a leak has to show within one
+    # awake session; the setup portal stays up and answers the same request over and over.
+    #
+    # Every /scan answered 200 logs the network list with Log_info_serial (WebServer.cpp's
+    # scan handler), so it runs log_impl's LOG_SERIAL_ONLY path (app_logger.cpp), which
+    # before #629 returned without freeing its two buffers (~1 KB a call).
+    it "does not leak heap across repeated setup page requests" do
+      fresh_device(memcheck: "log") do |s|
+        # Warm up: the first scans set up the scan results, the web server's state and the
+        # network list; later ones replace them.
+        5.times { s.portal_scan }
+        before = s.memcheck["heap"]["internal"]
+        50.times { s.portal_scan }
+        after = s.memcheck["heap"]["internal"]
+
+        grown = after["live_bytes"] - before["live_bytes"]
+        blocks = after["live_blocks"] - before["live_blocks"]
+        expect(grown).to be < 4096, "live heap grew #{grown} bytes (#{blocks} blocks) over 50 /scan requests"
+        s.assert_no_memory_errors
+      end
+    end
+  end
 end
