@@ -21,6 +21,7 @@ const TRMNL_DEVICE device_list[] =
   "m5_papers3",   BB_PANEL_M5PAPERS3,   BB_PANEL_NONE,         0xff,  0xff,  0xff,  3,    0xff,   BATT_ADC,
   "sensoria_c5",  BB_PANEL_SENSORIA_C5, BB_PANEL_NONE,         7,     6,     0,     0xff, 0xff,   BATT_ADC,
   "lilygo_t5pro", BB_PANEL_EPDIY_V7,    BBEP_DISPLAY_ED047TC1, 39,    40,    0,     0xff, 0xff,   BATT_BQ27220,
+  "m5paper",      BB_PANEL_M5PAPER,     BB_PANEL_NONE,         21,    22,    38,    0xff, 0xff,   BATT_NONE,
   "reterminal_e1003", BB_PANEL_NONE,    BB_PANEL_NONE,         0xff,  0xff,  3,     1,    40,     BATT_ADC, // IT8951 init is in display_init()
   NULL, 0, 0, 0, 0, 0, 0, 0, 0,
 }; // Parallel Eink device list
