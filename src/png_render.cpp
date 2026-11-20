@@ -590,7 +590,7 @@ int png_count_colors(PNG *png, const uint8_t *pData, int iDataSize) {
  *        due to insufficient RAM to hold the fully decoded image
  * @param pointer to the buffer holding the PNG file
  * @param size of the PNG file
- * @return refresh mode based on image type and presence of old image, or -1 when out of memory
+ * @return refresh mode based on image type and presence of old image, or -1 when nothing was drawn
  */
 int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious) {
   int iPlane = PNG_1_BIT, rc = -1;
@@ -632,6 +632,7 @@ int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious) {
         png->close();
         delete (png); // free the decoder instance
         bbep.writePlane(); // send the pixels to the display panel
+        bbep.freeBuffer(); // the panel has the pixels now and the refresh does not read the framebuffer
         return REFRESH_FAST;
       }
       if (bbep.capabilities() & BBEP_2BIT_BW) {
@@ -749,6 +750,7 @@ int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious) {
     }
   } else {
     Log_error("%s [%d]: png->openRAM() returned %d", __FILE__, __LINE__, rc);
+    rc = -1; // a PNGdec error code is not a refresh mode
   }
   delete (png); // free the decoder instance
   return rc;
