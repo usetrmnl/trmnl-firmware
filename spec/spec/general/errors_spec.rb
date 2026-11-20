@@ -40,7 +40,7 @@ General.describe "Errors" do
 
     it "api unreachable", :smoke do
       dev.mock.set_fault("/api/display", close: true)
-      boot_with_error { |s| expect(s.status["display_refreshes"]).to be > 1 }
+      boot_with_error { |s| expect(s).to show_message("wifi_internal_error.png", [200, 320, 400, 96]) }
     end
 
     it "api unreachable on weak wifi" do
