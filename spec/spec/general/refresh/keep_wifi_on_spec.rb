@@ -41,7 +41,8 @@ General.describe "Keep Wi-Fi on", skip_if: :touchbar,
     dev.mock.display = { image: "two", refresh_rate: 600 }
     dev.boot do |s|
       s.wait_for_deep_sleep(timeout: 180)
-      expect(dev.mock.paths.count(path)).to eq(1)
+      # once for the two live answers, once more for the answer that ends the session, which is saved
+      expect(dev.mock.paths.count(path)).to eq(2)
       expect(wifi_joins(s)).to eq(1)
       expect(s).to show_image(expected, tolerance: 64, max_ratio: 0)
     end
@@ -54,6 +55,18 @@ General.describe "Keep Wi-Fi on", skip_if: :touchbar,
       15.times { s.status["sim_time_s"] - started > 25 * 60 ? break : s.wait(settle_ms: 20_000, timeout: 60) }
       expect([s.status["sim_time_s"] - started, dev.mock.requests.select { _1.path == "/api/display" }])
         .to match([be > 25 * 60, all(have_header("Reset-Reason", "ESP_RST_POWERON"))])
+    end
+  end
+
+  it "does not write live frames to flash" do
+    serve_png("one", device_number("1"))
+    serve_png("two", device_number("2"))
+    dev.mock.display_queue = [{ image: "one", refresh_rate: 2, keep_wifi_on: true },
+                              { image: "two", refresh_rate: 2, keep_wifi_on: true }]
+    dev.mock.display = { image: "default", refresh_rate: 600 } # a BMP, which is never saved under its name
+    dev.boot do |s|
+      s.wait_for_deep_sleep(timeout: 180)
+      expect(s.console(0).grep(/Writing .* to SPIFFS/).size).to eq(0)
     end
   end
 
