@@ -267,4 +267,9 @@ void modem_reset_target(void) {
   bbep.ioWrite(PIN_ESP32C5_EN, 1);
 }
 
+void modem_power_off(void) {
+  // Held in reset until modem_reset_target()
+  bbep.ioWrite(PIN_ESP32C5_EN, 0);
+}
+
 #endif // BOARD_TRMNL_X

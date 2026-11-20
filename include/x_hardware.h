@@ -23,4 +23,5 @@ battery_count_t detect_battery_count();
 extern "C" {
   void modem_enter_bootloader();
   void modem_reset_target();
+  void modem_power_off();
 }
