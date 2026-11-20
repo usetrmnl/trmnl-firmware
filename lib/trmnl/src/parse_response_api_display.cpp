@@ -55,5 +55,6 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload) {
       .reset_firmware = doc["reset_firmware"],
       .special_function = parseSpecialFunction(special_function_str),
       .action = doc["action"] | "",
-      .verbose_logging = doc["verbose_logging"] | ""};
+      .verbose_logging = doc["verbose_logging"] | "",
+      .reveal = reveal_parse_timing(doc["reveal"])};
 }

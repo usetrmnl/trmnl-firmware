@@ -79,7 +79,9 @@ uint16_t display_width();
  * @return none
  */
 
-void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool bSkipClear = false);
+// bTransition plays the server's screen transition, for a screen just fetched (TRMNL X only)
+void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool bSkipClear = false,
+                        bool bTransition = false);
 
 /**
  * @brief Enable or disable light sleep at runtime
