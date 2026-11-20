@@ -17,6 +17,25 @@ RSpec.describe "TRMNL X OTA updates", env: "TRMNL_X" do
       expect_failed_update("/missing.bin")
     end
 
+    it "reports a failed modem update through the modem" do
+      # On 5 GHz the S3's own WiFi stays off, so stored logs can only reach /api/log through the modem.
+      update_from("/missing.bin")
+      dev.boot do |s|
+        expect_to_keep_running_the_old_firmware(s, "/missing.bin")
+        log = dev.mock.wait_for_request("/api/log", timeout: 60)
+        expect(log.body).to include("Modem OTA download failed")
+      end
+    end
+
+    it "reports the modem's WiFi link in logs sent through the modem" do
+      update_from("/missing.bin")
+      dev.boot do |s|
+        expect_to_keep_running_the_old_firmware(s, "/missing.bin")
+        entry = JSON.parse(dev.mock.wait_for_request("/api/log", timeout: 60).body)["logs"].last
+        expect(entry).to include("wifi_status" => "connected", "wifi_signal" => be < 0)
+      end
+    end
+
     it "installs the new firmware with a modem update" do
       update_from("/firmware.bin", File.binread(File.join(TrmnlX.build, "firmware.bin")))
       dev.boot do |s|

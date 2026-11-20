@@ -15,7 +15,9 @@ private:
   HardwareSerial ModemSerial;
   uint32_t baudRate;
   bool _initialized = false;
+  int32_t _lastSignalRssi = 0;
   String waitForResponse(const String& expected, unsigned long timeoutMs);
+  bool setRequestHeaders(const String& reqHeaders); // AT+HTTPCHEAD, one "Key: Value" per line
 
 public:
   Modem(uint32_t baudRate);
@@ -56,6 +58,10 @@ public:
   // Fails once nothing arrives from the modem for idleTimeoutMs.
   ModemHttpResult httpGet(const String& url, std::function<bool(const uint8_t*, size_t)> chunkCb, size_t contentLength = 0, const String& reqHeaders = "", unsigned long idleTimeoutMs = 60000);
 
+  // AT+HTTPCPOST with reqHeaders in the httpGet format. True once the modem says SEND OK; the
+  // modem does not report the server's status.
+  bool httpPost(const String& url, const String& body, const String& reqHeaders = "");
+
   // Configures modem SNTP and returns Unix timestamp (UTC), or 0 on failure.
   time_t getSntpTime();
 
@@ -64,4 +70,6 @@ public:
 
   // Returns the RSSI (dBm) of the currently joined AP, (replaces WiFi.RSSI() on TRMNL_X)
   int32_t getSignalRssi();
+  // getSignalRssi()'s last answer, without an AT command, so it is safe during a transfer.
+  int32_t lastSignalRssi() const { return _lastSignalRssi; }
 };

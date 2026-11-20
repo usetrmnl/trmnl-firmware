@@ -713,28 +713,7 @@ Modem::ModemHttpResult Modem::httpGet(const String& url, const String& saveToFil
 Modem::ModemHttpResult Modem::httpGet(const String& url, std::function<bool(const uint8_t*, size_t)> chunkCb, size_t contentLength, const String& reqHeaders, unsigned long idleTimeoutMs) {
   while (ModemSerial.available()) ModemSerial.read();  // flush
 
-  if (!reqHeaders.isEmpty()) {
-    sendCommand("AT+HTTPCHEAD=0");
-    if (waitForResponse("OK", 3000).isEmpty()) {
-      Log_info_serial("[HTTP] HTTPCHEAD=0 failed");
-      return {false, 0, "", 0};
-    }
-    int pos = 0;
-    while (pos <= (int)reqHeaders.length()) {
-      int nl = reqHeaders.indexOf('\n', pos);
-      String hdr = (nl < 0) ? reqHeaders.substring(pos) : reqHeaders.substring(pos, nl);
-      hdr.trim();
-      if (!hdr.isEmpty()) {
-        sendCommand(("AT+HTTPCHEAD=" + String(hdr.length())).c_str());
-        if (waitForResponse(">", 3000).isEmpty()) return {false, 0, "", 0};
-        ModemSerial.write((const uint8_t*)hdr.c_str(), hdr.length());
-        ModemSerial.flush();
-        if (waitForResponse("OK", 3000).isEmpty()) return {false, 0, "", 0};
-      }
-      if (nl < 0) break;
-      pos = nl + 1;
-    }
-  }
+  if (!reqHeaders.isEmpty() && !setRequestHeaders(reqHeaders)) return {false, 0, "", 0};
 
   String urlParam = escape_modem_param(url);
 
@@ -964,6 +943,7 @@ String Modem::getMacAddress() {
 // getSignalRssi(): AT+CWJAP? — RSSI (dBm) of the joined AP, 0 if not connected
 // ---------------------------------------------------------------------------
 int32_t Modem::getSignalRssi() {
+  _lastSignalRssi = 0;
   while (ModemSerial.available()) ModemSerial.read();  // flush
 
   sendCommand("AT+CWJAP?");
@@ -991,6 +971,66 @@ int32_t Modem::getSignalRssi() {
 
   int32_t rssi = resp.substring(cRssi + 1, cEnd >= 0 ? cEnd : resp.length()).toInt();
   Log_info_serial("[MODEM] RSSI: %d dBm", rssi);
+  _lastSignalRssi = rssi;
   return rssi;
 }
+
+// ---------------------------------------------------------------------------
+// setRequestHeaders(): clears the modem's headers, then sets each "Key: Value" line of reqHeaders
+// ---------------------------------------------------------------------------
+bool Modem::setRequestHeaders(const String& reqHeaders) {
+  sendCommand("AT+HTTPCHEAD=0");
+  if (waitForResponse("OK", 3000).isEmpty()) {
+    Log_info_serial("[HTTP] HTTPCHEAD=0 failed");
+    return false;
+  }
+  int pos = 0;
+  while (pos <= (int)reqHeaders.length()) {
+    int nl = reqHeaders.indexOf('\n', pos);
+    String hdr = (nl < 0) ? reqHeaders.substring(pos) : reqHeaders.substring(pos, nl);
+    hdr.trim();
+    if (!hdr.isEmpty()) {
+      sendCommand(("AT+HTTPCHEAD=" + String(hdr.length())).c_str());
+      if (waitForResponse(">", 3000).isEmpty()) return false;
+      ModemSerial.write((const uint8_t*)hdr.c_str(), hdr.length());
+      ModemSerial.flush();
+      if (waitForResponse("OK", 3000).isEmpty()) return false;
+    }
+    if (nl < 0) break;
+    pos = nl + 1;
+  }
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// httpPost(): AT+HTTPCPOST, the body sent after the '>' prompt
+// ---------------------------------------------------------------------------
+bool Modem::httpPost(const String& url, const String& body, const String& reqHeaders) {
+  while (ModemSerial.available()) ModemSerial.read();  // flush
+
+  if (!setRequestHeaders(reqHeaders)) return false;
+
+  bool sent = false;
+  sendCommand(("AT+HTTPCPOST=\"" + escape_modem_param(url) + "\"," + String(body.length())).c_str());
+  if (!waitForResponse(">", 5000).isEmpty()) {
+    ModemSerial.write((const uint8_t*)body.c_str(), body.length());
+    ModemSerial.flush();
+    unsigned long deadline = millis() + 30000;
+    String acc;
+    while (millis() < deadline && !sent) {
+      while (ModemSerial.available()) acc += (char)ModemSerial.read();
+      sent = acc.indexOf("SEND OK") >= 0;
+      if (acc.indexOf("SEND FAIL") >= 0 || acc.indexOf("ERROR") >= 0) break;
+      delay(5);
+    }
+    if (!sent) Log_info_serial("[HTTP] HTTPCPOST failed: %s", acc.c_str());
+  } else {
+    Log_info_serial("[HTTP] HTTPCPOST: no '>' prompt");
+  }
+
+  sendCommand("AT+HTTPCHEAD=0");
+  waitForResponse("OK", 2000);
+  return sent;
+}
+
 #endif // BOARD_TRMNL_X
