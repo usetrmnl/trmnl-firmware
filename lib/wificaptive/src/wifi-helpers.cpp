@@ -19,12 +19,16 @@ const char *wifiStatusStr(wl_status_t wifi_status) {
       {"connect_failed", WL_CONNECT_FAILED},
       {"connection_lost", WL_CONNECTION_LOST},
       {"disconnected", WL_DISCONNECTED},
+#if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+      {"stopped", WL_STOPPED},
+#endif
   };
 
   for (const WifiStatusNode &entry : wifiStatusMap) {
     if (wifi_status == entry.value) return entry.name;
   }
-  return nullptr;
+  // Callers strncpy this into a fixed-size log field, so it must never be null.
+  return "unknown";
 }
 
 void applyWifiHostname(const String &hostname) {

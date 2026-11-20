@@ -1,770 +1,1841 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <title>TRMNL Wi-Fi Configuration</title>
   <style>
-    table {
-      border-spacing: 1;
-      border-collapse: collapse;
-      background: white;
-      border-radius: 4px;
-      overflow: hidden;
-      width: 100%;
-      margin: 0 auto;
-      position: relative;
+    :root {
+      --paper: #F0F0EB;
+      --surface: #FFFFFF;
+      --ink: #1B1B19;
+      --ink-2: #63635C;
+      --ink-3: #93938B;
+      --rule: #CFCFC7;
+      --rule-soft: #E1E1DA;
+      --spark: #F86527;
+      --invert-fg: #F0F0EB;
+      --warn-bg: #FBF0DC;
+      --warn-ink: #6B4E12;
+      --spark-fg: #FFF;
+      --btn-radius: 8px;
+      --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+      --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     }
 
-    table td,
-    table th {
-      padding-left: 8px;
-      text-align: left;
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --paper: #1A1A17;
+        --surface: #242420;
+        --ink: #EDEDE6;
+        --ink-2: #9E9E95;
+        --ink-3: #6E6E66;
+        --rule: #3A3A33;
+        --rule-soft: #2C2C27;
+        --spark: #FA7C41;
+        --invert-fg: #1A1A17;
+        --warn-bg: #322A16;
+        --warn-ink: #E3C77E;
+      }
     }
 
-    table td {
-      text-align: right;
+    * {
+      box-sizing: border-box;
     }
 
-    table tbody tr {
-      height: 30px;
-      border-bottom: 1px solid #BBBB;
-      font-size: 16px;
-    }
-
-    table tbody.hoverable tr:hover {
-      background: #f2f2f2;
-    }
-
-    .selected {
-      background-color: #BBBB;
+    /* Author-origin display rules beat the UA's [hidden]{display:none}, so every
+       `display:` rule below would silently un-hide anything carrying the attribute.
+       This restores it once, globally, for every element in every task. */
+    [hidden] {
+      display: none !important;
     }
 
     body {
-      font: 400 14px 'Calibri', 'Arial';
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font: 400 13.5px/1.55 var(--sans);
+      -webkit-text-size-adjust: 100%;
     }
 
-    blockquote {
-      color: white;
-      text-align: center;
-    }
-
-    #loader-wrapper {
-      position: fixed;
+    .p-head {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
+      padding: 14px 20px 11px;
+      border-bottom: 1px solid var(--rule);
+      position: sticky;
       top: 0;
-      right: 0;
-      bottom: 0;
-      left: 0;
-      background-color: rgba(0, 0, 0, 0.5);
-      z-index: 9999;
+      background: var(--paper);
+      z-index: 2;
     }
 
-    #loader {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 60px;
-      height: 60px;
+    .p-head-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
 
-    #loader:before {
+    /* The logo sits in the centre column, Back (when shown) in the left one */
+    .p-head-lead {
+      flex: 1 1 auto;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+    }
+
+    .p-head-lead .head-back {
+      grid-column: 1;
+      justify-self: start;
+    }
+
+    .p-head-lead .logo {
+      grid-column: 2;
+    }
+
+    /* The visible box is small; ::before stretches the touch target to 44px.
+       The negative margin keeps the box from making the header any taller. */
+    .head-back {
+      position: relative;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .12em;
+      line-height: 1;
+      text-transform: uppercase;
+      color: var(--ink);
+      background: transparent;
+      border: 1px solid var(--rule);
+      border-radius: var(--btn-radius);
+      cursor: pointer;
+      padding: 7px 9px;
+      margin: -4px 0;
+      transition: border-color .12s steps(3);
+    }
+
+    .head-back::before {
       content: "";
-      display: block;
       position: absolute;
-      border-style: solid;
-      border-color: #fff;
-      border-top-color: transparent;
-      border-width: 6px;
-      border-radius: 50%;
-      width: 60px;
-      height: 60px;
-      top: 10px;
-      left: 10px;
-      animation: loader-spin 1s linear infinite;
+      inset: -9px -6px;
     }
 
-    @keyframes loader-spin {
-      0% {
-        transform: rotate(0);
-      }
+    .head-back:hover {
+      border-color: var(--ink);
+    }
 
-      100% {
+    .logo {
+      height: 20px;
+      width: auto;
+      display: block;
+    }
+
+    .logo path {
+      fill: var(--spark);
+    }
+
+    .spark {
+      width: 20px;
+      height: 20px;
+      display: block;
+    }
+
+    .spark path {
+      fill: var(--spark);
+    }
+
+    /* The spinner is a plain HTML box rotated by CSS, with the static SVG inside
+       it: nothing within the SVG is animated, so the compositor can spin the box
+       at full frame rate. Keep it continuous - the spark has 7 identical blades,
+       so stepping in 1/7 turns lands it on itself and only wiggles. The origin
+       is the spark's true centre (15.32, 14.77 in its 30-unit viewBox). */
+    .spinner {
+      display: block;
+      transform-origin: 51.07% 49.23%;
+      animation: spin 2.4s linear infinite;
+      will-change: transform;
+    }
+
+    @keyframes spin {
+      to {
         transform: rotate(360deg);
       }
     }
 
-    #loader-wrapper {
-      display: none;
+    .p-body {
+      padding: 22px 20px 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 26px;
     }
 
-    .div-container {
+    .p-title {
+      font-family: var(--mono);
+      font-size: 21px;
+      font-weight: 600;
+      letter-spacing: -.015em;
+      margin: 0 0 6px;
+    }
+
+    .p-sub {
+      color: var(--ink-2);
+      margin: 0;
+    }
+
+    .mac-footer {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .mac-line {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .mac-label {
+      font-family: var(--mono);
+      font-size: 10.5px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+    }
+
+    .mac-alt {
+      font-family: var(--mono);
+      font-size: 12.5px;
+      color: var(--ink-2);
+      font-variant-numeric: tabular-nums;
+      -webkit-user-select: all;
+      user-select: all;
+    }
+
+    :focus-visible {
+      outline: 2px solid var(--spark);
+      outline-offset: 2px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+
+      *,
+      *::before,
+      *::after {
+        animation-duration: .001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .001ms !important;
+      }
+    }
+
+    .grp-label {
+      font-family: var(--mono);
+      font-size: 10.5px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 0 -20px;
+      padding: 0 20px 8px;
+      border-bottom: 1px solid var(--rule);
+    }
+
+    /* a small button in a section label keeps the label row at its usual height */
+    .grp-label .btn-sm {
+      margin: -10px 0 -4px;
+    }
+
+    /* Lists run the full page width: they cancel .p-body's 20px gutter and
+       their rows carry it as their only padding. */
+    .netlist {
+      display: flex;
+      flex-direction: column;
+      margin: 0 -20px;
+    }
+
+    .net {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      position: relative;
+      min-height: 48px;
+      padding: 0 20px;
+      width: 100%;
+      border: 0;
+      border-bottom: 1px solid var(--rule-soft);
+      background: transparent;
+      color: var(--ink);
+      font: inherit;
+      text-align: left;
+      transition: background-color .12s steps(3), color .12s steps(3);
+    }
+
+    .net:last-child {
+      border-bottom: 0;
+    }
+
+    button.net {
+      cursor: pointer;
+    }
+
+    button.net:not([aria-checked="true"]):hover {
+      background: var(--rule-soft);
+    }
+
+    .net:focus-visible {
+      outline: 2px solid var(--spark);
+      outline-offset: -2px;
+    }
+
+    .net[aria-checked="true"] {
+      background: var(--ink);
+      color: var(--invert-fg);
+    }
+
+    .net[aria-checked="true"] .badge {
+      border-color: var(--invert-fg);
+      color: var(--invert-fg);
+    }
+
+    .net[aria-checked="true"] .bar {
+      border-color: var(--invert-fg);
+    }
+
+    .net[aria-checked="true"] .bar.on {
+      background: var(--invert-fg);
+    }
+
+    .net[aria-checked="true"] .lock {
+      fill: var(--invert-fg);
+    }
+
+    .net[aria-checked="true"] .caret {
+      opacity: 1;
+    }
+
+    .ssid {
+      font-family: var(--mono);
+      font-size: 14.5px;
+      flex: 1 1 auto;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .caret {
+      color: var(--spark);
+      font-family: var(--mono);
+      font-size: 12px;
+      opacity: 0;
+      /* in the gutter, so network names line up with the rest of the page */
+      position: absolute;
+      left: 7px;
+    }
+
+    .badge {
+      font-family: var(--mono);
+      font-size: 9.5px;
+      letter-spacing: .06em;
+      line-height: 1.2;
+      padding: 2px 4px;
+      border: 1px solid var(--ink-3);
+      color: var(--ink-2);
+      border-radius: 2px;
+      flex: 0 0 auto;
+    }
+
+    .lock {
+      width: 11px;
+      height: 11px;
+      fill: var(--ink-3);
+      flex: 0 0 auto;
+    }
+
+    .bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 12px;
+      flex: 0 0 auto;
+    }
+
+    .bar {
+      width: 3px;
+      border: 1px solid var(--ink-3);
+      border-radius: 1px;
+    }
+
+    .bar:nth-child(1) {
+      height: 5px;
+    }
+
+    .bar:nth-child(2) {
+      height: 8.5px;
+    }
+
+    .bar:nth-child(3) {
+      height: 12px;
+    }
+
+    .bar.on {
+      background: var(--ink);
+      border-color: var(--ink);
+    }
+
+    .dither {
+      background-image:
+        linear-gradient(45deg, var(--rule) 25%, transparent 25%, transparent 75%, var(--rule) 75%),
+        linear-gradient(45deg, var(--rule) 25%, transparent 25%, transparent 75%, var(--rule) 75%);
+      background-size: 4px 4px;
+      background-position: 0 0, 2px 2px;
+    }
+
+    .scanning {
       display: flex;
       flex-direction: column;
       align-items: center;
-      margin: 30px 30px 30px 30px;
+      gap: 12px;
+      padding: 26px 0 22px;
     }
 
-    .form-group {
+    .scanning .spark {
+      width: 30px;
+      height: 30px;
+    }
+
+    .scanning p {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--ink-2);
+      margin: 0;
+    }
+
+    .fields {
       display: flex;
       flex-direction: column;
-      align-items: flex-start;
-      margin-bottom: 20px;
+      gap: 16px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .field label {
+      font-family: var(--mono);
+      font-size: 10.5px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+    }
+
+    .field .opt {
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    .hint {
+      font-size: 12.5px;
+      color: var(--ink-3);
+      margin: 0;
+    }
+
+    .inp {
+      font-family: var(--mono);
+      font-size: 15px;
+      color: var(--ink);
+      background: var(--surface);
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      padding: 13px 12px;
       width: 100%;
+      min-height: 48px;
+      transition: border-color .1s steps(2);
     }
 
-    label {
-      font-size: 18px;
-      margin-bottom: 5px;
+    .inp::placeholder {
+      color: var(--ink-3);
     }
 
-    input, select, textarea {
-      border-width: 1px;
-      border-radius: .75rem;
-      font-size: 16px;
-      padding: 5px;
-      width: 100%;
-      box-sizing: border-box;
-    }
-
-    textarea {
-      font-family: monospace;
-      resize: vertical;
-    }
-
-    select {
-      height: 35px;
-    }
-
-    input:focus {
+    .inp:focus {
       outline: none;
-      border: 2px solid #F86527;
-      border-radius: .75rem;
+      border-color: var(--spark);
+      box-shadow: inset 0 0 0 1px var(--spark);
     }
 
-    input::placeholder {
-      opacity: 70%;
-    }
-
-    .button {
-      color: #fff;
-      border: none;
-      padding: 8px 18px;
-      font-size: 18px;
-      border-radius: 5px;
-    }
-
-    .button:disabled {
-      opacity: .65;
-    }
-
-    .button-success {
-      background-color: #F86527;
-    }
-
-    .button-primary {
-      background-color: #e4eaf0;
-      color: #212529;
-    }
-
-    .button-primary:hover:not([disabled]) {
-      background-color: #d7dfe8;
-    }
-
-    .button-secondary {
-      background-color: #343a40;
-    }
-
-    .button-secondary:hover:not([disabled]) {
-      background-color: #3e444a;
-    }
-
-    .button:hover:not([disabled]) {
-      filter: saturate(0.8);
-    }
-
-    h1 {
-      text-align: center;
-    }
-
-    .alert-primary {
-      color: #383d41;
-      background-color: #e2e3e5;
-      border-color: #d6d8db;
-    }
-
-    .alert-warning {
-      color: #856404;
-      background-color: #fff3cd;
-      border-color: #ffeeba;
-    }
-
-    .alert {
+    .pw-wrap {
       position: relative;
-      padding: .75rem 1.25rem;
-      margin-bottom: 1rem;
-      border: 1px solid transparent;
-      border-radius: .25rem;
-      margin-left: auto;
-      margin-right: auto;
+      display: flex;
     }
 
-    #toggler {
+    .pw-wrap .inp {
+      padding-right: 62px;
+    }
+
+    .pw-toggle {
       position: absolute;
-      font-size: 20px;
-      right: 50px;
+      right: 1px;
+      top: 0;
+      bottom: 0;
+      padding: 0 12px;
+      background: none;
+      border: 0;
+      border-left: 1px solid var(--rule-soft);
+      font-family: var(--mono);
+      font-size: 10.5px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--ink-2);
       cursor: pointer;
-      margin-top: 32px;
     }
 
-    caption {
-      padding-top: .5rem;
-      padding-bottom: .5rem;
-      color: #6c757d;
-      text-align: left;
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
     }
 
-    .bi::before {
-      display: inline-block;
-      content: "";
-      vertical-align: -.125em;
-      background-repeat: no-repeat;
-      background-size: 1rem 1rem;
-      width: 20px;
-      height: 20px;
+    .btn {
+      font-family: var(--mono);
+      font-size: 14px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      padding: 15px 18px;
+      border-radius: var(--btn-radius);
+      border: 1px solid transparent;
+      cursor: pointer;
+      width: 100%;
+      min-height: 48px;
+      transition: background-color .12s steps(3), color .12s steps(3), border-color .12s steps(3);
     }
 
-    .bi-wifi::before {
-      background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='bi bi-wifi' viewBox='0 0 16 16'><path d='M15.384 6.115a.485.485 0 0 0-.047-.736A12.44 12.44 0 0 0 8 3C5.259 3 2.723 3.882.663 5.379a.485.485 0 0 0-.048.736.52.52 0 0 0 .668.05A11.45 11.45 0 0 1 8 4c2.507 0 4.827.802 6.716 2.164.205.148.49.13.668-.049'/><path d='M13.229 8.271a.482.482 0 0 0-.063-.745A9.46 9.46 0 0 0 8 6c-1.905 0-3.68.56-5.166 1.526a.48.48 0 0 0-.063.745.525.525 0 0 0 .652.065A8.46 8.46 0 0 1 8 7a8.46 8.46 0 0 1 4.576 1.336c.206.132.48.108.653-.065m-2.183 2.183c.226-.226.185-.605-.1-.75A6.5 6.5 0 0 0 8 9c-1.06 0-2.062.254-2.946.704-.285.145-.326.524-.1.75l.015.015c.16.16.407.19.611.09A5.5 5.5 0 0 1 8 10c.868 0 1.69.201 2.42.56.203.1.45.07.61-.091zM9.06 12.44c.196-.196.198-.52-.04-.66A2 2 0 0 0 8 11.5a2 2 0 0 0-1.02.28c-.238.14-.236.464-.04.66l.706.706a.5.5 0 0 0 .707 0l.707-.707z'/></svg>");
+    .btn-primary {
+      background: var(--spark);
+      color: var(--spark-fg);
+      border-color: var(--spark);
     }
 
-    .bi-wifi-1::before {
-      background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='bi bi-wifi-1' viewBox='0 0 16 16'><path d='M11.046 10.454c.226-.226.185-.605-.1-.75A6.5 6.5 0 0 0 8 9c-1.06 0-2.062.254-2.946.704-.285.145-.326.524-.1.75l.015.015c.16.16.407.19.611.09A5.5 5.5 0 0 1 8 10c.868 0 1.69.201 2.42.56.203.1.45.07.611-.091zM9.06 12.44c.196-.196.198-.52-.04-.66A2 2 0 0 0 8 11.5a2 2 0 0 0-1.02.28c-.238.14-.236.464-.04.66l.706.706a.5.5 0 0 0 .707 0l.708-.707z'/></svg>");
+    .btn-primary:hover:not(:disabled) {
+      background: var(--ink);
+      border-color: var(--ink);
+      color: var(--invert-fg);
     }
 
-    .bi-wifi-2::before {
-      background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='bi bi-wifi-2' viewBox='0 0 16 16'><path d='M13.229 8.271c.216-.216.194-.578-.063-.745A9.46 9.46 0 0 0 8 6c-1.905 0-3.68.56-5.166 1.526a.48.48 0 0 0-.063.745.525.525 0 0 0 .652.065A8.46 8.46 0 0 1 8 7a8.46 8.46 0 0 1 4.577 1.336c.205.132.48.108.652-.065m-2.183 2.183c.226-.226.185-.605-.1-.75A6.5 6.5 0 0 0 8 9c-1.06 0-2.062.254-2.946.704-.285.145-.326.524-.1.75l.015.015c.16.16.408.19.611.09A5.5 5.5 0 0 1 8 10c.868 0 1.69.201 2.42.56.203.1.45.07.611-.091zM9.06 12.44c.196-.196.198-.52-.04-.66A2 2 0 0 0 8 11.5a2 2 0 0 0-1.02.28c-.238.14-.236.464-.04.66l.706.706a.5.5 0 0 0 .708 0l.707-.707z'/></svg>");
+    .btn:disabled {
+      opacity: .55;
+      cursor: default;
     }
 
-    .bi-eye::before {
-      background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='bi bi-eye' viewBox='0 0 16 16'><path d='M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8M1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z'/><path d='M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0'/></svg>");
+    .btn-quiet {
+      background: transparent;
+      color: var(--ink);
+      border-color: var(--rule);
     }
 
-    .bi-eye-slash::before {
-      background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='bi bi-eye-slash' viewBox='0 0 16 16'><path d='M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7 7 0 0 0-2.79.588l.77.771A6 6 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755q-.247.248-.517.486z'/><path d='M11.297 9.176a3.5 3.5 0 0 0-4.474-4.474l.823.823a2.5 2.5 0 0 1 2.829 2.829zm-2.943 1.299.822.822a3.5 3.5 0 0 1-4.474-4.474l.823.823a2.5 2.5 0 0 0 2.829 2.829'/><path d='M3.35 5.47q-.27.24-.518.487A13 13 0 0 0 1.172 8l.195.288c.335.48.83 1.12 1.465 1.755C4.121 11.332 5.881 12.5 8 12.5c.716 0 1.39-.133 2.02-.36l.77.772A7 7 0 0 1 8 13.5C3 13.5 0 8 0 8s.939-1.721 2.641-3.238l.708.709zm10.296 8.884-12-12 .708-.708 12 12z'/></svg>");
+    .btn-quiet:hover {
+      border-color: var(--ink);
     }
 
-    .bi-lock::before {
-      background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='bi bi-lock' viewBox='0 0 16 16'><path d='M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2m3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2M5 8h6a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1'/></svg>");
+    .msg {
+      border: 1px solid var(--rule);
+      border-left: 3px solid var(--ink-3);
+      background: var(--surface);
+      color: var(--ink-2);
+      padding: 12px 14px;
+      border-radius: 2px;
     }
 
-    .band-badge {
-      font-size: 10px;
-      font-weight: bold;
-      padding: 1px 4px;
-      border-radius: 3px;
-      margin-left: 5px;
-      vertical-align: middle;
+    .msg strong {
+      color: var(--ink);
+      font-weight: 600;
+      display: block;
+      margin-bottom: 2px;
     }
 
-    .band-5ghz {
-      background-color: #F86527;
-      color: white;
+    .msg-warn {
+      background: var(--warn-bg);
+      color: var(--warn-ink);
+      border-color: transparent;
+      border-left-color: var(--spark);
     }
 
-    .band-24ghz {
-      background-color: #adb5bd;
-      color: white;
+    .msg-warn strong {
+      color: var(--warn-ink);
     }
 
-    .loader {
-      border: 6px solid #f3f3f3;
-      border-radius: 50%;
-      border-top: 6px solid #F86527;
-      width: 40px;
-      height: 40px;
-      -webkit-animation: spin 2s linear infinite;
-      /* Safari */
-      animation: spin 2s linear infinite;
+    .msg-live {
+      border-left-color: var(--spark);
+    }
+
+    .progress {
+      height: 4px;
+      margin-top: 10px;
+      border: 1px solid var(--rule);
+      border-radius: 1px;
+      overflow: hidden;
+    }
+
+    .progress i {
+      display: block;
+      height: 100%;
+      width: 45%;
+      animation: crawl 2.4s steps(9, end) infinite;
+    }
+
+    @keyframes crawl {
+      from {
+        transform: translateX(-100%);
+      }
+
+      to {
+        transform: translateX(230%);
+      }
+    }
+
+    .row2 {
+      display: flex;
+      gap: 10px;
+    }
+
+    .row2 .btn {
+      width: auto;
+      flex: 1 1 0;
+    }
+
+    /* Two views in one document. Only one is ever visible - the global
+       [hidden] { display: none !important } rule from Task 2 does the hiding,
+       so no extra display rule is needed here. */
+    .view {
+      display: flex;
+      flex-direction: column;
+      gap: 26px;
+    }
+
+    .p-title[tabindex] {
+      outline: none;
+    }
+
+    .p-title[tabindex]:focus,
+    .p-title[tabindex]:focus-visible {
+      outline: none;
+    }
+
+    .adv-sec {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .adv-sec>h3 {
+      font-family: var(--mono);
+      font-size: 10.5px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      margin: 0 -20px;
+      padding: 0 20px 8px;
+      border-bottom: 1px solid var(--rule);
+    }
+
+    .switch {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      min-height: 48px;
+    }
+
+    .switch input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--spark);
+      flex: 0 0 auto;
     }
 
     .modal {
       display: none;
       position: fixed;
-      z-index: 1;
-      left: 0;
-      top: 0;
-      width: 100%;
-      height: 100%;
-      overflow: auto;
-      background-color: rgb(0, 0, 0);
-      background-color: rgba(0, 0, 0, 0.4);
+      inset: 0;
+      z-index: 10;
+      background: rgba(0, 0, 0, .45);
+      padding: 20px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal[open] {
+      display: flex;
     }
 
     .modal-content {
-      background-color: #fefefe;
-      margin: 15% auto;
+      background: var(--paper);
+      border: 1px solid var(--rule);
+      border-radius: 2px;
       padding: 20px;
-      border: 1px solid #888;
-      width: 80%;
-      max-width: 500px;
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .modal-content p {
+      margin: 0;
+    }
+
+    /* The landing menu: one row per settings page (see PAGES in the script). */
+    .menu {
+      display: flex;
+      flex-direction: column;
+      border-top: 1px solid var(--rule);
+      margin: 0 -20px;
+    }
+
+    /* The landing menu sits flush under the header, whose bottom rule is its top line */
+    .menu-flush {
+      border-top: 0;
+      margin-top: -22px;
+    }
+
+    .menu-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 68px;
+      padding: 12px 20px;
+      width: 100%;
+      border: 0;
+      border-bottom: 1px solid var(--rule);
+      background: transparent;
+      color: var(--ink);
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+      transition: background-color .12s steps(3);
+    }
+
+    .menu-item:hover {
+      background: var(--rule-soft);
+    }
+
+    .menu-item:focus-visible {
+      outline-offset: -2px;
+    }
+
+    .menu-text {
+      flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .menu-title {
+      font-family: var(--mono);
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .menu-desc {
+      color: var(--ink-2);
+      font-size: 12.5px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .menu-tag {
+      border-color: var(--spark);
+      color: var(--spark);
+      text-transform: uppercase;
+    }
+
+    .chev {
+      color: var(--ink-3);
+      font-family: var(--mono);
+      font-size: 11px;
+      flex: 0 0 auto;
+    }
+
+    /* A saved network: its name with its labels on a line below */
+    .net-main {
+      flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      padding: 10px 0;
+    }
+
+    .net-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    /* A small regular button, inside a row or a label (Forget, Scan again) */
+    .btn-sm {
       position: relative;
-    }
-
-    .close {
-      color: #aaa;
-      float: right;
-      font-size: 28px;
-      font-weight: bold;
-    }
-
-    .close:hover,
-    .close:focus {
-      color: black;
-      text-decoration: none;
+      font-family: var(--mono);
+      font-size: 10.5px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--ink);
+      background: transparent;
+      border: 1px solid var(--rule);
+      border-radius: var(--btn-radius);
       cursor: pointer;
+      padding: 8px 10px;
+      flex: 0 0 auto;
+      transition: border-color .12s steps(3);
     }
 
-    .button {
-      padding: 10px 20px;
-      margin: 5px;
-      cursor: pointer;
+    /* the visible button is small; this stretches its touch target to 48px */
+    .btn-sm::before {
+      content: "";
+      position: absolute;
+      inset: -9px -6px;
     }
 
-    .modal-footer {
-      text-align: right;
-      margin-top: 20px;
+    .btn-sm:hover:not(:disabled) {
+      border-color: var(--ink);
     }
 
-    /* Safari */
-    @-webkit-keyframes spin {
-      0% {
-        -webkit-transform: rotate(0deg);
-      }
-
-      100% {
-        -webkit-transform: rotate(360deg);
-      }
+    .btn-sm:disabled {
+      opacity: .55;
+      cursor: default;
     }
 
-    @keyframes spin {
-      0% {
-        transform: rotate(0deg);
-      }
-
-      100% {
-        transform: rotate(360deg);
-      }
+    .net-act {
+      margin-left: 4px;
     }
   </style>
   <script>
-    function setRefreshButtonState(scanning) {
-      var btn = document.getElementById('btnRefresh');
-      btn.disabled = scanning;
-      btn.textContent = scanning ? 'Rescanning...' : 'Refresh';
+    // ---- Pages ---------------------------------------------------------------
+    // Every screen but the landing menu is a page, listed here. Its `title` is
+    // the heading (with `sub` as an optional line under it). A page without
+    // `parent` gets a row in the landing menu; one with `parent` gets a row in
+    // that page's menu (<nav class="menu" data-parent="PARENT"> in the parent's
+    // view) and its Back button goes there. `desc` (the line under the title in
+    // the menu) and `tag` (a small highlighted label, or '') may be strings or
+    // functions; functions are evaluated again whenever the device state
+    // changes (renderMenus).
+    //
+    // To add a page, either:
+    // - give it a `setting`, for a page that is one text field saved through
+    //   POST /settings (the view is generated, see buildSettingPages), or
+    // - put a <div class="view" id="view-NAME" hidden> in the body, with a
+    //   <div class="msg page-msg" hidden> where its messages should appear.
+    var SERVER_ERROR = 'Please enter a valid URL for your custom server';
+
+    var PAGES = [
+      {
+        id: 'wifi',
+        title: 'Wi-Fi',
+        desc: function () {
+          if (!savedLoaded) return 'Networks your TRMNL can join';
+          if (!saved.length) return 'Not connected yet';
+          return saved.length === 1 ? saved[0].ssid : saved.length + ' saved networks';
+        },
+        tag: function () { return wifiEmpty() ? 'Start here' : ''; }
+      },
+      {
+        id: 'add-network',
+        parent: 'wifi',
+        title: 'Select a Network'
+      },
+      {
+        id: 'advanced',
+        title: 'Advanced Settings',
+        sub: 'Most people never need anything here.',
+        desc: 'Server, hostname, time, diagnostics, reset'
+      },
+      {
+        id: 'server',
+        parent: 'advanced',
+        title: 'Server',
+        // `key` is the field in GET /device-settings, `param` the one POST /settings
+        // takes; `fallback` is what the menu shows while the value is empty. `clean`
+        // tidies the trimmed value and `error` returns what is wrong with it, or ''.
+        setting: {
+          key: 'api_url',
+          param: 'server',
+          label: 'API server',
+          type: 'url',
+          placeholder: 'https://trmnl.app',
+          hint: 'Point your TRMNL at your own server (BYOS). Changing it pairs the device again.',
+          fallback: 'trmnl.app',
+          clean: function (value) { return value.replace(/\/+$/, ''); },
+          error: function (value) {
+            try { new URL(value); } catch (_) { return SERVER_ERROR; }
+            return /^https?:\/\//.test(value) ? '' : SERVER_ERROR;
+          }
+        }
+      },
+      {
+        id: 'hostname',
+        parent: 'advanced',
+        title: 'Hostname',
+        setting: {
+          key: 'hostname',
+          param: 'hostname',
+          label: 'Name on your network',
+          placeholder: 'trmnl-living-room',
+          hint: 'Letters, numbers and hyphens. Leave empty for the default (trmnl-xxxx).',
+          fallback: 'Default',
+          error: function (value) {
+            return /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/.test(value) ? ''
+              : 'Hostname can use letters, numbers and hyphens only, and cannot start or end with a hyphen.';
+          }
+        }
+      },
+      {
+        id: 'time',
+        parent: 'advanced',
+        title: 'Time Source',
+        setting: {
+          key: 'ntp_server',
+          param: 'ntpServer1',
+          label: 'NTP server',
+          placeholder: 'time.nist.gov',
+          hint: 'Leave empty to use time.google.com.',
+          fallback: 'time.google.com'
+        }
+      },
+      {
+        id: 'diagnostics',
+        parent: 'advanced',
+        title: 'Diagnostics',
+        desc: 'Sensor test, serial logs'
+      },
+      {
+        id: 'reset',
+        parent: 'advanced',
+        title: 'Reset',
+        desc: 'Erase Wi-Fi, device ID and API key'
+      }
+    ];
+
+    // Device state shared by the pages
+    var saved = [], savedLoaded = false, maxSaved = 5; // GET /saved-networks
+    var scanned = [];                                   // GET /scan
+    var deviceSettings = {};                            // GET /device-settings
+
+    // ---- Helpers -------------------------------------------------------------
+    function $(id) {
+      return document.getElementById(id);
     }
 
-    async function refresh() {
+    function show(id, visible) {
+      $(id).hidden = !visible;
+    }
+
+    function each(list, fn) {
+      Array.prototype.forEach.call(list, fn);
+    }
+
+    var OFFLINE = 'Could not reach your TRMNL. Check that you are still on its Wi-Fi network, then try again.';
+
+    // A request to the device: a POST of JSON when `body` is given, else a GET.
+    // Resolves with the JSON it answers (null when it answers without any, like
+    // /scan's 202 while a scan runs) and rejects with an Error whose message can
+    // be shown as it is.
+    function api(path, body) {
+      var options = body === undefined ? {} : {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      };
+      return fetch(path, options).then(function (response) {
+        if (!response.ok) throw new Error(OFFLINE);
+        if (response.status !== 200) return null;
+        return response.json().catch(function () { return null; });
+      }, function () {
+        throw new Error(OFFLINE);
+      });
+    }
+
+    // ---- Navigation ----------------------------------------------------------
+    function currentPage() {
+      var id = location.hash.replace('#', '');
+      for (var i = 0; i < PAGES.length; i++) if (PAGES[i].id === id) return PAGES[i];
+      return null; // anything else is the landing menu
+    }
+
+    function evaluate(value) {
+      return (typeof value === 'function' ? value() : value) || '';
+    }
+
+    // Fills every menu on the page: the landing menu (data-parent="") and each
+    // parent page's menu, with a row per page whose parent it is.
+    function renderMenus() {
+      each(document.querySelectorAll('nav.menu'), function (menu) {
+        var parent = menu.dataset.parent || '';
+        menu.innerHTML = '';
+        PAGES.forEach(function (page) {
+          if ((page.parent || '') !== parent) return;
+          var item = document.createElement('button');
+          item.type = 'button';
+          item.className = 'menu-item';
+          item.onclick = function () { location.hash = '#' + page.id; };
+          item.innerHTML =
+            '<span class="menu-text"><span class="menu-title"></span><span class="menu-desc"></span></span>' +
+            '<span class="badge menu-tag" hidden></span>' +
+            '<span class="chev" aria-hidden="true">&#9654;</span>';
+          item.querySelector('.menu-title').textContent = page.title;
+          // a setting's row shows its value
+          item.querySelector('.menu-desc').textContent = page.setting
+            ? deviceSettings[page.setting.key] || page.setting.fallback
+            : evaluate(page.desc);
+          var tag = evaluate(page.tag);
+          var tagEl = item.querySelector('.menu-tag');
+          tagEl.textContent = tag;
+          tagEl.hidden = !tag;
+          menu.appendChild(item);
+        });
+      });
+
+      // Done needs a saved network to go back to
+      show('home-actions', saved.length > 0);
+    }
+
+    // Back goes up one level: to the parent page, or the landing menu
+    function goBack() {
+      var page = currentPage();
+      var target = (page && page.parent) || 'home';
+      // an empty Wi-Fi page sends you on to Add a Network, so Back skips over it
+      if (target === 'wifi' && wifiEmpty()) target = 'home';
+      location.hash = '#' + target;
+    }
+
+    function wifiEmpty() {
+      return savedLoaded && !saved.length;
+    }
+
+    // The Wi-Fi page has nothing to show without a saved network: go on to adding one.
+    // Replaces the history entry, so the browser's own Back doesn't land here again.
+    function skipEmptyWifi() {
+      var page = currentPage();
+      if (page && page.id === 'wifi' && wifiEmpty()) {
+        location.replace('#add-network');
+        return true;
+      }
+      return false;
+    }
+
+    function showView() {
+      closeModal();
+      if (skipEmptyWifi()) return; // comes back here for Add a Network
+      var page = currentPage();
+      var active = 'view-' + (page ? page.id : 'home');
+      each(document.querySelectorAll('.view'), function (view) {
+        view.hidden = view.id !== active;
+      });
+      show('headBack', page);
+      show('pageHead', page);
+      $('pageTitle').textContent = page ? page.title : '';
+      $('pageSub').textContent = page ? page.sub || '' : '';
+      show('pageSub', page && page.sub);
+      window.scrollTo(0, 0);
+      if (page) $('pageTitle').focus();
+    }
+
+    // ---- Messages ------------------------------------------------------------
+    // Each view has one message box (its .page-msg); a view without one shows nothing.
+    function msgBox() {
+      var page = currentPage();
+      return document.querySelector('#view-' + (page ? page.id : 'home') + ' .page-msg');
+    }
+
+    // Shows `text` on the page being shown, under a bold `title` if given. `box`
+    // is for an answer that may arrive after the user has moved to another page.
+    function pageMsg(text, warn, title, box) {
+      box = box || msgBox();
+      if (!box) return;
+      box.classList.toggle('msg-warn', !!warn);
+      box.textContent = '';
+      if (title) box.appendChild(document.createElement('strong')).textContent = title;
+      box.appendChild(document.createTextNode(text));
+      box.hidden = false;
+    }
+
+    function hideMsgs() {
+      each(document.querySelectorAll('.page-msg'), function (box) { box.hidden = true; });
+    }
+
+    // ---- Confirmation dialog -------------------------------------------------
+    var confirmAction = null;
+
+    function askConfirm(title, text, actionLabel, action) {
+      $('confirmTitle').textContent = title;
+      $('confirmText').textContent = text;
+      $('confirmYes').textContent = actionLabel;
+      confirmAction = action;
+      $('confirmationModal').setAttribute('open', '');
+      $('confirmNo').focus();
+    }
+
+    function confirmYes() {
+      var action = confirmAction;
+      closeModal();
+      if (action) action();
+    }
+
+    function closeModal() {
+      confirmAction = null;
+      $('confirmationModal').removeAttribute('open');
+    }
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && $('confirmationModal').hasAttribute('open')) closeModal();
+    });
+
+    // ---- Landing page --------------------------------------------------------
+    // Done: the device closes the portal and restarts onto a saved network.
+    function finish() {
+      var btn = $('btnDone');
+      btn.disabled = true;
+      api('/exit', {}).then(function () {
+        btn.textContent = 'Restarting…';
+        pageMsg('Your TRMNL is restarting and will reconnect to Wi-Fi. You can close this page.');
+      }, function (e) {
+        btn.disabled = false;
+        pageMsg(e.message, true);
+      });
+    }
+
+    function displayInfo(mac, mac5) {
+      if (mac) {
+        $('mac24').textContent = mac.toUpperCase();
+        show('mac24-row', true);
+      }
+      if (mac5) {
+        $('mac5').textContent = mac5.toUpperCase();
+        show('mac5-row', true);
+        // Only dual-band boards report a second MAC; single-band ones keep the plain label.
+        $('mac24-label').textContent = '2.4 GHz MAC';
+      }
+      if (mac || mac5) show('info-message', true);
+    }
+
+    // ---- Wi-Fi: saved networks -----------------------------------------------
+    function loadSaved() {
+      return api('/saved-networks').then(function (json) {
+        saved = json.networks || [];
+        maxSaved = json.max || maxSaved;
+        // First-time setup: a portal that opens with nothing saved goes straight to
+        // adding a network. Only on launch and only from the bare URL, so Back still
+        // reaches Wi-Fi and the menu.
+        if (!savedLoaded && !saved.length && !location.hash) location.hash = '#add-network';
+        savedLoaded = true;
+      }, function () { }).then(function () {
+        renderSaved();
+        renderMenus();
+        skipEmptyWifi(); // the last network was forgotten, or the list loaded after the page opened
+      });
+    }
+
+    function isSavedNetwork(ssid, band) {
+      return saved.some(function (n) { return n.ssid === ssid && (!band || n.band === band); });
+    }
+
+    function renderSaved() {
+      show('saved-networks', saved.length > 0);
+      show('saved-hint', saved.length > 1);
+      // a full list has no room for another network
+      show('full-note', saved.length >= maxSaved);
+      show('add-actions', saved.length < maxSaved);
+
+      var table = $('table-saved');
+      table.innerHTML = '';
+      saved.forEach(function (n) {
+        var inRange = scanned.filter(function (s) { return s.name === n.ssid && s.band === n.band; })[0];
+        var tags =
+          (n.enterprise ? '<span class="badge">ENT</span>' : '') +
+          (n.static_ip ? '<span class="badge">STATIC IP</span>' : '');
+        var row = document.createElement('div');
+        row.className = 'net';
+        row.innerHTML =
+          '<span class="net-main"><span class="ssid"></span>' +
+          (tags ? '<span class="net-tags">' + tags + '</span>' : '') + '</span>' +
+          '<span class="badge">' + (n.band === '5GHz' ? '5G' : '2.4G') + '</span>' +
+          (inRange ? barsHTML(inRange.rssi) : '') +
+          '<button class="btn-sm net-act" type="button">Forget</button>';
+        row.querySelector('.ssid').textContent = n.ssid;
+        var btn = row.querySelector('.net-act');
+        btn.setAttribute('aria-label', 'Forget ' + n.ssid);
+        btn.onclick = function () { forgetNetwork(n); };
+        table.appendChild(row);
+      });
+    }
+
+    function forgetNetwork(n) {
+      var text = saved.length === 1
+        ? 'This is the only saved network. Your TRMNL stays in setup mode until you add another.'
+        : 'Your TRMNL will no longer join this network.';
+      askConfirm('Forget ' + n.ssid + '?', text, 'Forget', function () {
+        hideMsgs();
+        api('/forget-network', { index: n.index, ssid: n.ssid })
+          .catch(function () { pageMsg('Could not forget ' + n.ssid + '. Please try again.', true); })
+          .then(loadSaved)
+          .then(renderScanned);
+      });
+    }
+
+    // ---- Wi-Fi: networks in range --------------------------------------------
+    function setRefreshButtonState(scanning) {
+      var btn = $('btnRefresh');
+      if (scanning && document.activeElement === btn) btn.blur();
+      btn.disabled = scanning;
+      btn.textContent = scanning ? 'Scanning…' : 'Scan again';
+    }
+
+    // The spinner of a scan that is running
+    function setScanning(scanning) {
+      show('scanning-info', scanning);
+    }
+
+    function refresh() {
+      $('table-others').innerHTML = '';
+      setScanning(true);
+      getInfo(true);
+    }
+
+    function getInfo(force) {
       setRefreshButtonState(true);
+      show('scan-error', false);
+      show('no-networks', false);
+      api('/scan' + (force ? '?force=1' : '')).then(function (json) {
+        if (!json) {
+          // still scanning: ask again, without force, which would restart the scan
+          setTimeout(function () { getInfo(false); }, 2000);
+          return;
+        }
+        setScanning(false);
+        setRefreshButtonState(false);
+        displayInfo(json.mac, json.mac_5ghz);
+        // The device also lists its saved networks that are out of range (rssi -200):
+        // those are shown under Saved, from /saved-networks.
+        scanned = json.networks.filter(function (item) { return Number(item.rssi) > -150; });
+        renderScanned();
+        renderSaved();
+      }, function () {
+        setScanning(false);
+        show('scan-error', true);
+        setRefreshButtonState(false);
+      });
+    }
 
-      document.getElementById('table-saved').innerHTML = '';
-      document.getElementById('table-others').innerHTML = '';
-      document.getElementById('saved-networks').style.display = 'none';
-      document.getElementById('other-networks-caption').style.display = 'none';
+    function renderScanned() {
+      var selected = $('ssid').value;
+      var band = $('band').value;
+      $('table-others').innerHTML = '';
+      scanned.forEach(function (item) {
+        // a saved network (same name and band) is listed under Saved Networks only
+        if (isSavedNetwork(item.name, item.band)) return;
+        var row = appendWifiToTable(item);
+        if (item.name === selected && (item.band || '') === band) row.setAttribute('aria-checked', 'true');
+      });
+      show('no-networks', scanned.length === 0);
+    }
 
-      let scanningInfoBox = document.getElementById('scanning-info');
-      scanningInfoBox.textContent = 'Scanning networks, please wait...';
-      scanningInfoBox.style.display = 'block';
-      document.getElementById('scanning-loader').style.display = 'block';
+    var LOCK_SVG = '<svg class="lock" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2m3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2M5 8h6a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1"/></svg>';
 
-      await getInfo(true);
+    function barsHTML(rssi) {
+      var n = rssi > -55 ? 3 : (rssi > -70 ? 2 : 1);
+      var s = '<span class="bars" aria-hidden="true">';
+      for (var i = 1; i <= 3; i++) s += '<i class="bar' + (i <= n ? ' on' : '') + '"></i>';
+      return s + '</span>';
+    }
+
+    function appendWifiToTable(item) {
+      var row = document.createElement('button');
+      row.className = 'net';
+      row.type = 'button';
+      row.setAttribute('role', 'radio');
+      row.setAttribute('aria-checked', 'false');
+      row.onclick = function () { selectNetwork(this); };
+      row.dataset.ssid = item.name;
+      row.dataset.band = item.band || '';
+      row.dataset.ent = item.enterprise ? '1' : '';
+
+      var label = item.band === '5GHz' ? '5G' : (item.band ? '2.4G' : '');
+      row.innerHTML =
+        '<span class="caret" aria-hidden="true">&#9654;</span>' +
+        '<span class="ssid"></span>' +
+        (label ? '<span class="badge">' + label + '</span>' : '') +
+        (item.enterprise ? '<span class="badge">ENT</span>' : '') +
+        (item.open ? '' : LOCK_SVG) +
+        barsHTML(item.rssi);
+      row.querySelector('.ssid').textContent = item.name;
+
+      $('table-others').appendChild(row);
+      return row;
+    }
+
+    function selectNetwork(el) {
+      each($('table-others').children, function (row) {
+        row.setAttribute('aria-checked', String(row === el));
+      });
+
+      $('ssid').value = el.dataset.ssid;
+      $('band').value = el.dataset.band || '';
+
+      var isEnterprise = el.dataset.ent === '1';
+      $('password').value = '';
+      toggleEnterpriseFields(isEnterprise);
+      focusField($(isEnterprise ? 'identity' : 'password'));
+    }
+
+    // ---- Wi-Fi: adding a network ---------------------------------------------
+    function isEnterpriseForm() {
+      return $('isEnterpriseHidden').value === 'true';
     }
 
     function toggleEnterpriseFields(isEnterprise) {
-      var enterpriseFields = document.getElementById('enterprise_fields');
-      var enterpriseUsernameGroup = document.getElementById('enterprise_username_group');
-      var enterpriseIndicator = document.getElementById('enterprise_indicator');
-
-      // store the enterprise status in a hidden field
-      document.getElementById('isEnterpriseHidden').value = isEnterprise ? 'true' : 'false';
-
-      if (isEnterprise) {
-        enterpriseFields.style.display = 'flex';
-        enterpriseUsernameGroup.style.display = 'flex';
-        enterpriseIndicator.style.display = 'block';
-      } else {
-        enterpriseFields.style.display = 'none';
-        enterpriseUsernameGroup.style.display = 'none';
-        enterpriseIndicator.style.display = 'none';
-      }
+      $('isEnterpriseHidden').value = isEnterprise ? 'true' : 'false';
+      show('enterprise_fields', isEnterprise);
+      show('enterprise_username_group', isEnterprise);
+      show('enterprise_indicator', isEnterprise);
     }
 
-    function connect() {
-      hideAlert();
-      var ssid = document.getElementById('ssid').value;
-      var pswd = document.getElementById('password').value;
-      var server = document.getElementById('server').value;
-      var band = document.getElementById('band').value;
-      var isEnterprise = document.getElementById('isEnterpriseHidden').value === 'true';
+    function toggleStaticIP() {
+      show('static_ip_fields', $('useStaticIP').checked);
+    }
 
-      if (!ssid) {
-        displayAlert('Please enter your Wi-Fi name', "warning");
-        return;
+    function togglePassword() {
+      var input = $('password');
+      var showing = input.type === 'text';
+      input.type = showing ? 'password' : 'text';
+      $('toggler').textContent = showing ? 'Show' : 'Hide';
+    }
+
+    // The network the form describes, or null (with the problem shown) when it is incomplete.
+    function networkFromForm() {
+      hideMsgs();
+      var problem = function (text) {
+        pageMsg(text, true);
+        return null;
+      };
+      var ssid = $('ssid').value;
+      var isEnterprise = isEnterpriseForm();
+
+      if (!ssid) return problem('Please enter your Wi-Fi name');
+
+      if (saved.length >= maxSaved && !isSavedNetwork(ssid)) {
+        return problem('All ' + maxSaved + ' network slots are in use. Forget a saved network first.');
       }
-
-      if (isEnterprise) {
-        var identity = document.getElementById('identity').value;
-        if (!identity) {
-          displayAlert('Please enter your identity for WPA2 Enterprise', "warning");
-          return;
-        }
-      }
-
-      // if custom server form-group is visible, validate the url
-      let customServerVisible = document.getElementById('custom_server_form_group').style.display != 'none';
-      if (customServerVisible && server) {
-        try {
-          new URL(server);
-
-          if (!server.startsWith('http://') && !server.startsWith('https://')) {
-            throw new Error();
-          }
-        } catch (_) {
-          displayAlert('Please enter a valid URL for your custom server', "warning");
-          return;
-        }
-      }
-
-      server = server.trim();
-      server = server.replace(/\/+$/, '');
 
       var body = {
         ssid: ssid,
-        pswd: pswd,
-        server: server,
-        band: band,
+        pswd: $('password').value,
+        band: $('band').value,
         isEnterprise: isEnterprise
       };
 
       if (isEnterprise) {
-        body.identity = document.getElementById('identity').value;
-        body.username = document.getElementById('username').value;
+        body.identity = $('identity').value;
+        body.username = $('username').value;
+        if (!body.identity) return problem('Please enter your identity for WPA2 Enterprise');
       }
 
-      // Include static IP settings from localStorage (configured in Advanced settings)
-      var useStaticIP = localStorage.getItem('useStaticIP') === 'true';
-      if (useStaticIP) {
+      if ($('useStaticIP').checked) {
+        var staticIP = $('staticIP').value.trim();
+        var ipPattern = /^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.){3}(25[0-5]|(2[0-4]|1\d|[1-9]|)\d)$/;
+        if (!ipPattern.test(staticIP)) return problem('Enter a valid static IP address, like 192.168.1.100');
         body.useStaticIP = true;
-        body.staticIP = localStorage.getItem('staticIP') || '';
-        body.gateway = localStorage.getItem('gateway') || '';
-        body.subnet = localStorage.getItem('subnet') || '';
-        body.dns1 = localStorage.getItem('dns1') || '';
+        body.staticIP = staticIP;
+        body.gateway = $('gateway').value.trim();
+        body.subnet = $('subnet').value.trim();
+        body.dns1 = $('dns1').value.trim();
       }
 
-      var ntp = localStorage.getItem('ntpServer1');
-      if (ntp) body.ntpServer1 = ntp;
+      return body;
+    }
 
-      var hostname = localStorage.getItem('customHostname');
-      if (hostname) body.hostname = hostname;
+    function connect() {
+      var body = networkFromForm();
+      if (!body) return;
 
-      var btn = document.getElementById("btnConnect");
+      var btn = $('btnConnect');
       btn.disabled = true;
-      btn.textContent = "Connecting...";
+      btn.textContent = 'Connecting…';
+      show('connect-status', true);
 
-      showLoader();
-      fetch('/connect', {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(body)
-      })
-        .then(response => response.json())
-        .then(response => {
-          displayWifiInfo(response);
-          hideLoader();
-        })
-        .catch(_ => {
-          hideLoader();
+      api('/connect', body).then(function (response) {
+        if (response.ssid) $('connect-status-title').textContent = 'Connecting to ' + response.ssid;
+        displayInfo(response.mac, response.mac_5ghz);
+        pollConnectionStatus(body.isEnterprise);
+      }, function (e) {
+        show('connect-status', false);
+        resetConnectButton();
+        pageMsg(e.message, true);
+      });
+    }
+
+    // Asks how the join went until it is over, then shows the outcome. With `once`
+    // it asks a single time: on page load, to recover the outcome of a join the
+    // page lost track of (the STA radio changing channel on connect can briefly
+    // drop captive-portal clients, which reloads the page).
+    function pollConnectionStatus(isEnterprise, once) {
+      var again = function () {
+        if (!once) setTimeout(function () { pollConnectionStatus(isEnterprise); }, 500);
+      };
+      api('/connection-status').then(function (response) {
+        if (response.status === 'connecting' || response.status === 'idle') return again();
+        displayConnectionResult(response.status, isEnterprise);
+      }, again);
+    }
+
+    function displayConnectionResult(status, isEnterprise) {
+      show('connect-status', false);
+      // the result may come back after a reload, on another page
+      if ((currentPage() || {}).id !== 'add-network') location.hash = '#add-network';
+
+      if (status === 'connected') {
+        pageMsg('Wi-Fi connected.');
+        return;
+      }
+
+      resetConnectButton();
+      if (status === 'authentication_failed') {
+        pageMsg(isEnterprise
+          ? 'Wi-Fi authentication failed. Check your credentials and try again.'
+          : 'Incorrect Wi-Fi password. Please try again.', true);
+        $('password').focus();
+      } else if (status === 'network_not_found') {
+        pageMsg('Wi-Fi network not found. Check the network name and try again.', true);
+      } else {
+        pageMsg('Unable to connect to Wi-Fi. Please try again.', true);
+      }
+    }
+
+    function resetConnectButton() {
+      var btn = $('btnConnect');
+      btn.disabled = false;
+      btn.textContent = 'Save and Connect';
+    }
+
+    // ---- Advanced settings ---------------------------------------------------
+    function settingInput(page) {
+      return $('set-' + page.id);
+    }
+
+    // The view of every page with a `setting`: its field, a hint and Save.
+    function buildSettingPages() {
+      PAGES.forEach(function (page) {
+        var setting = page.setting;
+        if (!setting) return;
+        var view = document.createElement('div');
+        view.className = 'view';
+        view.id = 'view-' + page.id;
+        view.hidden = true;
+        view.innerHTML =
+          '<div class="field"><label></label><input class="inp"><p class="hint"></p></div>' +
+          '<div class="actions"><button class="btn btn-primary" type="button">Save</button>' +
+          '<div class="msg page-msg" role="alert" hidden></div></div>';
+        var input = view.querySelector('input');
+        input.id = 'set-' + page.id;
+        input.type = setting.type || 'text';
+        input.placeholder = setting.placeholder;
+        var label = view.querySelector('label');
+        label.htmlFor = input.id;
+        label.textContent = setting.label;
+        view.querySelector('.hint').textContent = setting.hint;
+        view.querySelector('button').onclick = function () { saveSetting(page, this); };
+        $('views').appendChild(view);
+      });
+    }
+
+    function loadSettings() {
+      return api('/device-settings').then(function (settings) {
+        deviceSettings = settings || {};
+        PAGES.forEach(function (page) {
+          if (page.setting) settingInput(page).value = deviceSettings[page.setting.key] || '';
         });
+        $('verboseLogging').checked = !!deviceSettings.verbose_logging;
+      }, function () { }).then(renderMenus);
+    }
+
+    // Saves a setting page's field, then goes back to the menu, which shows the new value.
+    function saveSetting(page, btn) {
+      hideMsgs();
+      var setting = page.setting;
+      var value = settingInput(page).value.trim();
+      if (setting.clean) value = setting.clean(value);
+      var error = value && setting.error ? setting.error(value) : '';
+      if (error) {
+        pageMsg(error, true);
+        return;
+      }
+      // Unchanged: nothing to send (the device pairs again whenever it is sent a server)
+      if (value === (deviceSettings[setting.key] || '')) {
+        goBack();
+        return;
+      }
+
+      var body = {};
+      body[setting.param] = value;
+      btn.disabled = true;
+      api('/settings', body).then(function () {
+        deviceSettings[setting.key] = value;
+        renderMenus();
+        goBack();
+      }, function (e) {
+        pageMsg(e.message, true);
+      }).then(function () { btn.disabled = false; });
+    }
+
+    // Saved right away, without a Save button
+    function saveVerboseLogging() {
+      var box = $('verboseLogging');
+      var enabled = box.checked;
+      api('/verbose-logging', { enabled: enabled }).then(function () {
+        pageMsg(enabled ? 'Verbose logging enabled.' : 'Verbose logging disabled.');
+      }, function () {
+        box.checked = !enabled;
+        pageMsg('Could not save verbose logging setting. Please try again.', true);
+      });
     }
 
     function confirmSoftReset() {
-      document.getElementById('confirmationModal').style.display = 'block';
+      askConfirm('Soft reset this TRMNL?',
+        'This erases saved Wi-Fi networks, the device ID and the API key. It can’t be undone.',
+        'Soft reset', softReset);
     }
 
-    function confirmCustomServer() {
-      document.getElementById('customServerWarningModal').style.display = 'block';
-    }
-
-    function showCustomServerInput() {
-      document.getElementById('custom_server_form_group').style.display = 'flex';
-      closeCustomServerModal();
-    }
-
-    function closeCustomServerModal() {
-      document.getElementById('customServerWarningModal').style.display = 'none';
-    }
-
-    function closeModal() {
-      document.getElementById('confirmationModal').style.display = 'none';
-    }
-
-    function togglePassword() {
-      var icon = document.getElementById("toggler");
-      var input = document.getElementById("password")
-      if (icon.classList.contains("bi-eye")) {
-        icon.classList.add("bi-eye-slash");
-        icon.classList.remove("bi-eye");
-        input.type = "text";
-      } else {
-        icon.classList.add("bi-eye");
-        icon.classList.remove("bi-eye-slash");
-        input.type = "password";
-      }
-    }
-
-    async function getInfo(force) {
-      let scanningInfoBox = document.getElementById('scanning-info');
-      let scanningLoader = document.getElementById('scanning-loader');
-      let response = await fetch('/scan' + (force ? '?force=1' : ''), {
-        method: 'GET',
-      })
-        .catch(_ => {
-          scanningLoader.style.display = 'none';
-          scanningInfoBox.textContent =
-            'There was an error while scanning networks. Please refresh the page or enter your wifi name manually';
-          setRefreshButtonState(false);
-        });
-
-      if (response && response.status == 200) {
-        var json = await response.json();
-        scanningInfoBox.style.display = 'none';
-        scanningLoader.style.display = 'none';
-        setRefreshButtonState(false);
-
-        displayInfo(json.mac_5ghz ? `2.4GHz MAC: ${json.mac}\n5GHz MAC: ${json.mac_5ghz.toUpperCase()}` : `MAC: ${json.mac}`);
-        var knownNetworks = json.networks.filter((item) => item.saved);
-        var otherNetworks = json.networks.filter((item) => !item.saved);
-        if (knownNetworks.length > 0) {
-          document.getElementById('saved-networks').style.display = 'table';
-          document.getElementById('other-networks-caption').style.display = 'block';
-        }
-        knownNetworks.forEach((item, row) => {
-          appendWifiToTable("table-saved", item.name, item.open, item.rssi, item.enterprise, false, item.band);
-        });
-        otherNetworks.forEach((item, row) => {
-          appendWifiToTable("table-others", item.name, item.open, item.rssi, item.enterprise, true, item.band);
-        });
-      } else if (response && response.status == 202) {
-        setTimeout(getInfo, 2000); // repeat in 2s
-      }
-    }
-
-    function appendWifiToTable(table, name, open, rssi, enterprise, onClick, band) {
-      var newRow = document.createElement('tr');
-      newRow.setAttribute('data-enterprise', enterprise ? 'true' : 'false');
-      newRow.setAttribute('data-band', band || '');
-      if (onClick) {
-        newRow.onclick = function () {
-          onClickItemTable(this);
-        };
-      }
-      var th = document.createElement('th');
-      var td = document.createElement('td');
-      th.appendChild(document.createTextNode(name));
-      if (band) {
-        var badgeSpan = document.createElement('span');
-        badgeSpan.classList.add('band-badge');
-        badgeSpan.classList.add(band === '5GHz' ? 'band-5ghz' : 'band-24ghz');
-        badgeSpan.textContent = band === '5GHz' ? '5G' : '2.4G';
-        th.appendChild(badgeSpan);
-      }
-      newRow.appendChild(th);
-      // append wifi strength
-      var wifiIco = document.createElement('i');
-      wifiIco.classList.add('bi');
-      if (rssi > -55) {
-        wifiIco.classList.add('bi-wifi');
-      } else if (rssi > -70) {
-        wifiIco.classList.add('bi-wifi-2');
-      } else if (rssi > -100) {
-        wifiIco.classList.add('bi-wifi-1');
-      }
-      td.appendChild(wifiIco);
-      if (!open) {
-        var lockIco = document.createElement('i');
-        lockIco.classList.add('bi');
-        lockIco.classList.add('bi-lock');
-        td.appendChild(lockIco);
-      }
-      newRow.appendChild(td);
-      document.getElementById(table).appendChild(newRow);
-    }
-
-    function onClickItemTable(x) {
-      x.classList.add('selected');
-      var siblings = Array.from(x.parentNode.children);
-      siblings.forEach((sibling) => {
-        if (sibling !== x) {
-          sibling.classList.remove('selected');
-        }
+    function softReset() {
+      var btn = $('btnReset');
+      btn.disabled = true;
+      btn.textContent = 'Resetting…';
+      api('/soft-reset').then(function () {
+        pageMsg('Soft reset complete. Your TRMNL is back to its default settings.', true);
+      }, function () {
+        pageMsg('The reset did not complete. Try again, or contact support if it keeps failing.', true);
+      }).then(function () {
+        btn.disabled = false;
+        btn.textContent = 'Soft reset this TRMNL';
       });
-      var value = x.querySelector('th').firstChild.textContent;
-      var isEnterprise = x.getAttribute('data-enterprise') === 'true';
+    }
 
-      if (value) {
-        document.getElementById('ssid').value = value;
-        document.getElementById('band').value = x.getAttribute('data-band') || '';
-        var passwordTag = document.getElementById('password');
-        passwordTag.value = '';
-
-        toggleEnterpriseFields(isEnterprise);
-
-        if (isEnterprise) {
-          document.getElementById('identity').focus();
+    function runTest() {
+      var btn = $('btnTest');
+      var box = msgBox(); // the test takes a while: its result belongs on this page
+      btn.disabled = true;
+      btn.textContent = 'Running…';
+      api('/run-test').then(function (data) {
+        if (data.Threshold) {
+          pageMsg('The panel is above 55 °C. Let it cool, then run the test again.', true, 'Test skipped', box);
         } else {
-          passwordTag.focus();
+          pageMsg('Initial ' + data.initialTemp + ' °C · Final ' + data.finalTemp + ' °C',
+            !data.testPassed, data.testPassed ? 'Test passed' : 'Test failed', box);
         }
-      }
+      }, function (e) {
+        pageMsg(e.message, true, 'Test did not run', box);
+      }).then(function () {
+        btn.disabled = false;
+        btn.textContent = 'Run sensor test';
+      });
     }
 
-    function displayWifiInfo(response) {
-      var mac = response.mac;
-      var macInfo = response.mac_5ghz ? `2.4GHz MAC: ${mac}\n5GHz MAC: ${response.mac_5ghz.toUpperCase()}` : `MAC: ${mac}`;
+    // The iOS captive-portal sheet focuses the page's first text field (Network
+    // name) by itself a moment after every network response - so on each /scan
+    // poll - and pops the keyboard. It does so from outside the page's script
+    // world, so it cannot be intercepted, only undone: a text field keeps focus
+    // only if the press started on the field or its label, if Tab was pressed,
+    // or if the page asked via focusField(). Anything else is sent back.
+    var fieldPressed = false, fieldIntentAt = 0, netSettledAt = 0;
 
-      if (response.ssid.length > 0) {
-        displayAlert(`Connecting to: ${response.ssid}`, "alert-warning");
-      }
-      displayInfo(macInfo);
+    function focusField(el) {
+      fieldIntentAt = Date.now();
+      el.focus();
     }
 
-    function displayInfo(message) {
-      var infoMessageBox = document.getElementById("info-message");
-      infoMessageBox.style.whiteSpace = "pre-wrap";
-      infoMessageBox.textContent = message;
-      infoMessageBox.style.display = "block";
-    }
+    // touchstart/pointerdown carry the element the finger really landed on.
+    ['pointerdown', 'touchstart'].forEach(function (type) {
+      document.addEventListener(type, function (e) {
+        fieldPressed = !!(e.target.closest && e.target.closest('.field'));
+      }, true);
+    });
+    ['pointerup', 'pointercancel', 'touchend', 'touchcancel'].forEach(function (type) {
+      document.addEventListener(type, function () {
+        if (fieldPressed) fieldIntentAt = Date.now();
+        fieldPressed = false;
+      }, true);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Tab') fieldIntentAt = Date.now();
+    }, true);
 
-    function displayAlert(message, type) {
-      var messageBox = document.getElementById("message");
-      messageBox.style.display = "block";
-      messageBox.textContent = message;
-      messageBox.classList.remove("alert-primary");
-      messageBox.classList.remove("alert-warning");
+    var plainFetch = window.fetch;
+    window.fetch = function () {
+      var settled = function () { netSettledAt = Date.now(); };
+      var p = plainFetch.apply(this, arguments);
+      p.then(settled, settled);
+      return p;
+    };
 
-      messageBox.classList.add(`alert-${type}`);
-    }
+    document.addEventListener('focusin', function (e) {
+      var el = e.target, from = e.relatedTarget;
+      if (!el.matches || !el.matches('input.inp')) return;
+      if (fieldPressed || Date.now() - fieldIntentAt < 1000) return;
+      var fromField = from && from.matches && from.matches('input.inp');
+      // Field-to-field moves with no press are the keyboard's previous/next
+      // arrows - unless a response just landed, when it is the sheet pulling
+      // focus out of the field being typed in.
+      if (fromField && Date.now() - netSettledAt > 1000) return;
+      if (fromField) focusField(from);
+      else el.blur();
+    });
 
-    function hideAlert() {
-      var messageBox = document.getElementById("message");
-      messageBox.style.display = "none";
-    }
-
-    function showLoader() {
-      var loader = document.getElementById("loader-wrapper");
-      loader.style.display = "block";
-    }
-
-    function hideLoader() {
-      var loader = document.getElementById("loader-wrapper");
-      loader.style.display = "none";
-    }
-
-    function showAdvanced(){
-      fetch('/advanced', {
-        method: 'GET',
-      })
-        .catch(_ => {
-          displayAlert('Failed to load advanced settings', "warning");
-        });
-    }
-
-    async function loadServerFromDevice() {
-      // pull value from advanced.html, if present
-      let server = localStorage.getItem('customServer');
-      localStorage.removeItem('customServer');
-      if (!server) {
-        try {
-          const response = await fetch('/device-settings');
-          server = (await response.json()).api_url;
-        } catch (_) { }
-      }
-      if (server) {
-        document.getElementById('server').value = server;
-        document.getElementById('custom_server_form_group').style.display = 'flex';
-      }
-    }
-
-    setTimeout(getInfo, 500);
-    setTimeout(loadServerFromDevice, 100);
+    window.addEventListener('hashchange', showView);
+    // This script runs in <head>, before <body> exists, so everything that
+    // touches the page waits for the DOM rather than running inline like the
+    // listener registration above - otherwise the views are still null and a
+    // direct load of /#advanced throws instead of opening it.
+    document.addEventListener('DOMContentLoaded', function () {
+      buildSettingPages();
+      renderMenus();
+      showView();
+      loadSaved();
+      loadSettings();
+      pollConnectionStatus(isEnterpriseForm(), true);
+      setTimeout(getInfo, 500);
+    });
   </script>
 </head>
 
 <body>
-  <img src="/logo.svg" style="margin-left: auto; margin-right: auto; width: 50%; display: block;" />
-  <h1>Wi-Fi Configuration</h1>
-  <div class="div-container">
-    <table id="saved-networks" style="display: none;">
-      <caption>Saved Networks</caption>
-      <tbody id="table-saved">
-      </tbody>
-    </table>
-    <table>
-      <caption style="display: none;" id="other-networks-caption">Other Networks</caption>
-      <tbody id="table-others" class="hoverable">
-      </tbody>
-    </table>
-    <p id="scanning-info">Scanning networks, please wait...</p>
-    <div id="scanning-loader" class="loader"></div>
-  </div>
-  <div class="div-container">
-    <div class="form-group">
-      <label for="ssid">SSID</label>
-      <input type="text" id="ssid" name="ssid" placeholder="Enter your Wi-Fi name" oninput="document.getElementById('band').value = ''">
-    </div>
-    <input type="hidden" id="isEnterpriseHidden" value="false">
-    <input type="hidden" id="band" name="band" value="">
-    <div class="form-group" id="enterprise_indicator" style="display: none;">
-      <div class="alert alert-primary" style="margin-bottom: 0;">
-        This network uses WPA2 Enterprise authentication. If you only have a username and password, use the identity field for your username.
+  <header class="p-head">
+    <div class="p-head-row">
+      <div class="p-head-lead">
+        <button class="head-back" id="headBack" type="button" onclick="goBack()" hidden>&larr;
+          Back</button>
+        <svg class="logo" viewBox="0 0 216 45" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="TRMNL">
+          <g fill-rule="evenodd" clip-rule="evenodd">
+            <path d="M11.9439 3.5957L23.6531 7.93423L21.4787 13.6634L9.76953 9.32491L11.9439 3.5957Z" />
+            <path d="M30.7173 2.17969L34.5849 13.93L28.6957 15.8224L24.8281 4.07206L30.7173 2.17969Z" />
+            <path d="M43.5419 15.805L36.6555 26.1189L31.4863 22.7494L38.3727 12.4355L43.5419 15.805Z" />
+            <path d="M40.7576 34.2015L28.3028 35.3124L27.7461 29.2183L40.2008 28.1074L40.7576 34.2015Z" />
+            <path d="M24.4628 43.5214L15.8184 34.5929L20.2933 30.3633L28.9378 39.2919L24.4628 43.5214Z" />
+            <path d="M6.92773 36.7506L8.60305 24.5059L14.74 25.3256L13.0647 37.5703L6.92773 36.7506Z" />
+            <path d="M1.35547 18.975L12.089 12.6348L15.2667 17.8866L4.53316 24.2269L1.35547 18.975Z" />
+          </g>
+          <g fill-rule="evenodd" clip-rule="evenodd">
+            <path d="M52.0352 15.6267V11.2168H78.7043V15.6267H67.9168V34.1703H62.8543V15.6267H52.0352Z" />
+            <path
+              d="M83.9219 11.2168V34.1703H89.016V26.1296H102.808C103.768 26.1296 104.395 26.3313 104.785 26.6862C105.167 27.0343 105.402 27.6058 105.402 28.5371V34.1703H110.464V27.945C110.464 26.5333 109.976 25.377 109.087 24.5645C108.578 24.0994 107.952 23.7596 107.239 23.5456C108.091 23.1363 108.796 22.5967 109.34 21.9301C110.197 20.8788 110.622 19.5478 110.622 18.0031C110.622 15.8273 109.887 14.0972 108.321 12.9279C106.778 11.7757 104.49 11.2168 101.483 11.2168H83.9219ZM100.6 21.8443H89.016V15.4709H100.6C102.285 15.4709 103.489 15.6906 104.264 16.1725C104.995 16.6268 105.402 17.3528 105.402 18.5641C105.402 19.7951 104.991 20.5734 104.252 21.0689C103.478 21.5881 102.276 21.8443 100.6 21.8443Z" />
+            <path
+              d="M117.002 34.1703V11.2168H124.056L134.184 28.3713L144.281 11.2168H151.304V34.1703H146.241V17.2398L136.391 34.1703H131.946L122.096 17.2398V34.1703H117.002Z" />
+            <path
+              d="M165.115 11.2168H158.275V34.1703H163.37V16.5226L179.651 34.1703H186.459V11.2168H181.396V28.8645L165.115 11.2168Z" />
+            <path d="M198.543 11.2168H193.449V34.1703H215.356V29.7604H198.543V11.2168Z" />
+          </g>
+        </svg>
       </div>
     </div>
-    <div class="form-group" id="enterprise_fields" style="display: none;">
-      <label for="identity">Identity (required)</label>
-      <input type="text" id="identity" name="identity" placeholder="Enter your identity (e.g. username@domain.com)">
+  </header>
+  <div class="p-body" id="views">
+    <div id="pageHead" hidden>
+      <h1 class="p-title" id="pageTitle" tabindex="-1"></h1>
+      <p class="p-sub" id="pageSub" hidden></p>
     </div>
-    <div class="form-group" id="enterprise_username_group" style="display: none;">
-      <label for="username">Username (optional)</label>
-      <input type="text" id="username" name="username" placeholder="Enter username (if different from identity)">
+
+    <div class="view" id="view-home">
+      <nav class="menu menu-flush" id="menu" data-parent="" aria-label="Settings"></nav>
+
+      <div class="msg page-msg" role="status" hidden></div>
+
+      <div class="actions" id="home-actions" hidden>
+        <button id="btnDone" class="btn btn-primary" type="button" onclick="finish()">Save and Connect</button>
+      </div>
+
+      <footer class="mac-footer" id="info-message" hidden>
+        <div class="mac-line" id="mac24-row" hidden>
+          <span class="mac-label" id="mac24-label">MAC address</span>
+          <span class="mac-alt" id="mac24"></span>
+        </div>
+        <div class="mac-line" id="mac5-row" hidden>
+          <span class="mac-label">5 GHz MAC</span>
+          <span class="mac-alt" id="mac5"></span>
+        </div>
+      </footer>
     </div>
-    <div class="form-group">
-      <label for="password">Password</label>
-      <input type="password" id="password" name="password" placeholder="Enter your Wi-Fi password">
-      <i id="toggler" class="bi bi-eye" onclick="togglePassword()"></i>
+
+    <div class="view" id="view-wifi" hidden>
+      <div id="saved-networks" hidden>
+        <div class="grp-label"><span>Saved Networks</span></div>
+        <div class="netlist" id="table-saved"></div>
+        <p class="hint" id="saved-hint" style="margin-top:10px" hidden>The strongest network will automatically be
+          used.</p>
+      </div>
+
+      <div id="full-note" class="msg" hidden>
+        <strong>All network slots are in use</strong>
+        Forget a saved network to add a new one.
+      </div>
+
+      <div class="msg page-msg" role="status" hidden></div>
+
+      <div class="actions" id="add-actions">
+        <button id="btnAdd" class="btn btn-primary" type="button" onclick="location.hash = '#add-network'">Add a
+          network</button>
+      </div>
     </div>
-    <div class="form-group" id="custom_server_form_group" style="display: none;">
-      <label for="server">API Server</label>
-      <input type="url" id="server" name="server" placeholder="Enter your custom server without a trailing / (e.g. https://trmnl.app)">
+
+    <div class="view" id="view-add-network" hidden>
+      <div>
+        <div class="grp-label">
+          <span>In range</span>
+          <button id="btnRefresh" class="btn-sm" type="button" onclick="refresh()">Refresh</button>
+        </div>
+        <div id="scan-error" class="msg msg-warn" role="alert" hidden>
+          <strong>Couldn't scan for networks</strong>
+          Type your network name below, or Refresh.
+        </div>
+        <div id="scanning-info" class="scanning">
+          <span class="spinner" aria-hidden="true">
+            <svg class="spark" viewBox="0 0 30 30" xmlns="http://www.w3.org/2000/svg">
+              <g fill-rule="evenodd" clip-rule="evenodd">
+                <path d="M8.02188 2.11328L15.8862 5.07445L14.4258 8.98481L6.56146 6.02364L8.02188 2.11328Z" />
+                <path d="M20.6315 1.14647L23.2291 9.16642L19.2738 10.458L16.6761 2.43807L20.6315 1.14647Z" />
+                <path d="M29.244 10.4452L24.6188 17.4848L21.147 15.185L25.7722 8.14549L29.244 10.4452Z" />
+                <path d="M27.374 23.0034L19.0089 23.7616L18.6349 19.6023L27 18.8441L27.374 23.0034Z" />
+                <path d="M16.4297 29.3638L10.6237 23.2697L13.6293 20.3828L19.4352 26.4769L16.4297 29.3638Z" />
+                <path d="M4.65232 24.7423L5.77753 16.3849L9.89932 16.9443L8.77411 25.3017L4.65232 24.7423Z" />
+                <path d="M0.910558 12.6074L8.11961 8.28L10.2539 11.8645L3.04481 16.192L0.910558 12.6074Z" />
+              </g>
+            </svg>
+          </span>
+          <p>Scanning for networks</p>
+        </div>
+        <div class="netlist" id="table-others" role="radiogroup" aria-label="Networks in range"></div>
+        <div id="no-networks" class="msg" hidden>
+          <strong>No networks found</strong>
+          Move closer to your router, or type your network name below.
+        </div>
+      </div>
+      <div class="fields">
+        <div class="field">
+          <label for="ssid">Network name</label>
+          <input class="inp" type="text" id="ssid" name="ssid" placeholder="Tap a network above"
+            oninput="document.getElementById('band').value = ''">
+        </div>
+
+        <input type="hidden" id="isEnterpriseHidden" value="false">
+        <input type="hidden" id="band" name="band" value="">
+
+        <div class="msg" id="enterprise_indicator" hidden>
+          <strong>This network uses WPA2 Enterprise</strong>
+          If you only have a username and password, put the username in Identity.
+        </div>
+        <div class="field" id="enterprise_fields" hidden>
+          <label for="identity">Identity</label>
+          <input class="inp" type="text" id="identity" name="identity" placeholder="you@company.com">
+        </div>
+        <div class="field" id="enterprise_username_group" hidden>
+          <label for="username">Username <span class="opt">&mdash; optional</span></label>
+          <input class="inp" type="text" id="username" name="username" placeholder="Only if different from identity">
+        </div>
+
+        <div class="field">
+          <label for="password">Password</label>
+          <div class="pw-wrap">
+            <input class="inp" type="password" id="password" name="password" placeholder="Network password"
+              autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false">
+            <button class="pw-toggle" id="toggler" type="button" onclick="togglePassword()">Show</button>
+          </div>
+        </div>
+
+        <label class="switch">
+          <input type="checkbox" id="useStaticIP" onchange="toggleStaticIP()">
+          Use a static IP on this network
+        </label>
+        <div id="static_ip_fields" class="fields" hidden>
+          <div class="field">
+            <label for="staticIP">IP address</label>
+            <input class="inp" type="text" id="staticIP" placeholder="192.168.1.100">
+          </div>
+          <div class="field">
+            <label for="gateway">Gateway <span class="opt">&mdash; optional</span></label>
+            <input class="inp" type="text" id="gateway" placeholder="Default: x.x.x.1 based on your IP">
+          </div>
+          <div class="field">
+            <label for="subnet">Subnet mask <span class="opt">&mdash; optional</span></label>
+            <input class="inp" type="text" id="subnet" placeholder="Default: 255.255.255.0">
+          </div>
+          <div class="field">
+            <label for="dns1">DNS server <span class="opt">&mdash; optional</span></label>
+            <input class="inp" type="text" id="dns1" placeholder="Default: 8.8.8.8">
+          </div>
+        </div>
+
+        <div class="msg page-msg" role="alert" hidden></div>
+
+        <div class="msg msg-live" id="connect-status" role="status" hidden>
+          <strong id="connect-status-title">Connecting</strong>
+          <span>Keep this page open. Your TRMNL restarts when it's connected.</span>
+          <div class="progress"><i class="dither"></i></div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="btnConnect" class="btn btn-primary" type="button" onclick="connect()">Save and
+          Connect</button>
+      </div>
     </div>
-    <div class="form-group">
-      <div class="alert alert-primary" id="message" role="alert" style="display: none;"></div>
+
+    <div class="view" id="view-advanced" hidden>
+      <nav class="menu" data-parent="advanced" aria-label="Advanced settings"></nav>
     </div>
-    <span>
-      <button id="btnConnect" class="button button-success" onclick="connect()">Connect</button>
-      <button id="btnRefresh" class="button button-primary" onclick="refresh()">Refresh</button>
-    </span>
-    <span style="margin-top: 20px;">
-      <button id="btnAdvanced" class="button button-primary" onclick="location.href='/advanced'">Advanced</button>
-    </span>
-    <div class="form-group" style="margin-top: 10px;">
-      <div class="alert alert-primary" id="info-message" role="alert" style="display: none;"></div>
+
+    <div class="view" id="view-diagnostics" hidden>
+      <div class="adv-sec">
+        <h3>Sensor test</h3>
+        <p class="hint">Runs the panel through a refresh cycle and reports the temperature before and after.</p>
+        <button id="btnTest" class="btn btn-primary" type="button" onclick="runTest()">Run sensor test</button>
+      </div>
+      <div class="adv-sec">
+        <h3>Serial logs</h3>
+        <label class="switch">
+          <input type="checkbox" id="verboseLogging" onchange="saveVerboseLogging()">
+          Send logs to serial
+        </label>
+        <p class="hint">Saved right away. Detailed logs over USB, for troubleshooting.</p>
+      </div>
+      <div class="msg page-msg" role="status" hidden></div>
+    </div>
+
+    <div class="view" id="view-reset" hidden>
+      <div class="msg msg-warn">
+        <strong>This can't be undone</strong>
+        A soft reset erases saved Wi-Fi networks, the device ID and the API key. You'll set the device up again
+        from scratch.
+      </div>
+      <div class="actions">
+        <button id="btnReset" class="btn btn-primary" type="button" onclick="confirmSoftReset()">Soft reset this
+          TRMNL</button>
+        <div class="msg page-msg" role="alert" hidden></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="confirmationModal" class="modal">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+      <p><strong id="confirmTitle"></strong></p>
+      <p id="confirmText"></p>
+      <div class="row2">
+        <button id="confirmYes" class="btn btn-primary" type="button" onclick="confirmYes()"></button>
+        <button id="confirmNo" class="btn btn-quiet" type="button" onclick="closeModal()">Cancel</button>
+      </div>
     </div>
   </div>
-  <div id="loader-wrapper">
-    <div id="loader"></div>
-  </div>
-  <!-- Confirmation Modal -->
 </body>
+
 </html>

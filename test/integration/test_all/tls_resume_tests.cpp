@@ -57,7 +57,7 @@ static ApiDisplayInputs make_display_inputs(float battery_voltage) {
   inputs.apiKey = s_api_key;
   inputs.friendlyId = s_friendly_id;
   inputs.updateSource = "timer";
-  inputs.refreshRate = RefreshInterval::DEFAULT_SECONDS;
+  inputs.refreshRate = SHORT_TERM_SLOW_RETRY_INTERVAL;
   inputs.macAddress = TEST_MAC_ADDRESS;
   inputs.batteryVoltage = battery_voltage;
   inputs.firmwareVersion = FW_VERSION_STRING;
@@ -67,6 +67,7 @@ static ApiDisplayInputs make_display_inputs(float battery_voltage) {
   inputs.displayWidth = display_width();
   inputs.displayHeight = display_height();
   inputs.specialFunction = SF_NONE;
+  inputs.specialFunctionChosen = false;
   return inputs;
 }
 

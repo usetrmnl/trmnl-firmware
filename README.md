@@ -7,179 +7,68 @@ created for the [TRMNL](https://trmnl.com) e-ink display.
 >
 > to access production-ready firmware, check out the [tagged releases](https://github.com/usetrmnl/trmnl-firmware/releases/)
  or use the [Flash Assistant](https://trmnl.com/flash).
-## **Algorithm block scheme**
+## **Wake cycle**
+
+Each wake the device connects to Wi-Fi, fetches its screen from `/api/display`, draws it, checks for a reset or firmware update and goes back to deep sleep.
+
+<details>
+<summary>Show the full flowchart</summary>
 
 ```mermaid
-graph TB
+flowchart TD
+    Wake(["Wake: power-on, button or timer"]) --> Init("Init board, pins, preferences")
+    Init --> IsButton{"Woken by<br/>the button?"}
 
-    Start(["Start"])
-    Init("Init peripherals")
-    Start --> Init
+    %% Button wake (the TRMNL X reads its touch bar instead)
+    IsButton -->|"Yes"| Press{"How was it<br/>pressed?"}
+    Press -->|"Hold ≥ 15 s"| Wipe1(["Wipe credentials, reboot"])
+    Press -->|"Hold 5–15 s"| ForgetWifi("Forget Wi-Fi")
+    Press -->|"Double-click"| SpecialFn("Run special function")
+    Press -->|"Short press"| Hardware
+    ForgetWifi --> Hardware
+    SpecialFn --> Hardware
+    IsButton -->|"No"| Hardware("Read battery, init display<br/>and filesystem<br/>(wake logo unless timer wake)")
 
-    IsLongRst{"Reset button
-      pressed > 5000 ms?"}
-    Init --> IsLongRst
-
-    ClearWifi("Wi-Fi credentials clear")
-    IsLongRst -->|"Yes"| ClearWifi
-    DisplayInit("Display init")
-    IsLongRst -->|"No"| DisplayInit
-    ClearWifi --> DisplayInit
-    WakeReason{"Wake by
-      user or timer?"}
-    DisplayInit --> WakeReason
-
-    ClearDisplay("Display clear")
-    WakeReason -->|"User"| ClearDisplay
-    IsWiFiSetup{"Wi-Fi saved?"}
-    WakeReason -->|"Timer"| IsWiFiSetup
-    ClearDisplay --> IsWiFiSetup
-    NeedConfig("Show set-up message")
-    IsWiFiSetup -->|"No"| NeedConfig
-
-    %% Config Wifi
-    RunSetup("Start config portal")
-    NeedConfig --> RunSetup
-    IsReset1{"Device
-      reset?"}
-    RunSetup -->|"Yes"| IsReset1
-    WipeConfig1("API key, friendly ID and WiFi clear")
-    IsReset1 -->|"Yes"| WipeConfig1
-    Reboot1(["Reboot"])
-    WipeConfig1 --> Reboot1
-    IsWifiConnect{"WiFi
-      connected?"}
-    IsReset1 -->|"No"| IsWifiConnect
-
-    %% Main Body
-    TryConnect{"WiFi connected
-      (5tries)?"}
-    IsWiFiSetup -->|"Yes"| TryConnect
-
-    ConnectError("Show connection error")
-    IsWifiConnect -->|"No"| ConnectError
-    TryConnect -->|"No"| ConnectError
-    Sleep1(["Sleep"])
-    ConnectError --> Sleep1
-    ClockSync("Check synchronization")
-    IsWifiConnect -->|"Yes"| ClockSync
-    TryConnect -->|"Yes"| ClockSync
-    IsApiSetup{"API key and
-      friendly ID exist?"}
-    ClockSync --> IsApiSetup
+    %% Wi-Fi
+    Hardware --> IsWifiSaved{"Wi-Fi<br/>saved?"}
+    IsWifiSaved -->|"No"| Portal{"Captive portal"}
+    Portal -->|"Reset device"| Wipe2(["Wipe credentials, reboot"])
+    Portal -->|"Timed out"| WifiError(["Show Wi-Fi error, sleep"])
+    Portal -->|"Connected"| Clock
+    IsWifiSaved -->|"Yes"| Connect{"Connected?<br/>(3 attempts)"}
+    Connect -->|"No"| WifiRetry(["Sleep with backoff<br/>(error shown on button wake<br/>or 12th failed wake)"])
+    Connect -->|"Yes"| Clock("Sync clock (NTP)")
 
     %% Setup
-    CallSetup("Ping /api/setup")
-    IsApiSetup -->|"No"| CallSetup
-    IsSetupSuccess{"Setup
-      success?"}
-    CallSetup --> IsSetupSuccess
-    SetupError("Show setup error")
-    IsSetupSuccess --> SetupError
-    Sleep2(["Sleep"])
-    SetupError --> Sleep2
+    Clock --> HasKeys{"API key and<br/>friendly ID saved?"}
+    HasKeys -->|"No"| Setup{"GET /api/setup"}
+    Setup -->|"404 MAC unknown"| NotRegistered(["Show not-registered<br/>screen, sleep"])
+    Setup -->|"200"| SetupOk("Save credentials, show<br/>friendly ID screen")
+    Setup -->|"Other error"| SetupError("Show setup error")
+    SetupOk --> Fetch
+    SetupError --> Fetch
+    HasKeys -->|"Yes"| Fetch
 
-    %% Check update
-    PingServer{"Ping server,
-      success?"}
-    IsApiSetup -->|"Yes"| PingServer
-    IsSetupSuccess -->|"Yes"| PingServer
-    PingError("Show server error")
-    PingServer -->|"No"| PingError
-    Sleep3(["Sleep"])
-    PingError --> Sleep3
-
-    %% Act on update
-    IsNeedReset{"Need to reset
-     the device?"}
-    PingServer -->|"Yes"| IsNeedReset
-    IsNeedReset -->|"Yes"| WipeConfig1
-    IsNeedUpdate{"Need to update?"}
-    IsNeedReset -->|"No"| IsNeedUpdate
-    IsNeedUpdate -->|"No"| Sleep3
-    Update("Download and update")
-    IsNeedUpdate -->|"Yes"| Update
-    Update --> Sleep3
+    %% Display
+    Fetch("Send stored logs, GET /api/display,<br/>download and draw the image") --> StayQuiet{"Failed on a timer<br/>wake, < 12 tries?"}
+    StayQuiet -->|"Yes"| QuietSleep(["Sleep with backoff"])
+    StayQuiet -->|"No"| ResetAsked{"Server asked<br/>for a reset?"}
+    ResetAsked -->|"Yes"| Wipe3(["Wipe credentials, reboot"])
+    ResetAsked -->|"No"| UpdateDue{"Firmware<br/>update due?"}
+    UpdateDue -->|"Yes"| Update{"Download and<br/>flash, success?"}
+    Update -->|"Yes"| Reboot(["Reboot"])
+    Update -->|"No"| ShowResult
+    UpdateDue -->|"No"| ShowResult("Show error screen, if any")
+    ShowResult --> MoreTaps{"TRMNL X:<br/>touch bar tapped?"}
+    MoreTaps -->|"Yes"| Fetch
+    MoreTaps -->|"No"| Sleep(["Sleep until the refresh<br/>interval or a button press"])
 ```
+
+</details>
 
 ## **Web Server Endpoints**
 
-following Wifi connection via the captive portal, device swaps its Mac Address for an API Key and Friendly ID from the server (which get saved on device).
-
-```curl
-GET /api/setup
-
-headers = {
-  'ID' => 'XX:XX:XX:XX:XX' # mac address
-}
-
-response example (success):
-{ "status": 200, "api_key": "2r--SahjsAKCFksVcped2Q", "friendly_id": "917F0B", "image_url": "https://trmnl.com/images/setup/setup-logo.bmp", "filename": "empty_state" }
-
-response example (fail, device with this Mac Address not found)
-{ "status" => 404, "api_key" => nil, "friendly_id" => nil, "image_url" => nil, "filename" => nil }
-```
-
-assuming the Setup endpoint responded successfully, future requests are made solely for image / display content:
-
-```curl
-GET /api/display
-
-headers = {
-  'ID' => 'XX:XX:XX:XX',
-  'Access-Token' => '2r--SahjsAKCFksVcped2Q',
-  'Refresh-Rate' => '1800',
-  'Battery-Voltage' => '4.1',
-  'FW-Version' => '2.1.3',
-  'RSSI' => '-69'
-}
-
-response example (success, device found with this access token):
-{
-  "status"=>0, # will be 202 if no user_id is attached to device
-  "image_url"=>"https://trmnl.s3.us-east-2.amazonaws.com/path-to-img.bmp",
-  "filename"=>"2024-09-20T00:00:00",
-  "update_firmware"=>false,
-  "firmware_url"=>nil,
-  "refresh_rate"=>"1800",
-  "reset_firmware"=>false
-}
-
-response example (success, device found AND needs soft reset):
-{
- "status"=>0,
- "image_url"=>"https://trmnl.s3.us-east-2.amazonaws.com/path-to-img.bmp",
- "filename"=>"name-of-img.bmp",
- "update_firmware"=>false,
- "firmware_url"=>nil,
- "refresh_rate"=>"1800",
- "reset_firmware"=>true
-}
-
-response example (success, device found AND needs firmware update):
-{
- "status"=>0,
- "image_url"=>"https://trmnl.s3.us-east-2.amazonaws.com/path-to-img.bmp",
- "filename"=>"name-of-img.bmp",
- "update_firmware"=>true,
- "firmware_url"=>"https://trmnl.s3.us-east-2.amazonaws.com/path-to-firmware.bin",
- "refresh_rate"=>"1800",
- "reset_firmware"=>false
-}
-
-response example (fail, device not found for this access token):
-{"status"=>500, "error"=>"Device not found"}
-
-if 'FW-Version' header != web server `Setting.firmware_download_url`, server will include absolute URL from which to download firmware.
-```
-
-if device detects an issue with response data from the `api/display` endpoint, logs are sent to server.
-
-```curl
-POST /api/log
-
-# example request tbd
-```
+The device talks to its server through three endpoints: `GET /api/setup`, `GET /api/display` and `POST /api/log`. The [BYOS guide](https://docs.trmnl.com/go/diy/byos#api) documents the request headers, every field the firmware reads, the filename rules and the image size + format for each model.
 
 ## **Power consumption**
 
@@ -241,7 +130,8 @@ There are technical and non-technical options to flashing firmware.
 ### **Via CLI**
 1. To build the binary run `pio run -e TRMNL_X_dev`
 2. To upload the binary to the device `pio run -e TRMNL_X_dev -t upload`
-3. If PlatformIO uses the wrong port use this
+3. To fully flash the device (full flash) `pio run -e TRMNL_X_dev -t erase`
+4. If PlatformIO uses the wrong port use this
 ```bash
 pio device list # make sure JTAG device is visible
 pio run -e TRMNL_X_dev -t upload --upload-port /dev/cu.usbmodem1234
@@ -402,6 +292,23 @@ Environment    Test                  Status    Duration
 -------------  --------------------  --------  ------------
 trmnl_test     integration/test_all  PASSED    00:00:56.488
 ```
+
+### Debugging in the simulator
+
+[trmnl-sim](https://github.com/usetrmnl/trmnl-sim) runs firmware builds without a device, and
+GDB can debug them there: breakpoints, stepping, watchpoints and backtraces, and a crash stops
+at the faulting instruction. The debug script downloads the latest trmnl-sim release for you
+(macOS arm64 or Linux x86_64) and caches it in `.pio/sim-debug/trmnl-sim`; set
+`TRMNL_SIM_VERSION` (e.g. `v0.3.1`) to pin a release.
+
+1. Open `trmnl.code-workspace` in VS Code and select the env in PlatformIO's status bar.
+2. In the Run and Debug view, start **Debug in simulator**. It builds the env, opens the
+   simulator held at reset, and attaches the debugger, so breakpoints catch the boot.
+   Stopping the debug session stops the simulator.
+
+From a terminal, `scripts/debug_sim.sh <env>` builds and runs the simulator, waiting for GDB on
+127.0.0.1:3333 (`scripts/debug_sim.sh --help`). To just run a build there, without the debugger,
+use `scripts/sim.sh <env>` (`scripts/sim.sh --help`).
 
 ## Code Formatting
 

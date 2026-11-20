@@ -1278,7 +1278,7 @@ bool BQ27427::connectAndConfigure(int sda, int scl, bool oneCellPack)
 
 	if (alive) {
 		uint8_t expectedScale = oneCellPack ? 1 : 10;
-		bool needsConfig = (flags() & BQ27427_FLAG_ITPOR) || (designEnergyScale() != expectedScale);
+		bool needsConfig = (flags() & BQ27427_FLAG_ITPOR) || (designEnergyScale() != expectedScale) || currentPolarity();
 
 		if (needsConfig) {
 			if (oneCellPack) {
@@ -1286,6 +1286,9 @@ bool BQ27427::connectAndConfigure(int sda, int scl, bool oneCellPack)
 			} else {
 				configureTwoCell();
 			}
+
+			// Report charging current as positive, discharge as negative.
+			if (currentPolarity()) changeCurrentPolarity();
 
 			// After SOFT_RESET the BQ27427 enters INITIALIZATION (ITPOR=1).
 			// The IT algorithm needs an OCV measurement (battery at rest) to

@@ -18,13 +18,6 @@ struct ApiSetupResponse {
   String message;
 };
 
-struct ApiSetupInputs {
-  String baseUrl;
-  String macAddress;
-  String firmwareVersion;
-  String model;
-};
-
 enum class ApiDisplayOutcome {
   Ok,
   DeserializationError,
@@ -45,7 +38,7 @@ struct ApiDisplayResponse {
   bool reset_firmware;
   SPECIAL_FUNCTION special_function;
   String action;
-  String touchbar_mode;
+  String verbose_logging;
 };
 
 struct ApiDisplayInputs {
@@ -65,19 +58,30 @@ struct ApiDisplayInputs {
   float batteryTemperature;
   int stateOfCharge;
   int stateOfHealth;
+  // Real gas-gauge (Impedance Track) readings, gathered for comparison even
+  // when BYPASS_BQ27427_SOC makes stateOfCharge/etc. above an approximation.
+  int gaugeSoc;
+  int gaugeHealth;
+  int gaugeCapacityRemain;
+  int gaugeCapacityFull;
 #endif
   String firmwareVersion;
   String firmwareCommit;
   String model;
+  String panelId; // EPD revision as hex; empty = unknown (header omitted)
   int rssi;
   String wifiBand;
   int displayWidth;
   int displayHeight;
   SPECIAL_FUNCTION specialFunction;
+  bool specialFunctionChosen; // picked on the device: the header names it instead of saying "true"
   UsbStatus usbStatus;
   bool imageCached;
   int prevWakeTime;
+  String resetReason; // esp_reset_reason_t name of this boot, e.g. ESP_RST_PANIC
 };
+
+using ApiSetupInputs = ApiDisplayInputs;
 
 struct ApiLogInputs {
   String macAddress;

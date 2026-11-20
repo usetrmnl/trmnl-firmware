@@ -1,0 +1,7 @@
+/tmp/
+# screenshots of failed golden comparisons
+/golden/**/*.actual.png
+# the last run's coverage and simulator logs and screens (spec/support/builds.rb)
+/out/
+# macOS Finder metadata
+.DS_Store

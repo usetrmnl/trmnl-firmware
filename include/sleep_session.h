@@ -1,0 +1,37 @@
+#pragma once
+
+/**
+ * Deep sleep entry and low-power GPIO configuration.
+ *
+ * GME2 G4: goToSleep / goToSleepButtonOnly / config_gpio_for_lp.
+ * GME2 G5: wifiErrorDeepSleep.
+ *
+ * Public goToSleep remains declared in bl.h for touchbar_actions / WifiCaptive.
+ */
+
+/** Prepare peripherals, enable timer + GPIO wake, enter deep sleep. */
+void goToSleep(void);
+
+#ifdef BOARD_TRMNL_X
+/** Sleeps until the last sleep's timer. Returns without sleeping if it is already due. */
+void goToSleepKeepingTimer(void);
+#endif
+
+/** Sync the clock from NTP and set time_since_sleep from the time goToSleep saved (0 when unsynced). */
+void updateTimeSinceSleep(void);
+
+/** Deep sleep until button only (no timer). Currently has no callers (wifiErrorDeepSleep now
+ * sleeps on the slow-retry timer at the limit). */
+void goToSleepButtonOnly(void);
+
+/** Float/tristate GPIOs for low power (TRMNL X panel/I2C pins). */
+void config_gpio_for_lp(void);
+
+/**
+ * Wi-Fi connect failure: sleep on the Wi-Fi retry backoff; at MAX_QUIET_SLOW_RETRIES show
+ * WIFI_FAILED and reset the count (still a timed sleep). Does not return.
+ */
+void wifiErrorDeepSleep(void);
+
+/** Restart the device if this wake has not reached deep sleep within 20 minutes. Not used on the X. */
+void awake_time_limit_start(void);

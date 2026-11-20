@@ -6,6 +6,7 @@
 #include <AsyncTCP.h> //https://github.com/me-no-dev/AsyncTCP using the latest dev version from @me-no-dev
 #include <DNSServer.h>
 #include <ESPAsyncWebServer.h> //https://github.com/me-no-dev/ESPAsyncWebServer using the latest dev version from @me-no-dev
+#include <atomic>
 #include <esp_wifi.h> //Used for mpdu_rx_disable android workaround
 #include <functional>
 #include <vector>
@@ -45,12 +46,17 @@
 #define WIFI_USE_STATIC_KEY(i)   ("wifi_" + String(i) + "_usip").c_str()
 
 #define WIFI_LAST_INDEX          "wifi_last_index"
+// Set when the user asks for the portal on a device that already has networks saved
+#define WIFI_PORTAL_REQUEST_KEY  "portal_req"
+// How the join that restarted the device failed (a WifiConnectionState), for the portal that follows
+#define WIFI_PORTAL_FAILURE_KEY  "portal_fail"
 
 struct ExternalNetwork {
   String ssid;
   int32_t rssi;
   bool open;
   bool is5GHz;
+  bool enterprise;
 };
 
 class WifiCaptive {
@@ -61,7 +67,11 @@ private:
   String _password = "";
   String _band = "";
   String _api_server = "";
+  bool _api_server_given = false;
+  std::atomic<bool> _exitRequested{false};
   WifiCredentials _enterprise_credentials;
+  std::atomic<WifiConnectionState> _connectionState{WifiConnectionState::Idle};
+  std::atomic<uint32_t> _connectionRequestedAt{0};
 
   std::function<void()> _resetcallback;
   std::function<void()> _tickCallback = nullptr;
@@ -82,15 +92,16 @@ private:
 
   void setUpDNSServer(DNSServer &dnsServer, const IPAddress &localIP);
   void readWifiCredentials();
-  void saveWifiCredentials(const WifiCredentials credentials);
+  void writeWifiCredentials();
   void saveLastUsedWifiIndex(int index);
   int readLastUsedWifiIndex();
-  void saveApiServer(String url);
+  void clearPortalRequest();
   int findSavedWifiIndex(const WifiCredentials credentials);
   bool tryConnectWithRetries(const WifiCredentials creds, int last_used_index);
   std::vector<WifiCredentials> matchNetworks(std::vector<WifiNetwork> &scanResults, WifiCredentials wifiCredentials[]);
   std::vector<WifiNetwork> getScannedUniqueNetworks(bool runScan);
   std::vector<WifiNetwork> combineNetworks(std::vector<WifiNetwork> &scanResults, WifiCredentials wifiCredentials[]);
+  WifiConnectionState classifyConnectionFailure(const WifiConnectionResult &result);
 
 public:
   wl_status_t connect(const WifiCredentials credentials);
@@ -109,6 +120,27 @@ public:
 
   /// @brief Resets all saved credentials
   void resetSettings();
+
+  /// @brief Asks for the portal on the next WiFi session even though networks are saved. The saved
+  ///        networks are kept. Persisted, so it survives the restart after a failed join.
+  void requestPortal();
+
+  /// @brief True when the portal should open: nothing is saved, or requestPortal() was called.
+  bool isPortalNeeded();
+
+  /// @brief Saves a network that was just joined (up to WIFI_MAX_SAVED_CREDS): it goes to the front and
+  ///        is tried first from now on. One with the same SSID and band is replaced, else the oldest
+  ///        is dropped when full.
+  void saveWifiCredentials(const WifiCredentials credentials);
+
+  /// @brief Forgets the saved network in slot `index`, if its SSID is `ssid`.
+  bool forgetWifiCredentials(int index, const String &ssid);
+
+  /// @brief Copies the saved networks (empty slots left out); returns the last used one's position.
+  int getSavedCredentials(std::vector<WifiCredentials> &out);
+
+  /// @brief Saves the API server ("" for the default). Changing it clears the pairing.
+  void saveApiServer(String url);
 
   /// @brief sets the function callback that is triggered when uses performs soft reset
   /// @param func reset callback

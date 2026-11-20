@@ -29,6 +29,7 @@ enum class DeviceSetupOutcome {
 struct DeviceSetupResult {
   DeviceSetupOutcome outcome = DeviceSetupOutcome::RequestError;
   String imageUrl;               // setup image URL from /api/setup
+  String imagePath;              // file the setup image was saved to this run ("": none)
   String message;                // user-facing message from /api/setup
   String friendlyId;             // for the FRIENDLY_ID screen
   ApiSetupResponse apiResponse;  // for the MAC_NOT_REGISTERED screen (404)
@@ -50,6 +51,11 @@ public:
   DeviceSetupResult perform();
 
 protected:
+  // True when bytes (at least 4 of them) start with the PNG signature.
+  static bool isPng(const uint8_t *bytes) {
+    return bytes[0] == 0x89 && bytes[1] == 'P' && bytes[2] == 'N' && bytes[3] == 'G';
+  }
+
   /// @brief Call the /api/setup endpoint.
   virtual ApiSetupResult callSetupApi(ApiSetupInputs &inputs);
 

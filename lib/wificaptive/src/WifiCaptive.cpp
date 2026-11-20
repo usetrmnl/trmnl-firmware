@@ -2,6 +2,7 @@
 
 #include <WiFi.h>
 #include <trmnl_log.h>
+#include <wifi_auth.h>
 #define _NO_DEV_CONFIG_
 #define UWORD uint16_t
 
@@ -34,6 +35,30 @@ String WifiCaptive::getAPSSID() {
 bool WifiCaptive::startPortal() {
   _dnsServer = new DNSServer();
   _server = new AsyncWebServer(80);
+  _connectionState = WifiConnectionState::Idle;
+  _exitRequested = false;
+
+  // A join that failed on the main chip restarted the device to get here: its outcome is kept for
+  // the settings page, which shows why nothing was saved
+  {
+    Preferences preferences;
+    preferences.begin("wificaptive", false);
+    if (preferences.isKey(WIFI_PORTAL_FAILURE_KEY)) {
+      uint8_t failure = preferences.getUChar(WIFI_PORTAL_FAILURE_KEY, (uint8_t)WifiConnectionState::Failed);
+      preferences.remove(WIFI_PORTAL_FAILURE_KEY);
+      if (failure == (uint8_t)WifiConnectionState::AuthenticationFailed ||
+          failure == (uint8_t)WifiConnectionState::NetworkNotFound) {
+        _connectionState = (WifiConnectionState)failure;
+      } else {
+        _connectionState = WifiConnectionState::Failed;
+      }
+    }
+    preferences.end();
+  }
+
+  // Opened with networks saved (settings, or adding a network): the restart after a failed join
+  // must come back here rather than join a saved network
+  if (isSaved()) requestPortal();
 
     // Set the WiFi mode to access point and station
   WiFi.mode(WIFI_MODE_AP);
@@ -77,12 +102,25 @@ bool WifiCaptive::startPortal() {
           }
         },
       .setConnectionCredentials =
-        [this](const WifiCredentials credentials, const String api_server, const String band) {
+        [this](const WifiCredentials credentials, const String api_server, bool api_server_given, const String band) {
           _ssid = credentials.ssid;
           _password = credentials.pswd;
           _band = band;
           _api_server = api_server;
+          _api_server_given = api_server_given;
           _enterprise_credentials = credentials;
+          _connectionRequestedAt = millis();
+          _connectionState = WifiConnectionState::Connecting;
+        },
+      .getConnectionState =
+        [this]() {
+          // A failure is reported once: the page shows it, and a later reload starts clean
+          WifiConnectionState state = _connectionState.load();
+          if (state != WifiConnectionState::Idle && state != WifiConnectionState::Connecting &&
+              state != WifiConnectionState::Connected) {
+            _connectionState.compare_exchange_strong(state, WifiConnectionState::Idle);
+          }
+          return state;
         },
       .getAnnotatedNetworks =
         [this](bool runScan) {
@@ -95,7 +133,7 @@ bool WifiCaptive::startPortal() {
                   saved = true;
                   break;
                 }
-              result.push_back({n.ssid, n.rssi, n.open, saved, n.is5GHz});
+              result.push_back({n.ssid, n.rssi, n.open, saved, n.is5GHz, n.enterprise});
             }
             return result;
           }
@@ -120,6 +158,13 @@ bool WifiCaptive::startPortal() {
 #endif
           WiFi.scanDelete();
           WiFi.scanNetworks(true);
+        },
+      .requestExit =
+        [this]() {
+          if (!isSaved()) return false; // nothing to go back to: stay in setup mode
+          _connectionRequestedAt = millis();
+          _exitRequested = true;
+          return true;
         }};
 
 #ifdef BOARD_TRMNL_X
@@ -144,6 +189,7 @@ bool WifiCaptive::startPortal() {
 
   bool succesfullyConnected = false;
   bool connected_via_modem = false;
+  bool exited = false;
   long lTime = millis();
     // wait until SSID is provided
   while ((millis() - lTime) < PORTAL_TIMEOUT) // keep CaptivePortal active for a maximum of 15 minutes
@@ -152,7 +198,21 @@ bool WifiCaptive::startPortal() {
 
     if (_tickCallback) _tickCallback();
 
-    if (_ssid == "") {
+    if (_exitRequested.load()) {
+      // "Done" on the settings page: give the /exit response time to reach the browser
+      if ((uint32_t)(millis() - _connectionRequestedAt.load()) < 1000) {
+        delay(DNS_INTERVAL);
+        continue;
+      }
+      exited = true;
+      break;
+    }
+
+    if (_connectionState.load() != WifiConnectionState::Connecting) {
+      delay(DNS_INTERVAL);
+    } else if ((uint32_t)(millis() - _connectionRequestedAt.load()) < 1000) {
+      // Give the /connect response time to reach the browser before the STA
+      // radio changes channel and may briefly disconnect captive-portal clients.
       delay(DNS_INTERVAL);
     } else {
             // use enterprise credentials if available, otherwise use basic credentials
@@ -181,45 +241,53 @@ bool WifiCaptive::startPortal() {
       }
 
       bool res = false;
-      if (credentials.is5GHz && _modemConnectCallback) {
+      WifiConnectionState failureState = WifiConnectionState::Failed;
+      if (credentials.is5GHz && !credentials.isEnterprise && _modemConnectCallback) {
         res = _modemConnectCallback(credentials.ssid, credentials.pswd);
         if (res) connected_via_modem = true;
       } else {
-        res = connect(credentials) == WL_CONNECTED;
+        auto result = initiateConnectionAndWaitForOutcome(credentials);
+        res = result.status == WL_CONNECTED;
+        if (!res) failureState = classifyConnectionFailure(result);
+        if (!res) {
+          // The main chip dropped the portal AP to try this network, so restart to avoid leaving the device stuck
+          Log_info("Connection failed, restarting device to bring the portal back up");
+          Preferences preferences;
+          preferences.begin("wificaptive", false);
+          preferences.putUChar(WIFI_PORTAL_FAILURE_KEY, (uint8_t)failureState);
+          preferences.end();
+          ESP.restart();
+        }
       }
 
       if (res) {
+        _connectionState = WifiConnectionState::Connected;
         saveWifiCredentials(credentials);
-        saveApiServer(_api_server);
+        if (_api_server_given) saveApiServer(_api_server);
         succesfullyConnected = true;
         break;
       } else {
-        _ssid = "";
-        _password = "";
-        _band = "";
-        _enterprise_credentials = WifiCredentials{};
-
+        _connectionState = failureState;
         WiFi.disconnect();
         WiFi.enableSTA(false);
-        break;
       }
     }
   }
 
-    // SSID provided, stop server
+  // SSID provided, stop server
   WiFi.scanDelete();
   WiFi.softAPdisconnect(true);
   delay(1000);
 
-  if (!connected_via_modem && (millis() - lTime) < PORTAL_TIMEOUT) {
+  if (succesfullyConnected && !connected_via_modem) {
     auto status = WiFi.status();
     if (status != WL_CONNECTED) {
       Log_info("Not connected after AP disconnect");
       WiFi.mode(WIFI_STA);
-            // Always start with _enterprise_credentials to preserve static IP settings
+      // Always start with _enterprise_credentials to preserve static IP settings
       WifiCredentials credentials = _enterprise_credentials;
       if (!credentials.isEnterprise) {
-                // For non-enterprise, ensure basic fields are set
+        // For non-enterprise, ensure basic fields are set
         credentials.ssid = _ssid;
         credentials.pswd = _password;
       }
@@ -230,17 +298,32 @@ bool WifiCaptive::startPortal() {
     }
   }
 
-    // stop dsn
+  _ssid = "";
+  _password = "";
+  _band = "";
+  _enterprise_credentials = WifiCredentials{};
+
+  // stop dsn
   _dnsServer->stop();
   delete _dnsServer;
   _dnsServer = nullptr;
 
-    // stop server
+  // stop server
   _server->end();
   delete _server;
   _server = nullptr;
-// Take different action for timeout (go to sleep)
-  if ((millis() - lTime) > PORTAL_TIMEOUT) {
+
+  // The portal is done with, however it ended (a failed join restarts above, with the request kept)
+  clearPortalRequest();
+
+  // Closed from the settings page, or left alone, with networks saved: start over and join one of them
+  if (!succesfullyConnected && (exited || isSaved())) {
+    Log_info("Portal %s, restarting to use the saved networks", exited ? "closed" : "timed out");
+    ESP.restart();
+  }
+
+  // Take different action for timeout (go to sleep)
+  if (!succesfullyConnected) {
 #ifdef BOARD_TRMNL_X
     if (power().usbStatus() == UsbStatus::CONNECTED) {
       showMessageWithLogo(READY_TO_SHIP);
@@ -260,12 +343,28 @@ bool WifiCaptive::startPortal() {
   return succesfullyConnected;
 }
 
+WifiConnectionState WifiCaptive::classifyConnectionFailure(const WifiConnectionResult &result) {
+  switch (result.eventData.disconnectReason) {
+  case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:
+  case WIFI_REASON_802_1X_AUTH_FAILED:
+  case WIFI_REASON_AUTH_FAIL:
+  case WIFI_REASON_HANDSHAKE_TIMEOUT:
+    return WifiConnectionState::AuthenticationFailed;
+  case WIFI_REASON_NO_AP_FOUND:
+    return WifiConnectionState::NetworkNotFound;
+  default:
+    return WifiConnectionState::Failed;
+  }
+}
+
 void WifiCaptive::resetSettings() {
   Log_info("Resetting WiFi settings");
 
   Preferences preferences;
   preferences.begin("wificaptive", false);
   preferences.remove(WIFI_LAST_INDEX);
+  preferences.remove(WIFI_PORTAL_REQUEST_KEY);
+  preferences.remove(WIFI_PORTAL_FAILURE_KEY);
   for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++) {
     preferences.remove(WIFI_SSID_KEY(i));
     preferences.remove(WIFI_PSWD_KEY(i));
@@ -273,7 +372,7 @@ void WifiCaptive::resetSettings() {
     preferences.remove(WIFI_ENT_KEY(i));
     preferences.remove(WIFI_USERNAME_KEY(i));
     preferences.remove(WIFI_IDENTITY_KEY(i));
-        // Remove static IP settings
+    // Remove static IP settings
     preferences.remove(WIFI_USE_STATIC_KEY(i));
     preferences.remove(WIFI_STATIC_IP_KEY(i));
     preferences.remove(WIFI_STATIC_GW_KEY(i));
@@ -287,7 +386,7 @@ void WifiCaptive::resetSettings() {
     _savedWifis[i] = WifiCredentials{};
   }
 
-    // Clean up any WPA2 Enterprise state
+  // Clean up any WPA2 Enterprise state
   disableWpa2Enterprise();
 
   WiFi.disconnect(true, true);
@@ -331,7 +430,7 @@ void WifiCaptive::readWifiCredentials() {
     _savedWifis[i].isEnterprise = preferences.getBool(WIFI_ENT_KEY(i), false);
     _savedWifis[i].username = preferences.getString(WIFI_USERNAME_KEY(i), "");
     _savedWifis[i].identity = preferences.getString(WIFI_IDENTITY_KEY(i), "");
-        // Load static IP settings
+    // Load static IP settings
     _savedWifis[i].useStaticIP = preferences.getBool(WIFI_USE_STATIC_KEY(i), false);
     _savedWifis[i].staticIP = preferences.getString(WIFI_STATIC_IP_KEY(i), "");
     _savedWifis[i].gateway = preferences.getString(WIFI_STATIC_GW_KEY(i), "");
@@ -347,45 +446,128 @@ void WifiCaptive::readWifiCredentials() {
   preferences.end();
 }
 
+void WifiCaptive::requestPortal() {
+  Preferences preferences;
+  preferences.begin("wificaptive", false);
+  if (!preferences.getBool(WIFI_PORTAL_REQUEST_KEY, false)) preferences.putBool(WIFI_PORTAL_REQUEST_KEY, true);
+  preferences.end();
+}
+
+void WifiCaptive::clearPortalRequest() {
+  Preferences preferences;
+  preferences.begin("wificaptive", false);
+  if (preferences.isKey(WIFI_PORTAL_REQUEST_KEY)) preferences.remove(WIFI_PORTAL_REQUEST_KEY);
+  preferences.end();
+}
+
+bool WifiCaptive::isPortalNeeded() {
+  if (!isSaved()) return true;
+  Preferences preferences;
+  preferences.begin("wificaptive", true);
+  bool requested = preferences.getBool(WIFI_PORTAL_REQUEST_KEY, false);
+  preferences.end();
+  return requested;
+}
+
+static bool sameWifiCredentials(const WifiCredentials &a, const WifiCredentials &b) {
+  return a.ssid == b.ssid && a.pswd == b.pswd && a.is5GHz == b.is5GHz && a.isEnterprise == b.isEnterprise &&
+         a.username == b.username && a.identity == b.identity && a.useStaticIP == b.useStaticIP &&
+         a.staticIP == b.staticIP && a.gateway == b.gateway && a.subnet == b.subnet && a.dns1 == b.dns1 &&
+         a.dns2 == b.dns2;
+}
+
 void WifiCaptive::saveWifiCredentials(const WifiCredentials credentials) {
   Log_info("Saving wifi credentials: %s (Enterprise: %s)", credentials.ssid.c_str(),
            credentials.isEnterprise ? "yes" : "no");
+  if (credentials.ssid.isEmpty()) return;
 
-    // Check if the credentials already exist
-  for (u16_t i = 0; i < WIFI_MAX_SAVED_CREDS; i++) {
-        // For regular networks, check SSID and password
-    if (!credentials.isEnterprise && !_savedWifis[i].isEnterprise) {
-      if (_savedWifis[i].ssid == credentials.ssid && _savedWifis[i].pswd == credentials.pswd) {
-        Log_info("Duplicate regular network found, not saving");
-        return; // Avoid saving duplicate networks
-      }
-    }
-        // For enterprise networks, check SSID, username, identity, and password
-    else if (credentials.isEnterprise && _savedWifis[i].isEnterprise) {
-      if (_savedWifis[i].ssid == credentials.ssid && _savedWifis[i].username == credentials.username &&
-          _savedWifis[i].identity == credentials.identity && _savedWifis[i].pswd == credentials.pswd) {
-        Log_info("Duplicate enterprise network found, not saving");
-        return; // Avoid saving duplicate networks
-      }
+  readWifiCredentials();
+
+  // A network is saved once per band: saving it again updates its password and options
+  int existing = -1;
+  for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++) {
+    if (_savedWifis[i].ssid.isEmpty()) continue;
+    if (existing < 0 && _savedWifis[i].ssid == credentials.ssid && _savedWifis[i].is5GHz == credentials.is5GHz) {
+      existing = i;
     }
   }
 
-  for (u16_t i = WIFI_MAX_SAVED_CREDS - 1; i > 0; i--) {
+  if (existing >= 0 && sameWifiCredentials(_savedWifis[existing], credentials)) {
+    Log_info("Duplicate %s network found, not saving", credentials.isEnterprise ? "enterprise" : "regular");
+    if (_lastIndex != existing) saveLastUsedWifiIndex(existing);
+    return;
+  }
+
+  // Joined: it goes to the front, the ones before its old slot (or all, dropping the oldest) move back
+  int from = existing >= 0 ? existing : WIFI_MAX_SAVED_CREDS - 1;
+  for (int i = from; i > 0; i--) {
     _savedWifis[i] = _savedWifis[i - 1];
   }
-
   _savedWifis[0] = credentials;
+  _lastIndex = 0;
+  writeWifiCredentials();
+}
 
+bool WifiCaptive::forgetWifiCredentials(int index, const String &ssid) {
+  readWifiCredentials();
+  if (index < 0 || index >= WIFI_MAX_SAVED_CREDS || ssid.isEmpty() || _savedWifis[index].ssid != ssid) {
+    return false;
+  }
+
+  Log_info("Forgetting wifi credentials: %s", ssid.c_str());
+  // The saved networks stay packed from slot 0 (isSaved() looks at the first one)
+  for (int i = index; i < WIFI_MAX_SAVED_CREDS - 1; i++) {
+    _savedWifis[i] = _savedWifis[i + 1];
+  }
+  _savedWifis[WIFI_MAX_SAVED_CREDS - 1] = WifiCredentials{};
+
+  if (_lastIndex == index) {
+    _lastIndex = 0;
+  } else if (_lastIndex > index) {
+    _lastIndex--;
+  }
+  writeWifiCredentials();
+  return true;
+}
+
+int WifiCaptive::getSavedCredentials(std::vector<WifiCredentials> &out) {
+  readWifiCredentials();
+  out.clear();
+  for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++) {
+    if (!_savedWifis[i].ssid.isEmpty()) out.push_back(_savedWifis[i]);
+  }
+  return _lastIndex;
+}
+
+// Writes _savedWifis and _lastIndex. An empty slot has no keys at all (checkForSavedCredentials()
+// goes by the first slot's SSID key).
+void WifiCaptive::writeWifiCredentials() {
   Preferences preferences;
   preferences.begin("wificaptive", false);
   for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++) {
+    if (_savedWifis[i].ssid.isEmpty()) {
+      if (!preferences.isKey(WIFI_SSID_KEY(i))) continue;
+      preferences.remove(WIFI_SSID_KEY(i));
+      preferences.remove(WIFI_PSWD_KEY(i));
+      preferences.remove(WIFI_5GHZ_KEY(i));
+      preferences.remove(WIFI_ENT_KEY(i));
+      preferences.remove(WIFI_USERNAME_KEY(i));
+      preferences.remove(WIFI_IDENTITY_KEY(i));
+      preferences.remove(WIFI_USE_STATIC_KEY(i));
+      preferences.remove(WIFI_STATIC_IP_KEY(i));
+      preferences.remove(WIFI_STATIC_GW_KEY(i));
+      preferences.remove(WIFI_STATIC_SN_KEY(i));
+      preferences.remove(WIFI_STATIC_DNS1_KEY(i));
+      preferences.remove(WIFI_STATIC_DNS2_KEY(i));
+      continue;
+    }
     preferences.putString(WIFI_SSID_KEY(i), _savedWifis[i].ssid);
     preferences.putString(WIFI_PSWD_KEY(i), _savedWifis[i].pswd);
     preferences.putBool(WIFI_5GHZ_KEY(i), _savedWifis[i].is5GHz);
     preferences.putBool(WIFI_ENT_KEY(i), _savedWifis[i].isEnterprise);
     preferences.putString(WIFI_USERNAME_KEY(i), _savedWifis[i].username);
     preferences.putString(WIFI_IDENTITY_KEY(i), _savedWifis[i].identity);
-        // Save static IP settings
+    // Save static IP settings
     preferences.putBool(WIFI_USE_STATIC_KEY(i), _savedWifis[i].useStaticIP);
     preferences.putString(WIFI_STATIC_IP_KEY(i), _savedWifis[i].staticIP);
     preferences.putString(WIFI_STATIC_GW_KEY(i), _savedWifis[i].gateway);
@@ -393,7 +575,7 @@ void WifiCaptive::saveWifiCredentials(const WifiCredentials credentials) {
     preferences.putString(WIFI_STATIC_DNS1_KEY(i), _savedWifis[i].dns1);
     preferences.putString(WIFI_STATIC_DNS2_KEY(i), _savedWifis[i].dns2);
   }
-  preferences.putInt(WIFI_LAST_INDEX, 0);
+  preferences.putInt(WIFI_LAST_INDEX, _lastIndex);
   preferences.end();
 }
 
@@ -401,12 +583,12 @@ void WifiCaptive::saveLastUsedWifiIndex(int index) {
   Preferences preferences;
   preferences.begin("wificaptive", false);
 
-    // if index is out of bounds, set to 0
+  // if index is out of bounds, set to 0
   if (index < 0 || index >= WIFI_MAX_SAVED_CREDS) {
     index = 0;
   }
 
-    // if index is greater than the total number of saved wifis, set to 0
+  // if index is greater than the total number of saved wifis, set to 0
   if (index > 0) {
     readWifiCredentials();
     if (_savedWifis[index].ssid == "") {
@@ -422,12 +604,12 @@ int WifiCaptive::readLastUsedWifiIndex() {
   Preferences preferences;
   preferences.begin("wificaptive", true);
   int index = preferences.getInt(WIFI_LAST_INDEX, 0);
-    // if index is out of range, return 0
+  // if index is out of range, return 0
   if (index < 0 || index >= WIFI_MAX_SAVED_CREDS) {
     index = 0;
   }
 
-    // if index is greater than the total number of saved wifis, set to 0
+  // if index is greater than the total number of saved wifis, set to 0
   if (index > 0) {
     readWifiCredentials();
     if (_savedWifis[index].ssid == "") {
@@ -536,7 +718,7 @@ std::vector<WifiNetwork> WifiCaptive::getScannedUniqueNetworks(bool runScan) {
       wifi_auth_mode_t encType = WiFi.encryptionType(i);
       bool bIs5GHz = (WiFi.channel(i) >= 36);
       bool open = WiFi.encryptionType(i) == WIFI_AUTH_OPEN;
-      bool enterprise = (encType == WIFI_AUTH_WPA2_ENTERPRISE);
+      bool enterprise = isEnterpriseWifiAuthMode(encType);
 
       bool found = false;
       for (auto &network : uniqueWifiNetworks) {

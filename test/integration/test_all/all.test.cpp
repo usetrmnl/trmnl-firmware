@@ -13,7 +13,7 @@
 #include "test_helpers.h"
 #include "tests.h"
 
-extern Preferences preferences; // from bl.cpp
+extern Preferences preferences; // from globals.cpp
 
 void setUp(void) {}
 void tearDown(void) {}

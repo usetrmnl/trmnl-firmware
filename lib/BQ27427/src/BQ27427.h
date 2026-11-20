@@ -91,6 +91,15 @@ struct BQ27427Snapshot {
 	unsigned int voltage; // Battery voltage (mV)
 	uint16_t flags;        // flags() register, captured at the same time as the readings above
 	uint8_t energyScale;   // Design energy scale factor used to compute capacityRemain/capacityFull
+
+	// Not filled by readSnapshot() itself - populated by the app layer
+	// (bq27427_battery.cpp) with the real gas-gauge (Impedance Track)
+	// values, for comparison against soc/health/capacityRemain/capacityFull
+	// when those are a BYPASS_BQ27427_SOC approximation instead.
+	int gaugeSoc;
+	int gaugeHealth;
+	int gaugeCapacityRemain;
+	int gaugeCapacityFull;
 };
 
 class BQ27427 {

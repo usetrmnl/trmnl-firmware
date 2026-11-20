@@ -10,6 +10,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "IQS323.h"  // for iqs323_gesture_events
 
 #ifdef __cplusplus
 extern "C" {
@@ -179,6 +180,42 @@ typedef void (*iqs323_data_callback_t)(void);
  * @param callback Function to call when new data is available (NULL to disable)
  */
 void iqs323_task_set_data_callback(iqs323_data_callback_t callback);
+
+// Touchbar-relevant IQS323 state, safe to read from any thread.
+typedef struct {
+    bool ch0_touch;
+    bool ch1_touch;
+    bool ch2_touch;
+    uint32_t last_updated_ms;   // millis() at last publish
+} touchbar_snapshot_t;
+
+/**
+ * @brief Copies out the current touchbar snapshot (mutex-protected, cheap to call often).
+ */
+void iqs323_task_read_snapshot(touchbar_snapshot_t *out);
+
+/**
+ * @brief The channels (bit n: channel n) whose touch started since the last call, and clears
+ * them: unlike the snapshot, a touch that starts and ends between two reads still shows.
+ */
+uint8_t iqs323_task_take_touch_starts(void);
+
+/**
+ * @brief Copies out the snapshot as it was at wake-stub validation time, not live
+ * state. Returns false (all-clear) if this boot wasn't a GPIO wakeup.
+ */
+bool iqs323_task_read_wake_stub_snapshot(touchbar_snapshot_t *out);
+
+/**
+ * @brief Switches between streaming mode (frequent RDY windows, for active
+ * hold-tracking) and event mode (RDY only on real events, lower power).
+ */
+bool iqs323_task_set_streaming_mode(bool enable);
+
+/**
+ * @brief Writes the gesture config registers for tap gestures (touch events only).
+ */
+bool iqs323_task_set_gesture_config(void);
 
 #ifdef __cplusplus
 }

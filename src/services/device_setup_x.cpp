@@ -44,7 +44,15 @@ void DeviceSetupX::downloadSetupImage() {
   Log_info("Downloading setup image via modem (5 GHz path)");
   _result.outcome = DeviceSetupOutcome::Success;
   auto httpRes = _modem->httpGet(_result.imageUrl, "/logo.bmp");
-  if (!httpRes.ok || httpRes.bytesReceived != DISPLAY_BMP_IMAGE_SIZE) {
+  uint8_t signature[4] = {};
+  bool png = httpRes.ok && httpRes.bytesReceived >= sizeof(signature) &&
+             filesystem_read_from_file("/logo.bmp", signature, sizeof(signature)) && isPng(signature);
+  if (httpRes.ok && httpRes.bytesReceived == DISPLAY_BMP_IMAGE_SIZE) {
+    _result.imagePath = "/logo.bmp";
+  } else if (png && filesystem_file_rename("/logo.bmp", "/logo.png")) {
+    Log_info("Received PNG setup logo (%u bytes)", httpRes.bytesReceived);
+    _result.imagePath = "/logo.png";
+  } else {
     Log_error_submit("Modem logo download failed: ok=%d bytes=%u expected=%u", httpRes.ok, httpRes.bytesReceived,
                      DISPLAY_BMP_IMAGE_SIZE);
     filesystem_file_delete("/logo.bmp");

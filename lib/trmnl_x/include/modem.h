@@ -30,8 +30,9 @@ public:
   struct ModemNetwork {
     String  ssid;
     int32_t rssi;
-    bool    open;    // true if no encryption (ecn == 0)
-    bool    is5GHz;  // true if channel >= 36
+    bool    open;        // true if no encryption (ecn == 0)
+    bool    is5GHz;      // true if channel >= 36
+    bool    enterprise;  // true if WPA2/WPA3 Enterprise, including transition mode
   };
   std::vector<ModemNetwork> scanNetworks();
 
@@ -51,8 +52,9 @@ public:
   // reqHeaders:   newline-separated "Key: Value" headers, e.g. "ID: mac\nKey: val"
   //               Set via AT+HTTPCHEAD before the request; cleared afterwards.
   ModemHttpResult httpGet(const String& url, const String& saveToFile = "", size_t contentLength = 0, const String& reqHeaders = "");
-  // Chunk-callback overload: chunkCb is called for each received chunk; return false to abort
-  ModemHttpResult httpGet(const String& url, std::function<bool(const uint8_t*, size_t)> chunkCb, size_t contentLength = 0, const String& reqHeaders = "", unsigned long timeoutMs = 60000);
+  // Chunk-callback overload: chunkCb is called for each received chunk; return false to abort.
+  // Fails once nothing arrives from the modem for idleTimeoutMs.
+  ModemHttpResult httpGet(const String& url, std::function<bool(const uint8_t*, size_t)> chunkCb, size_t contentLength = 0, const String& reqHeaders = "", unsigned long idleTimeoutMs = 60000);
 
   // Configures modem SNTP and returns Unix timestamp (UTC), or 0 on failure.
   time_t getSntpTime();

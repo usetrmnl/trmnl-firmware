@@ -1,0 +1,5 @@
+# Bulk formatting commits for `git blame` to skip. GitHub's blame view uses this file automatically;
+# locally, run once: git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# Format remaining files (#786): clang-format pass over bl.cpp, display.cpp and the files split out of them
+ac06003297cac93620b03e7f1c53026acb9d0791
