@@ -79,7 +79,8 @@ uint16_t display_width();
  * @return none
  */
 
-void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool bSkipClear = false);
+// false when the image could not be decoded or the panel did not take it
+bool display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool bSkipClear = false);
 
 /**
  * @brief Enable or disable light sleep at runtime
