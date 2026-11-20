@@ -632,6 +632,7 @@ int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious) {
         png->close();
         delete (png); // free the decoder instance
         bbep.writePlane(); // send the pixels to the display panel
+        bbep.freeBuffer(); // the panel has the pixels now and the refresh does not read the framebuffer
         return REFRESH_FAST;
       }
       if (bbep.capabilities() & BBEP_2BIT_BW) {
