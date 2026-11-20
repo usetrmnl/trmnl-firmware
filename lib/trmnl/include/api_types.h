@@ -23,6 +23,8 @@ enum class ApiDisplayOutcome {
   DeserializationError,
 };
 
+#define DEFAULT_FULL_REFRESH_EVERY 8
+
 struct ApiDisplayResponse {
   ApiDisplayOutcome outcome;
   String error_detail;
@@ -39,6 +41,7 @@ struct ApiDisplayResponse {
   SPECIAL_FUNCTION special_function;
   String action;
   String verbose_logging;
+  int full_refresh_every; // draws per full refresh
 };
 
 struct ApiDisplayInputs {

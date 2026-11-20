@@ -11,6 +11,7 @@ void assert_response_equal(ApiDisplayResponse expected, ApiDisplayResponse actua
   TEST_ASSERT_EQUAL(expected.reset_firmware, actual.reset_firmware);
   TEST_ASSERT_EQUAL(expected.special_function, actual.special_function);
   TEST_ASSERT_EQUAL_STRING(expected.action.c_str(), actual.action.c_str());
+  TEST_ASSERT_EQUAL(expected.full_refresh_every, actual.full_refresh_every);
 }
 
 void test_parseResponse_apiDisplay_success(void) {
@@ -18,7 +19,7 @@ void test_parseResponse_apiDisplay_success(void) {
     "{\"status\":200,\"image_url\":\"http://example.com/"
     "foo.bmp\",\"filename\":\"empty_state\",\"update_firmware\":true,\"firmware_url\":\"https://example.com/"
     "firmware.bin\",\"refresh_rate\":123456,\"reset_firmware\":true,\"special_function\":\"identify\",\"action\":"
-    "\"special_action\"}";
+    "\"special_action\",\"full_refresh_every\":30}";
 
   ApiDisplayResponse expected = {
       .outcome = ApiDisplayOutcome::Ok,
@@ -29,7 +30,8 @@ void test_parseResponse_apiDisplay_success(void) {
       .refresh_rate = 123456,
       .reset_firmware = true,
       .special_function = SPECIAL_FUNCTION::SF_IDENTIFY,
-      .action = "special_action"};
+      .action = "special_action",
+      .full_refresh_every = 30};
 
   assert_response_equal(expected, parseResponse_apiDisplay(input));
 }
@@ -37,7 +39,7 @@ void test_parseResponse_apiDisplay_success(void) {
 void test_parseResponse_apiDisplay_deserializationError(void) {
   String input = "invalid json";
 
-  ApiDisplayResponse expected = {.outcome = ApiDisplayOutcome::DeserializationError};
+  ApiDisplayResponse expected = {.outcome = ApiDisplayOutcome::DeserializationError, .full_refresh_every = 8};
 
   assert_response_equal(expected, parseResponse_apiDisplay(input));
 }
@@ -53,9 +55,16 @@ void test_parseResponse_apiDisplay_missing_fields(void) {
       .refresh_rate = 0,
       .reset_firmware = false,
       .special_function = SPECIAL_FUNCTION::SF_NONE,
-      .action = ""};
+      .action = "",
+      .full_refresh_every = 8};
 
   assert_response_equal(expected, parseResponse_apiDisplay(input));
+}
+
+void test_parseResponse_apiDisplay_full_refresh_every_below_one_is_the_default(void) {
+  String input = "{\"full_refresh_every\":0}";
+
+  TEST_ASSERT_EQUAL(8, parseResponse_apiDisplay(input).full_refresh_every);
 }
 
 void test_parseResponse_apiDisplay_treats_unknown_sf_as_none(void) {
@@ -82,6 +91,7 @@ void process() {
   RUN_TEST(test_parseResponse_apiDisplay_deserializationError);
   RUN_TEST(test_parseResponse_apiDisplay_treats_unknown_sf_as_none);
   RUN_TEST(test_parseResponse_apiDisplay_missing_fields);
+  RUN_TEST(test_parseResponse_apiDisplay_full_refresh_every_below_one_is_the_default);
   UNITY_END();
 }
 
