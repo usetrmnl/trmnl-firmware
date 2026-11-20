@@ -11,6 +11,11 @@
 // Waits u32Millis, in light sleep unless DO_NOT_LIGHT_SLEEP
 void display_sleep(uint32_t u32Millis);
 
+#ifndef BB_EPAPER
+// Loads the X's calibrated gray table, which every 4-bpp full update uses
+void display_use_gray_matrix(void);
+#endif // !BB_EPAPER
+
 #ifdef BB_EPAPER
 bool display_update_epaper(int refreshMode, bool wait, bool writePlane = false, uint8_t plane = PLANE_0);
 void display_prepare_message(void);
