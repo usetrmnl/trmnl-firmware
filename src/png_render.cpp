@@ -668,7 +668,11 @@ int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious) {
       if (png->getBpp() == 1 ||
           (png->getBpp() == 2 && png_count_colors(png, pPNG, iDataSize) == 2)) { // 1-bit image (single plane)
         png->close(); // use a different PNGDraw callback for color matching
-        bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit);
+        if (pDevice->epd_mosi_pin != 0 || pDevice->epd_sck_pin != 0) {
+          bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit);
+        } else {
+          bbep.begin(dpList[pDevice->panel_set][0].OneBit);
+        }
         rc = REFRESH_PARTIAL; // the new image is 1bpp - try a partial update
         bbep.startWrite(PLANE_0); // start writing image data to plane 0
         png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
