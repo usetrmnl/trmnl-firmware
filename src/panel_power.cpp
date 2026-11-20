@@ -2,6 +2,7 @@
 #include <panel_power.h>
 
 #ifdef BOARD_TRMNL_X
+#include <Wire.h>
 #include <epd_driver.h>
 #include <trmnl_log.h>
 
@@ -32,6 +33,14 @@ static bool powerGoodArrives() {
   return false;
 }
 
+// A TPS65185 register, or -1 when the chip does not answer. Only while WAKEUP is high.
+static int powerChipRegister(uint8_t reg) {
+  Wire.beginTransmission(0x68);
+  Wire.write(reg);
+  if (Wire.endTransmission() != 0 || Wire.requestFrom(0x68, 1) != 1) return -1;
+  return Wire.read();
+}
+
 static void powerDown(FASTEPDSTATE *panel) {
   for (uint8_t pin : POWER_DOWN_PINS)
     bbep.ioWrite(pin, LOW);
@@ -51,9 +60,12 @@ static int powerWithTimeout(void *state, int on) {
     bbep.ioWrite(pin, HIGH);
   if (powerGoodArrives()) return library_power(state, on);
 
+  // INT2 names the rail that is out of regulation, PG the rails that are good (FA = all of them)
+  int faults = powerChipRegister(0x07), rail_faults = powerChipRegister(0x08), rails_good = powerChipRegister(0x0F);
   powerDown(panel);
   power_failed = true;
-  Log_error("Panel power good timed out after %d ms, not drawing", POWER_GOOD_TIMEOUT_MS);
+  Log_error("Panel power good timed out after %d ms, not drawing (TPS65185 INT1 %02X INT2 %02X PG %02X)",
+            POWER_GOOD_TIMEOUT_MS, faults & 0xFF, rail_faults & 0xFF, rails_good & 0xFF);
   return BBEP_IO_ERROR;
 }
 
