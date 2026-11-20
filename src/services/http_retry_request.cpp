@@ -14,6 +14,7 @@
 
 #ifdef BOARD_TRMNL_X
 #include <WifiCaptive.h>
+#include <connection_manager.h>
 #include <globals.h>
 #include <modem.h>
 #endif
@@ -118,6 +119,7 @@ bool HttpRetryRequest::useModem() const {
 int32_t HttpRetryRequest::signalRssi() const {
 #ifdef BOARD_TRMNL_X
   if (useModem()) return g_modem->getSignalRssi();
+  if (conn_mgr_is_eth()) return 0; // RSSI is meaningless over Ethernet
 #endif
   return WiFi.RSSI();
 }

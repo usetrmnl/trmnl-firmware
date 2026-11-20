@@ -853,7 +853,7 @@
         id: 'advanced',
         title: 'Advanced Settings',
         sub: 'Most people never need anything here.',
-        desc: 'Server, hostname, time, diagnostics, reset'
+        desc: 'Server, hostname, time, Ethernet, diagnostics, reset'
       },
       {
         id: 'server',
@@ -908,6 +908,12 @@
         }
       },
       {
+        id: 'ethernet',
+        parent: 'advanced',
+        title: 'Ethernet over USB',
+        desc: function () { return ethernetEnabled ? 'On' : 'Off'; }
+      },
+      {
         id: 'diagnostics',
         parent: 'advanced',
         title: 'Diagnostics',
@@ -925,6 +931,7 @@
     var saved = [], savedLoaded = false, maxSaved = 5; // GET /saved-networks
     var scanned = [];                                   // GET /scan
     var deviceSettings = {};                            // GET /device-settings
+    var ethernetEnabled = false;                        // GET /get-ethernet
 
     // ---- Helpers -------------------------------------------------------------
     function $(id) {
@@ -1462,6 +1469,32 @@
       }, function () { }).then(renderMenus);
     }
 
+    function loadEthernet() {
+      return api('/get-ethernet').then(function (data) {
+        ethernetEnabled = !!(data && data.enabled);
+        $('useEthernet').checked = ethernetEnabled;
+      }, function () { }).then(renderMenus);
+    }
+
+    // Saved right away; the device only starts Ethernet on its next boot, hence Restart
+    function saveEthernet() {
+      var box = $('useEthernet');
+      var enabled = box.checked;
+      api('/set-ethernet?enabled=' + (enabled ? '1' : '0')).then(function () {
+        ethernetEnabled = enabled;
+        renderMenus();
+        pageMsg(enabled ? 'Ethernet enabled. Restart to apply.' : 'Ethernet disabled. Restart to apply.');
+      }, function () {
+        box.checked = !enabled;
+        pageMsg('Could not save the Ethernet setting. Please try again.', true);
+      });
+    }
+
+    function restartDevice() {
+      pageMsg('Your TRMNL is restarting. You can close this page.');
+      fetch('/restart').catch(function () { });
+    }
+
     // Saves a setting page's field, then goes back to the menu, which shows the new value.
     function saveSetting(page, btn) {
       hideMsgs();
@@ -1604,6 +1637,7 @@
       showView();
       loadSaved();
       loadSettings();
+      loadEthernet();
       pollConnectionStatus(isEnterpriseForm(), true);
       setTimeout(getInfo, 500);
     });
@@ -1809,6 +1843,20 @@
         <p class="hint">Saved right away. Detailed logs over USB, for troubleshooting.</p>
       </div>
       <div class="msg page-msg" role="status" hidden></div>
+    </div>
+
+    <div class="view" id="view-ethernet" hidden>
+      <div class="adv-sec">
+        <label class="switch">
+          <input type="checkbox" id="useEthernet" onchange="saveEthernet()">
+          Use a USB Ethernet adapter
+        </label>
+        <p class="hint">Saved right away. Takes effect after a restart. Supports RTL8152/RTL8153 adapters.</p>
+      </div>
+      <div class="actions">
+        <button class="btn btn-quiet" type="button" onclick="restartDevice()">Restart now</button>
+        <div class="msg page-msg" role="status" hidden></div>
+      </div>
     </div>
 
     <div class="view" id="view-reset" hidden>

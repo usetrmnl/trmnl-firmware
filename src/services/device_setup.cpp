@@ -15,6 +15,10 @@
 #include <trmnl_log.h>
 #include <types.h>
 
+#ifdef BOARD_TRMNL_X
+#include <connection_manager.h>
+#endif
+
 DeviceSetupResult DeviceSetup::perform() {
   _result = DeviceSetupResult();
   performApiSetup();
@@ -37,7 +41,12 @@ DeviceSetupResult DeviceSetup::perform() {
 ApiSetupResult DeviceSetup::callSetupApi(ApiSetupInputs &inputs) { return fetchApiSetup(inputs); }
 
 void DeviceSetup::handleInvalidImage(uint32_t bytesRead) {
-  _result.errorScreen = (WiFi.RSSI() > WIFI_CONNECTION_RSSI) ? API_SIZE_ERROR : WIFI_WEAK;
+#ifdef BOARD_TRMNL_X
+  bool hasSignal = conn_mgr_is_eth() || WiFi.RSSI() > WIFI_CONNECTION_RSSI;
+#else
+  bool hasSignal = WiFi.RSSI() > WIFI_CONNECTION_RSSI;
+#endif
+  _result.errorScreen = hasSignal ? API_SIZE_ERROR : WIFI_WEAK;
   _result.outcome = DeviceSetupOutcome::ImageInvalidError;
   Log_error_submit("Receiving failed. Read: %" PRIu32, bytesRead);
 }
@@ -74,7 +83,12 @@ void DeviceSetup::performApiSetup() {
 
   // Handle HTTP request errors
   if (apiResult.error != HTTPS_NO_ERR) {
-    _result.errorScreen = (WiFi.RSSI() > WIFI_CONNECTION_RSSI) ? API_SETUP_FAILED : WIFI_WEAK;
+#ifdef BOARD_TRMNL_X
+    bool hasSignal = conn_mgr_is_eth() || WiFi.RSSI() > WIFI_CONNECTION_RSSI;
+#else
+    bool hasSignal = WiFi.RSSI() > WIFI_CONNECTION_RSSI;
+#endif
+    _result.errorScreen = hasSignal ? API_SETUP_FAILED : WIFI_WEAK;
     _result.outcome = DeviceSetupOutcome::RequestError;
     Log_error_submit("[HTTPS] Request failed: %s", apiResult.error_detail.c_str());
     return;
@@ -130,7 +144,12 @@ void DeviceSetup::downloadSetupImage() {
 
   withHttp(_result.imageUrl, [&](HTTPClient *https, HttpError error) -> bool {
     if (error != HttpError::HTTPCLIENT_SUCCESS) {
-      _result.errorScreen = (WiFi.RSSI() > WIFI_CONNECTION_RSSI) ? API_IMAGE_DOWNLOAD_ERROR : WIFI_WEAK;
+#ifdef BOARD_TRMNL_X
+      bool hasSignal = conn_mgr_is_eth() || WiFi.RSSI() > WIFI_CONNECTION_RSSI;
+#else
+      bool hasSignal = WiFi.RSSI() > WIFI_CONNECTION_RSSI;
+#endif
+      _result.errorScreen = hasSignal ? API_IMAGE_DOWNLOAD_ERROR : WIFI_WEAK;
       Log_error_submit("[HTTPS] Unable to connect");
       return false;
     }
@@ -156,7 +175,12 @@ void DeviceSetup::downloadSetupImage() {
 
     // httpCode will be negative on error
     if (httpCode <= 0) {
-      _result.errorScreen = (WiFi.RSSI() > WIFI_CONNECTION_RSSI) ? API_IMAGE_DOWNLOAD_ERROR : WIFI_WEAK;
+#ifdef BOARD_TRMNL_X
+      bool hasSignal = conn_mgr_is_eth() || WiFi.RSSI() > WIFI_CONNECTION_RSSI;
+#else
+      bool hasSignal = WiFi.RSSI() > WIFI_CONNECTION_RSSI;
+#endif
+      _result.errorScreen = hasSignal ? API_IMAGE_DOWNLOAD_ERROR : WIFI_WEAK;
       Log_error_submit("[HTTPS] GET... failed, error: %s", https->errorToString(httpCode).c_str());
       return false;
     }
@@ -166,7 +190,12 @@ void DeviceSetup::downloadSetupImage() {
 
     // file found at server
     if (httpCode != HTTP_CODE_OK && httpCode != HTTP_CODE_MOVED_PERMANENTLY) {
-      _result.errorScreen = (WiFi.RSSI() > WIFI_CONNECTION_RSSI) ? API_IMAGE_DOWNLOAD_ERROR : WIFI_WEAK;
+#ifdef BOARD_TRMNL_X
+      bool hasSignal = conn_mgr_is_eth() || WiFi.RSSI() > WIFI_CONNECTION_RSSI;
+#else
+      bool hasSignal = WiFi.RSSI() > WIFI_CONNECTION_RSSI;
+#endif
+      _result.errorScreen = hasSignal ? API_IMAGE_DOWNLOAD_ERROR : WIFI_WEAK;
       Log_error_submit("[HTTPS] GET... failed, error: %s", https->errorToString(httpCode).c_str());
       return false;
     }

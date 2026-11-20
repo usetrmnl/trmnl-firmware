@@ -110,6 +110,12 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
     request->send(200);
   });
 
+  server.on("/restart", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(200);
+    delay(100);
+    ESP.restart();
+  });
+
   server.on("/advanced", HTTP_GET, [&](AsyncWebServerRequest *request) { request->redirect("/#advanced"); });
   server.on("/run-test", HTTP_GET, [](AsyncWebServerRequest *request) {
     Log_info_serial("Running sensor test from web...");
@@ -205,6 +211,23 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
   server.on("/exit", HTTP_POST, [callbacks](AsyncWebServerRequest *request) {
     bool exiting = callbacks.requestExit();
     request->send(exiting ? 200 : 409, "application/json", exiting ? "{\"exiting\":true}" : "{\"exiting\":false}");
+  });
+
+  server.on("/get-ethernet", HTTP_GET, [](AsyncWebServerRequest *request) {
+    Preferences prefs;
+    prefs.begin("data", true);
+    bool enabled = prefs.getBool("eth_enabled", false);
+    prefs.end();
+    request->send(200, "application/json", enabled ? "{\"enabled\":true}" : "{\"enabled\":false}");
+  });
+
+  server.on("/set-ethernet", HTTP_GET, [](AsyncWebServerRequest *request) {
+    bool enabled = request->hasParam("enabled") && request->getParam("enabled")->value() == "1";
+    Preferences prefs;
+    prefs.begin("data", false);
+    prefs.putBool("eth_enabled", enabled);
+    prefs.end();
+    request->send(200, "application/json", enabled ? "{\"enabled\":true}" : "{\"enabled\":false}");
   });
 
   server.on("/connection-status", HTTP_GET, [callbacks](AsyncWebServerRequest *request) {
