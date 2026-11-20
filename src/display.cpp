@@ -74,14 +74,8 @@ static void display_apply_light_sleep(uint8_t enabled) {
 }
 
 bool display_update_epaper(int refreshMode, bool wait, bool writePlane, uint8_t plane) {
-#if defined(BOARD_SEEED_RETERMINAL_E1002) || defined(BOARD_SEEED_RETERMINAL_E1004) || defined(BOARD_TRMNL_GEN2)
-    // Light sleep with the WiFi radio running is unsupported
-  if (bLightSleepWanted && WiFi.getMode() != WIFI_MODE_NULL) {
-    display_apply_light_sleep(false);
-  } else {
-    display_apply_light_sleep(bLightSleepWanted);
-  }
-#endif
+  // Light sleep with the WiFi radio running is unsupported: it hangs a Gen2 and fakes button presses on an OG
+  display_apply_light_sleep(bLightSleepWanted && WiFi.getMode() == WIFI_MODE_NULL);
   if (writePlane) {
     bbep.writePlane(plane);
   }

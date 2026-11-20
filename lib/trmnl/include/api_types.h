@@ -39,6 +39,7 @@ struct ApiDisplayResponse {
   SPECIAL_FUNCTION special_function;
   String action;
   String verbose_logging;
+  bool keep_wifi_on; // wait for the next check-in awake with Wi-Fi connected, not in deep sleep
 };
 
 struct ApiDisplayInputs {
