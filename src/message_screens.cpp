@@ -75,7 +75,7 @@ static void draw_wifi_failed_message(void) {
   String string0 = "TRMNL firmware ";
   string0 += Messages::firmware_version();
 #ifdef __BB_EPAPER__
-  bbep.setCursor(40, bbep.height()/10); // place in upper left corner
+  bbep.setCursor(40, bbep.height() / 10); // place in upper left corner
 #else
   bbep.setCursor(80, 104); // place in upper left corner
 #endif
@@ -648,7 +648,7 @@ static void draw_wifi_connect_setup_message(const char *fw_version, String messa
   String string1 = "TRMNL firmware ";
   string1 += fw_version;
 #ifdef __BB_EPAPER__
-  bbep.setCursor(40, bbep.height()/10); // place in upper left corner
+  bbep.setCursor(40, bbep.height() / 10); // place in upper left corner
 #else
   bbep.setCursor(40, 48); // place in upper left corner
 #endif
@@ -656,8 +656,8 @@ static void draw_wifi_connect_setup_message(const char *fw_version, String messa
   String string2 = "Connect your phone or computer to:";
   bbep.getStringBox(string2, &rect);
 #ifdef __BB_EPAPER__
-const int iFontHeight = 12;
-  bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height()-(iFontHeight*4));
+  const int iFontHeight = 12;
+  bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - (iFontHeight * 4));
 #else
   bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 100 - rect.h);
 #endif
