@@ -85,11 +85,24 @@ RSpec.describe "Faults on the TRMNL X", env: "TRMNL_X" do
     end
 
     it "sleeps without a picture on a panel power failure" do
-      # The PMIC's power good never comes: the panel gets no drive voltages.
+      # The PMIC's power good never comes: the panel gets no drive voltages. FastEPD waits for
+      # the pin with no time limit, so powerWithTimeout() (src/panel_power.cpp) gives up first,
+      # at the wake logo, and the device still reaches the server.
       dev.boot(faults: { panel_busy_stuck: true }) do |s|
+        s.wait(console: /Panel power good timed out/, timeout: 60)
         dev.mock.wait_for_request("/images/five.png", timeout: 120)
         s.wait(state: "deep_sleep", timeout: 180)
         expect(s).not_to show_image(@five, tolerance: 64, max_ratio: 0)
+      end
+    end
+
+    it "draws the same picture on the wake after a panel power failure" do
+      dev.boot(faults: { panel_busy_stuck: true }) do |s|
+        s.wait(state: "deep_sleep", timeout: 180)
+        s.clear_faults
+        dev.mock.next_request("/api/display", timeout: 60) { s.wake }
+        s.wait(state: "deep_sleep", timeout: 60, settle_ms: 300)
+        expect(s).to show_image(@five, tolerance: 64, max_ratio: 0)
       end
     end
 
