@@ -25,6 +25,42 @@ namespace {
     }
     return "failed";
   }
+
+  // The network a /connect body describes
+  WifiCredentials credentialsFromJson(JsonObject data) {
+    WifiCredentials credentials;
+    credentials.ssid = data["ssid"].is<String>() ? data["ssid"].as<String>() : "";
+    credentials.pswd = data["pswd"].is<String>() ? data["pswd"].as<String>() : "";
+    credentials.isEnterprise = data["isEnterprise"].is<bool>() && data["isEnterprise"].as<bool>();
+    credentials.username = data["username"].is<String>() ? data["username"].as<String>() : "";
+    credentials.identity = data["identity"].is<String>() ? data["identity"].as<String>() : "";
+    // Static IP fields (optional)
+    credentials.useStaticIP = data["useStaticIP"].is<bool>() && data["useStaticIP"].as<bool>();
+    credentials.staticIP = data["staticIP"].is<String>() ? data["staticIP"].as<String>() : "";
+    credentials.gateway = data["gateway"].is<String>() ? data["gateway"].as<String>() : "";
+    credentials.subnet = data["subnet"].is<String>() ? data["subnet"].as<String>() : "";
+    credentials.dns1 = data["dns1"].is<String>() ? data["dns1"].as<String>() : "";
+    credentials.dns2 = data["dns2"].is<String>() ? data["dns2"].as<String>() : "";
+    return credentials;
+  }
+
+  // Device settings in the "data" namespace: "" goes back to the default
+  void saveDeviceSetting(const char *key, const String &value) {
+    Preferences prefs;
+    prefs.begin("data", false);
+    if (value.length() > 0) {
+      prefs.putString(key, value);
+    } else if (prefs.isKey(key)) {
+      prefs.remove(key);
+    }
+    prefs.end();
+  }
+
+  void sendJson(AsyncWebServerRequest *request, int code, JsonDocument &doc) {
+    String out;
+    serializeJson(doc, out);
+    request->send(code, "application/json", out);
+  }
 } // namespace
 
 void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperationCallbacks callbacks,
@@ -84,13 +120,91 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
   server.on("/device-settings", HTTP_GET, [](AsyncWebServerRequest *request) {
     Preferences prefs;
     prefs.begin("data", true);
-    String apiUrl = prefs.getString("api_url", "");
+    JsonDocument doc;
+    doc["api_url"] = prefs.getString("api_url", "");
+    doc["hostname"] = prefs.getString("hostname", "");
+    doc["ntp_server"] = prefs.getString("ntp_server", "");
     prefs.end();
-    bool verboseLogging = read_verbose_logging();
-    apiUrl.replace("\\", "\\\\");
-    apiUrl.replace("\"", "\\\"");
-    request->send(200, "application/json",
-                  "{\"api_url\":\"" + apiUrl + "\",\"verbose_logging\":" + (verboseLogging ? "true" : "false") + "}");
+    doc["verbose_logging"] = read_verbose_logging();
+    sendJson(request, 200, doc);
+  });
+
+  // The device-wide settings of the Advanced page, saved right away (a field left out is not touched)
+  AsyncCallbackJsonWebHandler *settingsHandler =
+    new AsyncCallbackJsonWebHandler("/settings", [](AsyncWebServerRequest *request, JsonVariant &json) {
+      JsonObject data = json.as<JsonObject>();
+      JsonDocument doc;
+
+      if (data["server"].is<String>()) {
+        String server = data["server"].as<String>();
+        server.trim();
+        while (server.endsWith("/"))
+          server.remove(server.length() - 1);
+        if (server.length() > 0 && !server.startsWith("http://") && !server.startsWith("https://")) {
+          doc["error"] = "server";
+          return sendJson(request, 400, doc);
+        }
+        WifiCaptivePortal.saveApiServer(server); // a different server clears the pairing
+        Log_info("WebServer: Saved API server: %s", server.c_str());
+      }
+
+      if (data["hostname"].is<String>()) {
+        String hostname = data["hostname"].as<String>();
+        hostname.trim();
+        saveDeviceSetting("hostname", hostname);
+        // an emptied hostname goes back to the default on the next start
+        if (hostname.length() > 0) WifiCaptivePortal.setHostname(hostname);
+        Log_info("WebServer: Saved hostname: %s", hostname.c_str());
+      }
+
+      if (data["ntpServer1"].is<String>()) {
+        String ntpServer = data["ntpServer1"].as<String>();
+        ntpServer.trim();
+        saveDeviceSetting("ntp_server", ntpServer);
+        Log_info("WebServer: Saved NTP server: %s", ntpServer.c_str());
+      }
+
+      doc["saved"] = true;
+      sendJson(request, 200, doc);
+    });
+  server.addHandler(settingsHandler);
+
+  // The saved networks (never their passwords), in the order of their slots
+  server.on("/saved-networks", HTTP_GET, [](AsyncWebServerRequest *request) {
+    std::vector<WifiCredentials> saved;
+    int lastUsed = WifiCaptivePortal.getSavedCredentials(saved);
+    JsonDocument doc;
+    doc["max"] = WIFI_MAX_SAVED_CREDS;
+    JsonArray networks = doc["networks"].to<JsonArray>();
+    for (size_t i = 0; i < saved.size(); i++) {
+      JsonObject network = networks.add<JsonObject>();
+      network["index"] = i;
+      network["ssid"] = saved[i].ssid;
+      network["band"] = saved[i].is5GHz ? "5GHz" : "2.4GHz";
+      network["enterprise"] = saved[i].isEnterprise;
+      network["static_ip"] = saved[i].useStaticIP;
+      network["last_used"] = (int)i == lastUsed;
+    }
+    sendJson(request, 200, doc);
+  });
+
+  // The SSID comes along with the slot, so a stale page can't forget the wrong network
+  AsyncCallbackJsonWebHandler *forgetHandler =
+    new AsyncCallbackJsonWebHandler("/forget-network", [](AsyncWebServerRequest *request, JsonVariant &json) {
+      JsonObject data = json.as<JsonObject>();
+      int index = data["index"].is<int>() ? data["index"].as<int>() : -1;
+      String ssid = data["ssid"].is<String>() ? data["ssid"].as<String>() : "";
+      JsonDocument doc;
+      bool forgotten = WifiCaptivePortal.forgetWifiCredentials(index, ssid);
+      doc["forgotten"] = forgotten;
+      sendJson(request, forgotten ? 200 : 404, doc);
+    });
+  server.addHandler(forgetHandler);
+
+  // "Done": the device restarts and joins a saved network
+  server.on("/exit", HTTP_POST, [callbacks](AsyncWebServerRequest *request) {
+    bool exiting = callbacks.requestExit();
+    request->send(exiting ? 200 : 409, "application/json", exiting ? "{\"exiting\":true}" : "{\"exiting\":false}");
   });
 
   server.on("/connection-status", HTTP_GET, [callbacks](AsyncWebServerRequest *request) {
@@ -182,34 +296,13 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
   AsyncCallbackJsonWebHandler *handler = new AsyncCallbackJsonWebHandler(
     "/connect", [callbacks, modemMac](AsyncWebServerRequest *request, JsonVariant &json) {
       JsonObject data = json.as<JsonObject>();
-      String ssid = data["ssid"];
-      String pswd = data["pswd"];
-      String api_server = data["server"];
-      bool isEnterprise = data["isEnterprise"].is<bool>() && data["isEnterprise"].as<bool>();
+      WifiCredentials credentials = credentialsFromJson(data);
+      String ssid = credentials.ssid;
+      bool useStaticIP = credentials.useStaticIP;
+      // The settings page saves the server on its Advanced page (/settings) and leaves it out here
+      bool api_server_given = data["server"].is<String>();
+      String api_server = api_server_given ? data["server"].as<String>() : "";
       String band = data["band"].is<String>() ? data["band"].as<String>() : "";
-      String username = data["username"].is<String>() ? data["username"].as<String>() : "";
-      String identity = data["identity"].is<String>() ? data["identity"].as<String>() : "";
-
-      // Static IP fields (optional)
-      bool useStaticIP = data["useStaticIP"].is<bool>() && data["useStaticIP"].as<bool>();
-      String staticIP = data["staticIP"].is<String>() ? data["staticIP"].as<String>() : "";
-      String gateway = data["gateway"].is<String>() ? data["gateway"].as<String>() : "";
-      String subnet = data["subnet"].is<String>() ? data["subnet"].as<String>() : "";
-      String dns1 = data["dns1"].is<String>() ? data["dns1"].as<String>() : "";
-      String dns2 = data["dns2"].is<String>() ? data["dns2"].as<String>() : "";
-      WifiCredentials credentials;
-      credentials.ssid = ssid;
-      credentials.pswd = pswd;
-      credentials.isEnterprise = isEnterprise;
-      credentials.username = username;
-      credentials.identity = identity;
-      // Static IP settings
-      credentials.useStaticIP = useStaticIP;
-      credentials.staticIP = staticIP;
-      credentials.gateway = gateway;
-      credentials.subnet = subnet;
-      credentials.dns1 = dns1;
-      credentials.dns2 = dns2;
 
       String ntpServer = data["ntpServer1"].is<String>() ? data["ntpServer1"].as<String>() : "";
       if (ntpServer.length() > 0) {
@@ -232,7 +325,7 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
 
       Log_info("WebServer: Received SSID: %s, Static IP: %s", ssid.c_str(), useStaticIP ? "yes" : "no");
 
-      callbacks.setConnectionCredentials(credentials, api_server, band);
+      callbacks.setConnectionCredentials(credentials, api_server, api_server_given, band);
       String mac = WiFi.macAddress();
       String message = "{\"ssid\":\"" + ssid + "\",\"mac\":\"" + mac + "\"";
 #ifdef BOARD_TRMNL_X
