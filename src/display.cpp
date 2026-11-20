@@ -332,6 +332,7 @@ static bool draw_image(uint8_t *image_buffer, int data_size, int *pRefreshMode, 
   } else if (MOTOSHORT(image_buffer) == 0xffd8) {
     Log_info("Drawing JPEG");
     iRefreshMode = jpeg_to_epd(image_buffer, data_size);
+    if (iRefreshMode < 0) return false; // no decoder memory, or the JPEG does not fit the panel
   } else // uncompressed BMP or Group5 compressed image
   {
     if (*(uint16_t *)image_buffer == BB_BITMAP_MARKER) {
