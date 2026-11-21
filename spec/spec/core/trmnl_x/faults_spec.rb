@@ -96,6 +96,16 @@ RSpec.describe "Faults on the TRMNL X", env: "TRMNL_X" do
       end
     end
 
+    it "draws the same picture on the wake after a panel power failure" do
+      dev.boot(faults: { panel_busy_stuck: true }) do |s|
+        s.wait(state: "deep_sleep", timeout: 180)
+        s.clear_faults
+        dev.mock.next_request("/api/display", timeout: 60) { s.wake }
+        s.wait(state: "deep_sleep", timeout: 60, settle_ms: 300)
+        expect(s).to show_image(@five, tolerance: 64, max_ratio: 0)
+      end
+    end
+
     it "recovers from an unresponsive modem" do
       dev.boot(faults: { modem_unresponsive: true }) do |s|
         s.wait(console: /Connection failed/, timeout: 180)

@@ -18,9 +18,9 @@ void show_last_image(void) {
   if (!curPath.isEmpty()) {
     uint8_t *buf = display_read_file(curPath.c_str(), &file_size);
     if (buf && file_size > 0) {
-      display_show_image(buf, file_size, true);
+      bool shown = display_show_image(buf, file_size, true);
       free(buf);
-      DisplayedImage::remember(curPath.c_str());
+      if (shown) DisplayedImage::remember(curPath.c_str());
     }
   }
 }
