@@ -33,5 +33,5 @@ void config_gpio_for_lp(void);
  */
 void wifiErrorDeepSleep(void);
 
-/** Restart the device if this wake has not reached deep sleep within 20 minutes. Not used on the X. */
+/** Restart the device if this wake has not reached deep sleep within 20 minutes. */
 void awake_time_limit_start(void);
