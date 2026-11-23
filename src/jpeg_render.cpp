@@ -1,6 +1,7 @@
 #include <JPEGDEC.h>
 #include <epd_driver.h>
 #include <jpeg_render.h>
+#include <new>
 #include <trmnl_log.h>
 
 static uint8_t *pDither;
@@ -69,13 +70,13 @@ int jpeg_draw(JPEGDRAW *pDraw) {
  * @return refresh mode based on image type and presence of old image
  */
 int jpeg_to_epd(const uint8_t *pJPEG, int iDataSize) {
-  JPEGDEC *jpg = new JPEGDEC();
+  JPEGDEC *jpg = new (std::nothrow) JPEGDEC(); // plain new throws instead of returning NULL
   int rc = -1; // invalid mode
   int iPlane = 0;
 
   if (!jpg) {
     Log_error("%s [%d]: Not enough memory for the JPEG decoder instance", __FILE__, __LINE__);
-    return JPEG_ERROR_MEMORY; // not enough memory for the decoder instance
+    return -1; // not a refresh mode, so nothing is refreshed
   }
   rc = jpg->openRAM((uint8_t *)pJPEG, iDataSize, jpeg_draw);
   if (rc) {
