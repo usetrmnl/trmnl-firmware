@@ -452,7 +452,7 @@ static bool refresh_epaper(int iRefreshMode, bool bWait, bool bAlloc) {
 }
 #else
 // Pushes the drawn image to the panel with the right clearing passes
-static void refresh_fastepd(bool bSkipClear) {
+static bool refresh_fastepd(bool bSkipClear) {
   {
     int rc = bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
     Log_info("%s [%d]: setCustomMatrix returned %d\r\n", __FILE__, __LINE__, rc);
@@ -470,7 +470,7 @@ static void refresh_fastepd(bool bSkipClear) {
                      : ((iUpdateCount & 7) == 0 || (iTempProfile > 0)) ? CLEAR_SLOW
                                                                        : CLEAR_FAST;
     Log_info("fullUpdate clear mode = %d\n", iClearMode);
-    bbep.fullUpdate(iClearMode, false);
+    return bbep.fullUpdate(iClearMode, false) == BBEP_SUCCESS;
     //   }
   }
 }
@@ -479,29 +479,32 @@ static void refresh_fastepd(bool bSkipClear) {
 /**
  * @brief Function to show the image on the display
  * @param image_buffer pointer to the uint8_t image buffer
- * @return none
+ * @return false when the image could not be decoded or the panel did not take it
  */
-void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool bSkipClear) {
+bool display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool bSkipClear) {
   int iRefreshMode;
   bool bAlloc;
 
   Log_info("display_show_image start");
   Log_info("maximum_compatibility = %d\n", apiDisplayResult.response.maximum_compatibility);
   if (!draw_image(image_buffer, data_size, &iRefreshMode, &bAlloc)) {
-    return;
+    return false;
   }
   Log_info("Display refresh start");
   save_temp_profile_from_api();
 #ifdef BB_EPAPER
   iRefreshMode = choose_refresh_mode(iRefreshMode, &bWait);
   if (!refresh_epaper(iRefreshMode, bWait, bAlloc)) {
-    return;
+    return false;
   }
 #else
-  refresh_fastepd(bSkipClear);
+  if (!refresh_fastepd(bSkipClear)) {
+    return false;
+  }
 #endif
   iUpdateCount++;
   Log_info("display_show_image end");
+  return true;
 }
 /**
  * @brief Function to got the display to the sleep

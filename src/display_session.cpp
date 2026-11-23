@@ -534,13 +534,12 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
         return result;
       }
       Log_info("%s isn't cached; showing /current.bmp", szTemp);
-      display_show_image(buffer, current_size, true);
+      bool shown = display_show_image(buffer, current_size, true);
       free(buffer);
       buffer = nullptr;
-      DisplayedImage::remember(szTemp);
+      if (shown) DisplayedImage::remember(szTemp);
       return result;
     }
-    DisplayedImage::remember(szTemp);
     Log.info("%s [%d]: Reading %s from SPIFFS\r\n", __FILE__, __LINE__, szTemp);
     size_t content_size = filesystem_read_and_allocate(szTemp, &buffer);
     if (!buffer || content_size == 0) {
@@ -549,10 +548,10 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
       return HTTPS_WRONG_IMAGE_SIZE;
     }
     Log.info("%s [%d]: Decoding image...\r\n", __FILE__, __LINE__);
-    display_show_image(buffer, content_size, true);
+    bool shown = display_show_image(buffer, content_size, true);
     free(buffer);
     buffer = nullptr;
-    DisplayedImage::remember(szTemp); // current image becomes the previous image
+    if (shown) DisplayedImage::remember(szTemp); // current image becomes the previous image
       // Rotate NVS path keys: last ← current ← szTemp
     String _curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
     String _lastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
@@ -626,11 +625,11 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
     char szTemp[36];
     filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
     Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
-    display_show_image(buffer, content_size, true); // PNG and JPEG decoders leave the buffer intact
+    bool shown = display_show_image(buffer, content_size, true); // PNG and JPEG decoders leave the buffer intact
     Log.info("%s [%d]: Writing %s to SPIFFS\r\n", __FILE__, __LINE__, szTemp);
     filesystem_purge_old_file(szTemp); // try to delete the old version or older than 24h
     writeImageToFile(szTemp, buffer, content_size);
-    DisplayedImage::remember(szTemp); // current image becomes the previous image
+    if (shown) DisplayedImage::remember(szTemp); // current image becomes the previous image
     String _curPath = preferences.getString(PREFERENCES_CURRENT_PATH_KEY, "");
     String _lastPath = preferences.getString(PREFERENCES_LAST_PATH_KEY, "");
     if (!_curPath.isEmpty() && (_curPath != String(szTemp) || _lastPath.isEmpty()))
@@ -680,8 +679,7 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
       writeImageToFile("/current.bmp", buffer, content_size);
     }
     Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
-    display_show_image(buffer, content_size, true);
-    {
+    if (display_show_image(buffer, content_size, true)) {
       char szTemp[36];
       filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
       DisplayedImage::remember(szTemp);
