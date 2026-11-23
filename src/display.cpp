@@ -3,6 +3,7 @@
 #include <PNGdec.h>
 #include <Preferences.h>
 #include <WiFi.h>
+#include <Wire.h>
 #include <board_config.h>
 #include <color_reduce.h>
 #include <display.h>
@@ -88,6 +89,9 @@ bool display_update_epaper(int refreshMode, bool wait, bool writePlane, uint8_t 
   if (bbep.capabilities() & (BBEP_3COLOR | BBEP_4COLOR | BBEP_7COLOR)) {
     Log_info("Color EPD, must use full refresh mode");
     refreshMode = REFRESH_FULL;
+    if (bbep.capabilities() & BBEP_7COLOR) {
+      wait = true;
+    }
   } else if (refreshMode == REFRESH_PARTIAL && !bCanDoPartial) {
     refreshMode = REFRESH_FAST;
     Log_info("Can't do partial refresh, no previous image");
@@ -138,6 +142,18 @@ void display_init(void) {
   Log_info("Saved temperature profile: %" PRIu32, iTempProfile);
 #ifdef BB_EPAPER
   Log_info("BB e-Paper init");
+#ifdef WAVESHARE_PHOTOPAINTER
+  Wire.begin(47, 48);
+  Wire.beginTransmission(0x34); // AXP2101
+  Wire.write(0x90);             // LDOS ON/OFF control
+  Wire.write(0x8);              // turn on ALDO4
+  Wire.endTransmission();
+  Wire.beginTransmission(0x34);
+  // set ALDO4 to 3.3V
+  Wire.write(0x95);
+  Wire.write(0x1c); // 3.3v
+  Wire.endTransmission();
+#endif // WAVESHARE_PHOTOPAINTER
 #ifdef BOARD_SEEED_STICKY
 // Special case for the Sticky - it shares the SPI bus with the uSD card, so the EPD CS line
 // must be the only one active at a time
