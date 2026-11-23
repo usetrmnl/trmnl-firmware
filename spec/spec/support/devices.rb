@@ -19,7 +19,7 @@ module Devices
       # Battery-Voltage it reports at the simulator's default 4.1 V battery (nil: varies)
       battery_v: 4.1,
       # Has a button the simulator can press (and that wakes it from deep sleep): `press` wakes
-      # it, a 5 s press forgets WiFi. On the X, its touch bar equivalents (TrmnlX::XSim).
+      # it, a 5 s press opens the settings portal. On the X, its touch bar equivalents (TrmnlX::XSim).
       button: true,
       # A double click (or a 1-5 s press) runs the special function the server assigned.
       double_click: true,
@@ -33,8 +33,8 @@ module Devices
       psram_frame_buffers: false,
       app_slot: 0x10000,   # offset of the first app slot (the factory-flashed firmware)
       ota_slot: 0x1E0000,  # offset of the second app slot, which an OTA update installs into
-      # Reads the panel revision (Panel-Rev header): the 7.5" UC8179 boards whose SPI pins the
-      # firmware knows (get_panel_rev() in display.cpp).
+      # Reads the panel revision (Panel-Rev header): the boards whose SPI pins the firmware knows
+      # (get_panel_rev() in epd_panel_rev.cpp).
       panel_rev: false,
       # Has an I2C bus for environment sensors (device_list[] sensor_sda/scl != 0xff): SCD41 /
       # AHT20 readings go in the SENSORS header.
@@ -99,7 +99,7 @@ module Devices
   ALL = [
     Device.new("trmnl", "og", "TRMNL OG", core: true, chip: "esp32c3", panel_rev: true, sensors: true, psram: false),
     Device.new("trmnl_4clr", "og_4clr", "TRMNL BWRY",
-               core: true, inks: "bwry", chip: "esp32c3", sensors: true, psram: false),
+               core: true, inks: "bwry", chip: "esp32c3", panel_rev: true, sensors: true, psram: false),
     Device.new("TRMNL_X", "x", "TRMNL X",
                core: true, size: [1872, 1404], inks: "gray16", battery_v: nil, double_click: false,
                soft_reset_press: false, shipment: true, app_slot: 0x20000, ota_slot: 0x320000,

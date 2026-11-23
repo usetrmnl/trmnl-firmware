@@ -21,12 +21,13 @@ module TrmnlX
     ->(x, y) { pixel.(x * 800 / 1872, y * 480 / 1404) ? 0 : 1 }
   end
 
-  # A simulated X (offline, with the X's MAC). With a block: yields it and closes it.
-  def sim(**kw, &block)
+  # A simulated X (offline, with the X's MAC) running `firmware` (a TRMNL_X build directory). With
+  # a block: yields it and closes it.
+  def sim(firmware: build, **kw, &block)
     kw = { name: Sims.current_name, mac: MAC, turbo: Builds::TURBO, memcheck: Builds::MEMCHECK }.merge(kw)
     extra = kw.delete(:extra_args).to_a
     extra += ["--offline"] unless extra.include?("--offline")
-    s = TrmnlSim::Simulator.new(Builds.env_of(build), build, extra_args: extra, **kw)
+    s = TrmnlSim::Simulator.new(Builds.env_of(firmware), firmware, extra_args: extra, **kw)
     block ? s.session(&block) : s
   end
 
@@ -36,6 +37,7 @@ module TrmnlX
     s.dock(true)
     s.wait(portal: true, timeout: 180)
     s.dock(false)
+    s.portal_enable_verbose_logging
     s.portal_connect(ssid, "password", server: mock.device_url)
     mock.wait_for_request("/api/display", timeout: 240)
     s.wait(state: "deep_sleep", timeout: 240)
@@ -83,12 +85,12 @@ module TrmnlX
     menu_tap(s, "center", /chose Settings/, screen: true)
   end
 
-  # Open Settings..., then Reset Wi-Fi..., leaving its confirmation (Confirm Reset Wi-Fi, Back)
+  # Open Settings..., then Wi-Fi & Settings..., leaving its confirmation (Open Wi-Fi & Settings, Back)
   # on the screen with the arrow on Back.
-  def ask_to_reset_wifi(s)
+  def ask_to_open_portal(s)
     open_settings_menu(s)
-    menu_tap(s, "right", /Diagnostics\.\.\. -> Reset Wi-Fi/)
-    menu_tap(s, "center", /chose Reset Wi-Fi/, screen: true)
+    menu_tap(s, "right", /Diagnostics\.\.\. -> Wi-Fi & Settings/)
+    menu_tap(s, "center", /chose Wi-Fi & Settings/, screen: true)
   end
 
   # The flash of an X a customer just unboxed: a shipped X (see ShippedX) taken out of shipment
@@ -104,6 +106,7 @@ module TrmnlX
         s.wait_for_console(/Entering shipment mode light sleep loop/, timeout: 180)
         s.dock(true)
         s.wait(portal: true, timeout: 180)
+        s.portal_enable_verbose_logging
       end
       {}
     end
@@ -133,8 +136,8 @@ module TrmnlX
   # - a short press (up to 1 s, which wakes the OG and refreshes) is a tap in the middle, which
   #   wakes the X (Update-Source: EXT0) into the touch menu, then a second one choosing Next
   #   Screen, which refreshes (TrmnlX.next_screen);
-  # - a long press (5-15 s: forget WiFi, open the setup portal) is the X's WiFi reset: Settings,
-  #   Reset Wi-Fi... and its confirmation in the touch menu (TrmnlX.ask_to_reset_wifi);
+  # - a long press (5-15 s: open the settings portal, saved networks kept) is the X's Settings,
+  #   Wi-Fi & Settings... and its confirmation in the touch menu (TrmnlX.ask_to_open_portal);
   # - the OG's double click or 1-5 s press (run the special function) and 15 s press (soft reset:
   #   forget the device too) aren't mapped: the X runs the saved special function from its touch
   #   menu, but nothing drives that here yet, and it has no soft reset. An example using them is
@@ -150,7 +153,7 @@ module TrmnlX
       if ms >= 15_000
         skip!("the TRMNL X has no soft-reset gesture (the OG's 15 s press)")
       elsif ms > 5000
-        reset_wifi_gesture
+        settings_portal_gesture
       elsif ms > 1000
         skip!("the TRMNL X has no gesture that runs the special function (the OG's 1-5 s press)")
       else
@@ -166,13 +169,13 @@ module TrmnlX
       down ? touch_down("center") : touch_up("center")
     end
 
-    # Forget WiFi and open the setup portal from the touch menu. The X reads the touch bar when
+    # Open the settings portal (saved networks kept) from the touch menu. The X reads the touch bar when
     # it wakes, so it waits for the device to be asleep first.
-    def reset_wifi_gesture
+    def settings_portal_gesture
       wait(state: "deep_sleep", timeout: 120, settle_ms: 200) unless status["state"] == "deep_sleep"
       skip_tutorial
-      TrmnlX.ask_to_reset_wifi(self)
-      TrmnlX.menu_tap(self, "left", /Back -> Confirm Reset Wi-Fi/)
+      TrmnlX.ask_to_open_portal(self)
+      TrmnlX.menu_tap(self, "left", /Back -> Open Wi-Fi & Settings/)
       touch("center", ms: 150)
     end
 
@@ -195,14 +198,16 @@ module TrmnlX
   end
 
   # A TRMNL X straight out of the factory: QA passed, modem flashed, waiting in shipment mode
-  # (light sleep until it is docked). From the setup cache (see SetupCache).
+  # (light sleep until it is docked), running `firmware` (default: this build; the factory's
+  # release: Builds.factory_release). From the setup cache (see SetupCache).
   class ShippedX
-    attr_reader :cache, :template, :factory_console
+    attr_reader :firmware, :cache, :template, :factory_console
 
-    def initialize
-      inputs = { build: SetupCache.build_id(TrmnlX.build), memcheck: Builds::MEMCHECK, turbo: Builds::TURBO }
+    def initialize(firmware = TrmnlX.build)
+      @firmware = firmware
+      inputs = { build: SetupCache.build_id(firmware), memcheck: Builds::MEMCHECK, turbo: Builds::TURBO }
       @cache, meta = SetupCache.entry("x-shipped", inputs) do |dir|
-        TrmnlX.sim(flash: File.join(dir, "flash.bin"), erase: true, name: "x-factory") do |s|
+        TrmnlX.sim(firmware:, flash: File.join(dir, "flash.bin"), erase: true, name: "x-factory") do |s|
           s.wait_for_console(/Entering shipment mode light sleep loop/, timeout: 180)
           { console: s.console(0) }
         end
@@ -219,37 +224,40 @@ module TrmnlX
       flash
     end
 
-    def boot(**, &) = TrmnlX.sim(flash: copy("shipped"), **, &)
+    def boot(**, &) = TrmnlX.sim(firmware:, flash: copy("shipped"), **, &)
 
     def close = FileUtils.rm_rf(@dir)
   end
 
   # A mock server plus an X that completed onboarding (on `ssid`) against a server like it; see
-  # ProvisionedDevice, which this mirrors (`boot`, `boot_asleep`, `restore`, `reset`).
+  # ProvisionedDevice, which this mirrors (`boot`, `boot_asleep`, `restore`, `reset`). The server
+  # shows `image`: the mock's 800x480 BMP ("default"), or else a white 1872x1404 PNG of that name,
+  # as the TRMNL server sends (1.8.17 reads past the end of a BMP smaller than its panel).
   class ProvisionedX
-    attr_reader :shipped, :ssid, :cache, :mock, :host_ports
+    attr_reader :shipped, :ssid, :image, :cache, :mock, :host_ports
 
-    def initialize(shipped, ssid: SSID_5)
+    def initialize(shipped, ssid: SSID_5, image: "default")
       @shipped = shipped
       @ssid = ssid
-      inputs = { shipped: File.basename(shipped.cache), ssid:, memcheck: Builds::MEMCHECK, turbo: Builds::TURBO }
+      @image = image
+      inputs = { shipped: File.basename(shipped.cache), ssid:, image:, memcheck: Builds::MEMCHECK,
+                 turbo: Builds::TURBO }
       @cache, meta = SetupCache.entry("x-provisioned-#{ssid}", inputs) { |dir| onboard(dir) }
-      @mock = TrmnlSim::MockTrmnl.new
-      mock.display = { image: "default", refresh_rate: 300 }
+      @mock = serve(TrmnlSim::MockTrmnl.new)
       @host_ports = { meta.fetch("port") => mock.port }
     end
 
-    def reset(display: { image: "default", refresh_rate: 300 }) = mock.reset(display:)
+    def reset(display: { image:, refresh_rate: 300 }) = mock.reset(display:)
 
     def boot(**, &)
       flash = shipped.copy("provisioned")
       FileUtils.cp(File.join(cache, "flash.bin"), flash)
-      TrmnlX.sim(flash:, host_ports:, **, &)
+      TrmnlX.sim(firmware: shipped.firmware, flash:, host_ports:, **, &)
     end
 
     def boot_asleep(**, &) = restore(File.join(cache, "asleep.trmnlsave"), **, &)
 
-    def restore(path, **, &) = TrmnlX.sim(restore: path, host_ports:, **, &)
+    def restore(path, **, &) = TrmnlX.sim(firmware: shipped.firmware, restore: path, host_ports:, **, &)
 
     # A save point of this X asleep after the block ran on it (booted from the onboarded flash,
     # served by `mock`), for `restore`. Cached like the onboarding: `inputs` names everything
@@ -269,11 +277,17 @@ module TrmnlX
 
     private
 
+    def serve(mock)
+      mock.set_png(image, ->(_x, _y) { 1 }) unless image == "default"
+      mock.display = { image:, refresh_rate: 300 }
+      mock
+    end
+
     def onboard(dir)
       FileUtils.cp(shipped.template, File.join(dir, "flash.bin"))
       TrmnlSim::MockTrmnl.open do |m|
-        m.display = { image: "default", refresh_rate: 300 }
-        TrmnlX.sim(flash: File.join(dir, "flash.bin"), name: "x-provision") do |s|
+        serve(m)
+        TrmnlX.sim(firmware: shipped.firmware, flash: File.join(dir, "flash.bin"), name: "x-provision") do |s|
           TrmnlX.onboard(s, m, ssid)
           s.save_point(File.join(dir, "asleep.trmnlsave"), label: "onboarded, asleep")
         end

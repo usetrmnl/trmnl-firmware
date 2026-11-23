@@ -6,6 +6,9 @@
 // Fills a pill (a rectangle whose left and right ends are half circles) in the image buffer
 void display_fill_pill(int x, int y, int w, int h, uint8_t color);
 
+// A pill's left and right inset on row `row`
+int display_pill_inset(int h, int row);
+
 // The battery icon (TRMNL X), DISPLAY_BATTERY_ICON_W x DISPLAY_BATTERY_ICON_H, drawn in the image
 // buffer with its top left at (x, y): charging while on USB power, otherwise the charge level from
 // the fuel gauge's last reading (battery().gaugeInit()), or a cross when there is none

@@ -53,6 +53,18 @@ General.describe "Refresh cycle" do
       end
     end
 
+    # createApiHeaders (src/api-client/header.cpp) sends the esp_reset_reason() name as Reset-Reason
+    # (lib/trmnl/src/api-client/request_headers.cpp).
+    it "reports the reset reason of each boot", :smoke do
+      dev.boot do |s|
+        expect(dev.mock.wait_for_request("/api/display", timeout: 90)).to have_header("Reset-Reason", "ESP_RST_POWERON")
+        s.wait_for_deep_sleep
+        req = dev.mock.next_request("/api/display", timeout: 90) { s.wake }
+        expect(req).to have_header("Reset-Reason", "ESP_RST_DEEPSLEEP")
+        s.wait_for_deep_sleep
+      end
+    end
+
     it "wakes and refreshes on a button press", :smoke,
        needs: :button do
       dev.boot_asleep do |s|
@@ -60,6 +72,18 @@ General.describe "Refresh cycle" do
         req = dev.mock.next_request("/api/display", timeout: 90) { s.press(150) }
         expect(req).to have_header("Update-Source", device.button_source)
         s.wait_for_deep_sleep
+      end
+    end
+
+    # showWakeLogo (status_screens.cpp) draws the loading screen before the new one, except on
+    # color panels, where each refresh takes 15 s or more.
+    it "draws the loading screen first on a button wake, except on color panels", :smoke,
+       needs: :button, skip_if: :shipment, why: "the X wakes by touch bar, with its own loading screen" do
+      draws = %w[bwr bwry spectra6].include?(device.inks) ? 1 : 2
+      dev.boot_asleep do |s|
+        refreshes = s.wait_for_deep_sleep["display_refreshes"]
+        dev.mock.next_request("/api/display", timeout: 90) { s.press(150) }
+        expect(s.wait_for_deep_sleep(timeout: 120)["display_refreshes"] - refreshes).to eq(draws)
       end
     end
 
@@ -116,7 +140,7 @@ General.describe "Refresh cycle" do
       end
     end
 
-    it "resets WiFi on a long press", needs: :button do
+    it "opens the settings portal on a long press", needs: :button do
       dev.boot_asleep do |s|
         s.wait_for_deep_sleep
         s.press(6000)
@@ -126,7 +150,7 @@ General.describe "Refresh cycle" do
 
     it "forgets the device on the portal's soft reset",
        needs: :button do
-      # A long press only forgets WiFi; the portal's Soft Reset also clears the API key, so the
+      # A long press only opens the portal; its Soft Reset clears WiFi and the API key, so the
       # next onboarding has to register with /api/setup again.
       dev.boot_asleep do |s|
         s.wait_for_deep_sleep
@@ -171,7 +195,7 @@ General.describe "Refresh cycle" do
                            timeout: 300)
         # the new app can't have reached the network yet
         req = dev.mock.next_request("/api/display", timeout: 120)
-        expect(req).to have_header("FW-Version", "1.8.16")
+        expect(req).to have_header("FW-Version", Builds.fw_version)
         s.wait_for_deep_sleep(timeout: 120)
       end
     end

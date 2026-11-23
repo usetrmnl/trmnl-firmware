@@ -288,7 +288,7 @@ bool startQA() {
 
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
   // QA runs before bl_init(), which is where pDevice is normally set up.
-  if (pDevice == NULL) hw_config_init();
+  if (pDevice == NULL) hw_config_init(DEVICE_MODEL);
   pins_init();
   Log.info("QA Test started\n");
   attachInterrupt(digitalPinToInterrupt(pDevice->interrupt_pin), onBtnPress, FALLING);

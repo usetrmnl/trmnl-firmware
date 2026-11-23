@@ -1,6 +1,7 @@
 #include <ArduinoLog.h>
 #include <WifiCaptive.h>
 #include <config.h>
+#include <epd_driver.h>
 #include <globals.h>
 #include <message_screens.h>
 #include <status_screens.h>
@@ -19,7 +20,6 @@
 
 void showMessageWithLogo(MSG message_type, String friendly_id, bool id, const char *fw_version, String message) {
   display_show_msg(storedLogoOrDefault(0), message_type, friendly_id, id, fw_version, message);
-  need_to_refresh_display = 1;
   preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
 }
 
@@ -27,7 +27,6 @@ void showMessageWithLogo(MSG message_type) { display_show_msg(storedLogoOrDefaul
 
 void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiResponse) {
   display_show_msg(storedLogoOrDefault(0), message_type, "", false, "", apiResponse.message);
-  need_to_refresh_display = 1;
   preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
 }
 
@@ -76,6 +75,22 @@ uint8_t *storedLogoOrDefault(int iType) {
 #endif
 }
 
+#ifdef BOARD_TRMNL_X
+void showTouchbarLoading(void) {
+  display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false, true);
+  touchbar_redraw_pending_indicator();
+}
+#endif // BOARD_TRMNL_X
+
+// A color panel's full refresh takes 15 s or more, so a loading screen there doubles the wait
+static bool panelIsColor(void) {
+#ifdef BB_EPAPER
+  return bbep.capabilities() & (BBEP_3COLOR | BBEP_4COLOR | BBEP_7COLOR);
+#else
+  return false;
+#endif
+}
+
 void showWakeLogo(void) {
   Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
 
@@ -88,7 +103,7 @@ void showWakeLogo(void) {
     showMessageWithLogo(NONE);
   }
 #else
-  display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false, true);
+  if (!panelIsColor()) display_show_image(storedLogoOrDefault(1), DEFAULT_IMAGE_SIZE, false, true);
 #endif // BOARD_TRMNL_X
   // Force the display to show the current playlist image after the loading screen
   // (even if it hasn't changed)

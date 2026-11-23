@@ -248,6 +248,14 @@ General.describe "Special functions" do
         expect(dev.mock.count("/api/display")).to eq(2)
       end
     end
+
+    it "screen wiper runs when a BYOS server stamps its filename (#668)", slow: wiper do
+      dev.mock.display = { image: "default", filename: "screen_wiper-1791191234", refresh_rate: 300 }
+      dev.boot do |s|
+        s.wait_for_deep_sleep(timeout: 600)
+        expect(dev.mock.count("/api/display")).to eq(2)
+      end
+    end
   end
 
   describe "Buttons", needs: :button do
@@ -272,7 +280,7 @@ General.describe "Special functions" do
     end
 
     # the OG reads a press in the double-click window after the waking tap
-    it "tap then long press resets wifi", needs: :double_click do
+    it "tap then long press opens the settings portal", needs: :double_click do
       dev.boot_asleep do |s|
         s.wait_for_deep_sleep
         s.press(20)

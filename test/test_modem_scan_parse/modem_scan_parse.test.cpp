@@ -1,5 +1,6 @@
 #include <modem_scan_parse.h>
 #include <unity.h>
+#include <wifi_auth.h>
 
 // One +CWLAP entry: (ecn,"ssid",rssi,"mac",channel)
 static const char *SAMPLE = "AT+CWLAP\r\n"
@@ -34,6 +35,29 @@ void test_open_and_personal_not_enterprise(void) {
   TEST_ASSERT_NOT_NULL(psk);
   TEST_ASSERT_FALSE(psk->open);
   TEST_ASSERT_FALSE(psk->enterprise);
+}
+
+void test_enterprise_auth_modes(void) {
+  // The shared classifier is used by both native Wi-Fi and modem scans.
+  for (int mode = 0; mode <= 15; ++mode) {
+    bool expected = mode == 5 || mode == 10 || mode == 14 || mode == 15;
+    TEST_ASSERT_EQUAL(expected, isEnterpriseWifiAuthMode(mode));
+  }
+  TEST_ASSERT_FALSE(isEnterpriseWifiAuthMode(-1));
+  TEST_ASSERT_FALSE(isEnterpriseWifiAuthMode(255));
+}
+
+void test_detects_wpa3_and_transition_enterprise_on_both_bands(void) {
+  for (int mode : {10, 14, 15}) {
+    for (int channel : {6, 40}) {
+      String raw = "+CWLAP:(" + String(mode) + ",\"CorpNet\",-55,\"aa:aa:aa:aa:aa:aa\"," + String(channel) + ")\r\n";
+      auto nets = parseCwlapResponse(raw);
+      TEST_ASSERT_EQUAL_INT(1, nets.size());
+      TEST_ASSERT_TRUE(nets[0].enterprise);
+      TEST_ASSERT_FALSE(nets[0].open);
+      TEST_ASSERT_EQUAL(channel >= 36, nets[0].is5GHz);
+    }
+  }
 }
 
 void test_band_from_channel(void) {
@@ -104,6 +128,8 @@ void tearDown(void) {}
 void process() {
   UNITY_BEGIN();
   RUN_TEST(test_detects_wpa2_enterprise);
+  RUN_TEST(test_enterprise_auth_modes);
+  RUN_TEST(test_detects_wpa3_and_transition_enterprise_on_both_bands);
   RUN_TEST(test_open_and_personal_not_enterprise);
   RUN_TEST(test_band_from_channel);
   RUN_TEST(test_dedup_keeps_highest_rssi_same_band);

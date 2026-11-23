@@ -121,6 +121,48 @@ jobs:
           path: ~/.buildcache
           key: ${{ runner.os }}-pio-build-cache-${{ matrix.env }}-${{ github.sha }}
 
+      # The releases the X specs update from (the factory's and the previous one): built once per
+      # pair of tags, after the caches above are saved, as their older platform would be saved too.
+      - uses: ruby/setup-ruby@v1
+        if: matrix.env == 'TRMNL_X'
+        with:
+          bundler-cache: true
+          working-directory: spec
+
+      - name: release tags
+        if: matrix.env == 'TRMNL_X'
+        id: releases
+        working-directory: spec
+        run: |
+          ruby -r./spec/support/builds -e '
+            puts "factory=#{Builds.factory_release}", "previous=#{Builds.previous_release}"' >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache/restore@v6
+        if: matrix.env == 'TRMNL_X'
+        id: releases-cache
+        with:
+          path: |
+            spec/tmp/releases/${{ steps.releases.outputs.factory }}/TRMNL_X
+            spec/tmp/releases/${{ steps.releases.outputs.previous }}/TRMNL_X
+          key: ${{ runner.os }}-releases-TRMNL_X-${{ steps.releases.outputs.factory }}-${{ steps.releases.outputs.previous }}
+
+      - name: build (releases)
+        if: matrix.env == 'TRMNL_X' && steps.releases-cache.outputs.cache-hit != 'true'
+        working-directory: spec
+        # esptool for the older platforms' merge_bin, which needs its Python deps (rich_click)
+        run: |
+          pip install esptool
+          bundle exec rake "firmware:build_release[${{ steps.releases.outputs.factory }}]"
+          bundle exec rake "firmware:build_release[${{ steps.releases.outputs.previous }}]"
+
+      - uses: actions/cache/save@v6
+        if: matrix.env == 'TRMNL_X' && github.ref == 'refs/heads/main' && steps.releases-cache.outputs.cache-hit != 'true'
+        with:
+          path: |
+            spec/tmp/releases/${{ steps.releases.outputs.factory }}/TRMNL_X
+            spec/tmp/releases/${{ steps.releases.outputs.previous }}/TRMNL_X
+          key: ${{ runner.os }}-releases-TRMNL_X-${{ steps.releases.outputs.factory }}-${{ steps.releases.outputs.previous }}
+
       - uses: actions/checkout@v7
         if: inputs.sim_ref
         with:
@@ -179,14 +221,14 @@ jobs:
           mkdir -p spec/out/artifacts
           find spec/golden -name '*.actual.png' -exec cp {} spec/out/artifacts/ \; || true
 
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: simulator-logs-and-screens-${{ matrix.env }}${{ matrix.groups && format('-{0}', matrix.groups) || '' }}${{ inputs.sim_extra_args && '-sim-extra-args' || '' }}
           path: spec/out/artifacts/
           if-no-files-found: ignore
 
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: firmware-coverage-${{ matrix.env }}${{ matrix.groups && format('-{0}', matrix.groups) || '' }}${{ inputs.sim_extra_args && '-sim-extra-args' || '' }}
