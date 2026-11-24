@@ -1,4 +1,11 @@
 cmake_minimum_required(VERSION 3.16.0)
+
+# USB Host components (espressif__usb, cdc_ecm_host) live in components_usb_host/ and are
+# only added for the TRMNL X envs, which pass -DTRMNL_USB_HOST=ON (board_build.cmake_extra_args).
+if(TRMNL_USB_HOST)
+    list(APPEND EXTRA_COMPONENT_DIRS "${CMAKE_CURRENT_LIST_DIR}/components_usb_host")
+endif()
+
 # sdkconfig.defaults lives under sdkconfigs/ (per-target configs are redirected there
 # via board_build.esp-idf.sdkconfig_path in platformio.ini). Must be set before project().
 # Only set the default when an env hasn't supplied its own SDKCONFIG_DEFAULTS chain

@@ -325,6 +325,12 @@ dependencies:
       registry_url: https://components.espressif.com/
       type: service
     version: 1.4.6
+  espressif/usb:
+    dependencies: []
+    source:
+      path: components_usb_host/espressif__usb
+      type: local
+    version: 1.4.0
   espressif/usb_host_cdc_acm:
     component_hash: f3893a5e117c65f3c4d90d282bbb43624a2fec4144532e5c72223e69bd1b00e9
     dependencies:
@@ -410,11 +416,12 @@ direct_dependencies:
 - espressif/network_provisioning
 - espressif/qrcode
 - espressif/rmaker_common
+- espressif/usb
 - espressif/usb_host_cdc_acm
 - espressif/usb_host_ch34x_vcp
 - espressif/usb_host_cp210x_vcp
 - idf
 - joltwallet/littlefs
-manifest_hash: 4547f754dacaa852dfde4d11869ba301405f180f2902c988379fe33c26f66f1d
+manifest_hash: 2446279a54681ac65e1b6107c67273b8104d31c958c79626c370ba55a2cf99bf
 target: esp32s3
 version: 3.0.0

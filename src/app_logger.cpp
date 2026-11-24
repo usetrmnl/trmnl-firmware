@@ -3,6 +3,9 @@
 #include <api-client/submit_log.h>
 #include <app_logger.h>
 #include <config.h>
+#ifdef BOARD_TRMNL_X
+#include "connection_manager.h"
+#endif // BOARD_TRMNL_X
 #include <cstdarg>
 #include <cstdio>
 #include <globals.h>
@@ -54,8 +57,13 @@ static bool storeLogString(const char *log_buffer) {
 }
 
 void submitStoredLogs(void) {
-  if (WiFi.isConnected() == false) {
-    Log_info("WiFi not connected; not submitting stored logs.");
+#ifdef BOARD_TRMNL_X
+  bool connected = conn_mgr_is_ready();
+#else
+  bool connected = WiFi.isConnected();
+#endif
+  if (!connected) {
+    Log_info("Network not connected; not submitting stored logs.");
     return;
   }
   String log = storedLogs.gather_stored_logs();
@@ -86,8 +94,18 @@ void submitStoredLogs(void) {
 static DeviceStatusStamp getDeviceStatusStamp() {
   DeviceStatusStamp deviceStatus = {};
 
-  deviceStatus.wifi_rssi_level = WiFi.RSSI();
-  strncpy(deviceStatus.wifi_status, wifiStatusStr(WiFi.status()), sizeof(deviceStatus.wifi_status) - 1);
+#ifdef BOARD_TRMNL_X
+  bool on_ethernet = conn_mgr_is_eth();
+#else
+  bool on_ethernet = false;
+#endif
+  if (on_ethernet) {
+    deviceStatus.wifi_rssi_level = 0;
+    strncpy(deviceStatus.wifi_status, "ethernet", sizeof(deviceStatus.wifi_status) - 1);
+  } else {
+    deviceStatus.wifi_rssi_level = WiFi.RSSI();
+    strncpy(deviceStatus.wifi_status, wifiStatusStr(WiFi.status()), sizeof(deviceStatus.wifi_status) - 1);
+  }
   deviceStatus.refresh_rate = refreshInterval.seconds(0);
   deviceStatus.time_since_last_sleep = time_since_sleep;
   snprintf(deviceStatus.current_fw_version, sizeof(deviceStatus.current_fw_version), "%s", FW_VERSION_STRING);

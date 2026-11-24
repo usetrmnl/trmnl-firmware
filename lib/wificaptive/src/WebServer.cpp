@@ -110,6 +110,12 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
     request->send(200);
   });
 
+  server.on("/restart", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(200);
+    delay(100);
+    ESP.restart();
+  });
+
   server.on("/advanced", HTTP_GET, [&](AsyncWebServerRequest *request) { request->redirect("/#advanced"); });
   server.on("/run-test", HTTP_GET, [](AsyncWebServerRequest *request) {
     Log_info_serial("Running sensor test from web...");
@@ -124,6 +130,9 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
     doc["api_url"] = prefs.getString("api_url", "");
     doc["hostname"] = prefs.getString("hostname", "");
     doc["ntp_server"] = prefs.getString("ntp_server", "");
+#ifdef BOARD_TRMNL_X
+    doc["ethernet"] = prefs.getBool("eth_enabled", false);
+#endif
     prefs.end();
     doc["verbose_logging"] = read_verbose_logging();
     sendJson(request, 200, doc);
@@ -163,6 +172,17 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
         saveDeviceSetting("ntp_server", ntpServer);
         Log_info("WebServer: Saved NTP server: %s", ntpServer.c_str());
       }
+
+#ifdef BOARD_TRMNL_X
+      if (data["ethernet"].is<bool>()) {
+        bool enabled = data["ethernet"].as<bool>();
+        Preferences prefs;
+        prefs.begin("data", false);
+        prefs.putBool("eth_enabled", enabled);
+        prefs.end();
+        Log_info("WebServer: Saved Ethernet over USB: %s", enabled ? "on" : "off");
+      }
+#endif
 
       doc["saved"] = true;
       sendJson(request, 200, doc);

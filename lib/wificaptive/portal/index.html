@@ -853,7 +853,9 @@
         id: 'advanced',
         title: 'Advanced Settings',
         sub: 'Most people never need anything here.',
-        desc: 'Server, hostname, time, diagnostics, reset'
+        desc: function () {
+          return 'Server, hostname, time, ' + (hasEthernet() ? 'Ethernet, ' : '') + 'diagnostics, reset';
+        }
       },
       {
         id: 'server',
@@ -906,6 +908,13 @@
           hint: 'Leave empty to use time.google.com.',
           fallback: 'time.google.com'
         }
+      },
+      {
+        id: 'ethernet',
+        parent: 'advanced',
+        title: 'Ethernet over USB',
+        available: hasEthernet,
+        desc: function () { return deviceSettings.ethernet ? 'On' : 'Off'; }
       },
       {
         id: 'diagnostics',
@@ -979,6 +988,7 @@
         menu.innerHTML = '';
         PAGES.forEach(function (page) {
           if ((page.parent || '') !== parent) return;
+          if (page.available && !page.available()) return;
           var item = document.createElement('button');
           item.type = 'button';
           item.className = 'menu-item';
@@ -1459,7 +1469,31 @@
           if (page.setting) settingInput(page).value = deviceSettings[page.setting.key] || '';
         });
         $('verboseLogging').checked = !!deviceSettings.verbose_logging;
+        $('useEthernet').checked = !!deviceSettings.ethernet;
       }, function () { }).then(renderMenus);
+    }
+
+    function hasEthernet() {
+      return deviceSettings.ethernet !== undefined;
+    }
+
+    // Saved right away; the device only starts Ethernet on its next boot, hence Restart
+    function saveEthernet() {
+      var box = $('useEthernet');
+      var enabled = box.checked;
+      api('/settings', { ethernet: enabled }).then(function () {
+        deviceSettings.ethernet = enabled;
+        renderMenus();
+        pageMsg(enabled ? 'Ethernet enabled. Restart to apply.' : 'Ethernet disabled. Restart to apply.');
+      }, function () {
+        box.checked = !enabled;
+        pageMsg('Could not save the Ethernet setting. Please try again.', true);
+      });
+    }
+
+    function restartDevice() {
+      pageMsg('Your TRMNL is restarting. You can close this page.');
+      fetch('/restart').catch(function () { });
     }
 
     // Saves a setting page's field, then goes back to the menu, which shows the new value.
@@ -1809,6 +1843,20 @@
         <p class="hint">Saved right away. Detailed logs over USB, for troubleshooting.</p>
       </div>
       <div class="msg page-msg" role="status" hidden></div>
+    </div>
+
+    <div class="view" id="view-ethernet" hidden>
+      <div class="adv-sec">
+        <label class="switch">
+          <input type="checkbox" id="useEthernet" onchange="saveEthernet()">
+          Use a USB Ethernet adapter
+        </label>
+        <p class="hint">Saved right away. Takes effect after a restart. Supports RTL8152/RTL8153 adapters.</p>
+      </div>
+      <div class="actions">
+        <button class="btn btn-quiet" type="button" onclick="restartDevice()">Restart now</button>
+        <div class="msg page-msg" role="status" hidden></div>
+      </div>
     </div>
 
     <div class="view" id="view-reset" hidden>

@@ -11,6 +11,7 @@
 
 #ifdef BOARD_TRMNL_X
 #include <WifiCaptive.h>
+#include <connection_manager.h>
 #include <globals.h>
 #include <modem.h>
 #endif
@@ -113,7 +114,12 @@ bool FirmwareUpdateService::performFirmwareUpdate() {
   withHttp(_firmwareUrl, [&](HTTPClient *https, HttpError errorCode) -> bool {
     if (errorCode != HttpError::HTTPCLIENT_SUCCESS || !https) {
       Log_fatal("%s [%d]: Unable to connect for firmware update\r\n", __FILE__, __LINE__);
-      _failureMessage = WiFi.RSSI() > _wifiConnectionRssiThreshold ? API_FIRMWARE_UPDATE_ERROR : WIFI_WEAK;
+#ifdef BOARD_TRMNL_X
+      bool hasSignal = conn_mgr_is_eth() || WiFi.RSSI() > _wifiConnectionRssiThreshold;
+#else
+      bool hasSignal = WiFi.RSSI() > _wifiConnectionRssiThreshold;
+#endif
+      _failureMessage = hasSignal ? API_FIRMWARE_UPDATE_ERROR : WIFI_WEAK;
       return false;
     }
 
