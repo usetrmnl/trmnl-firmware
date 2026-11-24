@@ -95,20 +95,17 @@ static DeviceStatusStamp getDeviceStatusStamp() {
   DeviceStatusStamp deviceStatus = {};
 
 #ifdef BOARD_TRMNL_X
-  if (conn_mgr_is_eth()) {
+  bool on_ethernet = conn_mgr_is_eth();
+#else
+  bool on_ethernet = false;
+#endif
+  if (on_ethernet) {
     deviceStatus.wifi_rssi_level = 0;
     strncpy(deviceStatus.wifi_status, "ethernet", sizeof(deviceStatus.wifi_status) - 1);
-  } else if (conn_mgr_is_wifi()) {
+  } else {
     deviceStatus.wifi_rssi_level = WiFi.RSSI();
     strncpy(deviceStatus.wifi_status, wifiStatusStr(WiFi.status()), sizeof(deviceStatus.wifi_status) - 1);
-  } else {
-    deviceStatus.wifi_rssi_level = 0;
-    strncpy(deviceStatus.wifi_status, "none", sizeof(deviceStatus.wifi_status) - 1);
   }
-#else
-  deviceStatus.wifi_rssi_level = WiFi.RSSI();
-  strncpy(deviceStatus.wifi_status, wifiStatusStr(WiFi.status()), sizeof(deviceStatus.wifi_status) - 1);
-#endif
   deviceStatus.refresh_rate = refreshInterval.seconds(0);
   deviceStatus.time_since_last_sleep = time_since_sleep;
   snprintf(deviceStatus.current_fw_version, sizeof(deviceStatus.current_fw_version), "%s", FW_VERSION_STRING);
