@@ -136,7 +136,7 @@
 
 #define API_BASE_URL                       "https://trmnl.app"
 #define MODEM_FW_VERSION                   "1.0.1" // modem firmware this release is built for
-#define MODEM_FW_BASE_URL                  "http://192.168.50.161:8080/modem" // image: <base>/<version>.bin
+#define MODEM_FW_BASE_URL                  "https://fw.trmnl.com/trmnl_x/modem-dev" // image: <base>/<version>.bin
 
 // Abort an image download when the stream goes this long with no data.
 #define IMAGE_STREAM_INACTIVITY_TIMEOUT_MS 30000
