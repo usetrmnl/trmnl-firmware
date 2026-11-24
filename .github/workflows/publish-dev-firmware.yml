@@ -60,7 +60,7 @@ jobs:
 
       - name: Write latest.json
         run: |
-          BASE_URL="https://trmnl-fw.s3.us-east-2.amazonaws.com/${{ matrix.folder }}/dev"
+          BASE_URL="https://fw.trmnl.com/${{ matrix.folder }}/dev"
           jq -n \
             --arg version "$VERSION" \
             --arg commit "$COMMIT" \
@@ -89,7 +89,7 @@ jobs:
 
       - name: Upload to S3
         run: |
-          DEST="s3://trmnl-fw/${{ matrix.folder }}/dev"
+          DEST="s3://fw.trmnl.com/${{ matrix.folder }}/dev"
           aws s3 cp "$OTA_FILE" "${DEST}/${OTA_FILE}"
           aws s3 cp "$FLASH_FILE" "${DEST}/${FLASH_FILE}"
           aws s3 cp latest.json "${DEST}/latest.json" --content-type application/json --cache-control no-cache
@@ -108,10 +108,10 @@ jobs:
         run: |
           PREFIX="${{ matrix.folder }}/dev/"
           # Newest-first list of .bin keys (latest.json is left untouched).
-          aws s3api list-objects-v2 --bucket trmnl-fw --prefix "$PREFIX" \
+          aws s3api list-objects-v2 --bucket fw.trmnl.com --prefix "$PREFIX" \
             --query "reverse(sort_by(Contents[?ends_with(Key, '.bin')], &LastModified))[].Key" \
             --output text | tr '\t' '\n' | tail -n +51 | while read -r key; do
               [ -z "$key" ] && continue
               echo "Deleting old firmware: $key"
-              aws s3 rm "s3://trmnl-fw/${key}"
+              aws s3 rm "s3://fw.trmnl.com/${key}"
             done

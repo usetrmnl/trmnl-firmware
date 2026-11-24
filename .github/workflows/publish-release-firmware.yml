@@ -89,8 +89,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  S3_BUCKET: trmnl-fw
-  S3_BASE_URL: https://trmnl-fw.s3.us-east-2.amazonaws.com
+  S3_BUCKET: fw.trmnl.com
+  S3_BASE_URL: https://fw.trmnl.com
 
 jobs:
   select:
