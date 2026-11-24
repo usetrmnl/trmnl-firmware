@@ -853,7 +853,9 @@
         id: 'advanced',
         title: 'Advanced Settings',
         sub: 'Most people never need anything here.',
-        desc: 'Server, hostname, time, Ethernet, diagnostics, reset'
+        desc: function () {
+          return 'Server, hostname, time, ' + (hasEthernet() ? 'Ethernet, ' : '') + 'diagnostics, reset';
+        }
       },
       {
         id: 'server',
@@ -911,7 +913,8 @@
         id: 'ethernet',
         parent: 'advanced',
         title: 'Ethernet over USB',
-        desc: function () { return ethernetEnabled ? 'On' : 'Off'; }
+        available: hasEthernet,
+        desc: function () { return deviceSettings.ethernet ? 'On' : 'Off'; }
       },
       {
         id: 'diagnostics',
@@ -931,7 +934,6 @@
     var saved = [], savedLoaded = false, maxSaved = 5; // GET /saved-networks
     var scanned = [];                                   // GET /scan
     var deviceSettings = {};                            // GET /device-settings
-    var ethernetEnabled = false;                        // GET /get-ethernet
 
     // ---- Helpers -------------------------------------------------------------
     function $(id) {
@@ -986,6 +988,7 @@
         menu.innerHTML = '';
         PAGES.forEach(function (page) {
           if ((page.parent || '') !== parent) return;
+          if (page.available && !page.available()) return;
           var item = document.createElement('button');
           item.type = 'button';
           item.className = 'menu-item';
@@ -1466,22 +1469,20 @@
           if (page.setting) settingInput(page).value = deviceSettings[page.setting.key] || '';
         });
         $('verboseLogging').checked = !!deviceSettings.verbose_logging;
+        $('useEthernet').checked = !!deviceSettings.ethernet;
       }, function () { }).then(renderMenus);
     }
 
-    function loadEthernet() {
-      return api('/get-ethernet').then(function (data) {
-        ethernetEnabled = !!(data && data.enabled);
-        $('useEthernet').checked = ethernetEnabled;
-      }, function () { }).then(renderMenus);
+    function hasEthernet() {
+      return deviceSettings.ethernet !== undefined;
     }
 
     // Saved right away; the device only starts Ethernet on its next boot, hence Restart
     function saveEthernet() {
       var box = $('useEthernet');
       var enabled = box.checked;
-      api('/set-ethernet?enabled=' + (enabled ? '1' : '0')).then(function () {
-        ethernetEnabled = enabled;
+      api('/settings', { ethernet: enabled }).then(function () {
+        deviceSettings.ethernet = enabled;
         renderMenus();
         pageMsg(enabled ? 'Ethernet enabled. Restart to apply.' : 'Ethernet disabled. Restart to apply.');
       }, function () {
@@ -1637,7 +1638,6 @@
       showView();
       loadSaved();
       loadSettings();
-      loadEthernet();
       pollConnectionStatus(isEnterpriseForm(), true);
       setTimeout(getInfo, 500);
     });

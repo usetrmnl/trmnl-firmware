@@ -130,6 +130,9 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
     doc["api_url"] = prefs.getString("api_url", "");
     doc["hostname"] = prefs.getString("hostname", "");
     doc["ntp_server"] = prefs.getString("ntp_server", "");
+#ifdef BOARD_TRMNL_X
+    doc["ethernet"] = prefs.getBool("eth_enabled", false);
+#endif
     prefs.end();
     doc["verbose_logging"] = read_verbose_logging();
     sendJson(request, 200, doc);
@@ -169,6 +172,17 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
         saveDeviceSetting("ntp_server", ntpServer);
         Log_info("WebServer: Saved NTP server: %s", ntpServer.c_str());
       }
+
+#ifdef BOARD_TRMNL_X
+      if (data["ethernet"].is<bool>()) {
+        bool enabled = data["ethernet"].as<bool>();
+        Preferences prefs;
+        prefs.begin("data", false);
+        prefs.putBool("eth_enabled", enabled);
+        prefs.end();
+        Log_info("WebServer: Saved Ethernet over USB: %s", enabled ? "on" : "off");
+      }
+#endif
 
       doc["saved"] = true;
       sendJson(request, 200, doc);
@@ -211,23 +225,6 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
   server.on("/exit", HTTP_POST, [callbacks](AsyncWebServerRequest *request) {
     bool exiting = callbacks.requestExit();
     request->send(exiting ? 200 : 409, "application/json", exiting ? "{\"exiting\":true}" : "{\"exiting\":false}");
-  });
-
-  server.on("/get-ethernet", HTTP_GET, [](AsyncWebServerRequest *request) {
-    Preferences prefs;
-    prefs.begin("data", true);
-    bool enabled = prefs.getBool("eth_enabled", false);
-    prefs.end();
-    request->send(200, "application/json", enabled ? "{\"enabled\":true}" : "{\"enabled\":false}");
-  });
-
-  server.on("/set-ethernet", HTTP_GET, [](AsyncWebServerRequest *request) {
-    bool enabled = request->hasParam("enabled") && request->getParam("enabled")->value() == "1";
-    Preferences prefs;
-    prefs.begin("data", false);
-    prefs.putBool("eth_enabled", enabled);
-    prefs.end();
-    request->send(200, "application/json", enabled ? "{\"enabled\":true}" : "{\"enabled\":false}");
   });
 
   server.on("/connection-status", HTTP_GET, [callbacks](AsyncWebServerRequest *request) {
