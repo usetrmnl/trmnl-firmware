@@ -4,6 +4,7 @@
 #include <ArduinoJson.h>
 
 #include "hardware_types.h"
+#include "reveal.h"
 #include "special_function.h"
 #include "trmnl_log.h"
 
@@ -39,6 +40,7 @@ struct ApiDisplayResponse {
   SPECIAL_FUNCTION special_function;
   String action;
   String verbose_logging;
+  RevealTiming reveal;
 };
 
 struct ApiDisplayInputs {

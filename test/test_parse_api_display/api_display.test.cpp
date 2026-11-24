@@ -68,6 +68,21 @@ void test_parseResponse_apiDisplay_treats_unknown_sf_as_none(void) {
   TEST_ASSERT_EQUAL(parsed.special_function, SPECIAL_FUNCTION::SF_NONE);
 }
 
+void test_parseResponse_apiDisplay_reads_the_reveal_timing(void) {
+  String input = "{\"status\":0,\"reveal\":{\"refresh\":\"smooth\",\"stagger_ms\":200,\"appear_effect\":\"appear\","
+                 "\"appear_ms\":0,\"wipe_ms\":600,\"max_total_ms\":2400}}";
+
+  auto parsed = parseResponse_apiDisplay(input);
+  TEST_ASSERT_TRUE(parsed.reveal.enabled);
+  TEST_ASSERT_EQUAL(600, parsed.reveal.wipe_ms);
+}
+
+void test_parseResponse_apiDisplay_has_no_reveal_when_the_server_sends_none(void) {
+  String input = "{\"status\":0}";
+
+  TEST_ASSERT_FALSE(parseResponse_apiDisplay(input).reveal.enabled);
+}
+
 void setUp(void) {
   // set stuff up here
 }
@@ -82,6 +97,8 @@ void process() {
   RUN_TEST(test_parseResponse_apiDisplay_deserializationError);
   RUN_TEST(test_parseResponse_apiDisplay_treats_unknown_sf_as_none);
   RUN_TEST(test_parseResponse_apiDisplay_missing_fields);
+  RUN_TEST(test_parseResponse_apiDisplay_reads_the_reveal_timing);
+  RUN_TEST(test_parseResponse_apiDisplay_has_no_reveal_when_the_server_sends_none);
   UNITY_END();
 }
 

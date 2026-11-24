@@ -15,6 +15,7 @@
 #include <power.h>
 #include <preferences_persistence.h>
 #include <refresh_interval.h>
+#include <reveal_x.h>
 
 #include "battery.h"
 #include "config.h"
@@ -465,11 +466,15 @@ static bool refresh_epaper(int iRefreshMode, bool bWait, bool bAlloc) {
   return true;
 }
 #else
+void display_use_gray_matrix(void) {
+  int rc = bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
+  Log_info("%s [%d]: setCustomMatrix returned %d\r\n", __FILE__, __LINE__, rc);
+}
+
 // Pushes the drawn image to the panel with the right clearing passes
 static void refresh_fastepd(bool bSkipClear) {
   {
-    int rc = bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
-    Log_info("%s [%d]: setCustomMatrix returned %d\r\n", __FILE__, __LINE__, rc);
+    display_use_gray_matrix();
 
  //   if (bbep.getPreviousMode() != BB_MODE_NONE && (bbep.getMode() == BB_MODE_1BPP || bbep.getMode() ==
  //   BB_MODE_2BPP)) {
@@ -495,7 +500,7 @@ static void refresh_fastepd(bool bSkipClear) {
  * @param image_buffer pointer to the uint8_t image buffer
  * @return none
  */
-void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool bSkipClear) {
+void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool bSkipClear, bool bTransition) {
   int iRefreshMode;
   bool bAlloc;
 
@@ -512,7 +517,8 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
     return;
   }
 #else
-  refresh_fastepd(bSkipClear);
+  const RevealPlayOutcome reveal = bTransition ? reveal_x_play(image_buffer, data_size) : REVEAL_NOT_PLAYED;
+  if (reveal != REVEAL_PANEL_SHOWS_IMAGE) refresh_fastepd(bSkipClear);
 #endif
   iUpdateCount++;
   Log_info("display_show_image end");

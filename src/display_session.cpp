@@ -626,7 +626,7 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
     char szTemp[36];
     filesystem_fix_filename(apiDisplayResult.response.filename.c_str(), szTemp);
     Log.info("%s [%d]: Decoding %s\r\n", __FILE__, __LINE__, (isPNG) ? "png" : "jpeg");
-    display_show_image(buffer, content_size, true); // PNG and JPEG decoders leave the buffer intact
+    display_show_image(buffer, content_size, true, false, true); // PNG and JPEG decoders leave the buffer intact
     Log.info("%s [%d]: Writing %s to SPIFFS\r\n", __FILE__, __LINE__, szTemp);
     filesystem_purge_old_file(szTemp); // try to delete the old version or older than 24h
     writeImageToFile(szTemp, buffer, content_size);
