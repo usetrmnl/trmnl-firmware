@@ -21,7 +21,36 @@
 #include <vector>
 #endif
 
-void wifiSessionInit(void) { WifiCaptivePortal.setHostname(getWifiClientHostname()); }
+#ifdef BOARD_TRMNL_X
+static void trackWifiReady(WiFiEvent_t event, WiFiEventInfo_t info) {
+  switch (event) {
+  case ARDUINO_EVENT_WIFI_STA_GOT_IP:
+    conn_mgr_mark_ready(CONNECTION_INTERFACE_WIFI);
+    conn_mgr_update_default_route();
+    break;
+  case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
+  case ARDUINO_EVENT_WIFI_STA_LOST_IP:
+  case ARDUINO_EVENT_WIFI_STA_STOP:
+    conn_mgr_mark_lost(CONNECTION_INTERFACE_WIFI);
+    break;
+  default:
+    break;
+  }
+}
+
+static void syncWifiReady(void) {
+  if (!WiFi.isConnected()) return;
+  conn_mgr_mark_ready(CONNECTION_INTERFACE_WIFI);
+  conn_mgr_update_default_route();
+}
+#endif
+
+void wifiSessionInit(void) {
+  WifiCaptivePortal.setHostname(getWifiClientHostname());
+#ifdef BOARD_TRMNL_X
+  WiFi.onEvent(trackWifiReady);
+#endif
+}
 
 #ifdef BOARD_TRMNL_X
 static bool wifiSessionModemNeeded(void) {
@@ -121,8 +150,7 @@ void wifiSessionConnect(bool should_show_error_now) {
       Log.info("%s [%d]:wifi_connection [DEBUG]: Connected: %s\r\n", __FILE__, __LINE__, ip.c_str());
       preferences.putInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT, 1);
 #ifdef BOARD_TRMNL_X
-      conn_mgr_mark_ready(CONNECTION_INTERFACE_WIFI);
-      conn_mgr_update_default_route();
+      syncWifiReady();
 #endif
     } else {
       if (should_show_error_now) {
@@ -176,8 +204,7 @@ void wifiSessionConnect(bool should_show_error_now) {
       wifiErrorDeepSleep();
     }
 #ifdef BOARD_TRMNL_X
-    conn_mgr_mark_ready(CONNECTION_INTERFACE_WIFI);
-    conn_mgr_update_default_route();
+    syncWifiReady();
 #endif
     Log.info("%s [%d]: WiFi connected\r\n", __FILE__, __LINE__);
     preferences.putInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT, 1);

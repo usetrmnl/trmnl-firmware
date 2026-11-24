@@ -617,7 +617,7 @@ https_request_err_e downloadAndShow(float batteryVoltage) {
     Log.info("Received successfully; staying awake for touch bar taps");
   } else {
 #ifdef BOARD_TRMNL_X
-    if (conn_mgr_is_wifi()) {
+    if (!conn_mgr_is_eth()) {
       WiFi.disconnect(true); // no need for WiFi, save power starting here
       conn_mgr_mark_lost(CONNECTION_INTERFACE_WIFI);
     }

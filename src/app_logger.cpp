@@ -58,11 +58,14 @@ static bool storeLogString(const char *log_buffer) {
 
 void submitStoredLogs(void) {
 #ifdef BOARD_TRMNL_X
-  if (!conn_mgr_is_ready()) {
+  bool connected = conn_mgr_is_ready();
+#else
+  bool connected = WiFi.isConnected();
+#endif
+  if (!connected) {
     Log_info("Network not connected; not submitting stored logs.");
     return;
   }
-#endif
   String log = storedLogs.gather_stored_logs();
 
   String api_key = "";
