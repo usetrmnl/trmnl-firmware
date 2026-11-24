@@ -12,6 +12,7 @@
 #include "logo_medium.h"
 #include "message_screens.h"
 #include "modem.h"
+#include "panel_power_check.h"
 
 // TRMNL X setup (quite different from OG)
 void setup() {
@@ -53,6 +54,12 @@ void setup() {
         }
       } else {
         Serial.println("[MODEM] Already flashed, skipping...");
+      }
+      bool panelPowerPassed = checkPanelPower();
+      Serial.printf("[PANEL] Power check %s\n", panelPowerPassed ? "passed" : "FAILED");
+      if (!panelPowerPassed) {
+        display_sleep();
+        esp_deep_sleep_start(); // never ships; a reset runs the check again
       }
       // enableShipmentMode() will block until charger is connected
       enableShipmentMode();

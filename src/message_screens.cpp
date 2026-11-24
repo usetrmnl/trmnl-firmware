@@ -35,6 +35,17 @@ static void draw_modem_flashing_message(void) {
   draw_centered_line(string1, 430);
 }
 
+static void draw_panel_power_checking_message(void) {
+  draw_centered_line("Checking panel power...", 430);
+  draw_centered_line("This takes about 1 minute.", 500);
+  draw_centered_line("Still here after 3 minutes: the unit FAILED.", 570);
+}
+
+static void draw_panel_power_result_message(const char *message_text) {
+  draw_centered_line("Panel power check", 430);
+  if (message_text) draw_centered_line(message_text, 500);
+}
+
 static void draw_modem_flash_failed_message(const char *message_text) {
   const char string1[] = "Failed to flash modem firmware.";
   draw_centered_line(string1, 430);
@@ -472,6 +483,12 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, const char *messa
     break;
   case MODEM_FLASH_FAILED:
     draw_modem_flash_failed_message(message_text);
+    break;
+  case PANEL_POWER_CHECKING:
+    draw_panel_power_checking_message();
+    break;
+  case PANEL_POWER_RESULT:
+    draw_panel_power_result_message(message_text);
     break;
   case READY_TO_SHIP:
     draw_ready_to_ship_message();
