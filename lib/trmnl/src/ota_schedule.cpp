@@ -1,10 +1,12 @@
 #include <ota_schedule.h>
 
-bool otaAttemptDue(uint32_t now, uint32_t lastOta) {
-  if (lastOta == 0) return true;
+bool retryDue(uint32_t now, uint32_t lastAttempt, uint32_t interval) {
+  if (lastAttempt == 0) return true;
   if (now == 0) return false;
-  return (now - lastOta) >= OTA_RETRY_INTERVAL_SECONDS;
+  return (now - lastAttempt) >= interval;
 }
+
+bool otaAttemptDue(uint32_t now, uint32_t lastOta) { return retryDue(now, lastOta, OTA_RETRY_INTERVAL_SECONDS); }
 
 uint32_t otaLastAttempt(Persistence &persistence) { return persistence.readUint(OTA_LAST_ATTEMPT_KEY, 0); }
 

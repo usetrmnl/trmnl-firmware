@@ -105,7 +105,7 @@ String Modem::readResponse(unsigned long timeout) {
   return response;
 }
 
-bool Modem::flashFromFile(const char* filename, String& errorOut) {
+bool Modem::flashFromFile(const char* filename, String& errorOut, void (*progressCb)(int percent)) {
   Serial.printf("[MODEM] Starting modem flash from: %s\n", filename);
 
   // Step 1: Open and validate firmware file
@@ -248,6 +248,7 @@ bool Modem::flashFromFile(const char* filename, String& errorOut) {
       Serial.printf("[FLASH] Progress: %u/%u blocks (%.1f%%) - %u/%u bytes\n",
                     blockNum + 1, totalBlocks, progressPercent, bytesWritten, firmwareSize);
       lastProgressBlock = blockNum;
+      if (progressCb) progressCb((int)progressPercent);
     }
   }
 
@@ -959,6 +960,31 @@ String Modem::getMacAddress() {
   String mac = resp.substring(start, end);
   Log_info_serial("[MODEM] MAC: %s", mac.c_str());
   return mac;
+}
+// ---------------------------------------------------------------------------
+// getFirmwareVersion(): AT+FWVER?: version of the modem firmware, empty if not supported
+// ---------------------------------------------------------------------------
+String Modem::getFirmwareVersion() {
+  while (ModemSerial.available()) ModemSerial.read();  // flush
+
+  sendCommand("AT+FWVER?");
+  String resp = waitForResponse("OK", 3000);
+
+  // Response: +FWVER:"1.2.3", then OK  (old firmware answers ERROR)
+  int idx = resp.indexOf("+FWVER:\"");
+  if (idx < 0) {
+    Serial.println("[MODEM] getFirmwareVersion: not supported");
+    return "";
+  }
+  int start = idx + 8;
+  int end   = resp.indexOf('"', start);
+  if (end < 0) {
+    Serial.println("[MODEM] getFirmwareVersion: closing quote not found");
+    return "";
+  }
+  String version = resp.substring(start, end);
+  Serial.printf("[MODEM] firmware version: %s\n", version.c_str());
+  return version;
 }
 // ---------------------------------------------------------------------------
 // getSignalRssi(): AT+CWJAP? — RSSI (dBm) of the joined AP, 0 if not connected
