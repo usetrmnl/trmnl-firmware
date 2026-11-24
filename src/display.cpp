@@ -17,6 +17,7 @@
 
 #include "battery.h"
 #include "config.h"
+#include "displayed_image.h"
 #include "messages.h"
 #ifdef PARALLEL_EPD
 FASTEPD bbep;
@@ -456,6 +457,9 @@ static bool refresh_epaper(int iRefreshMode, bool bWait, bool bAlloc) {
 }
 #else
 // Pushes the drawn image to the panel with the right clearing passes
+// Power good came after 33 ms on our desk TRMNL X
+static const uint32_t SLOW_POWER_ON_MS = 200;
+
 static void refresh_fastepd(bool bSkipClear) {
   {
     int rc = bbep.setCustomMatrix(u8_graytable, sizeof(u8_graytable));
@@ -474,8 +478,15 @@ static void refresh_fastepd(bool bSkipClear) {
                      : ((iUpdateCount & 7) == 0 || (iTempProfile > 0)) ? CLEAR_SLOW
                                                                        : CLEAR_FAST;
     Log_info("fullUpdate clear mode = %d\n", iClearMode);
-    rc = bbep.fullUpdate(iClearMode, false);
+    uint32_t power_on_start_ms = millis();
+    rc = bbep.einkPower(1);
+    uint32_t power_on_ms = millis() - power_on_start_ms;
+    if (rc != BBEP_SUCCESS || power_on_ms > SLOW_POWER_ON_MS) {
+      Log_info("einkPower rc %d in %" PRIu32 " ms", rc, power_on_ms);
+    }
+    if (rc == BBEP_SUCCESS) rc = bbep.fullUpdate(iClearMode, false);
     if (rc != BBEP_SUCCESS) {
+      DisplayedImage::fail(); // redraw on the next wake
       Log_error("FastEPD reported error %d; potentially a hardware fault", rc);
     }
     //   }
@@ -505,6 +516,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
     return;
   }
 #else
+  if (apiDisplayResult.received) bbep.setPowerGoodTimeout(apiDisplayResult.response.power_good_timeout);
   refresh_fastepd(bSkipClear);
 #endif
   iUpdateCount++;

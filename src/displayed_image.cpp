@@ -8,13 +8,17 @@ namespace DisplayedImage {
     // SPIFFS path of the image currently on the display
   RTC_DATA_ATTR static char szPrevFile[36] = {0};
   RTC_DATA_ATTR static bool covered = false;
+  RTC_DATA_ATTR static bool draw_failed = false;
 
     // filename must already be a 32-byte fixed SPIFFS path (see Storage::fix_file_name)
   void remember(const char *filename) {
     strncpy(szPrevFile, filename, sizeof(szPrevFile) - 1);
     szPrevFile[sizeof(szPrevFile) - 1] = '\0';
-    covered = false;
+    covered = draw_failed;
+    draw_failed = false;
   }
+
+  void fail() { draw_failed = true; }
 
   void cover() { covered = true; }
 

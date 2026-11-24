@@ -68,6 +68,18 @@ void test_parseResponse_apiDisplay_treats_unknown_sf_as_none(void) {
   TEST_ASSERT_EQUAL(parsed.special_function, SPECIAL_FUNCTION::SF_NONE);
 }
 
+void test_parseResponse_apiDisplay_reads_power_good_timeout(void) {
+  String input = "{\"status\":200,\"power_good_timeout\":7500}";
+
+  TEST_ASSERT_EQUAL_UINT32(7500, parseResponse_apiDisplay(input).power_good_timeout);
+}
+
+void test_parseResponse_apiDisplay_power_good_timeout_defaults_to_zero(void) {
+  String input = "{\"status\":200}";
+
+  TEST_ASSERT_EQUAL_UINT32(0, parseResponse_apiDisplay(input).power_good_timeout);
+}
+
 void setUp(void) {
   // set stuff up here
 }
@@ -82,6 +94,8 @@ void process() {
   RUN_TEST(test_parseResponse_apiDisplay_deserializationError);
   RUN_TEST(test_parseResponse_apiDisplay_treats_unknown_sf_as_none);
   RUN_TEST(test_parseResponse_apiDisplay_missing_fields);
+  RUN_TEST(test_parseResponse_apiDisplay_reads_power_good_timeout);
+  RUN_TEST(test_parseResponse_apiDisplay_power_good_timeout_defaults_to_zero);
   UNITY_END();
 }
 

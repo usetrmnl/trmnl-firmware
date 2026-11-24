@@ -4,6 +4,7 @@
 // so the next wakeup can skip repainting when the server re-serves it.
 namespace DisplayedImage {
   void remember(const char *filename);
+  void fail(); // the draw failed: the next remember() keeps the screen covered
   void cover(); // the loading screen is over it: exists() and matches() are false until the next remember()
   bool exists();
   bool matches(const char *filename);
