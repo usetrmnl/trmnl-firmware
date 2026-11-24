@@ -3,7 +3,7 @@
 
 #include "sdkconfig.h"
 
-#ifdef CONFIG_SOC_USB_OTG_SUPPORTED
+#ifdef BOARD_TRMNL_X
 
 #include "trmnl_log.h"
 #include "esp_netif.h"
@@ -109,11 +109,11 @@ void ethernet_start(void)
     Log_info("CDC-ECM driver initialized, waiting for dongle...");
 }
 
-#else  // !CONFIG_SOC_USB_OTG_SUPPORTED
+#else  // !BOARD_TRMNL_X
 
 void ethernet_start(void) {}
 bool ethernet_is_link_up(void) { return false; }
 bool ethernet_is_connected(void) { return false; }
 bool ethernet_get_mac(uint8_t /*mac*/[6]) { return false; }
 
-#endif  // CONFIG_SOC_USB_OTG_SUPPORTED
+#endif  // BOARD_TRMNL_X
