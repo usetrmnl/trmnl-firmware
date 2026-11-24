@@ -258,12 +258,16 @@ void display_wipe(void) {
   }
   bbep.sleep((bbep.capabilities() & BBEP_4COLOR) ? DEEP_SLEEP : LIGHT_SLEEP);
 #else
+  int rc = BBEP_SUCCESS;
   bbep.setMode(BB_MODE_1BPP);
   bbep.fillScreen(BBEP_WHITE);
-  for (int i = 0; i < 100; i++) { // 200 black/white cycles should remove any ghosting
-    bbep.fullUpdate(CLEAR_SLOW, true);
+  for (int i = 0; i < 100 && rc == BBEP_SUCCESS; i++) { // 200 black/white cycles should remove any ghosting
+    rc = bbep.fullUpdate(CLEAR_SLOW, true);
   }
   bbep.einkPower(0); // power off the display
+  if (rc != BBEP_SUCCESS) {
+    Log_error("FastEPD reported error %d; potentially a hardware fault", rc);
+  }
 #endif
 } /* display_wipe() */
 
@@ -307,7 +311,10 @@ void display_reset(void) {
     Log_error("display_reset: e-paper update failed");
   }
 #else
-  bbep.fullUpdate();
+  int rc = bbep.fullUpdate();
+  if (rc != BBEP_SUCCESS) {
+    Log_error("FastEPD reported error %d; potentially a hardware fault", rc);
+  }
 #endif
   Log_info("e-Paper Clear end");
     // DEV_Delay_ms(500);
@@ -484,7 +491,10 @@ static void refresh_fastepd(bool bSkipClear) {
                      : ((iUpdateCount & 7) == 0 || (iTempProfile > 0)) ? CLEAR_SLOW
                                                                        : CLEAR_FAST;
     Log_info("fullUpdate clear mode = %d\n", iClearMode);
-    bbep.fullUpdate(iClearMode, false);
+    rc = bbep.fullUpdate(iClearMode, false);
+    if (rc != BBEP_SUCCESS) {
+      Log_error("FastEPD reported error %d; potentially a hardware fault", rc);
+    }
     //   }
   }
 }
