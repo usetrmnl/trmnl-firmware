@@ -14,6 +14,8 @@
 #include <wifi_session.h>
 
 #ifdef BOARD_TRMNL_X
+#include <WifiCaptive.h>
+#include <panel_power_check.h>
 #include <touchbar_actions.h>
 #endif
 
@@ -44,6 +46,15 @@ void bl_init(void) {
   startBoardHardware(wake, init_time);
   if (wake.reason != ESP_SLEEP_WAKEUP_TIMER) showWakeLogo();
   logVersions();
+#ifdef BOARD_TRMNL_X
+  // Warehouse and returns: power on or reset the X near this network (by default the OG QA's
+  // network). Not after a software restart, such as the one after every update.
+  if (esp_reset_reason() == ESP_RST_POWERON && findNetwork(QA_NETWORK_SSID)) {
+    checkPanelPower();
+    display_sleep();
+    goToSleep();
+  }
+#endif
 
   wifiSessionConnect(wake.showErrorsNow);
   updateTimeSinceSleep();
