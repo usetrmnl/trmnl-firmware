@@ -35,6 +35,7 @@ struct ApiDisplayResponse {
   String firmware_url;
   uint64_t refresh_rate;
   uint32_t temp_profile;
+  bool missing_clock_fix; // TRMNL X: drive the right edge columns (FastEPD BB_PANEL_FLAG_MISSING_CLOCK)
   bool reset_firmware;
   SPECIAL_FUNCTION special_function;
   String action;

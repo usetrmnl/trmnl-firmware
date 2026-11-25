@@ -63,6 +63,8 @@ const uint8_t u8_graytable[] = {
 #include "bmp.h"
 #include "png_flip.h"
 
+static bool bMissingClockFix = false; // saved from the server; used where FastEPD has the clock fix (TRMNL X)
+
 #ifdef BB_EPAPER
 static uint8_t bLightSleepWanted = 0;
 
@@ -140,6 +142,8 @@ void display_init(void) {
   Log_info("dev module start");
   iTempProfile = preferences.getUInt(PREFERENCES_TEMP_PROFILE, TEMP_PROFILE_DEFAULT);
   Log_info("Saved temperature profile: %" PRIu32, iTempProfile);
+  bMissingClockFix = preferences.getBool(PREFERENCES_MISSING_CLOCK_FIX, false);
+  Log_info("Missing clock fix: %s", bMissingClockFix ? "on" : "off");
 #ifdef BB_EPAPER
   Log_info("BB e-Paper init");
 #ifdef WAVESHARE_PHOTOPAINTER
@@ -206,7 +210,12 @@ void display_init(void) {
                   EPD_VCC_EN);
   bbep.setPanelSize(BBEP_DISPLAY_ED103TC2);
 #else // normal parallel eink devices
+#ifdef BB_PANEL_FLAG_MISSING_CLOCK
+  // The clock fix washed out some X screens (FastEPD cee828c), so the server turns it on per device
+  bbep.initPanel(pDevice->iBoardType, 0, bMissingClockFix ? 0 : BB_PANEL_FLAG_MISSING_CLOCK);
+#else
   bbep.initPanel(pDevice->iBoardType);
+#endif
   if (pDevice->iPanelSize != BB_PANEL_NONE) {
     bbep.setPanelSize(pDevice->iPanelSize);
   }
@@ -410,6 +419,16 @@ static void save_temp_profile_from_api(void) {
   }
 }
 
+// Saves the missing clock fix setting the server asked for, when it changed; display_init uses it next wake
+static void save_missing_clock_fix_from_api(void) {
+  if (!apiDisplayResult.received) return;
+  if (bMissingClockFix != apiDisplayResult.response.missing_clock_fix) {
+    bMissingClockFix = apiDisplayResult.response.missing_clock_fix;
+    Log_info("Saving missing clock fix (%s) to FLASH", bMissingClockFix ? "on" : "off");
+    preferences.putBool(PREFERENCES_MISSING_CLOCK_FIX, bMissingClockFix);
+  }
+}
+
 #ifdef BB_EPAPER
 // Adjusts the image's refresh mode for the refresh count, the server's settings and the panel
 static int choose_refresh_mode(int iRefreshMode, bool *pWait) {
@@ -506,6 +525,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
   }
   Log_info("Display refresh start");
   save_temp_profile_from_api();
+  save_missing_clock_fix_from_api();
 #ifdef BB_EPAPER
   iRefreshMode = choose_refresh_mode(iRefreshMode, &bWait);
   if (!refresh_epaper(iRefreshMode, bWait, bAlloc)) {

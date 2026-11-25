@@ -168,4 +168,31 @@ RSpec.describe "TRMNL X images", env: "TRMNL_X" do
       end
     end
   end
+
+  # The server's missing_clock_fix setting is saved on a draw (save_missing_clock_fix_from_api) and
+  # passed to FastEPD's initPanel by display_init on the next wake (src/display.cpp).
+  describe "XMissingClockFix" do
+    it "is off until the server turns it on, then on from the next wake" do
+      level = levels(0, 255)
+      png = TrmnlSim::Images.png_image(level, w, h, bits: 8)
+      expected = TrmnlSim::Images.expected_gray(level, w, h, bits: 8)
+      show("clock_off.png", png, "image/png") do |s|
+        expect(s.preferences).not_to have_key("clock_fix")
+        url = dev.mock.set_file("/img/clock_on.png", "image/png", png)
+        dev.mock.display = { image_url: url, filename: "plugin-000002-1000", refresh_rate: 300,
+                             missing_clock_fix: true }
+        c = s.status["console_total"]
+        s.wake
+        s.wait(console: /Missing clock fix: off/, since: c, timeout: 15)
+        s.wait(console: /Saving missing clock fix \(on\)/, since: c, timeout: 30)
+        s.wait(state: "deep_sleep", timeout: 30, settle_ms: 300)
+        expect(s.preferences.fetch("clock_fix")).to eq("1")
+        c = s.status["console_total"]
+        s.wake
+        s.wait(console: /Missing clock fix: on/, since: c, timeout: 15)
+        s.wait(state: "deep_sleep", timeout: 30, settle_ms: 300)
+        expect(s).to show_image(expected, tolerance: 64, max_ratio: 0.001)
+      end
+    end
+  end
 end
