@@ -327,6 +327,16 @@ static void iqs323_publish_snapshot(void)
     g_touchbar_snapshot.last_updated_ms = millis();
 }
 
+void iqs323_task_read_counts(uint16_t counts[3], uint16_t lta[3])
+{
+    const bool locked = iqs323_mutex != NULL && xSemaphoreTake(iqs323_mutex, pdMS_TO_TICKS(50)) == pdTRUE;
+    for (uint8_t channel = 0; channel < 3; channel++) {
+        counts[channel] = iqs323.readChannelCounts((iqs323_channel_e)channel);
+        lta[channel] = iqs323.readChannelLTA((iqs323_channel_e)channel);
+    }
+    if (locked) xSemaphoreGive(iqs323_mutex);
+}
+
 void iqs323_task_read_snapshot(touchbar_snapshot_t *out)
 {
     if (out == NULL) {

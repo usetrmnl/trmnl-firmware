@@ -239,6 +239,26 @@ RSpec.describe "TRMNL X touch bar: tap mode", env: "TRMNL_X" do
       end
     end
 
+    # recalibrate_after_runaway_taps (src/touchbar_actions.cpp): more taps than a person makes mean the
+    # bar is touching itself, and a recalibration stops it, as a reset does. The error is stored for
+    # /api/log, which this X (on 5 GHz, through the modem) cannot send, so the console shows it.
+    it "recalibrates the touch bar on the 41st tap in an hour, and still takes taps" do
+      tapped_awake do |s, c|
+        40.times do |n|
+          expect(s.console(c).grep(/recalibrating/)).to be_empty, "not after #{n + 1} taps"
+          since = s.status["console_total"]
+          dev.mock.next_request("/api/display", timeout: 15) { s.touch("right", ms: 150) }
+          s.wait(console: /display_show_image end/, since:, timeout: 15)
+          s.wait(display_idle: true, settle_ms: 300, timeout: 15)
+        end
+        s.wait(console: /IQS323 Task: Reinit successful/, since: c, timeout: 15)
+        expect(s.console(c).grep(%r{^E: .*Touch bar: 41 taps in \d+ s - recalibrating. Counts/LTA: left \d+/\d+}).size)
+          .to eq(1)
+        dev.mock.next_request("/api/display", timeout: 15) { s.touch("right", ms: 150) }
+        s.wait(state: "deep_sleep", timeout: 30, settle_ms: 500)
+      end
+    end
+
     it "a timer wake doesn't stay awake" do
       boot_two_images do |s|
         c = s.status["console_total"]
