@@ -29,6 +29,7 @@
 #define PREFERENCES_FRIENDLY_ID_DEFAULT      ""
 #define PREFERENCES_HOSTNAME                 "hostname"
 #define PREFERENCES_TEMP_PROFILE             "temp_profile"
+#define PREFERENCES_MISSING_CLOCK_FIX        "clock_fix"
 #define PREFERENCES_LOG_KEY                  "log_"
 #define PREFERENCES_LOG_BUFFER_HEAD_KEY      "log_head"
 #define PREFERENCES_LOG_ID_KEY               "log_id"
