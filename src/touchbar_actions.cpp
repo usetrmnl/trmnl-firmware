@@ -4,6 +4,7 @@
 
 #include <config.h>
 #include <display.h>
+#include <esp_rtc_time.h>
 #include <esp_system.h>
 #include <globals.h>
 #include <status_screens.h>
@@ -153,9 +154,40 @@ static void touchbar_locked_wake(void) {
   show_last_image_and_sleep();
 }
 
+// More taps than a person makes: the bar is touching itself. A recalibration, as on a reset, stops it for a while.
+#define TOUCHBAR_RUNAWAY_TAPS     40
+#define TOUCHBAR_RUNAWAY_WINDOW_S 3600
+
+// RTC memory, so taps count across deep sleeps: when each of the last taps came, oldest at next_tap_slot
+RTC_DATA_ATTR static uint32_t recent_tap_times_s[TOUCHBAR_RUNAWAY_TAPS];
+RTC_DATA_ATTR static uint8_t next_tap_slot = 0;
+RTC_DATA_ATTR static uint8_t recorded_taps = 0; // up to TOUCHBAR_RUNAWAY_TAPS
+
+static void recalibrate_after_runaway_taps(void) {
+  const uint32_t now_s = esp_rtc_get_time_us() / 1000000;
+  const uint32_t oldest_s = recent_tap_times_s[next_tap_slot];
+  recent_tap_times_s[next_tap_slot] = now_s;
+  next_tap_slot = (next_tap_slot + 1) % TOUCHBAR_RUNAWAY_TAPS;
+  if (recorded_taps < TOUCHBAR_RUNAWAY_TAPS) {
+    recorded_taps++;
+    return;
+  }
+  // The RTC clock restarts on power-on: an older time from before it underflows and never counts
+  if (now_s - oldest_s >= TOUCHBAR_RUNAWAY_WINDOW_S) return;
+
+  uint16_t counts[3], lta[3];
+  iqs323_task_read_counts(counts, lta);
+  Log_error("Touch bar: %d taps in %u s - recalibrating. Counts/LTA: left %u/%u, middle %u/%u, right %u/%u",
+            TOUCHBAR_RUNAWAY_TAPS + 1, (unsigned)(now_s - oldest_s), counts[0], lta[0], counts[1], lta[1], counts[2],
+            lta[2]);
+  iqs323_task_reinit();
+  recorded_taps = 0;
+}
+
 // Single dispatch point for the resolved navigation intent. Returns false if the screen needs no
 // fetching: the menu closed, with the current image back up.
 static bool dispatch_touchbar_intent(const touchbar_resolution_t &resolved) {
+  if (resolved.intent != touchbar_intent_t::NONE) recalibrate_after_runaway_taps();
   if (resolved.intent != touchbar_intent_t::NONE && !menu_tutorial_done(touchbar_menu_controls)) {
     Log_info("Touch bar used before its tutorial - showing it");
     menu_open_tutorial(touchbar_menu_controls);

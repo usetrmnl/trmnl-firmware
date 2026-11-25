@@ -113,6 +113,9 @@ bool iqs323_task_prepare_sleep(uint32_t timeout_ms);
  */
 bool iqs323_task_reinit(void);
 
+// The last read counts and long-term averages (LTA) of channels 0-2. A touch is counts well below the LTA.
+void iqs323_task_read_counts(uint16_t counts[3], uint16_t lta[3]);
+
 /**
  * @brief Notify task that GPIO wakeup occurred
  *
