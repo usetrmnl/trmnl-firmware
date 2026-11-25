@@ -23,12 +23,15 @@ RSpec.describe "TRMNL X panel power check", env: "TRMNL_X" do
     end
   end
 
-  it "runs on a reset near the TRMNL_QA network, and sleeps with the result on screen" do
+  it "runs on a reset near the TRMNL_QA network, sleeps with the result on screen, then checks in on its timer" do
     dev.reset
     dev.boot(networks:) do |s|
       s.wait_for_console(/Panel power check PASS  slowest \d+ ms, 0 of 30 tries timed out/, timeout: 300)
-      s.wait(state: "deep_sleep", timeout: 60)
+      asleep = s.wait_for_deep_sleep(timeout: 60)
       expect(dev.mock.paths).not_to include("/api/display")
+      expect(asleep["wake_at_s"]).to be_within(15).of(asleep["sim_time_s"] + 300), "no timer wake armed"
+      request = dev.mock.next_request("/api/display", timeout: 60) { s.wake }
+      expect(request).to have_header("Update-Source", "timer")
     end
   end
 
