@@ -516,7 +516,9 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
     return;
   }
 #else
+#ifdef BOARD_TRMNL_X // the other FastEPD boards pin a FastEPD without setPowerGoodTimeout
   if (apiDisplayResult.received) bbep.setPowerGoodTimeout(apiDisplayResult.response.power_good_timeout);
+#endif
   refresh_fastepd(bSkipClear);
 #endif
   iUpdateCount++;
