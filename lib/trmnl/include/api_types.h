@@ -39,6 +39,7 @@ struct ApiDisplayResponse {
   SPECIAL_FUNCTION special_function;
   String action;
   String verbose_logging;
+  uint32_t power_good_timeout; // milliseconds FastEPD waits for panel power good; 0 = FastEPD default (1000)
 };
 
 struct ApiDisplayInputs {
