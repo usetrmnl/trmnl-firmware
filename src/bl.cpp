@@ -5,6 +5,7 @@
 #include <display.h>
 #include <display_session.h>
 #include <globals.h>
+#include <keep_wifi_on.h>
 #include <request_handling.h>
 #include <setup_session.h>
 #include <sleep_session.h>
@@ -55,6 +56,8 @@ void bl_init(void) {
   showScreen(wake.showErrorsNow);
 #ifdef BOARD_TRMNL_X
   touchbar_stay_awake([] { showScreen(true); });
+#else
+  stay_awake_while_server_asks([] { showScreen(true); });
 #endif
 
   // display go to sleep
