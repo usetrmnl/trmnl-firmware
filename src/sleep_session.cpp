@@ -23,6 +23,7 @@
 
 #ifdef BOARD_TRMNL_X
 #include <iqs323_task.h>
+#include <touchbar_actions.h>
 #include <touchbar_gesture.h>
 
 #include "esp_rtc_time.h"
@@ -116,7 +117,8 @@ static void enterSleep(bool keep_timer) {
   esp_deep_sleep_enable_gpio_wakeup(1 << pDevice->interrupt_pin, ESP_GPIO_WAKEUP_GPIO_LOW);
 #elif defined(CONFIG_IDF_TARGET_ESP32S3)
 #ifdef BOARD_TRMNL_X
-  esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
+  // A controller that did not start holds its ready line low, which would end the sleep at once
+  if (touchbar_started()) esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0);
 #else
   esp_sleep_enable_ext0_wakeup((gpio_num_t)pDevice->interrupt_pin, 0);
 #endif

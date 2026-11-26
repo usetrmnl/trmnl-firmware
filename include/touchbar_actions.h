@@ -18,6 +18,9 @@ void touchbar_log_wake_stub_status(void);
 // device if the task fails to start.
 void touchbar_start(esp_sleep_wakeup_cause_t wakeup_reason, bool gpio_wakeup);
 
+// False when the touch controller did not answer on this wake.
+bool touchbar_started(void);
+
 // Resolves the current navigation intent and dispatches it. Called once per wake. If that closes the
 // menu, waits for a tap to dispatch instead, and sleeps (does not return) if none comes or the menu
 // locked the touch bar. While locked, returns only when a refresh is due.
