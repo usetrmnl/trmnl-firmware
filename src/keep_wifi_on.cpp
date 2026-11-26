@@ -10,7 +10,10 @@ static void IRAM_ATTR latch_button_press(void) { button_pressed_while_awake = tr
 
 // The check-in after the wait reads as a timer wake, or as a button wake after a press, even one made during a check-in
 static void wait_awake_for_next_check_in(void) {
-  const uint32_t wait_ms = max<uint32_t>(apiDisplayResult.response.refresh_rate, 1) * 1000; // 0 would hammer the API
+  const ApiDisplayResponse &answer = apiDisplayResult.response;
+  // the floors stop a 0 from hammering the API
+  const uint32_t wait_ms =
+    answer.refresh_rate_ms ? max<uint32_t>(answer.refresh_rate_ms, 250) : max<uint32_t>(answer.refresh_rate, 1) * 1000;
   wakeup_reason = ESP_SLEEP_WAKEUP_TIMER;
   while (millis() - apiDisplayResult.received_ms < wait_ms) {
     if (button_pressed_while_awake) {
