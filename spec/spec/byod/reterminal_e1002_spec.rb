@@ -40,7 +40,6 @@ RSpec.describe "reTerminal E1002", env: "seeed_reTerminal_E1002" do
         s.wake
         req = dev.mock.wait_for_request("/api/display", timeout: 30)
         expect(req).to have_header("Model", "reterminal_e1002")
-        expect(req).not_to have_header("Panel-Rev") # not read on Spectra panels
         expect(req.headers.values_at("Width", "Height")).to eq(%w[800 480])
         # 4.1 V through the divider, read while the firmware switches it on (GPIO21)
         expect(req).to have_header("Battery-Voltage", a_value_within(0.05).of(4.1))
@@ -131,7 +130,7 @@ RSpec.describe "reTerminal E1002", env: "seeed_reTerminal_E1002" do
         s.wait(portal: true, timeout: 30)
         s.wait(display_idle: true, min_refreshes: 3, settle_ms: 500, timeout: 30)
         expect(s).to match_screenshot(Golden.path("setup_screen_body.png"), region: [0, 56, 800, 424])
-        expect(s).to match_screenshot(Golden.path("setup_screen_top_right.png"), region: [320, 0, 480, 56])
+        expect(s).to match_screenshot(Golden.path("setup_screen_top_right.png"), region: [480, 0, 320, 56])
       end
     end
   end

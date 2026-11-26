@@ -371,23 +371,23 @@ RSpec.describe "TRMNL X touch bar: tap mode", env: "TRMNL_X" do
     end
   end
 
-  describe "WifiResetConfirmation" do
+  describe "WifiSettingsConfirmation" do
     include_context "provisioned X"
 
-    # Open Reset Wi-Fi's confirmation on the X showing "2" (boot_two_images); yields the simulator,
+    # Open Wi-Fi & Settings' confirmation on the X showing "2" (boot_two_images); yields the simulator,
     # the console index before and the expected screen of "2". A timeout redraws the image the
     # menu covered (show_last_image, src/cached_images.cpp), then sleeps once 20 s pass without a touch.
     def ask
       boot_two_images do |s, _one, two|
         c = s.status["console_total"]
-        TrmnlX.ask_to_reset_wifi(s)
+        TrmnlX.ask_to_open_portal(s)
         yield s, c, two
       end
     end
 
-    it "choosing Confirm resets WiFi" do
+    it "choosing Open opens the portal" do
       ask do |s|
-        TrmnlX.menu_tap(s, "left", /Back -> Confirm Reset Wi-Fi/)
+        TrmnlX.menu_tap(s, "left", /Back -> Open Wi-Fi & Settings/)
         s.touch("center", ms: 150)
         s.wait(portal: true, timeout: 90)
       end
@@ -398,9 +398,9 @@ RSpec.describe "TRMNL X touch bar: tap mode", env: "TRMNL_X" do
         # the arrow starts on Back
         TrmnlX.menu_tap(s, "center", /chose Back/, screen: true)
         # Settings again, with the arrow on its first item
-        TrmnlX.menu_tap(s, "right", /Diagnostics\.\.\. -> Reset Wi-Fi/)
-        TrmnlX.menu_tap(s, "center", /chose Reset Wi-Fi/, screen: true)
-        expect(s.console(c).join("\n")).not_to match(/Resetting WiFi/)
+        TrmnlX.menu_tap(s, "right", /Diagnostics\.\.\. -> Wi-Fi & Settings/)
+        TrmnlX.menu_tap(s, "center", /chose Wi-Fi & Settings/, screen: true)
+        expect(s.console(c).join("\n")).not_to match(/Opening the settings portal/)
         expect(s.status["portal_url"]).to be_nil
       end
     end
@@ -421,8 +421,8 @@ RSpec.describe "TRMNL X touch bar: tap mode", env: "TRMNL_X" do
     # Open Settings, then Shut Down..., leaving its confirmation on the screen
     def ask(s)
       TrmnlX.open_settings_menu(s)
-      TrmnlX.menu_tap(s, "right", /Diagnostics\.\.\. -> Reset Wi-Fi/)
-      TrmnlX.menu_tap(s, "right", /Reset Wi-Fi\.\.\. -> Shut Down/)
+      TrmnlX.menu_tap(s, "right", /Diagnostics\.\.\. -> Wi-Fi & Settings/)
+      TrmnlX.menu_tap(s, "right", /Wi-Fi & Settings\.\.\. -> Shut Down/)
       TrmnlX.menu_tap(s, "center", /chose Shut Down/, screen: true)
     end
 
@@ -451,7 +451,7 @@ RSpec.describe "TRMNL X touch bar: tap mode", env: "TRMNL_X" do
         ask(s)
         # the arrow starts on Back
         TrmnlX.menu_tap(s, "center", /chose Back/, screen: true)
-        TrmnlX.menu_tap(s, "right", /Diagnostics\.\.\. -> Reset Wi-Fi/)
+        TrmnlX.menu_tap(s, "right", /Diagnostics\.\.\. -> Wi-Fi & Settings/)
         expect(s.console(c).join("\n")).not_to match(/Shutting down/)
       end
     end
@@ -470,7 +470,7 @@ RSpec.describe "TRMNL X touch bar: tap mode", env: "TRMNL_X" do
         expect(log).to match(/Diagnostics: Wi-Fi Network\tTRMNL-Sim/)
         expect(log).to match(/Diagnostics: Wi-Fi Signal\t-\d+ dBm/)
         TrmnlX.menu_tap(s, "center", /chose Back/, screen: true)
-        TrmnlX.menu_tap(s, "right", /Diagnostics\.\.\. -> Reset Wi-Fi/)
+        TrmnlX.menu_tap(s, "right", /Diagnostics\.\.\. -> Wi-Fi & Settings/)
       end
     end
   end

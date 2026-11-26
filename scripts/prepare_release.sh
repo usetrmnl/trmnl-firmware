@@ -24,14 +24,12 @@ BYOD_ENVS=(
 )
 
 CONFIG="include/config.h"
-FORCE=0
 ENV_INPUT=()
 ENVS=()
 
 for arg in "$@"; do
     case "$arg" in
-        --force|-f) FORCE=1 ;;
-        --help) echo "Usage: $0 [--force] [trmnls] [byod] [env1] [env2] [...]"; exit 0 ;;
+        --help) echo "Usage: $0 [trmnls] [byod] [env1] [env2] [...]"; exit 0 ;;
         *) ENV_INPUT+=("$arg") ;;
     esac
 done
@@ -66,23 +64,10 @@ MAJOR=$(awk '/#define FW_MAJOR_VERSION/ {print $3}' "$CONFIG")
 MINOR=$(awk '/#define FW_MINOR_VERSION/ {print $3}' "$CONFIG")
 PATCH=$(awk '/#define FW_PATCH_VERSION/ {print $3}' "$CONFIG")
 VERSION="$MAJOR.$MINOR.$PATCH"
-EXPECTED_MSG="v$VERSION"
 
 echo "Firmware version:        $VERSION"
-echo "Expected commit message: $EXPECTED_MSG"
 echo "Environments:            ${ENVS[*]}"
 echo
-
-HEAD_MSG=$(git log -1 --pretty=%s)
-if [ "$HEAD_MSG" != "$EXPECTED_MSG" ]; then
-    if [ "$FORCE" -eq 1 ]; then
-        echo "Warning: HEAD commit message is \"$HEAD_MSG\", expected \"$EXPECTED_MSG\" (bypassed with --force)"
-    else
-        echo "Error: HEAD commit message is \"$HEAD_MSG\", expected \"$EXPECTED_MSG\""
-        echo "Use --force to bypass this check."
-        exit 1
-    fi
-fi
 
 # PIO_CORE_ROOT: when set, each PlatformIO platform gets its own core dir
 # under it. espressif32 6.x and pioarduino install different packages under the

@@ -3,6 +3,7 @@
 #include <PNGdec.h>
 #include <Preferences.h>
 #include <WiFi.h>
+#include <Wire.h>
 #include <board_config.h>
 #include <color_reduce.h>
 #include <display.h>
@@ -85,7 +86,13 @@ bool display_update_epaper(int refreshMode, bool wait, bool writePlane, uint8_t 
   if (writePlane) {
     bbep.writePlane(plane);
   }
-  if (refreshMode == REFRESH_PARTIAL && !bCanDoPartial) {
+  if (bbep.capabilities() & (BBEP_3COLOR | BBEP_4COLOR | BBEP_7COLOR)) {
+    Log_info("Color EPD, must use full refresh mode");
+    refreshMode = REFRESH_FULL;
+    if (bbep.capabilities() & BBEP_7COLOR) {
+      wait = true;
+    }
+  } else if (refreshMode == REFRESH_PARTIAL && !bCanDoPartial) {
     refreshMode = REFRESH_FAST;
     Log_info("Can't do partial refresh, no previous image");
   } else if (refreshMode == REFRESH_PARTIAL) {
@@ -115,7 +122,7 @@ static void display_select_one_bit_panel(bool only_if_changed = false) {
 // Message screens are 1-bit
 void display_prepare_message(void) {
   display_select_one_bit_panel(true);
-  bbep.setMemoryMode(BB_MODE_1BPP); // use 1-bit mode to save memory
+  bbep.setMemoryMode(BBEP_MODE_1BPP); // use 1-bit mode to save memory
   bbep.allocBuffer(false);
 }
 
@@ -128,13 +135,25 @@ void display_prepare_message(void) {
  */
 void display_init(void) {
   if (pDevice == NULL) {
-    hw_config_init();
+    hw_config_init(DEVICE_MODEL);
   }
   Log_info("dev module start");
   iTempProfile = preferences.getUInt(PREFERENCES_TEMP_PROFILE, TEMP_PROFILE_DEFAULT);
   Log_info("Saved temperature profile: %" PRIu32, iTempProfile);
 #ifdef BB_EPAPER
   Log_info("BB e-Paper init");
+#ifdef WAVESHARE_PHOTOPAINTER
+  Wire.begin(47, 48);
+  Wire.beginTransmission(0x34); // AXP2101
+  Wire.write(0x90);             // LDOS ON/OFF control
+  Wire.write(0x8);              // turn on ALDO4
+  Wire.endTransmission();
+  Wire.beginTransmission(0x34);
+  // set ALDO4 to 3.3V
+  Wire.write(0x95);
+  Wire.write(0x1c); // 3.3v
+  Wire.endTransmission();
+#endif // WAVESHARE_PHOTOPAINTER
 #ifdef BOARD_SEEED_STICKY
 // Special case for the Sticky - it shares the SPI bus with the uSD card, so the EPD CS line
 // must be the only one active at a time
@@ -145,6 +164,14 @@ void display_init(void) {
   pinMode(10, OUTPUT); // SD card enable (if it's powered down, the SPI bus may be blocked)
   digitalWrite(10, 1);
 #endif // BOARD_SEEED_STICKY
+
+#ifdef BOARD_ZECTRIX_NOTE4
+  pinMode(6, OUTPUT); // EPD power enable
+  pinMode(17, OUTPUT); // Battery LDO enable
+  digitalWrite(6, HIGH);
+  digitalWrite(17, HIGH);
+#endif // BOARD_ZECTRIX_NOTE4
+
     // Read the panel ID after any board-specific power/CS setup, but before bb_epaper takes over the SPI pins.
     // Only on the first call: the bit-banged read detaches SCK/MOSI from the SPI peripheral, and
     // SPI.begin() is a no-op once the bus is running, so a second read would leave the panel unreachable.
@@ -154,12 +181,24 @@ void display_init(void) {
     panel_rev_read = true;
     Log_info("Panel ID = 0x%08x\n", panel_rev);
   }
+  if (strcmp(DEVICE_MODEL, "xiao_epaper_mini") == 0 && panel_rev == 0x40000000) {
+    // New 4.26" panel needs a different ePaper configuration
+    Log_info("Detected newer 4.26 inch panel type; switching profiles...");
+    hw_config_init("xiao_epaper_mini_b");
+  }
   if (pDevice->epd_mosi_pin != 0 || pDevice->epd_sck_pin != 0) {
     bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit); // must be set BEFORE calling initio
     bbep.initIO(pDevice->epd_dc_pin, pDevice->epd_rst_pin, pDevice->epd_busy_pin, pDevice->epd_cs_pin,
                 pDevice->epd_mosi_pin, pDevice->epd_sck_pin, 8000000);
   } else { // it's a pre-defined PCB+display in bb_epaper
     bbep.begin(dpList[pDevice->panel_set][0].OneBit);
+  }
+  if (strcmp(DEVICE_MODEL, "seeed_sticky_b") == 0 && bbep.testPanelType() == BBEP_CHIP_SSD16xx) {
+    // New 3.97" panel needs a different ePaper configuration
+    Log_info("Detected SSD1677 (old) Sticky panel type; switching profiles...");
+    hw_config_init("seeed_sticky");
+  } else {
+    Log_info("Detected SSD2677 (new) Sticky panel type");
   }
 #else // Parallel eink devices
 #if defined(BOARD_SEEED_RETERMINAL_E1003)
@@ -217,7 +256,7 @@ void display_wipe(void) {
   for (int i = 0; i < refreshCount; i++) {
     bbep.refresh(REFRESH_FULL); // 2 to 3 minutes of Black/White clearing of the display
   }
-  bbep.sleep(LIGHT_SLEEP);
+  bbep.sleep((bbep.capabilities() & BBEP_4COLOR) ? DEEP_SLEEP : LIGHT_SLEEP);
 #else
   bbep.setMode(BB_MODE_1BPP);
   bbep.fillScreen(BBEP_WHITE);
@@ -305,16 +344,18 @@ static bool draw_image(uint8_t *image_buffer, int data_size, int *pRefreshMode, 
   if (isPNG == true && data_size < MAX_IMAGE_SIZE) {
     Log_info("Drawing PNG");
     iRefreshMode = png_to_epd(image_buffer, data_size, false);
+    if (iRefreshMode < 0) return false; // no decoder memory, no frame buffer, or PNGdec rejected the file
   } else if (MOTOSHORT(image_buffer) == 0xffd8) {
     Log_info("Drawing JPEG");
     iRefreshMode = jpeg_to_epd(image_buffer, data_size);
+    if (iRefreshMode < 0) return false; // no decoder memory, or the JPEG does not fit the panel
   } else // uncompressed BMP or Group5 compressed image
   {
     if (*(uint16_t *)image_buffer == BB_BITMAP_MARKER) {
             // G5 compressed image
       BB_BITMAP *pBBB = (BB_BITMAP *)image_buffer;
 #ifdef BB_EPAPER
-      bbep.setMemoryMode(BB_MODE_1BPP); // use 1-bit mode to save memory
+      bbep.setMemoryMode(BBEP_MODE_1BPP); // use 1-bit mode to save memory
       if (bbep.allocBuffer(false) != BBEP_SUCCESS) {
         Log_info("Error allocating bb_epaper frame buffer");
         return false;
@@ -343,7 +384,7 @@ static bool draw_image(uint8_t *image_buffer, int data_size, int *pRefreshMode, 
                            (iBmpWidth / 8) * iBmpHeight); // palette may be [white, black]
       flip_image(image_buffer + 62, iBmpWidth, iBmpHeight, false); // fix bottom-up bitmap images
 #ifdef BB_EPAPER
-      bbep.setMemoryMode(BB_MODE_1BPP);
+      bbep.setMemoryMode(BBEP_MODE_1BPP);
       bbep.setBuffer(image_buffer + 62); // uncompressed 1-bpp bitmap
 #endif // BB_EPAPER
     }
@@ -452,7 +493,6 @@ static void refresh_fastepd(bool bSkipClear) {
 /**
  * @brief Function to show the image on the display
  * @param image_buffer pointer to the uint8_t image buffer
- * @param reverse shows if the color scheme is reverse
  * @return none
  */
 void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool bSkipClear) {
@@ -485,7 +525,7 @@ void display_show_image(uint8_t *image_buffer, int data_size, bool bWait, bool b
 void display_sleep(void) {
   Log_info("Goto Sleep...");
 #ifdef BB_EPAPER
-  bbep.sleep(LIGHT_SLEEP);
+  bbep.sleep((bbep.capabilities() & BBEP_4COLOR) ? DEEP_SLEEP : LIGHT_SLEEP);
 #else
   bbep.einkPower(0);
   bbep.deInit();

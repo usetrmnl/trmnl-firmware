@@ -275,7 +275,8 @@ General.describe "Images" do
 
   describe "Jpeg" do
     it "jpeg is dithered to 1bit" do
-      unless device.env == "TRMNL_X" # the X draws with FastEPD, not bb_epaper
+      # the X draws with FastEPD, not bb_epaper; bb_epaper c41223c fixed the OG
+      unless %w[TRMNL_X trmnl].include?(device.env)
         pending "bb_epaper leaves the UC81xx panel in partial mode after a JPEG (screen stays blank)"
       end
       show("five.jpg", data_file("five_#{w}x#{h}.jpg"), "image/jpeg") do |s|

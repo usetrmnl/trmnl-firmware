@@ -75,7 +75,7 @@ static void draw_wifi_failed_message(void) {
   String string0 = "TRMNL firmware ";
   string0 += Messages::firmware_version();
 #ifdef __BB_EPAPER__
-  bbep.setCursor(40, 48); // place in upper left corner
+  bbep.setCursor(40, bbep.height() / 10); // place in upper left corner
 #else
   bbep.setCursor(80, 104); // place in upper left corner
 #endif
@@ -87,7 +87,8 @@ static void draw_wifi_failed_message(void) {
 #ifndef BOARD_TRMNL_X
   const char string2[] = "Hold the button on the back to reset Wi-Fi, or scan the QR code for help.";
 #else
-  const char string2[] = "Tap the middle of the touch bar for Settings > Reset Wi-Fi, or scan the QR code for help.";
+  const char string2[] =
+    "Tap the middle of the touch bar for Settings > Wi-Fi & Settings, or scan the QR code for help.";
 #endif
   draw_centered_line(string2, -1);
 #ifdef __BB_EPAPER__
@@ -207,7 +208,7 @@ static void draw_api_size_error_message(void) {
 #ifndef BOARD_TRMNL_X
   const char string2[] = "Wait, or hold the button on the back to reset.";
 #else
-  const char string2[] = "Wait, or tap the middle of the touch bar for Settings > Reset Wi-Fi.";
+  const char string2[] = "Wait, or tap the middle of the touch bar for Settings > Wi-Fi & Settings.";
 #endif
   draw_centered_line(string2, -1);
 }
@@ -218,7 +219,7 @@ static void draw_api_firmware_update_error_message(void) {
 #ifndef BOARD_TRMNL_X
   const char string2[] = "Wait, or hold the button on the back to reset.";
 #else
-  const char string2[] = "Wait, or tap the middle of the touch bar for Settings > Reset Wi-Fi.";
+  const char string2[] = "Wait, or tap the middle of the touch bar for Settings > Wi-Fi & Settings.";
 #endif
   draw_centered_line(string2, -1);
 }
@@ -242,7 +243,7 @@ static void draw_api_image_download_error_message(void) {
 #ifndef BOARD_TRMNL_X
   const char string2[] = "Wait, or hold the button on the back to reset.";
 #else
-  const char string2[] = "Wait, or tap the middle of the touch bar for Settings > Reset Wi-Fi.";
+  const char string2[] = "Wait, or tap the middle of the touch bar for Settings > Wi-Fi & Settings.";
 #endif
   draw_centered_line(string2, -1);
 }
@@ -647,24 +648,33 @@ static void draw_wifi_connect_setup_message(const char *fw_version, String messa
 
   String string1 = "TRMNL firmware ";
   string1 += fw_version;
+#ifdef __BB_EPAPER__
+  bbep.setCursor(40, bbep.height() / 10); // place in upper left corner
+#else
   bbep.setCursor(40, 48); // place in upper left corner
+#endif
   bbep.println(string1);
-  String string2 = "Connect your phone or computer to ";
-  string2 += (message.length() > 0) ? "\"" + message + "\"" : String("the TRMNL");
-  string2 += " Wi-Fi";
+  String string2 = "Connect your phone or computer to:";
   bbep.getStringBox(string2, &rect);
 #ifdef __BB_EPAPER__
-  bbep.setCursor((bbep.width() - rect.w) / 2, 386);
+  const int iFontHeight = 12;
+  bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - (iFontHeight * 4));
 #else
   bbep.setCursor((bbep.width() - rect.w) / 2, bbep.height() - 100 - rect.h);
 #endif
   bbep.println(string2);
+  string2 = (message.length() > 0) ? "\"" + message + "\"" : String("the TRMNL");
+  string2 += " Wi-Fi";
+  bbep.getStringBox(string2, &rect);
+  bbep.setCursor((bbep.width() - rect.w) / 2, -1);
+  bbep.println(string2);
   const char string3[] = "or scan the QR code for help";
   draw_centered_line(string3, -1);
+  const int qr_size = ((const BB_BITMAP *)wifi_connect_qr)->width; // the code for trmnl.com/setup
 #ifdef __BB_EPAPER__
-  bbep.loadG5Image(wifi_connect_qr, bbep.width() - 40 - 66, 40, BBEP_WHITE, BBEP_BLACK); // 66x66 QR code
+  bbep.loadG5Image(wifi_connect_qr, bbep.width() - 40 - qr_size, 40, BBEP_WHITE, BBEP_BLACK);
 #else // bigger for X
-  bbep.loadG5Image(wifi_connect_qr, bbep.width() - (66 * 2) - 80, 80, BBEP_WHITE, BBEP_BLACK, 2.0f);
+  bbep.loadG5Image(wifi_connect_qr, bbep.width() - (qr_size * 2) - 80, 80, BBEP_WHITE, BBEP_BLACK, 2.0f);
 #endif
 }
 

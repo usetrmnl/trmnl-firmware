@@ -76,7 +76,6 @@ uint16_t display_width();
 /**
  * @brief Function to show the image on the display
  * @param image_buffer pointer to the uint8_t image buffer
- * @param reverse shows if the color scheme is reverse
  * @return none
  */
 

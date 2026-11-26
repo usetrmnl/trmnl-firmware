@@ -65,6 +65,25 @@ General.describe "Portal" do
       expect(JSON.parse(body)).to include("api_url")
     end
 
+    # POST /settings: the Advanced page's device-wide settings, saved without joining a network
+    it "saves the advanced settings" do
+      code, data = portal.portal_request("/settings", { hostname: "kitchen-trmnl", ntpServer1: "time.example.com" })
+      expect(code).to eq(200), data
+      settings = JSON.parse(raw_get(portal, "/device-settings")[2])
+      expect(settings).to include("hostname" => "kitchen-trmnl", "ntp_server" => "time.example.com")
+      expect(portal.portal_request("/settings", { server: "not a url" })[0]).to eq(400)
+      # emptied: back to the defaults
+      expect(portal.portal_request("/settings", { hostname: "", ntpServer1: "" })[0]).to eq(200)
+      settings = JSON.parse(raw_get(portal, "/device-settings")[2])
+      expect(settings).to include("hostname" => "", "ntp_server" => "")
+    end
+
+    # A device being set up has no network to go back to, so its portal can't be closed (POST /exit)
+    it "has no saved networks and stays in setup mode" do
+      expect(JSON.parse(raw_get(portal, "/saved-networks")[2])).to eq("max" => 5, "networks" => [])
+      expect(portal.portal_request("/exit", {})[0]).to eq(409)
+    end
+
     it "runs the sensor self test" do
       # two averages of 1000 chip temperature readings, 7 s apart: over 9 s of device time,
       # more on the clock where the simulation runs slower than real time

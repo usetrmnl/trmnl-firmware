@@ -3,6 +3,7 @@
 #include <color_reduce.h>
 #include <epd_driver.h>
 #include <globals.h>
+#include <new>
 #include <png_render.h>
 #include <trmnl_log.h>
 
@@ -139,6 +140,58 @@ int png_draw_6clr(PNGDRAW *pDraw) {
   } // for x
   return 1; // continue decoding
 } /* png_draw_6clr() */
+
+//
+// Write 1-bit image data as packed 2-bits per pixel
+// for the SSD26xx EPD controller
+// (Zectrix Note 4 & newer Seeed Sticky so far)
+//
+int png_draw_2bit_bw(PNGDRAW *pDraw) {
+  int x;
+  uint8_t ucBppChanged = 0, ucInvert = 0;
+  uint8_t uc, ucMask, src, *s, *d, *pTemp = bbep.getCache(); // get some scratch memory (not from the stack)
+  int iWidth;
+
+  iWidth = pDraw->iWidth;
+  if (pDraw->y >= bbep.height()) return 0; // stop decoding if we'll go past the bottom
+  if (iWidth > bbep.width()) iWidth = bbep.width(); // crop image width to display size if it's larger
+
+  if (pDraw->iPixelType == PNG_PIXEL_INDEXED || pDraw->iBpp > 2) {
+    if (pDraw->iBpp == 1) { // 1-bit output, just see which color is brighter
+      uint32_t u32Gray0, u32Gray1;
+      u32Gray0 = pDraw->pPalette[0] + (pDraw->pPalette[1] << 2) + pDraw->pPalette[2];
+      u32Gray1 = pDraw->pPalette[3] + (pDraw->pPalette[4] << 2) + pDraw->pPalette[5];
+      if (u32Gray0 < u32Gray1) {
+        ucInvert = 0xff;
+      }
+    } else {
+            // Reduce the source image to 2-bpp
+      ReduceBpp(2, pDraw->iPixelType, pDraw->pPalette, pDraw->pPixels, pTemp, iWidth, pDraw->iBpp);
+      ucBppChanged = 1;
+    }
+  }
+  if (pDraw->iBpp == 1) {
+    s = (ucBppChanged) ? pTemp : (uint8_t *)pDraw->pPixels;
+    d = pTemp;
+    for (x = 0; x < iWidth; x += 8) {
+      uint8_t uc1 = 0, uc2 = 0;
+      for (int bit = 0; bit < 4; bit++) {
+        uc1 <<= 2;
+        uc2 <<= 2;
+        if (s[0] & (0x80 >> bit)) uc1 |= 1;
+        if (s[0] & (0x08 >> bit)) uc2 |= 1;
+      }
+      s++;
+      *d++ = uc1;
+      *d++ = uc2;
+    }
+  } else if (pDraw->iBpp == 2 && !ucBppChanged) {
+    memcpy(pTemp, pDraw->pPixels, (iWidth + 3) / 4); // Use the unmodified PNG pixels for 2-bpp
+  }
+    // For 2-bit gray, the output of ReduceBpp is already in the right form
+  bbep.writeData(pTemp, (iWidth + 3) / 4);
+  return 1;
+} /* png_draw_2bit_bw() */
 
 #ifdef BOARD_TRMNL_4CLR
 //
@@ -537,18 +590,21 @@ int png_count_colors(PNG *png, const uint8_t *pData, int iDataSize) {
  *        due to insufficient RAM to hold the fully decoded image
  * @param pointer to the buffer holding the PNG file
  * @param size of the PNG file
- * @return refresh mode based on image type and presence of old image
+ * @return refresh mode based on image type and presence of old image, or -1 when nothing was drawn
  */
 int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious) {
   int iPlane = PNG_1_BIT, rc = -1;
-  PNG *png = new PNG();
 
 #ifndef BB_EPAPER
   if (bPrevious && bbep.getPreviousMode() != BB_MODE_NONE)
     return 0; // no need to decode previous image, we drew a msg/glyph
 #endif
 
-  if (!png) return PNG_MEM_ERROR; // not enough memory for the decoder instance
+  PNG *png = new (std::nothrow) PNG(); // plain new throws when the heap has no 49 KB block, and aborts
+  if (!png) {
+    Log_error("No memory for the PNG decoder");
+    return -1;
+  }
   rc = png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
   png->close();
   if (rc == PNG_SUCCESS) {
@@ -566,6 +622,7 @@ int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious) {
         CreateSpectra6Pal(); // create a fast color matching palette
         if (bbep.allocBuffer() != BBEP_SUCCESS) {
           Log_error("%s [%d]: bbep.AllocBuffer failed!\n\r", __FILE__, __LINE__);
+          delete png;
           return -1;
         }
         bbep.fillScreen(BBEP_WHITE); // in case the image is too small - undrawn areas will be white
@@ -575,7 +632,25 @@ int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious) {
         png->close();
         delete (png); // free the decoder instance
         bbep.writePlane(); // send the pixels to the display panel
+        bbep.freeBuffer(); // the panel has the pixels now and the refresh does not read the framebuffer
         return REFRESH_FAST;
+      }
+      if (bbep.capabilities() & BBEP_2BIT_BW) {
+        // new SSD26xx controller forces 2-bits per pixel for 1-bit content
+        Log_info("%s [%d]: decoding for SSD26xx special case 2/1-bit\r\n", __FILE__, __LINE__);
+        png->openRAM((uint8_t *)pPNG, iDataSize, png_draw_2bit_bw);
+        if (png->getBpp() >= 2) { // Draw as 2-bit grayscale image
+          Log_info("Using 2-bit grayscale panel setup for this image");
+          bbep.setPanelType(dpList[pDevice->panel_set][0].TwoBit);
+          bbep.sendInit();
+        }
+        bbep.startWrite(PLANE_1); // start writing image data (0x10 cmd instead of 0x13)
+        png->decode(NULL, 0);
+        png->close();
+        delete (png); // free the decoder instance
+        bbep.writeCmd(UC8151_PON); // turn the power on AFTER writing the data
+        bbep.wait();
+        return REFRESH_PARTIAL;
       }
 #ifdef BOARD_TRMNL_4CLR
       Log_info("%s [%d]: decoding for 4-color EPD\r\n", __FILE__, __LINE__);
@@ -599,7 +674,11 @@ int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious) {
       if (png->getBpp() == 1 ||
           (png->getBpp() == 2 && png_count_colors(png, pPNG, iDataSize) == 2)) { // 1-bit image (single plane)
         png->close(); // use a different PNGDraw callback for color matching
-        bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit);
+        if (pDevice->epd_mosi_pin != 0 || pDevice->epd_sck_pin != 0) {
+          bbep.setPanelType(dpList[pDevice->panel_set][iTempProfile].OneBit);
+        } else {
+          bbep.begin(dpList[pDevice->panel_set][0].OneBit);
+        }
         rc = REFRESH_PARTIAL; // the new image is 1bpp - try a partial update
         bbep.startWrite(PLANE_0); // start writing image data to plane 0
         png->openRAM((uint8_t *)pPNG, iDataSize, png_draw);
@@ -671,6 +750,7 @@ int png_to_epd(const uint8_t *pPNG, int iDataSize, bool bPrevious) {
     }
   } else {
     Log_error("%s [%d]: png->openRAM() returned %d", __FILE__, __LINE__, rc);
+    rc = -1; // a PNGdec error code is not a refresh mode
   }
   delete (png); // free the decoder instance
   return rc;

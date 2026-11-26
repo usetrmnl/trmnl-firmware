@@ -12,8 +12,8 @@ RSpec.describe "TRMNL X touch bar: lock", env: "TRMNL_X" do
   # Open Settings, then Lock Touchbar..., leaving its hold prompt on the screen.
   def ask_to_lock(s)
     TrmnlX.open_settings_menu(s)
-    TrmnlX.menu_tap(s, "right", /Diagnostics\.\.\. -> Reset Wi-Fi/)
-    TrmnlX.menu_tap(s, "right", /Reset Wi-Fi\.\.\. -> Shut Down/)
+    TrmnlX.menu_tap(s, "right", /Diagnostics\.\.\. -> Wi-Fi & Settings/)
+    TrmnlX.menu_tap(s, "right", /Wi-Fi & Settings\.\.\. -> Shut Down/)
     TrmnlX.menu_tap(s, "right", /Shut Down\.\.\. -> Lock Touchbar/)
     c = s.status["console_total"]
     s.touch("center", ms: 150)
@@ -48,7 +48,7 @@ RSpec.describe "TRMNL X touch bar: lock", env: "TRMNL_X" do
       boot_two_images do |s|
         ask_to_lock(s)
         TrmnlX.menu_tap(s, "left", /Hold prompt: another input - cancelled/, screen: true)
-        TrmnlX.menu_tap(s, "right", /Diagnostics\.\.\. -> Reset Wi-Fi/)
+        TrmnlX.menu_tap(s, "right", /Diagnostics\.\.\. -> Wi-Fi & Settings/)
         s.wait(state: "deep_sleep", timeout: 60, settle_ms: 500)
         expect(s.preferences["touch_locked"]).to be_nil
       end

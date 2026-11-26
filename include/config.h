@@ -4,7 +4,7 @@
 
 #define FW_MAJOR_VERSION 1
 #define FW_MINOR_VERSION 8
-#define FW_PATCH_VERSION 19
+#define FW_PATCH_VERSION 20
 
 // Helper macros for stringification
 #define STRINGIFY(x)     #x
@@ -138,7 +138,7 @@
 
 // Battery measurement types
 // BATT_NONE = use fake voltage
-enum { BATT_NONE = 0, BATT_ADC, BATT_BQ27220, BATT_BQ27427, BATT_AXP2101 };
+enum { BATT_NONE = 0, BATT_ADC, BATT_BQ27220, BATT_BQ27427, BATT_AXP2101, BATT_BQ27426 };
 
 #ifdef PARALLEL_EPD
 // TRMNL Device structure (slightly different for parallel eink panels)
@@ -180,6 +180,7 @@ typedef struct tag_trmnl_device {
 enum {
   EPD_75 = 0,
   EPD_426,
+  EPD_426B,
   EPD_397,
   EPD_75_3CLR,
   EPD_75_4CLR,
@@ -190,6 +191,9 @@ enum {
   EPD_PAPER_COLOR,
   EPD_133_COLOR,
   EPD_368,
+  EPD_42C,
+  EPD_42_4CLR,
+  EPD_397C,
 };
 
 /**

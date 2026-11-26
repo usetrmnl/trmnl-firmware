@@ -57,7 +57,7 @@ General.describe "Sensors" do
       end
     end
 
-    it "a long press resets WiFi", needs: %i[sensors button] do
+    it "a long press opens the settings portal", needs: %i[sensors button] do
       dev.boot_asleep(extra_args: ["--sensor", "scd41"]) do |s|
         s.wait_for_deep_sleep(timeout: 15)
         s.press(6000)

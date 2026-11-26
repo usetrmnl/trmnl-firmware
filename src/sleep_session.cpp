@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <ArduinoLog.h>
 #include <WiFi.h>
+#include <Wire.h>
 #include <app_logger.h>
 #include <bl.h>
 #include <board_config.h>
@@ -68,6 +69,15 @@ static void enterSleep(bool keep_timer) {
   WiFi.mode(WIFI_OFF);
 #endif
 
+#ifdef WAVESHARE_PHOTOPAINTER
+  Wire.begin(47, 48);
+  Wire.beginTransmission(0x34); // AXP2101
+  Wire.write(0x90); // LDOS ON/OFF control
+  Wire.write(0); // all LDOs off
+  Wire.write(0);
+  Wire.endTransmission();
+#endif // WAVESHARE_PHOTOPAINTER
+
 #if BOARD_TRMNL_X
   Log_info("Preparing IQS323 for sleep via task...");
 
@@ -126,6 +136,12 @@ static void enterSleep(bool keep_timer) {
   gpio_deep_sleep_hold_en(); // Needed to keep the battery power enabled during RTC sleep
 #endif
 #endif
+#ifdef BOARD_ZECTRIX_NOTE4
+  digitalWrite(6, LOW); // disable the EPD power
+  gpio_hold_en(GPIO_NUM_17); // MOSFET enabling the battery power
+  gpio_deep_sleep_hold_en(); // Needed to keep the battery power enabled during RTC sleep
+#endif // BOARD_ZECTRIX_NOTE4C
+
   esp_deep_sleep_start();
 }
 
