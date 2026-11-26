@@ -5,7 +5,9 @@ constexpr const char *ButtonPressResultNames[] = {"LongPress", "DoubleClick", "S
 static_assert(sizeof(ButtonPressResultNames) / sizeof(ButtonPressResultNames[0]) == NoAction + 1,
               "one name per ButtonPressResult, in enum order");
 
-ButtonPressResult read_button_presses();
+// hold_dialog: show what releasing or holding on will do once a press is held long enough to open the settings
+// portal (TRMNL OG)
+ButtonPressResult read_button_presses(bool hold_dialog = false);
 
 ButtonPressResult read_long_press();
 

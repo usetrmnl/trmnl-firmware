@@ -112,7 +112,7 @@ void startBoardHardware(const WakeContext &wake, uint32_t init_time) {
   bool double_click = false;
   if (wake.gpio) {
     Log_info("GPIO wakeup detected (%d)", wake.reason);
-    ButtonPressResult button = read_button_presses();
+    ButtonPressResult button = read_button_presses(true);
     wait_for_serial();
     double_click = button_wake_act(button);
   } else {
