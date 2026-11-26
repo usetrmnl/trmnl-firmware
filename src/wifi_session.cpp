@@ -146,7 +146,7 @@ void wifiSessionConnect(bool should_show_error_now) {
 #endif
     bool portal_ok = WifiCaptivePortal.startPortal();
     if (!portal_ok) {
-      WiFi.disconnect(true);
+      WiFi.disconnect();
 
       showMessageWithLogo(WIFI_FAILED);
 

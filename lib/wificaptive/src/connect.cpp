@@ -205,7 +205,7 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
     }
 
         // configure WPA2 Enterprise
-    WiFi.mode(WIFI_STA);
+    WiFi.enableSTA(true);
     applyWifiHostname(WifiCaptivePortal.getHostname());
     WiFi.disconnect();
     delay(100);
@@ -271,7 +271,7 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
     Log_info("WiFi: WPA2 Enterprise configured, starting from status %s", wifiStatusStr(beginResult));
   } else {
         // regular connection
-    WiFi.mode(WIFI_STA);
+    WiFi.enableSTA(true);
 
     setWiFiBand(credentials);
 
